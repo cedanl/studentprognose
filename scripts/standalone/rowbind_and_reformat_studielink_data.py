@@ -25,7 +25,7 @@ if __name__ == "__main__":
     data = pd.concat(dataframes)
 
     # Gewogen vooraanmelders berekenen
-    data["Gewogen vooraanmelders"] = data["meercode_V"] / data["Aantal"]
+    data["Gewogen vooraanmelders"] = data["Aantal"] / data["meercode_V"]
 
     # Kolommen hernoemen
     data.rename(
