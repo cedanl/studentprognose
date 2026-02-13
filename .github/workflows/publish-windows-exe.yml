@@ -1,0 +1,39 @@
+name: Publish Windows exe
+
+on:
+  # Manual trigger from the Actions tab
+  workflow_dispatch:
+
+  # Optional: automatic trigger when you push a tag
+  push:
+    tags:
+      - "*"
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v2
+        with:
+          version: "latest"
+
+      - name: Sync dependencies from uv.lock
+        run: uv sync --locked
+
+      - name: Install PyInstaller (if not already in pyproject)
+        run: uv add pyinstaller
+
+      - name: Build exe with PyInstaller
+        run: uv run pyinstaller main.py --name Instroomprognose --onefile
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Instroomprognose-${{ github.ref_name }}-win-x64
+          path: dist/Instroomprognose.exe
+
