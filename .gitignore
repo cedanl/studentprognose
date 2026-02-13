@@ -1,16 +1,25 @@
-scrips/__pycache__/
-*.pyc
-.venv/
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
 
-#Data files can be ignored
-data/*
+# Virtual environments
+.venv
 
-!data/input
-data/input/*
-!data/input/blank.xlsx
+# Environment variables
+.env
+.env.example
 
-!data/output
-data/output/*
-!data/output/blank.xlsx
+# Own test files
+test.py
 
+# Notebooks
+*.ipynb
+*.ipynb_checkpoints
 
+# Output
+output/*.xlsx
+output/**/*.xlsx

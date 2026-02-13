@@ -1,0 +1,65 @@
+# configuration.yaml
+
+# Filtering
+filtering:
+  programme:
+  herkomst:
+  examentype:
+
+# Paths
+paths:
+  input:
+    path_cumulative: "${root_path}\\data\\input\\vooraanmeldingen_cumulatief.csv"
+    path_cumulative_new: "${root_path}\\data\\input\\Vooraanmeldingen.csv"
+    path_individual: "${root_path}\\data\\input\\vooraanmeldingen_individueel.csv"
+    path_latest: "${root_path}\\data\\output\\Prognosebestand_totaal.xlsx"
+    path_distances: "${root_path}\\data\\input\\afstanden.xlsx"
+    path_student_count_first_years: "${root_path}\\data\\input\\student_count_first-years.xlsx"
+    path_student_count_higher_years: "${root_path}\\data\\input\\student_count_higher-years.xlsx"
+    path_lookup_higher_years: "${root_path}\\data\\input\\lookup_higher_years.xlsx"
+  
+  output:
+    path_output: "output\\output_${time}.xlsx"
+    path_individual_cleaned: "${root_path}\\data\\output\\individual_cleaned.csv"
+
+other_paths:
+  path_october: "${oktober_path}\\Feiten en Cijfers Studentenaantallen 20251002.xlsx"
+  cumulative_sarima_models: "${root_path}\\saved_models\\cumulative"
+  individual_sarima_models: "${root_path}\\saved_models\\individual"
+
+# Numerus fixus
+numerus_fixus:
+  B Biomedische Wetenschappen: 100
+  B Geneeskunde: 330
+  B Psychologie: 600
+  B Tandheelkunde: 67
+
+# Used to be numerus_fixus
+used_to_be_numerus_fixus:
+  "B Artificial Intelligence": [2018, 2019, 2020, 2021, 2022]
+  "B Biology": [2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025]
+
+# New programmes
+new_programmes:
+  B Humane Neurowetenschappen: FSW
+  M Intersectional Gender Studies: FSW
+
+# Faculties
+faculty:
+  LET: FdL
+  SOW: FSW
+  RU: FdM
+  MAN: FdM
+  NWI: FNWI
+  MED: FMW
+  FTR: FFTR
+  JUR: FdR
+
+# Starting year for training
+start_year: 2018
+individual_start_year: 2018
+ensemble_start_year: 2021
+
+# Excluded years 
+covid_year: 2020 # Excluded because of a difference in application deadlines
+
