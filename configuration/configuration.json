@@ -1,12 +1,12 @@
 {
     "paths": {
-        "path_cumulative": "data/input/vooraanmeldingen_cumulatief.csv",
+        "path_cumulative": "data/input/vooraanmeldingen_cumulatief_DEMO.csv",
         "path_latest": "data/input/totaal.xlsx",
         "path_cumulative_new": "",
         "path_distances": "data/input/afstanden.xlsx",
         "path_ensemble_weights": "data/input/ensemble_weights.xlsx",
         "path_october": "data/input/[JOUW_BESTAND_WAAR_JE_STUDENTAANTALLEN_VANDAAN_HAALT].xlsx",
-        "path_student_count_first-years": "data/input/student_count_first-years_inclusief_pre-master.xlsx",
+        "path_student_count_first-years": "data/input/student_count_first-years_inclusief_pre-master_DEMO.xlsx",
         "path_student_count_higher-years": "data/input/student_count_higher-years.xlsx",
         "path_student_volume": "data/input/student_volume.xlsx",
         "path_ratios": "data/input/ratiobestand.xlsx",
