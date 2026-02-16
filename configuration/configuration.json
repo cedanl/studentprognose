@@ -1,15 +1,16 @@
 {
     "paths": {
-        "path_cumulative": "C:\\Users\\YOUR_USER_NAME\\Documents\\GitHub\\ceda\\studentprognose\\data\\input\\vooraanmeldingen_cumulatief.csv",
-        "path_latest": "C:\\Users\\YOUR_USER_NAME\\Documents\\GitHub\\ceda\\studentprognose\\data\\input\\totaal.xlsx",
-        "path_cumulative_new": "\\C:\\Users\\YOUR_USER_NAME\\Documents\\GitHub\\ceda\\studentprognose\\data\\input\\vooraanmeldingen_cumulatief.csv",
-        "path_distances": "[JOUW_INPUT_FOLDER]\\afstanden.xlsx",
-        "path_weighted_ensemble": "[JOUW_INPUT_FOLDER]\\ensemble_weights.xlsx",
-        "path_october": "[JOUW_INPUT_FOLDER]\\[JOUW_BESTAND_WAAR_JE_STUDENTAANTALLEN_VANDAAN_HAALT].xlsx",
-        "path_student_count_first-years": "C:\\Users\\YOUR_USER_NAME\\Documents\\GitHub\\ceda\\studentprognose\\data\\input\\student_count_first-years_inclusief_pre-master.xlsx",
-        "path_student_count_higher-years": "[JOUW_INPUT_FOLDER]\\student_count_higher-years.xlsx",
-        "path_student_volume": "[JOUW_INPUT_FOLDER]\\student_volume.xlsx",
-        "path_ratios": "[JOUW_INPUT_FOLDER]\\ratiobestand.xlsx"
+        "path_cumulative": "data/input/vooraanmeldingen_cumulatief.csv",
+        "path_latest": "data/input/totaal.xlsx",
+        "path_cumulative_new": "",
+        "path_distances": "data/input/afstanden.xlsx",
+        "path_ensemble_weights": "data/input/ensemble_weights.xlsx",
+        "path_october": "data/input/[JOUW_BESTAND_WAAR_JE_STUDENTAANTALLEN_VANDAAN_HAALT].xlsx",
+        "path_student_count_first-years": "data/input/student_count_first-years_inclusief_pre-master.xlsx",
+        "path_student_count_higher-years": "data/input/student_count_higher-years.xlsx",
+        "path_student_volume": "data/input/student_volume.xlsx",
+        "path_ratios": "data/input/ratiobestand.xlsx",
+        "path_individual": ""
     },
     "numerus_fixus": {
         "B Opleiding": 0
