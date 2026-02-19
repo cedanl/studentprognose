@@ -13,4 +13,6 @@ data/input/*
 data/output/*
 !data/output/blank.xlsx
 
+!data/metadata
+
 
