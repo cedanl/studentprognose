@@ -10,7 +10,7 @@
         "path_student_count_higher-years": "data/input/student_count_higher-years.xlsx",
         "path_student_volume": "data/input/student_volume.xlsx",
         "path_ratios": "data/input/ratiobestand.xlsx",
-        "path_individual": ""
+        "path_individual": "data/input/vooraanmeldingen_individueel_DEMO.csv"
     },
     "numerus_fixus": {
         "B Opleiding": 0
