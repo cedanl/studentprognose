@@ -30,7 +30,7 @@ class Superclass(ABC):
     # itself.
     @abstractmethod
     def preprocess(self, programme_filtering, herkomst_filtering):
-        return None
+        pass
 
     # Abstract method that must be defined in the subclasses (Indivual, Cumulative, BothDatasets)
     # itself.
