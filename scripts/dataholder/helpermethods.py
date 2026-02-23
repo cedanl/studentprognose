@@ -14,15 +14,15 @@ class HelperMethods:
     """
 
     def __init__(self, configuration, helpermethods_initialise_material):
-        self.data_latest = helpermethods_initialise_material[0]
-        self.ensemble_weights = helpermethods_initialise_material[1]
-        self.data_studentcount = helpermethods_initialise_material[2]
+        self.data_latest = helpermethods_initialise_material.data_latest
+        self.ensemble_weights = helpermethods_initialise_material.ensemble_weights
+        self.data_studentcount = helpermethods_initialise_material.data_student_numbers_first_years
 
         self.numerus_fixus_list = configuration["numerus_fixus"]
 
-        self.CWD = helpermethods_initialise_material[3]
+        self.CWD = helpermethods_initialise_material.cwd
 
-        self.data_option = helpermethods_initialise_material[4]
+        self.data_option = helpermethods_initialise_material.data_option
         self.data = None
 
     # This method used when calculating the cumulative value. The input is the data_to_predict

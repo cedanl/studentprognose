@@ -1,168 +1,206 @@
+import argparse
 import datetime
+import os
 import sys
-from enum import Enum
 
-from scripts.load_data import *
-from scripts.dataholder.superclass import *
-from scripts.dataholder.individual import *
-from scripts.dataholder.cumulative import *
-from scripts.dataholder.bothdatasets import *
-from scripts.higher_years import *
-from scripts.helper import DataOption, StudentYearPrediction
+from scripts.load_data import load_data, load_configuration
+from scripts.dataholder.individual import Individual
+from scripts.dataholder.cumulative import Cumulative
+from scripts.dataholder.bothdatasets import BothDatasets
+from scripts.helper import DataOption, HelperMethodsMaterial, StudentYearPrediction
+
+DEFAULT_CONFIGURATION_PATH = "configuration/configuration.json"
+DEFAULT_FILTERING_PATH = "configuration/filtering/base.json"
+MAX_WEEK_NUMBER = 52
+ACADEMIC_YEAR_START_WEEK = 40
+
+OUTPUT_DIR = "data/output"
+OUTPUT_PRELIM = os.path.join(OUTPUT_DIR, "output_prelim.xlsx")
+OUTPUT_FILES = {
+    StudentYearPrediction.FIRST_YEARS: os.path.join(OUTPUT_DIR, "output_first-years.xlsx"),
+    StudentYearPrediction.HIGHER_YEARS: os.path.join(OUTPUT_DIR, "output_higher-years.xlsx"),
+    StudentYearPrediction.VOLUME: os.path.join(OUTPUT_DIR, "output_volume.xlsx"),
+}
+
+
+def parse_range(values: list[str]) -> list[int]:
+    """Parse a list of string values that may contain ':' for ranges.
+
+    For example: ['3', ':', '7'] -> [3, 4, 5, 6, 7]
+    """
+    result: list[int] = []
+    i = 0
+    while i < len(values):
+        if i + 2 < len(values) and values[i + 1] == ":":
+            start = int(values[i])
+            end = int(values[i + 2])
+            result.extend(range(start, end + 1))
+            i += 3
+        else:
+            result.append(int(values[i]))
+            i += 1
+    return result
+
+
+def parse_arguments(arguments: list[str]) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Studentprognose: predict student enrollment numbers."
+    )
+    parser.add_argument(
+        "-w", "-W", "-week",
+        nargs="+",
+        dest="weeks",
+        default=[],
+        help="Target week number(s). Supports ranges with ':' (e.g., 3 : 7).",
+    )
+    parser.add_argument(
+        "-y", "-Y", "-year",
+        nargs="+",
+        dest="years",
+        default=[],
+        help="Target year(s). Supports ranges with ':' (e.g., 2020 : 2023).",
+    )
+    parser.add_argument(
+        "-d", "-D", "-dataset",
+        dest="dataset",
+        choices=["i", "individual", "c", "cumulative", "b", "both"],
+        default="b",
+        help="Dataset to use: (i)ndividual, (c)umulative, or (b)oth (default: both).",
+    )
+    parser.add_argument(
+        "-c", "-C", "-configuration",
+        dest="configuration",
+        default=DEFAULT_CONFIGURATION_PATH,
+        help="Path to configuration JSON file.",
+    )
+    parser.add_argument(
+        "-f", "-F", "-filtering",
+        dest="filtering",
+        default=DEFAULT_FILTERING_PATH,
+        help="Path to filtering JSON file.",
+    )
+    parser.add_argument(
+        "-sy", "-SY", "-studentyear",
+        dest="studentyear",
+        choices=["f", "first-years", "h", "higher-years", "v", "volume"],
+        default="f",
+        help="Prediction type: (f)irst-years, (h)igher-years, or (v)olume (default: first-years).",
+    )
+    parser.add_argument(
+        "-sk", "-SK", "-skipyears",
+        dest="skipyears",
+        type=int,
+        default=0,
+        help="Number of years to skip.",
+    )
+    parser.add_argument(
+        "-t", "--test",
+        dest="test_mode",
+        action="store_true",
+        default=False,
+        help="Run in test mode (skip writing final output files).",
+    )
+
+    args = parser.parse_args(arguments[1:])
+
+    # Parse weeks (with range support)
+    weeks_specified = len(args.weeks) > 0
+    if weeks_specified:
+        weeks = parse_range(args.weeks)
+    else:
+        current_week = datetime.date.today().isocalendar()[1]
+        if current_week > MAX_WEEK_NUMBER:
+            print("Current week is week 53, check what weeknumber should be used")
+            print(f"Now predicting for week {MAX_WEEK_NUMBER}")
+            current_week = MAX_WEEK_NUMBER
+        weeks = [current_week]
+
+    # Parse years (with range support)
+    if len(args.years) > 0:
+        years = parse_range(args.years)
+    else:
+        current_year = datetime.date.today().year
+        if not weeks_specified and weeks[0] >= ACADEMIC_YEAR_START_WEEK:
+            current_year += 1
+        years = [current_year]
+
+    # Map dataset flag to DataOption
+    dataset_map = {
+        "i": DataOption.INDIVIDUAL,
+        "individual": DataOption.INDIVIDUAL,
+        "c": DataOption.CUMULATIVE,
+        "cumulative": DataOption.CUMULATIVE,
+        "b": DataOption.BOTH_DATASETS,
+        "both": DataOption.BOTH_DATASETS,
+    }
+    data_option = dataset_map[args.dataset]
+
+    # Map studentyear flag to StudentYearPrediction
+    studentyear_map = {
+        "f": StudentYearPrediction.FIRST_YEARS,
+        "first-years": StudentYearPrediction.FIRST_YEARS,
+        "h": StudentYearPrediction.HIGHER_YEARS,
+        "higher-years": StudentYearPrediction.HIGHER_YEARS,
+        "v": StudentYearPrediction.VOLUME,
+        "volume": StudentYearPrediction.VOLUME,
+    }
+    student_year_prediction = studentyear_map[args.studentyear]
+
+    # Validate file paths
+    if not os.path.exists(args.configuration):
+        parser.error(f"Configuration path does not exist: {args.configuration}")
+    if not os.path.exists(args.filtering):
+        parser.error(f"Filtering path does not exist: {args.filtering}")
+
+    return argparse.Namespace(
+        weeks=weeks,
+        years=years,
+        data_option=data_option,
+        configuration_path=args.configuration,
+        filtering_path=args.filtering,
+        student_year_prediction=student_year_prediction,
+        skip_years=args.skipyears,
+        test_mode=args.test_mode,
+    )
 
 
 class Main:
-    def __init__(self, arguments):
-        self._parse_arguments(arguments)
+    def __init__(self, arguments: list[str]) -> None:
+        args = parse_arguments(arguments)
+        self.weeks: list[int] = args.weeks
+        self.years: list[int] = args.years
+        self.data_option: DataOption = args.data_option
+        self.configuration_path: str = args.configuration_path
+        self.filtering_path: str = args.filtering_path
+        self.student_year_prediction: StudentYearPrediction = args.student_year_prediction
+        self.skip_years: int = args.skip_years
+        self.test_mode: bool = args.test_mode
 
-    class Cmd(Enum):
-        NO_ARG = 0
-        WEEKS = 1
-        YEARS = 2
-        DATASETS = 3
-        CONFIGURATION = 4
-        FILTERING = 5
-        STUDENT_YEAR_PREDICTION = 6
-        SKIP_YEARS = 7
+    def _check_output_files_writable(self) -> None:
+        """Check that output files are not locked by another process."""
+        output_files = [OUTPUT_PRELIM]
 
-    def _parse_arguments(self, arguments):
-        cmd_arg = Main.Cmd.NO_ARG
+        if not self.test_mode:
+            output_file = OUTPUT_FILES.get(self.student_year_prediction)
+            if output_file:
+                output_files.append(output_file)
 
-        self.weeks = []
-        self.week_slice = False
-        self.years = []
-        self.year_slice = False
-        self.data_option = DataOption.BOTH_DATASETS
-        self.configuration_path = "configuration/configuration.json"
-        self.filtering_path = "configuration/filtering/base.json"
-        self.student_year_prediction = StudentYearPrediction.FIRST_YEARS
-        self.skip_years = 0
+        for path in output_files:
+            try:
+                with open(path, "a"):
+                    pass
+            except IOError:
+                input(
+                    f"Could not open {path} because it is (probably) opened by another process. "
+                    "Please close Excel. Press Enter to continue."
+                )
 
-        try:
-            # First arguments is always the name of the python script
-            for i in range(1, len(arguments)):
-                arg = arguments[i]
-
-                if cmd_arg == Main.Cmd.WEEKS and arg == ":":
-                    self.week_slice = True
-                elif cmd_arg == Main.Cmd.WEEKS and arg.isnumeric():
-                    if self.week_slice:
-                        last_week = self.weeks.pop(-1)
-                        self.weeks = self.weeks + list(range(last_week, int(arg) + 1))
-                        self.week_slice = False
-                    else:
-                        self.weeks.append(int(arg))
-                elif cmd_arg == Main.Cmd.YEARS and arg == ":":
-                    self.year_slice = True
-                elif cmd_arg == Main.Cmd.YEARS and arg.isnumeric():
-                    if self.year_slice:
-                        last_year = self.years.pop(-1)
-                        self.years = self.years + list(range(last_year, int(arg) + 1))
-                        self.year_slice = False
-                    else:
-                        self.years.append(int(arg))
-                elif cmd_arg == Main.Cmd.DATASETS:
-                    if arg == "i" or arg == "individual":
-                        self.data_option = DataOption.INDIVIDUAL
-                        cmd_arg = Main.Cmd.NO_ARG
-                    elif arg == "c" or arg == "cumulative":
-                        self.data_option = DataOption.CUMULATIVE
-                        cmd_arg = Main.Cmd.NO_ARG
-                    elif arg == "b" or arg == "both":
-                        self.data_option = DataOption.BOTH_DATASETS
-                        cmd_arg = Main.Cmd.NO_ARG
-                elif cmd_arg == Main.Cmd.CONFIGURATION:
-                    if os.path.exists(arg):
-                        self.configuration_path = arg
-                    else:
-                        raise Exception("Configuration path does not exist")
-                    cmd_arg = Main.Cmd.NO_ARG
-                elif cmd_arg == Main.Cmd.FILTERING:
-                    if os.path.exists(arg):
-                        self.filtering_path = arg
-                    else:
-                        raise Exception("Configuration path does not exist")
-                elif cmd_arg == Main.Cmd.STUDENT_YEAR_PREDICTION:
-                    if arg == "f" or arg == "first-years":
-                        self.student_year_prediction = StudentYearPrediction.FIRST_YEARS
-                        cmd_arg = Main.Cmd.NO_ARG
-                    elif arg == "h" or arg == "higher-years":
-                        self.student_year_prediction = StudentYearPrediction.HIGHER_YEARS
-                        cmd_arg = Main.Cmd.NO_ARG
-                    elif arg == "v" or arg == "volume":
-                        self.student_year_prediction = StudentYearPrediction.VOLUME
-                        cmd_arg = Main.Cmd.NO_ARG
-                elif cmd_arg == Main.Cmd.SKIP_YEARS and arg.isnumeric():
-                    self.skip_years = int(arg)
-                    cmd_arg = Main.Cmd.NO_ARG
-
-                if arg == "-w" or arg == "-W" or arg == "-week":
-                    cmd_arg = Main.Cmd.WEEKS
-                elif arg == "-y" or arg == "-Y" or arg == "-year":
-                    cmd_arg = Main.Cmd.YEARS
-                elif arg == "-d" or arg == "-D" or arg == "-dataset":
-                    cmd_arg = Main.Cmd.DATASETS
-                elif arg == "-c" or arg == "-C" or arg == "-configuration":
-                    cmd_arg = Main.Cmd.CONFIGURATION
-                elif arg == "-f" or arg == "-F" or arg == "-filtering":
-                    cmd_arg = Main.Cmd.FILTERING
-                elif arg == "-sy" or arg == "-SY" or arg == "-studentyear":
-                    cmd_arg = Main.Cmd.STUDENT_YEAR_PREDICTION
-                elif arg == "-sk" or arg == "-SK" or arg == "-skipyears":
-                    cmd_arg = Main.Cmd.SKIP_YEARS
-        except:
-            print(
-                "Something went wrong while parsing the arguments, read the README.md for usage."
-            )
-
-        weeks_specified = True
-        if self.weeks == []:
-            weeks_specified = False
-            current_week = datetime.date.today().isocalendar()[1]
-            # Max of 52 weeks, week 53 is an edge case where the user should manually input data
-            if current_week > 52:
-                print("Current week is week 53, check what weeknumber should be used")
-                print("Now predicting for week 52")
-                current_week = 52
-            self.weeks = [current_week]
-
-        if self.years == []:
-            current_year = datetime.date.today().year
-
-            if not weeks_specified and self.weeks[0] >= 40:
-                current_year += 1
-
-            self.years = [current_year]
-
-    def run(self):
-
-        # Make sure that the output files are closed. Otherwise the program will crash when
-        # it tries to write to these files.
-        try:
-            open("data/output/output_prelim.xlsx", "w").close()
-
-            if "test" not in self.filtering_path:
-                match self.student_year_prediction:
-                    case StudentYearPrediction.FIRST_YEARS:
-                        open("data/output/output_first-years.xlsx", "w").close()
-                    case StudentYearPrediction.HIGHER_YEARS:
-                        open("data/output/output_higher-years.xlsx", "w").close()
-                    case StudentYearPrediction.VOLUME:
-                        open("data/output/output_volume.xlsx", "w").close()
-
-        except IOError:
-            input(
-                "Could not open output files because they are (probably) opened by another process. Please close Excel. Press Enter to continue."
-            )
-
-        print("Predicting for years: ", self.years, " and weeks: ", self.weeks)
-
-        # Load configuration
+    def _load_config_and_data(self) -> None:
+        """Load configuration files and all datasets."""
         print("Loading configuration...")
-        self.configuration = load_configuration(self.configuration_path)
-        self.filtering = load_configuration(self.filtering_path)
+        self.configuration: dict = load_configuration(self.configuration_path)
+        self.filtering: dict = load_configuration(self.filtering_path)
 
-        # Load data
         print("Loading data...")
         (
             self.data_individual,
@@ -173,17 +211,21 @@ class Main:
             self.ensemble_weights,
         ) = load_data(self.configuration, self.data_option)
 
-        CWD = os.path.dirname(os.path.abspath(__file__))
-        helpermethods_initialise_material = [
-            self.data_latest,
-            self.ensemble_weights,
-            self.data_student_numbers_first_years,
-            CWD,
-            self.data_option,
-        ]
+    def _build_helper_material(self) -> HelperMethodsMaterial:
+        """Construct the HelperMethodsMaterial passed to dataholder constructors."""
+        cwd = os.path.dirname(os.path.abspath(__file__))
+        return HelperMethodsMaterial(
+            data_latest=self.data_latest,
+            ensemble_weights=self.ensemble_weights,
+            data_student_numbers_first_years=self.data_student_numbers_first_years,
+            cwd=cwd,
+            data_option=self.data_option,
+        )
 
-        # Initialize dataholder
+    def _init_dataholder(self, helper_material: HelperMethodsMaterial) -> None:
+        """Initialize the appropriate dataholder based on data_option."""
         self.dataholder = None
+
         if self.skip_years > 0 or self.data_option == DataOption.CUMULATIVE:
             if self.data_cumulative is None:
                 raise Exception("Cumulative dataset not found")
@@ -191,7 +233,7 @@ class Main:
                 self.data_cumulative,
                 self.data_student_numbers_first_years,
                 self.configuration,
-                helpermethods_initialise_material,
+                helper_material,
             )
         elif self.data_option == DataOption.BOTH_DATASETS:
             if self.data_individual is None:
@@ -205,17 +247,16 @@ class Main:
                     self.data_distances,
                     self.data_student_numbers_first_years,
                     self.configuration,
-                    helpermethods_initialise_material,
+                    helper_material,
                     self.years,
                 )
             except ValueError as e:
-                print(e)  # Log the error message
-                # Initialize only the cumulative dataset:
+                print(e)
                 self.dataholder = Cumulative(
                     self.data_cumulative,
                     self.data_student_numbers_first_years,
                     self.configuration,
-                    helpermethods_initialise_material,
+                    helper_material,
                 )
         elif self.data_option == DataOption.INDIVIDUAL:
             if self.data_individual is None:
@@ -224,27 +265,19 @@ class Main:
                 self.data_individual,
                 self.data_distances,
                 self.configuration,
-                helpermethods_initialise_material,
+                helper_material,
             )
 
-        # self.higher_years_dataholder = HigherYears(
-        #     self.data_student_numbers_first_years,
-        #     self.data_student_numbers_higher_years,
-        #     self.data_student_numbers_volume,
-        #     self.data_individual,
-        #     self.configuration,
-        #     self.data_october,
-        #     self.data_ratios,
-        #     CWD,
-        # )
+    def _preprocess(self) -> None:
+        """Run preprocessing and set up data for the prediction loop."""
+        self.preprocessed_data = None
 
-        if (
-            self.student_year_prediction == StudentYearPrediction.FIRST_YEARS
-            or self.student_year_prediction == StudentYearPrediction.VOLUME
+        if self.student_year_prediction in (
+            StudentYearPrediction.FIRST_YEARS,
+            StudentYearPrediction.VOLUME,
         ):
-            # Preprocess data
             print("Preprocessing...")
-            self.data_cumulative = self.dataholder.preprocess()
+            self.preprocessed_data = self.dataholder.preprocess()
 
         if self.student_year_prediction == StudentYearPrediction.HIGHER_YEARS:
             self.dataholder.helpermethods.data = self.dataholder.helpermethods.data_latest[
@@ -267,19 +300,19 @@ class Main:
                 ]
             ]
 
-        # Set programme and origin filtering
         self.dataholder.set_filtering(
             self.filtering["filtering"]["programme"],
             self.filtering["filtering"]["herkomst"],
             self.filtering["filtering"]["examentype"],
         )
 
+    def _predict_loop(self) -> None:
+        """Run predictions for each year/week combination."""
         for year in self.years:
             for week in self.weeks:
-                # Predict first years student based on settings
-                if (
-                    self.student_year_prediction == StudentYearPrediction.FIRST_YEARS
-                    or self.student_year_prediction == StudentYearPrediction.VOLUME
+                if self.student_year_prediction in (
+                    StudentYearPrediction.FIRST_YEARS,
+                    StudentYearPrediction.VOLUME,
                 ):
                     print(f"Predicting first-years: {year}-{week}...")
                     data_to_predict = self.dataholder.predict_nr_of_students(
@@ -288,49 +321,47 @@ class Main:
                     if data_to_predict is None:
                         continue
                     self.dataholder.helpermethods.prepare_data_for_output_prelim(
-                        data_to_predict, year, week, self.data_cumulative, self.skip_years
+                        data_to_predict, year, week, self.preprocessed_data, self.skip_years
                     )
 
-                    if (
-                        self.data_option == DataOption.CUMULATIVE
-                        or self.data_option == DataOption.BOTH_DATASETS
-                    ):
-                        # Run ratio model
+                    if self.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS):
                         self.dataholder.helpermethods.predict_with_ratio(
-                            self.data_cumulative, year
+                            self.preprocessed_data, year
                         )
 
-                    # Post process
                     print("Postprocessing...")
                     self.dataholder.helpermethods.postprocess(year, week)
 
-                # Predicting higher years students and/or volume based on settings
-                if (
-                    self.student_year_prediction == StudentYearPrediction.HIGHER_YEARS
-                    or self.student_year_prediction == StudentYearPrediction.VOLUME
+                if self.student_year_prediction in (
+                    StudentYearPrediction.HIGHER_YEARS,
+                    StudentYearPrediction.VOLUME,
                 ):
-                    print(f"Predicting higher-years: {year}-{week}...")
-                    self.dataholder.helpermethods.data = (
-                        self.higher_years_dataholder.predict_nr_of_students(
-                            self.dataholder.helpermethods.data,
-                            self.dataholder.helpermethods.data_latest,
-                            year,
-                            week,
-                            self.skip_years,
-                        )
+                    raise NotImplementedError(
+                        "Higher-years prediction is not yet implemented. "
+                        "The HigherYears dataholder needs to be configured before using -sy h or -sy v."
                     )
 
                 self.dataholder.helpermethods.ready_new_data()
 
-        # Save final output
-        if (
-            "test" not in self.filtering_path
-        ):  # We do this to ensure faster testing times for fast setups
-            if self.dataholder.helpermethods.data is not None:
-                print("Saving output...")
-                self.dataholder.helpermethods.save_output(self.student_year_prediction)
-            else:
-                print("No data to save. Saving output skipped.")
+    def _save_output(self) -> None:
+        """Save the final output file unless in test mode."""
+        if self.test_mode:
+            return
+
+        if self.dataholder.helpermethods.data is not None:
+            print("Saving output...")
+            self.dataholder.helpermethods.save_output(self.student_year_prediction)
+        else:
+            print("No data to save. Saving output skipped.")
+
+    def run(self) -> None:
+        self._check_output_files_writable()
+        print("Predicting for years: ", self.years, " and weeks: ", self.weeks)
+        self._load_config_and_data()
+        self._init_dataholder(self._build_helper_material())
+        self._preprocess()
+        self._predict_loop()
+        self._save_output()
 
 
 if __name__ == "__main__":

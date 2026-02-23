@@ -1,6 +1,7 @@
 import pandas as pd
 import collections
 from enum import Enum
+from typing import NamedTuple, Optional
 
 
 class DataOption(Enum):
@@ -13,6 +14,14 @@ class StudentYearPrediction(Enum):
     FIRST_YEARS = 1
     HIGHER_YEARS = 2
     VOLUME = 3
+
+
+class HelperMethodsMaterial(NamedTuple):
+    data_latest: Optional[pd.DataFrame]
+    ensemble_weights: Optional[pd.DataFrame]
+    data_student_numbers_first_years: Optional[pd.DataFrame]
+    cwd: str
+    data_option: DataOption
 
 
 def get_max_week_from_weeks(weeks: pd.Series) -> int:
