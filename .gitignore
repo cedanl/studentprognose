@@ -8,6 +8,7 @@ data/*
 !data/input
 data/input/*
 !data/input/blank.xlsx
+!data/input/vooraanmeldingen_individueel_DEMO.csv
 
 !data/output
 data/output/*
