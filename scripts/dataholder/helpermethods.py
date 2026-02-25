@@ -495,7 +495,6 @@ class HelperMethods:
 
         elif self.data_option == DataOption.INDIVIDUAL:
             predictions = [
-                "Prognose_ratio",
                 "SARIMA_individual",
             ]
 
