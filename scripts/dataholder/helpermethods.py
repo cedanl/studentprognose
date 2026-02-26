@@ -93,12 +93,12 @@ class HelperMethods:
                 & (data["Weeknummer"] == week)
                 & (data["Croho groepeernaam"] == nf)
             ]
-            if np.sum(nf_data["SARIMA_individual"]) > self.numerus_fixus_list[nf]:
+            if "SARIMA_individual" in data.columns and np.sum(nf_data["SARIMA_individual"]) > self.numerus_fixus_list[nf]:
                 data = self._nf_students_based_on_distribution_of_last_years(
                     data, self.data_latest, nf, year, week, "SARIMA_individual"
                 )
 
-            if np.sum(nf_data["SARIMA_cumulative"]) > self.numerus_fixus_list[nf]:
+            if "SARIMA_cumulative" in data.columns and np.sum(nf_data["SARIMA_cumulative"]) > self.numerus_fixus_list[nf]:
                 data = self._nf_students_based_on_distribution_of_last_years(
                     data, self.data_latest, nf, year, week, "SARIMA_cumulative"
                 )

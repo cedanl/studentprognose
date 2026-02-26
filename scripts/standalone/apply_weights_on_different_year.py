@@ -245,7 +245,9 @@ if __name__ == "__main__":
     year_to_use_ensemble_weights_from = 2022
 
     configuration = load_configuration("configuration/configuration.json")
-    data_latest = pd.read_excel(configuration["paths"]["path_latest"])
+    # NOTE: This script uses SARIMA_cumulative and Prognose_ratio (from cumulative variant)
+    # and SARIMA_individual (from individual variant). Currently only loads the cumulative file.
+    data_latest = pd.read_excel(configuration["paths"]["path_latest_cumulative"])
     data_studentcount = pd.read_excel(configuration["paths"]["path_student_count_first-years"])
 
     ensemble_weights = pd.read_excel(configuration["paths"]["path_ensemble_weights"])
@@ -271,4 +273,4 @@ if __name__ == "__main__":
     )
     apply_weights_on_different_year.postprocess()
     data_latest = apply_weights_on_different_year.data_latest
-    data_latest.to_excel(configuration["paths"]["path_latest"], index=False)
+    data_latest.to_excel(configuration["paths"]["path_latest_cumulative"], index=False)
