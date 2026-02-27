@@ -188,7 +188,7 @@ class HelperMethods:
             )
 
         # Exportation to .xlsx
-        output_path = os.path.join(self.CWD, "data", "output", "output_prelim.xlsx")
+        output_path = os.path.join(self.CWD, "data", "output", f"output_prelim_{self.data_option.filename_suffix}.xlsx")
         self.data.to_excel(output_path, index=False)
 
     # This method predicts the influx of students by looking at the ratio between pre-registrants
@@ -556,7 +556,7 @@ class HelperMethods:
         elif student_year_prediction == StudentYearPrediction.VOLUME:
             output_filename += "volume"
 
-        output_filename += ".xlsx"
+        output_filename += f"_{self.data_option.filename_suffix}.xlsx"
 
         output_path = os.path.join(self.CWD, "data", "output", output_filename)
 
