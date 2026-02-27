@@ -8,6 +8,14 @@ class DataOption(Enum):
     CUMULATIVE = 2
     BOTH_DATASETS = 3
 
+    @property
+    def filename_suffix(self):
+        return {
+            DataOption.INDIVIDUAL: "individueel",
+            DataOption.CUMULATIVE: "cumulatief",
+            DataOption.BOTH_DATASETS: "beide",
+        }[self]
+
 
 class StudentYearPrediction(Enum):
     FIRST_YEARS = 1
