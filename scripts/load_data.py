@@ -7,6 +7,14 @@ from scripts.standalone.add_weeks_where_preapplicants_are_zero import (
 )
 
 
+def get_path_latest(paths, data_option):
+    if data_option == DataOption.INDIVIDUAL:
+        return paths.get("path_latest_individual", "")
+    elif data_option == DataOption.CUMULATIVE:
+        return paths.get("path_latest_cumulative", "")
+    return ""
+
+
 def load_data(configuration, data_option):
     paths = configuration["paths"]
 
@@ -63,9 +71,10 @@ def load_data(configuration, data_option):
             data_cumulative.to_csv(paths["path_cumulative"], sep=";", index=False)
             os.remove(paths["path_cumulative_new"])
 
+    path_latest = get_path_latest(paths, data_option)
     data_latest = (
-        pd.read_excel(paths["path_latest"])
-        if (paths["path_latest"] != "" and os.path.exists(paths["path_latest"]))
+        pd.read_excel(path_latest)
+        if (path_latest != "" and os.path.exists(path_latest))
         else None
     )
 

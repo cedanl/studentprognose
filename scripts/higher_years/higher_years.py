@@ -206,7 +206,7 @@ if __name__ == "__main__":
     data_october = pd.read_excel(configuration["paths"]["path_october"])
 
     data_ratios = pd.read_excel(configuration["paths"]["path_ratios"])
-    data_latest = pd.read_excel(configuration["paths"]["path_latest"])
+    data_latest = pd.read_excel(configuration["paths"]["path_latest_cumulative"])
 
     data_october = data_october[data_october["Examentype code"] != "Master post-initieel"]
     data_october[

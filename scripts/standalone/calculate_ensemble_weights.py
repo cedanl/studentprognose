@@ -404,7 +404,9 @@ def load_current_ensemble_data():
 
 
 if __name__ == "__main__":
-    data_latest = pd.read_excel(CONFIGURATION["paths"]["path_latest"])
+    # NOTE: This script uses SARIMA_cumulative and Prognose_ratio (from cumulative variant)
+    # and SARIMA_individual (from individual variant). Currently only loads the cumulative file.
+    data_latest = pd.read_excel(CONFIGURATION["paths"]["path_latest_cumulative"])
     data_latest = data_latest.replace(np.inf, np.nan)
 
     years = get_year_to_calculate()

@@ -1,7 +1,8 @@
 {
     "paths": {
         "path_cumulative": "data/input/vooraanmeldingen_cumulatief_DEMO.csv",
-        "path_latest": "data/input/totaal.xlsx",
+        "path_latest_individual": "data/input/totaal_individueel.xlsx",
+        "path_latest_cumulative": "data/input/totaal_cumulatief.xlsx",
         "path_cumulative_new": "",
         "path_distances": "data/input/afstanden.xlsx",
         "path_ensemble_weights": "data/input/ensemble_weights.xlsx",
