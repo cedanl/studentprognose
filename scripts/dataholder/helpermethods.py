@@ -93,12 +93,12 @@ class HelperMethods:
                 & (data["Weeknummer"] == week)
                 & (data["Croho groepeernaam"] == nf)
             ]
-            if np.sum(nf_data["SARIMA_individual"]) > self.numerus_fixus_list[nf]:
+            if "SARIMA_individual" in data.columns and np.sum(nf_data["SARIMA_individual"]) > self.numerus_fixus_list[nf]:
                 data = self._nf_students_based_on_distribution_of_last_years(
                     data, self.data_latest, nf, year, week, "SARIMA_individual"
                 )
 
-            if np.sum(nf_data["SARIMA_cumulative"]) > self.numerus_fixus_list[nf]:
+            if "SARIMA_cumulative" in data.columns and np.sum(nf_data["SARIMA_cumulative"]) > self.numerus_fixus_list[nf]:
                 data = self._nf_students_based_on_distribution_of_last_years(
                     data, self.data_latest, nf, year, week, "SARIMA_cumulative"
                 )
@@ -188,7 +188,7 @@ class HelperMethods:
             )
 
         # Exportation to .xlsx
-        output_path = os.path.join(self.CWD, "data", "output", "output_prelim.xlsx")
+        output_path = os.path.join(self.CWD, "data", "output", f"output_prelim_{self.data_option.filename_suffix}.xlsx")
         self.data.to_excel(output_path, index=False)
 
     # This method predicts the influx of students by looking at the ratio between pre-registrants
@@ -495,7 +495,6 @@ class HelperMethods:
 
         elif self.data_option == DataOption.INDIVIDUAL:
             predictions = [
-                "Prognose_ratio",
                 "SARIMA_individual",
             ]
 
@@ -557,7 +556,7 @@ class HelperMethods:
         elif student_year_prediction == StudentYearPrediction.VOLUME:
             output_filename += "volume"
 
-        output_filename += ".xlsx"
+        output_filename += f"_{self.data_option.filename_suffix}.xlsx"
 
         output_path = os.path.join(self.CWD, "data", "output", output_filename)
 

@@ -188,7 +188,7 @@ class Individual(Superclass):
         )
         self.data_individual_backup = self.data_individual
 
-        return None
+        return self.data_individual
 
     def predict_nr_of_students(self, predict_year, predict_week, skip_years=0):
         self.data_individual = self.data_individual_backup.copy(deep=True)

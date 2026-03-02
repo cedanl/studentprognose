@@ -16,6 +16,20 @@ class AddWeeksWherePreapplicantsAreZero:
     def add_weeks(self):
         data_cumulative = self.data_cumulative
 
+        # Convert numeric columns to appropriate types before using them
+        numeric_columns = [
+            "Gewogen vooraanmelders",
+            "Ongewogen vooraanmelders",
+            "Aantal aanmelders met 1 aanmelding",
+            "Inschrijvingen",
+            "Collegejaar",
+            "Weeknummer",
+            "Weeknummer rapportage"
+        ]
+        for col in numeric_columns:
+            if col in data_cumulative.columns:
+                data_cumulative[col] = pd.to_numeric(data_cumulative[col], errors='coerce').fillna(0).astype(int)
+
         data_cumulative.loc[
             (data_cumulative["Type hoger onderwijs"] == "Pre-master"),
             "Hogerejaars",

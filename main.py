@@ -139,16 +139,17 @@ class Main:
         # Make sure that the output files are closed. Otherwise the program will crash when
         # it tries to write to these files.
         try:
-            open("data/output/output_prelim.xlsx", "w").close()
+            mode_suffix = self.data_option.filename_suffix
+            open(f"data/output/output_prelim_{mode_suffix}.xlsx", "w").close()
 
             if "test" not in self.filtering_path:
                 match self.student_year_prediction:
                     case StudentYearPrediction.FIRST_YEARS:
-                        open("data/output/output_first-years.xlsx", "w").close()
+                        open(f"data/output/output_first-years_{mode_suffix}.xlsx", "w").close()
                     case StudentYearPrediction.HIGHER_YEARS:
-                        open("data/output/output_higher-years.xlsx", "w").close()
+                        open(f"data/output/output_higher-years_{mode_suffix}.xlsx", "w").close()
                     case StudentYearPrediction.VOLUME:
-                        open("data/output/output_volume.xlsx", "w").close()
+                        open(f"data/output/output_volume_{mode_suffix}.xlsx", "w").close()
 
         except IOError:
             input(
