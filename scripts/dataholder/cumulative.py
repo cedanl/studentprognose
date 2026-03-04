@@ -470,6 +470,12 @@ class Cumulative(Superclass):
                 (data_to_predict["Weeknummer"] == self.predict_week) & replace_mask
             ][columns_to_match].merge(test2, on=columns_to_match)
             if not test2_merged.empty:
+                if train2.empty:
+                    print(
+                        f"WARNING: Skipping XGBoost prediction: no training data "
+                        f"available (try increasing --ci test N)."
+                    )
+                    return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
                 ahead_predictions = self._predict_with_xgboost(train2, test2_merged)
                 test2["Collegejaar"] = test2["Collegejaar"] + self.skip_years
@@ -499,6 +505,12 @@ class Cumulative(Superclass):
             ][columns_to_match].merge(test, on=columns_to_match)
 
             if not test_merged.empty:
+                if train.empty:
+                    print(
+                        f"WARNING: Skipping XGBoost prediction: no training data "
+                        f"available (try increasing --ci test N)."
+                    )
+                    return data_to_predict
                 predictions = self._predict_with_xgboost(train, test_merged)
 
                 # This mask indicates which items in data_to_predict are just predicted.
@@ -539,6 +551,9 @@ class Cumulative(Superclass):
             return np.nan
 
         train.drop_duplicates(inplace=True, ignore_index=True)
+
+        if train.empty:
+            return np.full(len(test), np.nan)
 
         X_train = train.drop(["Aantal_studenten"], axis=1)
         y_train = train.pop("Aantal_studenten")
