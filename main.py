@@ -162,16 +162,17 @@ class Main:
         # it tries to write to these files.
         try:
             mode_suffix = self.data_option.filename_suffix
-            open(f"data/output/output_prelim_{mode_suffix}.xlsx", "w").close()
+            ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
+            open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
 
             if "test" not in self.filtering_path:
                 match self.student_year_prediction:
                     case StudentYearPrediction.FIRST_YEARS:
-                        open(f"data/output/output_first-years_{mode_suffix}.xlsx", "w").close()
+                        open(f"data/output/output_first-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
                     case StudentYearPrediction.HIGHER_YEARS:
-                        open(f"data/output/output_higher-years_{mode_suffix}.xlsx", "w").close()
+                        open(f"data/output/output_higher-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
                     case StudentYearPrediction.VOLUME:
-                        open(f"data/output/output_volume_{mode_suffix}.xlsx", "w").close()
+                        open(f"data/output/output_volume_{mode_suffix}{ci_suffix}.xlsx", "w").close()
 
         except IOError:
             input(
@@ -221,6 +222,7 @@ class Main:
             self.data_student_numbers_first_years,
             CWD,
             self.data_option,
+            self.ci_test_n,
         ]
 
         # Initialize dataholder

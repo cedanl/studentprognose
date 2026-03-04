@@ -23,6 +23,7 @@ class HelperMethods:
         self.CWD = helpermethods_initialise_material[3]
 
         self.data_option = helpermethods_initialise_material[4]
+        self.ci_test_n = helpermethods_initialise_material[5] if len(helpermethods_initialise_material) > 5 else None
         self.data = None
 
     # This method used when calculating the cumulative value. The input is the data_to_predict
@@ -188,7 +189,8 @@ class HelperMethods:
             )
 
         # Exportation to .xlsx
-        output_path = os.path.join(self.CWD, "data", "output", f"output_prelim_{self.data_option.filename_suffix}.xlsx")
+        ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
+        output_path = os.path.join(self.CWD, "data", "output", f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx")
         self.data.to_excel(output_path, index=False)
 
     # This method predicts the influx of students by looking at the ratio between pre-registrants
@@ -556,7 +558,8 @@ class HelperMethods:
         elif student_year_prediction == StudentYearPrediction.VOLUME:
             output_filename += "volume"
 
-        output_filename += f"_{self.data_option.filename_suffix}.xlsx"
+        ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
+        output_filename += f"_{self.data_option.filename_suffix}{ci_suffix}.xlsx"
 
         output_path = os.path.join(self.CWD, "data", "output", output_filename)
 
