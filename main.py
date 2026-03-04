@@ -2,6 +2,7 @@ import datetime
 import sys
 from enum import Enum
 
+from scripts.ci_subset import apply_ci_test_subset
 from scripts.load_data import *
 from scripts.dataholder.superclass import *
 from scripts.dataholder.individual import *
@@ -24,6 +25,7 @@ class Main:
         FILTERING = 5
         STUDENT_YEAR_PREDICTION = 6
         SKIP_YEARS = 7
+        CI_TEST = 8
 
     def _parse_arguments(self, arguments):
         cmd_arg = Main.Cmd.NO_ARG
@@ -37,6 +39,7 @@ class Main:
         self.filtering_path = "configuration/filtering/base.json"
         self.student_year_prediction = StudentYearPrediction.FIRST_YEARS
         self.skip_years = 0
+        self.ci_test_n = None
 
         try:
             # First arguments is always the name of the python script
@@ -95,6 +98,23 @@ class Main:
                 elif cmd_arg == Main.Cmd.SKIP_YEARS and arg.isnumeric():
                     self.skip_years = int(arg)
                     cmd_arg = Main.Cmd.NO_ARG
+                elif cmd_arg == Main.Cmd.CI_TEST:
+                    if arg == "test" and self.ci_test_n is None:
+                        self.ci_test_n = -1  # Awaiting N
+                    elif self.ci_test_n == -1:
+                        try:
+                            self.ci_test_n = int(arg)
+                        except ValueError:
+                            raise Exception(
+                                f"Invalid --ci argument: '{arg}'. "
+                                f"Usage: --ci test <N>"
+                            )
+                        cmd_arg = Main.Cmd.NO_ARG
+                    else:
+                        raise Exception(
+                            f"Invalid --ci argument: '{arg}'. "
+                            f"Usage: --ci test <N>"
+                        )
 
                 if arg == "-w" or arg == "-W" or arg == "-week":
                     cmd_arg = Main.Cmd.WEEKS
@@ -110,6 +130,8 @@ class Main:
                     cmd_arg = Main.Cmd.STUDENT_YEAR_PREDICTION
                 elif arg == "-sk" or arg == "-SK" or arg == "-skipyears":
                     cmd_arg = Main.Cmd.SKIP_YEARS
+                elif arg == "--ci":
+                    cmd_arg = Main.Cmd.CI_TEST
         except:
             print(
                 "Something went wrong while parsing the arguments, read the README.md for usage."
@@ -140,16 +162,17 @@ class Main:
         # it tries to write to these files.
         try:
             mode_suffix = self.data_option.filename_suffix
-            open(f"data/output/output_prelim_{mode_suffix}.xlsx", "w").close()
+            ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
+            open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
 
             if "test" not in self.filtering_path:
                 match self.student_year_prediction:
                     case StudentYearPrediction.FIRST_YEARS:
-                        open(f"data/output/output_first-years_{mode_suffix}.xlsx", "w").close()
+                        open(f"data/output/output_first-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
                     case StudentYearPrediction.HIGHER_YEARS:
-                        open(f"data/output/output_higher-years_{mode_suffix}.xlsx", "w").close()
+                        open(f"data/output/output_higher-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
                     case StudentYearPrediction.VOLUME:
-                        open(f"data/output/output_volume_{mode_suffix}.xlsx", "w").close()
+                        open(f"data/output/output_volume_{mode_suffix}{ci_suffix}.xlsx", "w").close()
 
         except IOError:
             input(
@@ -174,6 +197,24 @@ class Main:
             self.ensemble_weights,
         ) = load_data(self.configuration, self.data_option)
 
+        if self.ci_test_n is not None:
+            (
+                self.data_individual,
+                self.data_cumulative,
+                self.data_student_numbers_first_years,
+                self.data_latest,
+                self.data_distances,
+                self.ensemble_weights,
+            ) = apply_ci_test_subset(
+                self.ci_test_n,
+                self.data_individual,
+                self.data_cumulative,
+                self.data_student_numbers_first_years,
+                self.data_latest,
+                self.data_distances,
+                self.ensemble_weights,
+            )
+
         CWD = os.path.dirname(os.path.abspath(__file__))
         helpermethods_initialise_material = [
             self.data_latest,
@@ -181,6 +222,7 @@ class Main:
             self.data_student_numbers_first_years,
             CWD,
             self.data_option,
+            self.ci_test_n,
         ]
 
         # Initialize dataholder

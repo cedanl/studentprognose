@@ -40,6 +40,27 @@ Voor een specifieke week en jaar:
 uv run main.py -y 2024 -w 10
 ```
 
+### CI Test modus
+
+Met de `--ci test <N>` vlag kun je een snellere run doen op een subset van de data. Dit is handig voor het testen tijdens development en in CI/CD pipelines.
+
+```bash
+uv run main.py -D cumulative -y 2024 -w 20 --ci test 10
+```
+
+Dit doet het volgende:
+- Filtert alle datasets naar `Collegejaar >= 2022`
+- Selecteert `N` programma's met een vaste seed (42), zodat iedereen dezelfde resultaten krijgt
+- De subset wordt in-memory aangemaakt en niet naar schijf geschreven
+
+De waarde van `N` moet tussen 1 en het aantal beschikbare programma's liggen.
+
+De `--ci test` vlag is te combineren met andere vlaggen:
+```bash
+uv run main.py -D individual -y 2024 -w 10 --ci test 5
+uv run main.py -D both -y 2024 -w 20 --ci test 15
+```
+
 ## Ondersteuning
 
 Voor vragen of problemen:
