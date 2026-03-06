@@ -1,0 +1,158 @@
+<svg viewBox="0 0 900 460" width="900" height="460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="gf3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#92FE9D" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="#92FE9D" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="sg3">
+      <feGaussianBlur stdDeviation="2" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="900" height="460" rx="14" fill="#1a1a2e"/>
+
+  <text x="32" y="36" font-family="'Segoe UI', Arial, sans-serif" font-size="18" font-weight="600" fill="white">B Kunstmatige Intelligentie — Eerstejaars NL</text>
+  <text x="32" y="56" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#888">Collegejaar 2024/2025 · Voorspelling vs. werkelijk</text>
+
+  <!-- Metric cards -->
+  <rect x="32" y="72" width="195" height="60" rx="10" fill="white" opacity="0.05"/>
+  <text x="50" y="95" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#888" letter-spacing="1">WERKELIJK</text>
+  <text x="50" y="122" font-family="'Segoe UI', Arial, sans-serif" font-size="26" font-weight="700" fill="#92FE9D">287</text>
+
+  <rect x="243" y="72" width="195" height="60" rx="10" fill="white" opacity="0.05"/>
+  <text x="261" y="95" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#888" letter-spacing="1">SARIMA</text>
+  <text x="261" y="122" font-family="'Segoe UI', Arial, sans-serif" font-size="26" font-weight="700" fill="#00C9FF">241</text>
+
+  <rect x="454" y="72" width="195" height="60" rx="10" fill="white" opacity="0.05"/>
+  <text x="472" y="95" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#888" letter-spacing="1">XGBOOST</text>
+  <text x="472" y="122" font-family="'Segoe UI', Arial, sans-serif" font-size="26" font-weight="700" fill="#b388ff">263</text>
+
+  <rect x="665" y="72" width="195" height="60" rx="10" fill="white" opacity="0.05"/>
+  <text x="683" y="95" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#888" letter-spacing="1">ENSEMBLE</text>
+  <text x="683" y="122" font-family="'Segoe UI', Arial, sans-serif" font-size="26" font-weight="700" fill="#ffd54f">258</text>
+
+  <!-- Legend -->
+  <circle cx="50" cy="156" r="5" fill="#92FE9D"/>
+  <text x="62" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#ccc">Werkelijk</text>
+  <circle cx="160" cy="156" r="5" fill="#00C9FF"/>
+  <text x="172" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#ccc">SARIMA</text>
+  <circle cx="260" cy="156" r="5" fill="#b388ff"/>
+  <text x="272" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#ccc">XGBoost</text>
+  <circle cx="368" cy="156" r="5" fill="#ffd54f"/>
+  <text x="380" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#ccc">Ensemble</text>
+
+  <!-- Y-axis -->
+  <text x="55" y="192" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="end">300</text>
+  <text x="55" y="242" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="end">250</text>
+  <text x="55" y="292" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="end">200</text>
+  <text x="55" y="342" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="end">150</text>
+  <text x="55" y="392" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="end">100</text>
+
+  <!-- Grid -->
+  <line x1="65" y1="188" x2="860" y2="188" stroke="#333" stroke-width="0.5"/>
+  <line x1="65" y1="238" x2="860" y2="238" stroke="#333" stroke-width="0.5"/>
+  <line x1="65" y1="288" x2="860" y2="288" stroke="#333" stroke-width="0.5"/>
+  <line x1="65" y1="338" x2="860" y2="338" stroke="#333" stroke-width="0.5"/>
+  <line x1="65" y1="388" x2="860" y2="388" stroke="#333" stroke-width="0.5"/>
+  <line x1="65" y1="188" x2="65" y2="395" stroke="#555" stroke-width="1"/>
+  <line x1="65" y1="395" x2="860" y2="395" stroke="#555" stroke-width="1"/>
+
+  <!-- Area fill -->
+  <polygon points="65,388 145,380 225,360 305,330 385,290 465,260 545,230 625,210 705,198 785,192 860,188 860,395 65,395" fill="url(#gf3)"/>
+
+  <!-- Lines with draw-on animation using stroke-dashoffset -->
+  <!-- Werkelijk (green) -->
+  <polyline points="65,388 145,380 225,360 305,330 385,290 465,260 545,230 625,210 705,198 785,192 860,188"
+            fill="none" stroke="#92FE9D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+            stroke-dasharray="1200" stroke-dashoffset="1200" filter="url(#sg3)">
+    <animate attributeName="stroke-dashoffset" from="1200" to="0" dur="3s" fill="freeze" repeatCount="indefinite"/>
+  </polyline>
+
+  <!-- SARIMA (blue) - starts slightly later -->
+  <polyline points="65,392 145,386 225,378 305,360 385,335 465,310 545,288 625,268 705,255 785,248 860,240"
+            fill="none" stroke="#00C9FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            stroke-dasharray="1200" stroke-dashoffset="1200">
+    <animate attributeName="stroke-dashoffset" from="1200" to="0" dur="3s" begin="0.3s" fill="freeze" repeatCount="indefinite"/>
+  </polyline>
+
+  <!-- XGBoost (purple) -->
+  <polyline points="65,390 145,384 225,370 305,345 385,308 465,278 545,252 625,235 705,222 785,215 860,210"
+            fill="none" stroke="#b388ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            stroke-dasharray="1200" stroke-dashoffset="1200">
+    <animate attributeName="stroke-dashoffset" from="1200" to="0" dur="3s" begin="0.6s" fill="freeze" repeatCount="indefinite"/>
+  </polyline>
+
+  <!-- Ensemble (yellow) -->
+  <polyline points="65,391 145,385 225,374 305,352 385,320 465,292 545,268 625,250 705,238 785,230 860,224"
+            fill="none" stroke="#ffd54f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+            stroke-dasharray="1200" stroke-dashoffset="1200">
+    <animate attributeName="stroke-dashoffset" from="1200" to="0" dur="3s" begin="0.9s" fill="freeze" repeatCount="indefinite"/>
+  </polyline>
+
+  <!-- Animated cursor with tooltip -->
+  <g>
+    <!-- Vertical scan line -->
+    <line y1="180" y2="400" stroke="white" stroke-width="1" opacity="0.25">
+      <animate attributeName="x1" values="65;860;860;65" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="x2" values="65;860;860;65" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+    </line>
+
+    <!-- Dots following each line -->
+    <circle r="6" fill="#92FE9D" opacity="0.9" filter="url(#sg3)">
+      <animate attributeName="cx" values="65;860;860;65" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="cy" values="388;188;188;388" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+    </circle>
+    <circle r="5" fill="#00C9FF" opacity="0.85">
+      <animate attributeName="cx" values="65;860;860;65" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="cy" values="392;240;240;392" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+    </circle>
+    <circle r="5" fill="#b388ff" opacity="0.85">
+      <animate attributeName="cx" values="65;860;860;65" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="cy" values="390;210;210;390" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+    </circle>
+    <circle r="5" fill="#ffd54f" opacity="0.85">
+      <animate attributeName="cx" values="65;860;860;65" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="cy" values="391;224;224;391" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+    </circle>
+
+    <!-- Tooltip -->
+    <rect width="90" height="74" rx="6" fill="#2a2a4a" stroke="#555" stroke-width="0.5">
+      <animate attributeName="x" values="75;830;830;75" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="y" values="300;120;120;300" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+    </rect>
+    <text font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="600" fill="#92FE9D">
+      <animate attributeName="x" values="83;838;838;83" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="y" values="316;136;136;316" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      Werkelijk: 287
+    </text>
+    <text font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="600" fill="#00C9FF">
+      <animate attributeName="x" values="83;838;838;83" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="y" values="330;150;150;330" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      SARIMA: 241
+    </text>
+    <text font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="600" fill="#b388ff">
+      <animate attributeName="x" values="83;838;838;83" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="y" values="344;164;164;344" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      XGBoost: 263
+    </text>
+    <text font-family="'Segoe UI', Arial, sans-serif" font-size="9" font-weight="600" fill="#ffd54f">
+      <animate attributeName="x" values="83;838;838;83" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      <animate attributeName="y" values="358;178;178;358" dur="7s" repeatCount="indefinite" keyTimes="0;0.42;0.58;1"/>
+      Ensemble: 258
+    </text>
+  </g>
+
+  <!-- X-axis -->
+  <text x="65" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 1</text>
+  <text x="145" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 5</text>
+  <text x="225" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 10</text>
+  <text x="305" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 15</text>
+  <text x="385" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 20</text>
+  <text x="465" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 25</text>
+  <text x="545" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 30</text>
+  <text x="625" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 35</text>
+  <text x="705" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 40</text>
+  <text x="785" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 45</text>
+  <text x="860" y="412" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">wk 52</text>
+</svg>
