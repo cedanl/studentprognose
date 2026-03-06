@@ -264,13 +264,10 @@ Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de ar
 ## 📊 Voorbeeldresultaten
 
 <div align="center">
-  <img src="doc/example_output.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
+  <img src="doc/chart_v2_glow.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
 </div>
 
-> De modellen convergeren al vroeg in het jaar, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen over de verwachte instroom.
-
-<!-- Voeg hier een GIF toe van de interactieve output: doc/demo.gif -->
-<!-- Maak deze aan met een screen recording van `uv run main.py` output -->
+> De ensemble voorspelling convergeert al vroeg in het jaar. Het betrouwbaarheidsinterval wordt smaller naarmate meer data binnenkomt, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen.
 
 ---
 
