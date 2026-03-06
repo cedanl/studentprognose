@@ -264,7 +264,7 @@ Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de ar
 ## 📊 Voorbeeldresultaten
 
 <div align="center">
-  <img src="doc/chart.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
+  <img src="doc/chart_v2_glow.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
 </div>
 
 > De ensemble voorspelling convergeert al vroeg in het jaar. Het betrouwbaarheidsinterval wordt smaller naarmate meer data binnenkomt, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen.
