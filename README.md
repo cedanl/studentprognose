@@ -271,6 +271,15 @@ Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de ar
 
 ---
 
+## 🗺️ Roadmap
+
+- [ ] Interactief dashboard — voorspellingen verkennen in de browser i.p.v. Excel ([#24](https://github.com/cedanl/studentprognose/issues/24))
+- [ ] Bring-your-own-data — upload je eigen data en draai voorspellingen via Streamlit ([#30](https://github.com/cedanl/studentprognose/issues/30))
+- [ ] Executables — dubbelklik om te starten, geen Python-installatie nodig ([#10](https://github.com/cedanl/studentprognose/issues/10))
+- [ ] Validatie met partnerinstellingen — nauwkeurigheid toetsen op echte data ([#30](https://github.com/cedanl/studentprognose/issues/30))
+
+---
+
 ## 🤝 Bijdragen
 
 Wil je bijdragen? Sluit je aan bij de [werkgroep](https://edu.nl/6d69d).
