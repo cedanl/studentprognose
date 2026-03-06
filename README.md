@@ -3,7 +3,7 @@
     <img src="doc/header.svg" alt="Studentprognose" style="max-width: 100%;">
   </a>
 
-  <h3>Voorspel de instroom van studenten. Lokaal, privacyvriendelijk, open source.</h3>
+  <h3>Voorspel je studentinstroom maanden vooruit — met je eigen data, op je eigen machine.</h3>
 
   <p>
     <a href="https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten"><img src="https://img.shields.io/badge/Ingezet_door-Radboud_Universiteit-darkred" alt="Radboud Universiteit"></a>
@@ -12,6 +12,7 @@
     <img src="https://img.shields.io/github/license/cedanl/studentprognose" alt="GitHub License">
     <br>
     <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
+    <img src="https://badgen.net/github/last-commit/cedanl/studentprognose" alt="GitHub Last Commit">
     <a href="#"><img src="https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white" alt="Windows"></a>
     <a href="#"><img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=F0F0F0" alt="macOS"></a>
     <a href="#"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" alt="Linux"></a>
