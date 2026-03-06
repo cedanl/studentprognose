@@ -1,0 +1,165 @@
+<svg viewBox="0 0 900 460" width="900" height="460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="sg2" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="1.5" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="accBar" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#ffd54f" stop-opacity="0.6"/>
+      <stop offset="100%" stop-color="#ffd54f" stop-opacity="0.2"/>
+    </linearGradient>
+    <linearGradient id="maeGrad" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff8a80" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#ff8a80" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="900" height="460" rx="14" fill="#0d0d1a"/>
+
+  <!-- Title -->
+  <text x="32" y="36" font-family="'Segoe UI', Arial, sans-serif" font-size="20" font-weight="600" fill="white">Model nauwkeurigheid over tijd</text>
+  <text x="32" y="56" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#666">B Kunstmatige Intelligentie · Collegejaar 2024/2025 · Hoe dichter bij 0, hoe beter</text>
+
+  <!-- Summary cards -->
+  <rect x="32" y="72" width="170" height="56" rx="10" fill="#92FE9D" opacity="0.06"/>
+  <text x="46" y="92" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#888" letter-spacing="1">BESTE WEEK</text>
+  <text x="46" y="117" font-family="'Segoe UI', Arial, sans-serif" font-size="22" font-weight="700" fill="#92FE9D">wk 45 (0.8%)</text>
+
+  <rect x="216" y="72" width="170" height="56" rx="10" fill="#ffd54f" opacity="0.06"/>
+  <text x="230" y="92" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#888" letter-spacing="1">GEM. MAPE</text>
+  <text x="230" y="117" font-family="'Segoe UI', Arial, sans-serif" font-size="22" font-weight="700" fill="#ffd54f">3.2%</text>
+
+  <rect x="400" y="72" width="170" height="56" rx="10" fill="white" opacity="0.04"/>
+  <text x="414" y="92" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#888" letter-spacing="1">GEM. MAE</text>
+  <text x="414" y="117" font-family="'Segoe UI', Arial, sans-serif" font-size="22" font-weight="700" fill="#ff8a80">8.4</text>
+
+  <rect x="584" y="72" width="170" height="56" rx="10" fill="#92FE9D" opacity="0.06"/>
+  <text x="598" y="92" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#888" letter-spacing="1">STABIEL VANAF</text>
+  <text x="598" y="117" font-family="'Segoe UI', Arial, sans-serif" font-size="22" font-weight="700" fill="#92FE9D">wk 30</text>
+
+  <!-- Left chart: MAPE over weeks (bar chart) -->
+  <text x="65" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="600" fill="white">MAPE per week (%)</text>
+
+  <!-- Y-axis -->
+  <text x="55" y="186" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">20%</text>
+  <text x="55" y="236" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">15%</text>
+  <text x="55" y="286" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">10%</text>
+  <text x="55" y="336" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">5%</text>
+  <text x="55" y="386" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">0%</text>
+
+  <!-- Grid -->
+  <line x1="65" y1="182" x2="430" y2="182" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="65" y1="232" x2="430" y2="232" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="65" y1="282" x2="430" y2="282" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="65" y1="332" x2="430" y2="332" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="65" y1="382" x2="430" y2="382" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="65" y1="182" x2="65" y2="386" stroke="#333" stroke-width="1"/>
+  <line x1="65" y1="386" x2="430" y2="386" stroke="#333" stroke-width="1"/>
+
+  <!-- MAPE bars (decreasing as weeks progress) -->
+  <!-- wk5: 18% -->
+  <rect x="78" y="196" width="22" height="190" rx="3" fill="url(#accBar)" opacity="0.8"/>
+  <!-- wk10: 14% -->
+  <rect x="113" y="222" width="22" height="164" rx="3" fill="url(#accBar)" opacity="0.8"/>
+  <!-- wk15: 10% -->
+  <rect x="148" y="262" width="22" height="124" rx="3" fill="url(#accBar)" opacity="0.8"/>
+  <!-- wk20: 7% -->
+  <rect x="183" y="312" width="22" height="74" rx="3" fill="url(#accBar)" opacity="0.8"/>
+  <!-- wk25: 4.5% -->
+  <rect x="218" y="341" width="22" height="45" rx="3" fill="url(#accBar)" opacity="0.9"/>
+  <!-- wk30: 2.8% -->
+  <rect x="253" y="358" width="22" height="28" rx="3" fill="#92FE9D" opacity="0.5"/>
+  <!-- wk35: 2.0% -->
+  <rect x="288" y="366" width="22" height="20" rx="3" fill="#92FE9D" opacity="0.5"/>
+  <!-- wk40: 1.5% -->
+  <rect x="323" y="371" width="22" height="15" rx="3" fill="#92FE9D" opacity="0.5"/>
+  <!-- wk45: 0.8% -->
+  <rect x="358" y="378" width="22" height="8" rx="3" fill="#92FE9D" opacity="0.6"/>
+  <!-- wk52: 1.0% -->
+  <rect x="393" y="376" width="22" height="10" rx="3" fill="#92FE9D" opacity="0.6"/>
+
+  <!-- Threshold line at 5% -->
+  <line x1="65" y1="332" x2="430" y2="332" stroke="#ff8a80" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.4"/>
+  <text x="435" y="336" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#ff8a80" opacity="0.6">5% drempel</text>
+
+  <!-- Bar x-labels -->
+  <text x="89" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">5</text>
+  <text x="124" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">10</text>
+  <text x="159" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">15</text>
+  <text x="194" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">20</text>
+  <text x="229" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">25</text>
+  <text x="264" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">30</text>
+  <text x="299" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">35</text>
+  <text x="334" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">40</text>
+  <text x="369" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">45</text>
+  <text x="404" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">52</text>
+  <text x="247" y="418" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">week →</text>
+
+  <!-- Right chart: MAE trendline -->
+  <text x="500" y="160" font-family="'Segoe UI', Arial, sans-serif" font-size="13" font-weight="600" fill="white">MAE per week (absoluut)</text>
+
+  <!-- Y-axis right -->
+  <text x="490" y="186" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">50</text>
+  <text x="490" y="236" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">40</text>
+  <text x="490" y="286" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">30</text>
+  <text x="490" y="336" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">20</text>
+  <text x="490" y="386" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#444" text-anchor="end">10</text>
+
+  <!-- Grid right -->
+  <line x1="500" y1="182" x2="860" y2="182" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="500" y1="232" x2="860" y2="232" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="500" y1="282" x2="860" y2="282" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="500" y1="332" x2="860" y2="332" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="500" y1="382" x2="860" y2="382" stroke="#1c1c2e" stroke-width="0.5"/>
+  <line x1="500" y1="182" x2="500" y2="386" stroke="#333" stroke-width="1"/>
+  <line x1="500" y1="386" x2="860" y2="386" stroke="#333" stroke-width="1"/>
+
+  <!-- MAE area fill -->
+  <polygon points="510,198 550,218 590,252 630,292 670,330 710,356 750,368 790,374 830,378 860,380
+                   860,386 510,386"
+           fill="url(#maeGrad)"/>
+
+  <!-- MAE line (drops from high to low as weeks progress) -->
+  <polyline points="510,198 550,218 590,252 630,292 670,330 710,356 750,368 790,374 830,378 860,380"
+            fill="none" stroke="#ff8a80" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#sg2)"/>
+
+  <!-- Data points on MAE -->
+  <circle cx="510" cy="198" r="3" fill="#ff8a80" opacity="0.7"/>
+  <circle cx="550" cy="218" r="3" fill="#ff8a80" opacity="0.7"/>
+  <circle cx="590" cy="252" r="3" fill="#ff8a80" opacity="0.7"/>
+  <circle cx="630" cy="292" r="3" fill="#ff8a80" opacity="0.7"/>
+  <circle cx="670" cy="330" r="3" fill="#ff8a80" opacity="0.7"/>
+  <circle cx="710" cy="356" r="3" fill="#92FE9D" opacity="0.7"/>
+  <circle cx="750" cy="368" r="3" fill="#92FE9D" opacity="0.7"/>
+  <circle cx="790" cy="374" r="3" fill="#92FE9D" opacity="0.7"/>
+  <circle cx="830" cy="378" r="3" fill="#92FE9D" opacity="0.7"/>
+  <circle cx="860" cy="380" r="4" fill="#92FE9D">
+    <animate attributeName="r" values="3;5;3" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- MAE value labels on key points -->
+  <text x="510" y="192" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#ff8a80" text-anchor="middle">46.2</text>
+  <text x="670" y="324" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#ff8a80" text-anchor="middle">13.1</text>
+  <text x="860" y="374" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#92FE9D" text-anchor="middle">4.2</text>
+
+  <!-- Good zone marker -->
+  <rect x="696" y="340" width="170" height="46" rx="0" fill="#92FE9D" opacity="0.02"/>
+  <line x1="696" y1="340" x2="696" y2="386" stroke="#92FE9D" stroke-width="0.6" stroke-dasharray="4,3" opacity="0.2"/>
+  <text x="706" y="354" font-family="'Segoe UI', Arial, sans-serif" font-size="9" fill="#92FE9D" opacity="0.4">MAE &lt; 10</text>
+
+  <!-- X-axis labels right -->
+  <text x="510" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">5</text>
+  <text x="550" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">10</text>
+  <text x="590" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">15</text>
+  <text x="630" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">20</text>
+  <text x="670" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">25</text>
+  <text x="710" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">30</text>
+  <text x="750" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">35</text>
+  <text x="790" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">40</text>
+  <text x="830" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">45</text>
+  <text x="860" y="400" font-family="'Segoe UI', Arial, sans-serif" font-size="8" fill="#555" text-anchor="middle">52</text>
+  <text x="680" y="418" font-family="'Segoe UI', Arial, sans-serif" font-size="10" fill="#555" text-anchor="middle">week →</text>
+
+  <!-- Bottom -->
+  <text x="450" y="448" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="11" fill="#555">Foutmarges dalen naarmate het jaar vordert — vanaf week 30 is de voorspelling betrouwbaar</text>
+</svg>
