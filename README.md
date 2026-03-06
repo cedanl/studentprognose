@@ -4,8 +4,10 @@
   </a>
 
   <p>
+    <a href="#"><img src="https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white" alt="Windows"></a>
     <a href="#"><img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=F0F0F0" alt="macOS"></a>
     <a href="#"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" alt="Linux"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
     <img src="https://badgen.net/github/last-commit/cedanl/studentprognose" alt="GitHub Last Commit">
     <img src="https://badgen.net/github/contributors/cedanl/studentprognose" alt="Contributors">
     <img src="https://img.shields.io/github/license/cedanl/studentprognose" alt="GitHub License">
@@ -21,7 +23,10 @@ Het **Studentprognose Model** helpt onderwijsinstellingen om de instroom van stu
 Hierdoor kunnen instellingen tijdig roosters, personeel en financiele middelen plannen. Bekijk ook een [interview](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten) over het model.
 
 > [!TIP]
-> **Nieuw:** CI Test modus met `--ci test <N>` — draai snelle tests op een subset van de data. Ideaal voor development en CI/CD pipelines.
+> **Wat is nieuw?**
+> - CI Test modus met `--ci test <N>` — draai snelle tests op een subset van de data
+> - Naamgeving outputbestanden op basis van runmode (first-years / higher-years / volume)
+> - Bugfix: individuele runs met demobestand werken nu correct
 
 ---
 
@@ -40,7 +45,7 @@ uv run main.py
 ```
 
 > [!NOTE]
-> Controleer de data om te zien welke jaren en weken beschikbaar zijn. Zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data. Zorg dat `configuration/configuration.json` de juiste bestandspaden bevat.
+> Controleer de data om te zien welke jaren en weken beschikbaar zijn. Zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data.
 
 ---
 
@@ -202,9 +207,6 @@ Transformeert ruwe Studielink-telbestanden naar het cumulatieve dataformaat dat 
 uv run scripts/standalone/rowbind_and_reformat_studielink_data.py
 ```
 
-> [!NOTE]
-> Pas het bestandspad in het script aan naar jouw situatie.
-
 ---
 
 ## 📈 Hogerjaars voorspellen
@@ -261,12 +263,10 @@ Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de ar
 ## 📊 Voorbeeldresultaten
 
 <div align="center">
-
-*De groene lijn is het uiteindelijke aantal inschrijvingen. De modellen (paarse en gele lijnen) zijn al stabiel sinds maart (week 14), waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen.*
-
-<img src="https://github.com/user-attachments/assets/8aff378c-74d7-4d97-86ed-00d28491a4b4" width="600">
-
+  <img src="doc/example_output.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
 </div>
+
+> De modellen convergeren al vroeg in het jaar, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen over de verwachte instroom.
 
 ---
 

@@ -1,0 +1,168 @@
+<svg viewBox="0 0 900 420" width="900" height="420" xmlns="http://www.w3.org/2000/svg">
+  <foreignObject width="100%" height="100%">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <style>
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes drawLine { from { stroke-dashoffset: 1000; } to { stroke-dashoffset: 0; } }
+        .card {
+          font-family: 'Segoe UI', Arial, sans-serif;
+          background: #1a1a2e;
+          border-radius: 14px;
+          padding: 28px 32px;
+          color: #e0e0e0;
+          width: 100%;
+          height: 420px;
+          box-sizing: border-box;
+          animation: fadeIn 0.8s ease;
+        }
+        .card-title {
+          font-size: 18px;
+          font-weight: 600;
+          color: white;
+          margin-bottom: 4px;
+        }
+        .card-subtitle {
+          font-size: 12px;
+          color: #888;
+          margin-bottom: 18px;
+        }
+        .metrics {
+          display: flex;
+          gap: 20px;
+          margin-bottom: 20px;
+        }
+        .metric {
+          background: rgba(255,255,255,0.05);
+          border-radius: 10px;
+          padding: 12px 18px;
+          flex: 1;
+        }
+        .metric-label {
+          font-size: 11px;
+          color: #888;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+        }
+        .metric-value {
+          font-size: 24px;
+          font-weight: 700;
+          margin-top: 2px;
+        }
+        .green { color: #92FE9D; }
+        .blue { color: #00C9FF; }
+        .purple { color: #b388ff; }
+        .yellow { color: #ffd54f; }
+        .legend {
+          display: flex;
+          gap: 18px;
+          margin-bottom: 14px;
+          font-size: 12px;
+        }
+        .legend-item {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+        }
+        .legend-dot {
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          display: inline-block;
+        }
+        .chart-area {
+          position: relative;
+          width: 100%;
+          height: 190px;
+          border-left: 1px solid #333;
+          border-bottom: 1px solid #333;
+          box-sizing: border-box;
+        }
+        .y-label {
+          position: absolute;
+          left: -4px;
+          font-size: 10px;
+          color: #555;
+          transform: translateX(-100%);
+        }
+        .x-labels {
+          display: flex;
+          justify-content: space-between;
+          font-size: 10px;
+          color: #555;
+          padding-top: 4px;
+          padding-left: 0;
+        }
+        .grid-line {
+          position: absolute;
+          left: 0;
+          right: 0;
+          height: 1px;
+          background: #222;
+        }
+      </style>
+      <div class="card">
+        <div class="card-title">B Kunstmatige Intelligentie — Eerstejaars NL</div>
+        <div class="card-subtitle">Collegejaar 2024/2025 · Voorspelling vs. werkelijk</div>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="metric-label">Werkelijk</div>
+            <div class="metric-value green">287</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">SARIMA</div>
+            <div class="metric-value blue">279</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">XGBoost</div>
+            <div class="metric-value purple">283</div>
+          </div>
+          <div class="metric">
+            <div class="metric-label">Ensemble</div>
+            <div class="metric-value yellow">281</div>
+          </div>
+        </div>
+
+        <div class="legend">
+          <div class="legend-item"><span class="legend-dot" style="background:#92FE9D"></span> Werkelijk</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#00C9FF"></span> SARIMA</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#b388ff"></span> XGBoost</div>
+          <div class="legend-item"><span class="legend-dot" style="background:#ffd54f"></span> Ensemble</div>
+        </div>
+
+        <div class="chart-area">
+          <div class="grid-line" style="top: 0%;"><span class="y-label">300</span></div>
+          <div class="grid-line" style="top: 25%;"><span class="y-label">250</span></div>
+          <div class="grid-line" style="top: 50%;"><span class="y-label">200</span></div>
+          <div class="grid-line" style="top: 75%;"><span class="y-label">150</span></div>
+          <div class="grid-line" style="top: 100%;"><span class="y-label">100</span></div>
+
+          <svg viewBox="0 0 800 190" width="100%" height="100%" preserveAspectRatio="none" style="position:absolute;top:0;left:0">
+            <!-- Werkelijk (green) -->
+            <polyline points="0,180 80,170 160,155 240,140 320,115 400,95 480,72 560,55 640,38 720,22 800,16"
+                      fill="none" stroke="#92FE9D" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+            <!-- SARIMA (blue) -->
+            <polyline points="0,178 80,168 160,158 240,142 320,118 400,100 480,78 560,60 640,42 720,28 800,22"
+                      fill="none" stroke="#00C9FF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+            <!-- XGBoost (purple) -->
+            <polyline points="0,176 80,172 160,160 240,138 320,120 400,98 480,75 560,58 640,40 720,25 800,19"
+                      fill="none" stroke="#b388ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.8"/>
+            <!-- Ensemble (yellow) -->
+            <polyline points="0,177 80,169 160,157 240,139 320,117 400,97 480,76 560,58 640,40 720,26 800,20"
+                      fill="none" stroke="#ffd54f" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6,3" opacity="0.8"/>
+            <!-- Glow dots at end -->
+            <circle cx="800" cy="16" r="4" fill="#92FE9D" opacity="0.9"/>
+            <circle cx="800" cy="22" r="3" fill="#00C9FF" opacity="0.7"/>
+            <circle cx="800" cy="19" r="3" fill="#b388ff" opacity="0.7"/>
+            <circle cx="800" cy="20" r="3" fill="#ffd54f" opacity="0.7"/>
+          </svg>
+        </div>
+
+        <div class="x-labels">
+          <span>wk 1</span><span>wk 5</span><span>wk 10</span><span>wk 15</span><span>wk 20</span>
+          <span>wk 25</span><span>wk 30</span><span>wk 35</span><span>wk 40</span><span>wk 45</span><span>wk 52</span>
+        </div>
+      </div>
+    </div>
+  </foreignObject>
+</svg>
