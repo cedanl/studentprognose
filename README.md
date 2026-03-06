@@ -7,6 +7,7 @@
     <a href="#"><img src="https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white" alt="Windows"></a>
     <a href="#"><img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=F0F0F0" alt="macOS"></a>
     <a href="#"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" alt="Linux"></a>
+    <br>
     <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
     <img src="https://badgen.net/github/last-commit/cedanl/studentprognose" alt="GitHub Last Commit">
     <img src="https://badgen.net/github/contributors/cedanl/studentprognose" alt="Contributors">
@@ -267,6 +268,9 @@ Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de ar
 </div>
 
 > De modellen convergeren al vroeg in het jaar, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen over de verwachte instroom.
+
+<!-- Voeg hier een GIF toe van de interactieve output: doc/demo.gif -->
+<!-- Maak deze aan met een screen recording van `uv run main.py` output -->
 
 ---
 
