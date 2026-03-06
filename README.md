@@ -19,15 +19,38 @@
 
 ## Wat is het?
 
-Het **Studentprognose Model** helpt onderwijsinstellingen om de instroom van studenten te voorspellen. Dit model maakt gebruik van historische data en geavanceerde algoritmes om betrouwbare voorspellingen te doen.
+Het **Studentprognose Model** helpt onderwijsinstellingen om de instroom van studenten te voorspellen op basis van historische aanmelddata. Het model voorspelt eerstejaars, hogerjaars en het totale studentvolume per opleiding.
 
-Hierdoor kunnen instellingen tijdig roosters, personeel en financiele middelen plannen. Bekijk ook een [interview](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten) over het model.
+Hierdoor kunnen instellingen tijdig roosters, personeel en financiele middelen plannen. Het model wordt o.a. ingezet door de [Radboud Universiteit](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten).
+
+### Waarom dit model?
+
+| | |
+|---|---|
+| **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
+| **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
+| **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
+| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input` |
+
+### Voor wie?
+
+Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig — configuratie en het draaien van het model gebeurt via de command line.
 
 > [!TIP]
 > **Wat is nieuw?**
 > - CI Test modus met `--ci test <N>` — draai snelle tests op een subset van de data
 > - Naamgeving outputbestanden op basis van runmode (first-years / higher-years / volume)
 > - Bugfix: individuele runs met demobestand werken nu correct
+
+---
+
+## 📊 Voorbeeldresultaten
+
+<div align="center">
+  <img src="doc/chart_v2_glow.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
+</div>
+
+> De ensemble voorspelling convergeert al vroeg in het jaar. Het betrouwbaarheidsinterval wordt smaller naarmate meer data binnenkomt, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen.
 
 ---
 
@@ -41,12 +64,12 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 git clone https://github.com/cedanl/studentprognose.git
 cd studentprognose
 
-# 3. Draai het model
+# 3. Draai het model met demodata
 uv run main.py
 ```
 
 > [!NOTE]
-> Controleer de data om te zien welke jaren en weken beschikbaar zijn. Zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data.
+> Demodata is meegeleverd in `data/input`, zodat je direct kunt starten. Controleer welke jaren en weken beschikbaar zijn — zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data.
 
 ---
 
@@ -261,28 +284,9 @@ Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de ar
 
 ---
 
-## 📊 Voorbeeldresultaten
-
-<div align="center">
-  <img src="doc/chart_v2_glow.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
-</div>
-
-> De ensemble voorspelling convergeert al vroeg in het jaar. Het betrouwbaarheidsinterval wordt smaller naarmate meer data binnenkomt, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen.
-
----
-
-## 🗺️ Roadmap
-
-- [ ] Interactief dashboard — voorspellingen verkennen in de browser i.p.v. Excel ([#24](https://github.com/cedanl/studentprognose/issues/24))
-- [ ] Bring-your-own-data — upload je eigen data en draai voorspellingen via Streamlit ([#30](https://github.com/cedanl/studentprognose/issues/30))
-- [ ] Executables — dubbelklik om te starten, geen Python-installatie nodig ([#10](https://github.com/cedanl/studentprognose/issues/10))
-- [ ] Validatie met partnerinstellingen — nauwkeurigheid toetsen op echte data ([#30](https://github.com/cedanl/studentprognose/issues/30))
-
----
-
 ## 🤝 Bijdragen
 
-Wil je bijdragen? Sluit je aan bij de [werkgroep](https://edu.nl/6d69d).
+Dit project wordt actief onderhouden door [CEDA](https://github.com/cedanl). Wil je bijdragen of meedenken? Sluit je aan bij de [werkgroep](https://edu.nl/6d69d).
 
 ## 🆘 Ondersteuning
 
