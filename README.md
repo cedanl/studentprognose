@@ -3,54 +3,24 @@
     <img src="doc/header.svg" alt="Studentprognose" style="max-width: 100%;">
   </a>
 
+  <h3>Voorspel de instroom van studenten. Lokaal, privacyvriendelijk, open source.</h3>
+
   <p>
+    <a href="https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten"><img src="https://img.shields.io/badge/Ingezet_door-Radboud_Universiteit-darkred" alt="Radboud Universiteit"></a>
+    <a href="https://github.com/cedanl"><img src="https://img.shields.io/badge/Onderhouden_door-CEDA-blue" alt="CEDA"></a>
+    <img src="https://badgen.net/github/contributors/cedanl/studentprognose" alt="Contributors">
+    <img src="https://img.shields.io/github/license/cedanl/studentprognose" alt="GitHub License">
+    <br>
+    <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
     <a href="#"><img src="https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white" alt="Windows"></a>
     <a href="#"><img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=F0F0F0" alt="macOS"></a>
     <a href="#"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" alt="Linux"></a>
-    <br>
-    <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
-    <img src="https://badgen.net/github/last-commit/cedanl/studentprognose" alt="GitHub Last Commit">
-    <img src="https://badgen.net/github/contributors/cedanl/studentprognose" alt="Contributors">
-    <img src="https://img.shields.io/github/license/cedanl/studentprognose" alt="GitHub License">
   </p>
-</div>
 
----
-
-## Wat is het?
-
-Het **Studentprognose Model** helpt onderwijsinstellingen om de instroom van studenten te voorspellen op basis van historische aanmelddata. Het model voorspelt eerstejaars, hogerjaars en het totale studentvolume per opleiding.
-
-Hierdoor kunnen instellingen tijdig roosters, personeel en financiele middelen plannen. Het model wordt o.a. ingezet door de [Radboud Universiteit](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten).
-
-### Waarom dit model?
-
-| | |
-|---|---|
-| **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
-| **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
-| **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
-| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input` |
-
-### Voor wie?
-
-Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig — configuratie en het draaien van het model gebeurt via de command line.
-
-> [!TIP]
-> **Wat is nieuw?**
-> - CI Test modus met `--ci test <N>` — draai snelle tests op een subset van de data
-> - Naamgeving outputbestanden op basis van runmode (first-years / higher-years / volume)
-> - Bugfix: individuele runs met demobestand werken nu correct
-
----
-
-## 📊 Voorbeeldresultaten
-
-<div align="center">
   <img src="doc/chart_v2_glow.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
+  <br>
+  <sub>De ensemble voorspelling convergeert al vroeg in het jaar — instellingen krijgen maanden van tevoren betrouwbare inzichten.</sub>
 </div>
-
-> De ensemble voorspelling convergeert al vroeg in het jaar. Het betrouwbaarheidsinterval wordt smaller naarmate meer data binnenkomt, waardoor instellingen maanden van tevoren betrouwbare inzichten krijgen.
 
 ---
 
@@ -70,6 +40,25 @@ uv run main.py
 
 > [!NOTE]
 > Demodata is meegeleverd in `data/input`, zodat je direct kunt starten. Controleer welke jaren en weken beschikbaar zijn — zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data.
+
+---
+
+## Waarom dit model?
+
+Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig.
+
+| | |
+|---|---|
+| **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
+| **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
+| **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
+| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input` |
+
+> [!TIP]
+> **Wat is nieuw?**
+> - CI Test modus met `--ci test <N>` — draai snelle tests op een subset van de data
+> - Naamgeving outputbestanden op basis van runmode (first-years / higher-years / volume)
+> - Bugfix: individuele runs met demobestand werken nu correct
 
 ---
 
