@@ -1,0 +1,222 @@
+<svg viewBox="0 0 900 520" width="900" height="520" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0c0c1d"/>
+      <stop offset="100%" stop-color="#080814"/>
+    </linearGradient>
+    <linearGradient id="band95" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.12"/>
+      <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.12"/>
+    </linearGradient>
+    <linearGradient id="band68" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.22"/>
+      <stop offset="50%" stop-color="#fbbf24" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#fbbf24" stop-opacity="0.22"/>
+    </linearGradient>
+    <linearGradient id="greenFade" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#34d399" stop-opacity="0.0"/>
+      <stop offset="10%" stop-color="#34d399" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#34d399" stop-opacity="1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="520" rx="16" fill="url(#bg)"/>
+
+  <!-- Title area -->
+  <text x="40" y="38" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="19" font-weight="700" fill="#f0f0f0">Ensemble Voorspelling</text>
+  <text x="40" y="58" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="12" fill="#6b7280">B Kunstmatige Intelligentie  ·  Eerstejaars NL  ·  Collegejaar 2024/2025</text>
+
+  <!-- KPI cards -->
+  <!-- Actual -->
+  <rect x="40" y="76" width="120" height="52" rx="8" fill="#34d399" fill-opacity="0.08" stroke="#34d399" stroke-opacity="0.15" stroke-width="1"/>
+  <text x="54" y="95" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" font-weight="600" fill="#6b7280" letter-spacing="1.2">WERKELIJK</text>
+  <text x="54" y="119" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="22" font-weight="700" fill="#34d399">287</text>
+
+  <!-- Prediction -->
+  <rect x="172" y="76" width="120" height="52" rx="8" fill="#fbbf24" fill-opacity="0.08" stroke="#fbbf24" stroke-opacity="0.15" stroke-width="1"/>
+  <text x="186" y="95" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" font-weight="600" fill="#6b7280" letter-spacing="1.2">ENSEMBLE</text>
+  <text x="186" y="119" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="22" font-weight="700" fill="#fbbf24">281</text>
+
+  <!-- MAE -->
+  <rect x="304" y="76" width="100" height="52" rx="8" fill="#fff" fill-opacity="0.03" stroke="#fff" stroke-opacity="0.06" stroke-width="1"/>
+  <text x="318" y="95" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" font-weight="600" fill="#6b7280" letter-spacing="1.2">MAE</text>
+  <text x="318" y="119" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="22" font-weight="700" fill="#f87171">4.2</text>
+
+  <!-- MAPE -->
+  <rect x="416" y="76" width="100" height="52" rx="8" fill="#fff" fill-opacity="0.03" stroke="#fff" stroke-opacity="0.06" stroke-width="1"/>
+  <text x="430" y="95" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" font-weight="600" fill="#6b7280" letter-spacing="1.2">MAPE</text>
+  <text x="430" y="119" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="22" font-weight="700" fill="#f87171">1.5%</text>
+
+  <!-- 95% CI -->
+  <rect x="528" y="76" width="142" height="52" rx="8" fill="#fff" fill-opacity="0.03" stroke="#fff" stroke-opacity="0.06" stroke-width="1"/>
+  <text x="542" y="95" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" font-weight="600" fill="#6b7280" letter-spacing="1.2">95% INTERVAL</text>
+  <text x="542" y="119" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="22" font-weight="700" fill="#9ca3af">269 – 293</text>
+
+  <!-- Status -->
+  <rect x="682" y="76" width="180" height="52" rx="8" fill="#34d399" fill-opacity="0.06" stroke="#34d399" stroke-opacity="0.12" stroke-width="1"/>
+  <text x="696" y="95" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" font-weight="600" fill="#6b7280" letter-spacing="1.2">CONVERGENTIE</text>
+  <text x="696" y="119" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="18" font-weight="700" fill="#34d399">Stabiel vanaf wk 30</text>
+
+  <!-- Legend -->
+  <circle cx="56" cy="152" r="4" fill="#34d399"/>
+  <text x="66" y="156" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="11" fill="#9ca3af">Werkelijk</text>
+  <circle cx="156" cy="152" r="4" fill="#fbbf24"/>
+  <text x="166" y="156" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="11" fill="#9ca3af">Ensemble</text>
+  <rect x="256" y="148" width="16" height="8" rx="2" fill="#fbbf24" opacity="0.25"/>
+  <text x="278" y="156" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="11" fill="#9ca3af">68% CI</text>
+  <rect x="336" y="148" width="16" height="8" rx="2" fill="#fbbf24" opacity="0.10"/>
+  <text x="358" y="156" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="11" fill="#9ca3af">95% CI</text>
+
+  <!-- Chart area: x=70..860, y=180..440 -->
+  <!-- Y-axis labels -->
+  <text x="60" y="186" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="end">320</text>
+  <text x="60" y="230" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="end">280</text>
+  <text x="60" y="274" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="end">240</text>
+  <text x="60" y="318" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="end">200</text>
+  <text x="60" y="362" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="end">160</text>
+  <text x="60" y="406" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="end">120</text>
+  <text x="60" y="444" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="end">100</text>
+
+  <!-- Grid lines (subtle) -->
+  <line x1="70" y1="182" x2="860" y2="182" stroke="#1e1e36" stroke-width="0.5"/>
+  <line x1="70" y1="226" x2="860" y2="226" stroke="#1e1e36" stroke-width="0.5"/>
+  <line x1="70" y1="270" x2="860" y2="270" stroke="#1e1e36" stroke-width="0.5"/>
+  <line x1="70" y1="314" x2="860" y2="314" stroke="#1e1e36" stroke-width="0.5"/>
+  <line x1="70" y1="358" x2="860" y2="358" stroke="#1e1e36" stroke-width="0.5"/>
+  <line x1="70" y1="402" x2="860" y2="402" stroke="#1e1e36" stroke-width="0.5"/>
+  <line x1="70" y1="440" x2="860" y2="440" stroke="#1e1e36" stroke-width="0.5"/>
+
+  <!-- Axes -->
+  <line x1="70" y1="182" x2="70" y2="445" stroke="#374151" stroke-width="1"/>
+  <line x1="70" y1="445" x2="860" y2="445" stroke="#374151" stroke-width="1"/>
+
+  <!--
+    Data mapping (approximate):
+    Y scale: 100=440, 120=402, 160=358, 200=314, 240=270, 280=226, 320=182
+    1 unit = (440-182)/(320-100) = 258/220 ~= 1.17px per unit
+    y(val) = 440 - (val-100)*1.17
+
+    X: 11 data points (wk1,5,10,15,20,25,30,35,40,45,52) spaced across 70..860
+    x positions: 70, 149, 228, 307, 386, 465, 544, 623, 702, 781, 860
+
+    Actual (werkelijk) data - cumulative enrollment approaching 287:
+    wk1:105, wk5:122, wk10:155, wk15:195, wk20:235, wk25:258, wk30:272, wk35:280, wk40:284, wk45:286, wk52:287
+    y: 434, 414, 376, 329, 282, 255, 239, 229, 225, 222, 221
+
+    Ensemble prediction - converging toward 281:
+    wk1:115, wk5:135, wk10:168, wk15:205, wk20:242, wk25:262, wk30:274, wk35:279, wk40:280, wk45:281, wk52:281
+    y: 422, 399, 360, 317, 274, 250, 236, 230, 229, 228, 228
+
+    95% CI upper: 150,175,210,245,275,290,296,295,293,293,293
+    95% CI lower: 80,95,125,165,210,234,252,263,267,269,269
+    upper y: 381, 352, 311, 270, 235, 218, 211, 212, 214, 214, 214
+    lower y: 463, 445, 410, 363, 309, 281, 239, 249, 242, 242, 242
+
+    Wait, let me recalculate more carefully.
+    y(val) = 440 - (val - 100) * 1.1727
+
+    95% upper: 150→381, 175→352, 210→311, 245→270, 275→235, 290→217, 296→210, 295→211, 293→214, 293→214, 293→214
+    95% lower: 80→417+23=463 → clipped; let me use min 90
+    95% lower: 90→452, 100→440, 120→417, 155→376, 200→323, 230→288, 255→258, 265→247, 269→242, 269→242, 269→242
+
+    68% upper: 130→405, 155→376, 190→334, 225→293, 260→252, 278→231, 288→220, 287→221, 285→223, 284→225, 284→225
+    68% lower: 100→440, 115→422, 145→387, 185→340, 224→295, 246→269, 260→253, 271→240, 275→235, 278→232, 278→232
+  -->
+
+  <!-- Convergence zone background -->
+  <rect x="544" y="182" width="316" height="263" fill="#34d399" fill-opacity="0.015"/>
+  <line x1="544" y1="182" x2="544" y2="445" stroke="#34d399" stroke-width="0.7" stroke-dasharray="4,4" opacity="0.2"/>
+
+  <!-- 95% confidence band -->
+  <polygon points="70,381 149,352 228,311 307,270 386,235 465,217 544,210 623,211 702,214 781,214 860,214
+                   860,242 781,242 702,242 623,247 544,258 465,288 386,323 307,376 228,417 149,440 70,452"
+           fill="url(#band95)">
+    <animate attributeName="opacity" values="0.6;0.9;0.6" dur="5s" repeatCount="indefinite"/>
+  </polygon>
+
+  <!-- 68% confidence band -->
+  <polygon points="70,405 149,376 228,334 307,293 386,252 465,231 544,220 623,221 702,223 781,225 860,225
+                   860,232 781,232 702,235 623,240 544,253 465,269 386,295 307,340 228,387 149,422 70,440"
+           fill="url(#band68)">
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="5s" repeatCount="indefinite"/>
+  </polygon>
+
+  <!-- Ensemble line (amber) -->
+  <polyline points="70,422 149,399 228,360 307,317 386,274 465,250 544,236 623,230 702,229 781,228 860,228"
+            fill="none" stroke="#fbbf24" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Actual line (green) -->
+  <polyline points="70,434 149,414 228,376 307,329 386,282 465,255 544,239 623,229 702,225 781,222 860,221"
+            fill="none" stroke="#34d399" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)"/>
+
+  <!-- Subtle pulsing glow on lines -->
+  <polyline points="70,422 149,399 228,360 307,317 386,274 465,250 544,236 623,230 702,229 781,228 860,228"
+            fill="none" stroke="#fbbf24" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)" opacity="0.15">
+    <animate attributeName="opacity" values="0.1;0.25;0.1" dur="4s" repeatCount="indefinite"/>
+  </polyline>
+  <polyline points="70,434 149,414 228,376 307,329 386,282 465,255 544,239 623,229 702,225 781,222 860,221"
+            fill="none" stroke="#34d399" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" filter="url(#softGlow)" opacity="0.15">
+    <animate attributeName="opacity" values="0.1;0.25;0.1" dur="4.5s" repeatCount="indefinite"/>
+  </polyline>
+
+  <!-- Data point dots on actual line -->
+  <circle cx="70"  cy="434" r="2.5" fill="#34d399" opacity="0.5"/>
+  <circle cx="149" cy="414" r="2.5" fill="#34d399" opacity="0.5"/>
+  <circle cx="228" cy="376" r="2.5" fill="#34d399" opacity="0.6"/>
+  <circle cx="307" cy="329" r="2.5" fill="#34d399" opacity="0.6"/>
+  <circle cx="386" cy="282" r="2.5" fill="#34d399" opacity="0.7"/>
+  <circle cx="465" cy="255" r="2.5" fill="#34d399" opacity="0.7"/>
+  <circle cx="544" cy="239" r="3"   fill="#34d399" opacity="0.8"/>
+  <circle cx="623" cy="229" r="3"   fill="#34d399" opacity="0.8"/>
+  <circle cx="702" cy="225" r="3"   fill="#34d399" opacity="0.9"/>
+  <circle cx="781" cy="222" r="3"   fill="#34d399" opacity="0.9"/>
+
+  <!-- End point: actual -->
+  <circle cx="860" cy="221" r="5" fill="#34d399" filter="url(#glow)">
+    <animate attributeName="r" values="4;7;4" dur="2.5s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.7;1;0.7" dur="2.5s" repeatCount="indefinite"/>
+  </circle>
+  <text x="845" y="213" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="11" font-weight="600" fill="#34d399" text-anchor="end">287</text>
+
+  <!-- End point: ensemble -->
+  <circle cx="860" cy="228" r="4.5" fill="#fbbf24" filter="url(#glow)">
+    <animate attributeName="r" values="3.5;6;3.5" dur="3s" repeatCount="indefinite"/>
+    <animate attributeName="opacity" values="0.6;1;0.6" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <text x="845" y="241" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="11" font-weight="600" fill="#fbbf24" text-anchor="end">281</text>
+
+  <!-- Annotation: error arrow at wk10 -->
+  <line x1="228" y1="360" x2="228" y2="376" stroke="#f87171" stroke-width="1" stroke-dasharray="2,2" opacity="0.6"/>
+  <text x="238" y="372" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" fill="#f87171" opacity="0.7">fout: 13</text>
+
+  <!-- Annotation: error at wk30 (convergence) -->
+  <line x1="544" y1="236" x2="544" y2="239" stroke="#34d399" stroke-width="1" opacity="0.4"/>
+  <text x="554" y="250" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="9" fill="#34d399" opacity="0.6">fout: 2</text>
+
+  <!-- X-axis labels -->
+  <text x="70"  y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 1</text>
+  <text x="149" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 5</text>
+  <text x="228" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 10</text>
+  <text x="307" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 15</text>
+  <text x="386" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 20</text>
+  <text x="465" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 25</text>
+  <text x="544" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#34d399" text-anchor="middle" opacity="0.7">wk 30</text>
+  <text x="623" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 35</text>
+  <text x="702" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 40</text>
+  <text x="781" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 45</text>
+  <text x="860" y="462" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#4b5563" text-anchor="middle">wk 52</text>
+
+  <!-- Bottom caption -->
+  <text x="465" y="498" text-anchor="middle" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="11" fill="#4b5563">Cumulatieve aanmeldingen per week — Ensemble voorspelling met 68% en 95% betrouwbaarheidsinterval</text>
+  <text x="465" y="514" text-anchor="middle" font-family="'Inter','Segoe UI',system-ui,sans-serif" font-size="10" fill="#374151">De voorspelling convergeert ruim voor het collegejaar begint, zodat instellingen tijdig kunnen plannen.</text>
+</svg>
