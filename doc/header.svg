@@ -1,0 +1,56 @@
+<svg width="800" height="200" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0F2027"/>
+      <stop offset="50%" style="stop-color:#203A43"/>
+      <stop offset="100%" style="stop-color:#2C5364"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#00C9FF"/>
+      <stop offset="100%" style="stop-color:#92FE9D"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="800" height="200" rx="12" fill="url(#bg)"/>
+
+  <!-- Chart lines decoration -->
+  <polyline points="50,160 120,140 190,145 260,120 330,100 400,110 470,80 540,60 610,65 680,40 750,30"
+            fill="none" stroke="url(#accent)" stroke-width="2.5" opacity="0.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="50,170 120,155 190,160 260,140 330,135 400,125 470,105 540,95 610,85 680,70 750,55"
+            fill="none" stroke="#00C9FF" stroke-width="1.5" opacity="0.15" stroke-dasharray="6,4"/>
+
+  <!-- Dot accents -->
+  <circle cx="470" cy="80" r="4" fill="#92FE9D" opacity="0.5"/>
+  <circle cx="680" cy="40" r="4" fill="#00C9FF" opacity="0.5"/>
+  <circle cx="750" cy="30" r="5" fill="#92FE9D" opacity="0.6" filter="url(#glow)"/>
+
+  <!-- Icon: graduation cap -->
+  <g transform="translate(310, 40)" fill="url(#accent)" filter="url(#glow)">
+    <polygon points="25,10 0,25 25,40 50,25" opacity="0.9"/>
+    <rect x="23" y="25" width="4" height="18" rx="1" opacity="0.7"/>
+    <path d="M10,27 L10,42 Q25,52 40,42 L40,27" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.7"/>
+  </g>
+
+  <!-- Title -->
+  <text x="400" y="110" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="40" font-weight="700" fill="white" filter="url(#glow)">
+    Studentprognose
+  </text>
+
+  <!-- Subtitle -->
+  <text x="400" y="140" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="16" fill="url(#accent)" letter-spacing="2">
+    Voorspel studentinstroom met geavanceerde modellen
+  </text>
+
+  <!-- Version pill -->
+  <rect x="335" y="152" width="130" height="24" rx="12" fill="white" opacity="0.1"/>
+  <text x="400" y="169" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#92FE9D" letter-spacing="1">
+    SARIMA + XGBoost
+  </text>
+</svg>
