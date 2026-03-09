@@ -18,9 +18,6 @@
     <a href="#"><img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" alt="Linux"></a>
   </p>
 
-  <img src="doc/chart_v2_glow.svg" alt="Voorbeeldresultaten" style="max-width: 100%;">
-  <br>
-  <sub>De ensemble voorspelling convergeert al vroeg in het jaar — instellingen krijgen maanden van tevoren betrouwbare inzichten.</sub>
 </div>
 
 ---
@@ -44,6 +41,13 @@ uv run main.py
 
 ---
 
+## 🗃️ Studielink Data
+
+> [!IMPORTANT]
+> Dit model werkt met **Studielink-telbestanden**. Je hebt deze data nodig om voorspellingen te maken voor jouw instelling. Demodata is meegeleverd zodat je het model eerst kunt uitproberen.
+
+---
+
 ## Waarom dit model?
 
 Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig.
@@ -54,12 +58,6 @@ Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen
 | **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
 | **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
 | **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input` |
-
-> [!TIP]
-> **Wat is nieuw?**
-> - CI Test modus met `--ci test <N>` — draai snelle tests op een subset van de data
-> - Naamgeving outputbestanden op basis van runmode (first-years / higher-years / volume)
-> - Bugfix: individuele runs met demobestand werken nu correct
 
 ---
 
@@ -158,30 +156,6 @@ uv run main.py -y 2025 -w 5 -d c
 | Filtering               | `-f` of `-F`   | `-filtering`     | Pad naar filterbestand                      |
 | Studentjaarvoorspelling | `-sy` of `-SY` | `-studentyear`   | `f`/`first-years`, `h`/`higher-years`, `v`/`volume` |
 | Skip jaren              | `-sk` of `-SK` | `-skipyears`     | Aantal jaren om over te slaan               |
-| CI test                 | `--ci`         |                  | `test <N>` (zie hieronder)                  |
-
----
-
-## 🧪 CI Test modus
-
-Met de `--ci test <N>` vlag kun je een snellere run doen op een subset van de data. Dit is handig voor testen tijdens development en in CI/CD pipelines.
-
-```bash
-uv run main.py -D cumulative -y 2024 -w 20 --ci test 10
-```
-
-Dit doet het volgende:
-- Filtert alle datasets naar `Collegejaar >= 2022`
-- Selecteert `N` programma's met een vaste seed (42), zodat iedereen dezelfde resultaten krijgt
-- De subset wordt in-memory aangemaakt en niet naar schijf geschreven
-
-De `--ci test` vlag is te combineren met andere vlaggen:
-
-```bash
-uv run main.py -D individual -y 2024 -w 10 --ci test 5
-uv run main.py -D both -y 2024 -w 20 --ci test 15
-```
-
 ---
 
 ## 🔧 Standalone scripts
@@ -288,3 +262,4 @@ Voor vragen of problemen:
 <div align="center">
   <sub>Gebouwd met ❤️ door de <a href="https://github.com/cedanl">CEDANL</a> community</sub>
 </div>
+
