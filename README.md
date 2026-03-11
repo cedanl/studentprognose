@@ -99,37 +99,6 @@ uv run main.py -c pad/naar/configuration.json
 uv run main.py -configuration langer/pad/naar/config.json
 ```
 
-### Filtering
-
-Het filterbestand bepaalt welke opleidingen, herkomst en examentypen worden meegenomen. Standaard: `configuration/filtering/base.json`.
-
-```bash
-uv run main.py -f pad/naar/filtering.json
-uv run main.py -filtering langer/pad/naar/filtering.json
-```
-
-Voorbeeld van een filterbestand:
-
-```json
-{
-    "filtering": {
-        "programme": ["B Sociologie"],
-        "herkomst": ["NL", "EER"],
-        "examentype": ["Bachelor"]
-    }
-}
-```
-
-### Studentjaarvoorspelling
-
-Kies welk type voorspelling je wilt maken:
-
-```bash
-uv run main.py -sy first-years    # Eerstejaars (standaard)
-uv run main.py -sy higher-years   # Hogerjaars
-uv run main.py -sy volume         # Totaal volume
-```
-
 ### Uitgebreid voorbeeld
 
 Voorspel eerstejaars voor 2023 en 2024, weken 10 t/m 20, met beide datasets:
@@ -153,67 +122,6 @@ uv run main.py -y 2025 -w 5 -d c
 | Slicing                 |                |                  | Gebruik `:` voor reeksen, bijv. `10 : 20`   |
 | Dataset                 | `-d` of `-D`   | `-dataset`       | `i`/`individual`, `c`/`cumulative`, `b`/`both` |
 | Configuratie            | `-c` of `-C`   | `-configuration` | Pad naar configuratiebestand                |
-| Filtering               | `-f` of `-F`   | `-filtering`     | Pad naar filterbestand                      |
-| Studentjaarvoorspelling | `-sy` of `-SY` | `-studentyear`   | `f`/`first-years`, `h`/`higher-years`, `v`/`volume` |
-| Skip jaren              | `-sk` of `-SK` | `-skipyears`     | Aantal jaren om over te slaan               |
----
-
-## 🔧 Standalone scripts
-
-### Studentaantallen berekenen
-
-Genereert bestanden met geaggregeerde studentaantallen op basis van Octoberdata:
-
-```bash
-uv run scripts/standalone/calculate_student_count.py
-```
-
-### Ensemble gewichten berekenen
-
-Berekent gewichten voor de ensemble-voorspelling op basis van eerdere prestaties:
-
-```bash
-uv run scripts/standalone/calculate_ensemble_weights.py
-uv run scripts/standalone/calculate_ensemble_weights.py -y 2023
-uv run scripts/standalone/calculate_ensemble_weights.py -year 2023 2024
-uv run scripts/standalone/calculate_ensemble_weights.py -y 2022 : 2024
-```
-
-### Studentaantallen toevoegen en fouten berekenen
-
-Bij voorspellingen voor historische jaren worden werkelijke aantallen automatisch toegevoegd. Voor toekomstige jaren kun je, zodra de werkelijke data beschikbaar zijn, het volgende uitvoeren:
-
-```bash
-uv run scripts/standalone/append_studentcount_and_compute_errors.py
-```
-
-### Studielink data transformeren
-
-Transformeert ruwe Studielink-telbestanden naar het cumulatieve dataformaat dat het model gebruikt:
-
-```bash
-uv run scripts/standalone/rowbind_and_reformat_studielink_data.py
-```
-
----
-
-## 📈 Hogerjaars voorspellen
-
-De voorspelling voor hogerjaars studenten is gebaseerd op een lineair model:
-
-$$
-\text{volgend jaar hogerjaars} = \text{huidig jaar hogerjaars} + (\text{huidig jaar eerstejaars} \times \text{ratio doorstroom}) - (\text{huidig jaar hogerjaars} \times \text{ratio uitval})
-$$
-
-De ratio's worden automatisch berekend op basis van de drie voorgaande jaren.
-
-```bash
-uv run scripts/higher_years/higher_years.py
-uv run scripts/higher_years/higher_years.py -y 2023
-uv run scripts/higher_years/higher_years.py -year 2023 2024
-uv run scripts/higher_years/higher_years.py -y 2022 : 2024
-```
-
 ---
 
 ## 📁 Beschrijving van bestanden
@@ -262,4 +170,5 @@ Voor vragen of problemen:
 <div align="center">
   <sub>Gebouwd met ❤️ door de <a href="https://github.com/cedanl">CEDANL</a> community</sub>
 </div>
+
 
