@@ -96,22 +96,21 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 │  │  Cumulatief: gewogen/ongewogen vooraanmelders per opleiding,           │  │
 │  │  herkomst, week, jaar.                                                 │  │
 │  │  Bron: Studielink → stap 1 → stap 2 (→ optioneel stap 4 filter)      │  │
+│  │  Gebruikt door: main.py → SARIMA_cumulative (DataOption.CUMULATIVE/BOTH)│  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  vooraanmeldingen_individueel.csv                                      │  │
 │  │  Individueel: een rij per student-aanmelding met persoonskenmerken.    │  │
 │  │  Bron: DIRECT van instelling (SIS/datawarehouse) — geen ETL-script.   │  │
-│  │                                                                        │  │
-│  │  Geladen in: scripts/load_data.py (regel 25-26)                        │  │
-│  │  Config key: configuration.json → paths.path_individual                │  │
-│  │  Gebruikt door: SARIMA_individual (DataOption.INDIVIDUAL of BOTH)      │  │
+│  │  Gebruikt door: main.py → SARIMA_individual (DataOption.INDIVIDUAL/BOTH)│ │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  student_count_first-years.xlsx                                        │  │
 │  │  Werkelijk aantal eerstejaars per opleiding/herkomst/jaar              │  │
 │  │  Bron: Oktober-bestand → stap 3 (→ optioneel stap 4 filter)          │  │
+│  │  Gebruikt door: main.py → hogerjaars-voorspelling en doorstroomratio's │  │
 │  └────────────────────────────────────────────────────────────────────────┘  │
 │                                                                              │
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
@@ -193,13 +192,7 @@ Afhankelijkheden samengevat:
 Studielink levert wekelijks telbestanden met geaggregeerde aanmeldcijfers per opleiding. Deze worden samengevoegd door `rowbind_and_reformat_studielink_data.py` (stap 1) tot `rowbinded.csv`. De gebruiker moet dit bestand vervolgens **handmatig hernoemen/verplaatsen** naar `data/input/vooraanmeldingen_cumulatief.csv` (het script heeft placeholder-paden op regel 4 en 108). Daarna kan `interpolate.py` (stap 2) ontbrekende weken interpoleren. Samen vormen ze de basis voor de `SARIMA_cumulative` voorspelling.
 
 **Individueel spoor (instelling → model)**
-De instelling levert per-student aanmelddata uit het eigen SIS/datawarehouse. Dit bestand wordt **direct aangeleverd** als `vooraanmeldingen_individueel.csv` — er is geen ETL-script voor nodig. Het bestand wordt geladen door `scripts/load_data.py` (regel 25-26) op basis van het pad in `configuration.json` → `paths.path_individual`. Het vormt de basis voor de `SARIMA_individual` voorspelling.
-
-Waar `vooraanmeldingen_individueel.csv` voorkomt in het project:
-- **`configuration/configuration.json`** — pad-configuratie (`path_individual`)
-- **`scripts/load_data.py`** — inlezen van het bestand (regel 25-26)
-- **`scripts/helper.py`** — mapping naar DataOption.INDIVIDUAL
-- **`data/input/`** — fysieke locatie van het bestand
+De instelling levert per-student aanmelddata uit het eigen SIS/datawarehouse. Dit bestand wordt **direct aangeleverd** als `vooraanmeldingen_individueel.csv` — er is geen ETL-script voor nodig. Het vormt de basis voor de `SARIMA_individual` voorspelling.
 
 **Studentaantallen (oktober-bestand → ground truth)**
 Het oktober-bestand (1-cijfer HO) bevat de werkelijke inschrijvingen na 1 oktober. `calculate_student_count.py` leidt hieruit de ground truth af die het model als referentie gebruikt voor error-berekening en ratio-voorspellingen.
