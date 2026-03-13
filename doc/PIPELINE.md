@@ -47,10 +47,10 @@ flowchart LR
     %% ══════════════════════════════════════
     subgraph bronnen ["Externe bronnen"]
         direction TB
-        SL(["Studielink Telbestanden<br><i>telbestandY2024WXX.csv</i><br><i>Bron: Studielink</i>"]):::bron
-        OKT(["Oktober-bestand<br><i>1-cijfer HO</i><br><i>Bron: Studielink</i>"]):::bron
-        SIS(["Individuele aanmelddata<br><i>SIS / datawarehouse</i><br><i>Bron: instelling</i>"]):::bron
-        AFI(["Afstanden woonplaats<br><i>Bron: instelling</i>"]):::bron
+        SL["Studielink Telbestanden<br><i>telbestandY2024WXX.csv</i><br><i>Bron: Studielink</i>"]:::bron
+        OKT["Oktober-bestand<br><i>1-cijfer HO</i><br><i>Bron: Studielink</i>"]:::bron
+        SIS["Individuele aanmelddata<br><i>SIS / datawarehouse</i><br><i>Bron: instelling</i>"]:::bron
+        AFI["Afstanden woonplaats<br><i>Bron: instelling</i>"]:::bron
     end
 
     %% ══════════════════════════════════════
@@ -84,7 +84,7 @@ flowchart LR
     %% ══════════════════════════════════════
     %% LAAG 4 — Prognosemodel
     %% ══════════════════════════════════════
-    MODEL["<b>PROGNOSEMODEL — main.py</b><br><br>1. Load configuration<br>2. Load data<br>3. Init dataholder · <i>-d i / c / b</i><br>4. Preprocess<br>5. Predict<br>6. Postprocess"]:::model
+    MODEL["<b>PROGNOSEMODEL — main.py</b><br><br>1. Load configuration<br>2. Load data<br>3. Preprocess<br>4. Predict · <i>SARIMA → XGBoost</i><br>5. Enrich output"]:::model
 
     %% ══════════════════════════════════════
     %% LAAG 5 — Output
@@ -98,7 +98,7 @@ flowchart LR
         direction TB
         PA["A · calculate_ensemble_weights.py<br><i>berekent optimale gewichten</i>"]:::script
         PB["B · append_studentcount_and_compute_errors.py<br><i>voegt werkelijke aantallen toe</i>"]:::script
-        PC["C · fill_in_ratiofile.py<br><i>input:</i><br><i>1. student_count_first-years.xlsx</i><br><i>2. student_count_higher-years.xlsx</i><br><i>3. oktober-bestand</i><br><i>4. ratiobestand.xlsx</i>"]:::script
+        PC["C · fill_in_ratiofile.py<br><i>input:</i><br><i>1. student_count_first-years.xlsx</i><br><i>2. student_count_higher-years.xlsx</i><br><i>3. oktober-bestand</i><br><i>4. ratiobestand.xlsx (leeg als Excel niet bestaat)</i>"]:::script
     end
 
     %% ── Bronnen → Pre-processing ──
@@ -122,6 +122,7 @@ flowchart LR
     %% ── Feedback loop (post-processing → data/input) ──
     PA -.-> EW
     PB -.-> TC
+    RB --> PC
     PC -.-> RB
 
     %% ── Subgraph styling ──
