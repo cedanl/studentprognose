@@ -4,16 +4,41 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 
 ---
 
+## Wat moet ik aanleveren?
+
+Onderstaande tabel geeft een overzicht van de bestanden die een instelling moet klaarzetten in `data/input/` om het prognosemodel te draaien.
+
+### Verplichte bestanden
+
+| Bestand | Beschrijving | Bron | Wanneer nodig |
+|---------|-------------|------|---------------|
+| `vooraanmeldingen_cumulatief.csv` | Gewogen/ongewogen vooraanmelders per opleiding, herkomst, week, jaar | Studielink telbestanden → pre-processing stap 1 + 2 | Bij `-d c` of `-d b` (default) |
+| `vooraanmeldingen_individueel.csv` | Een rij per student-aanmelding met persoonskenmerken | Direct uit SIS/datawarehouse van de instelling | Bij `-d i` of `-d b` (default) |
+| `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | Oktober-bestand (1-cijfer HO) → pre-processing stap 3 | Altijd |
+
+### Optionele bestanden
+
+| Bestand | Beschrijving | Bron |
+|---------|-------------|------|
+| `afstanden.xlsx` | Afstanden woonplaats → instelling per plaats | Direct van instelling |
+| `ensemble_weights.xlsx` | Gewichten voor ensemble weging | Gegenereerd door post-processing stap A |
+| `totaal_cumulatief.xlsx` / `totaal_individueel.xlsx` | Historische voorspellingen (eerdere model-runs) | Gegenereerd door post-processing stap B |
+| `ratiobestand.xlsx` | Doorstroomratio's eerstejaars → hogerjaars | Gegenereerd door post-processing stap C |
+
+> Bij een eerste run zijn de optionele post-processing bestanden nog niet beschikbaar. Het model draait zonder — ze worden pas aangemaakt na de eerste model-run via de post-processing scripts.
+
+---
+
 ## Overzicht
 
 ```
                               EXTERNE BRONNEN
   ┌───────────────────────┐ ┌──────────────────────┐ ┌───────────────────────┐ ┌────────────────────────┐
   │  Studielink           │ │  Oktober-bestand     │ │  Individuele          │ │  Afstanden woonplaats  │
-  │  Telbestanden         │ │  (1-cijfer HO)       │ │  aanmelddata (SIS)    │ │  → universiteit        │
+  │  Telbestanden         │ │  (1-cijfer HO)       │ │  aanmelddata (SIS)    │ │  → instelling          │
   │  (telbestandY2024     │ │                      │ │                       │ │                        │
   │   WXX.csv per week)   │ │  Bron: instelling    │ │  Bron: instelling     │ │  Bron: instelling      │
-  │                       │ │  (universiteit)      │ │  (SIS/datawarehouse)  │ │                        │
+  │                       │ │                      │ │  (SIS/datawarehouse)  │ │                        │
   └───────────┬───────────┘ └──────────┬───────────┘ └───────────┬───────────┘ └────────────┬───────────┘
               │                        │                         │                          │
               │                        │                         │                          │
@@ -120,7 +145,7 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 │  ┌────────────────────────────────────────────────────────────────────────┐  │
 │  │  afstanden.xlsx                                           [OPTIONEEL]  │  │
 │  │  Model draait zonder; distance-feature wordt overgeslagen.             │  │
-│  │  Afstanden woonplaats → universiteit per plaats.                       │  │
+│  │  Afstanden woonplaats → instelling per plaats.                         │  │
 │  │  Bron: DIRECT van instelling — geen ETL-script.                        │  │
 │  │  Gebruikt door: main.py → individuele dataholder (feature voor         │  │
 │  │  voorspelling)                                                         │  │
