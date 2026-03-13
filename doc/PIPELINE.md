@@ -15,6 +15,8 @@ Onderstaande tabel geeft een overzicht van de bestanden die een instelling moet 
 | `vooraanmeldingen_cumulatief.csv` | Gewogen/ongewogen vooraanmelders per opleiding, herkomst, week, jaar | Studielink telbestanden → pre-processing stap 1 + 2 | Bij `-d c` of `-d b` (default) |
 | `vooraanmeldingen_individueel.csv` | Een rij per student-aanmelding met persoonskenmerken | Direct uit SIS/datawarehouse van de instelling | Bij `-d i` of `-d b` (default) |
 | `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | Oktober-bestand (1-cijfer HO) → pre-processing stap 3 | Altijd |
+| `student_count_higher-years.xlsx` | Werkelijk aantal hogerjaars per opleiding/herkomst/jaar | Oktober-bestand (1-cijfer HO) → pre-processing stap 3 | Altijd |
+| `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | Oktober-bestand (1-cijfer HO) → pre-processing stap 3 | Altijd |
 
 ### 🟠 Optionele bestanden
 
@@ -142,7 +144,7 @@ flowchart TD
   │  Studielink           │ │  Oktober-bestand     │ │  Individuele          │ │  Afstanden woonplaats  │
   │  Telbestanden         │ │  (1-cijfer HO)       │ │  aanmelddata (SIS)    │ │  → instelling          │
   │  (telbestandY2024     │ │                      │ │                       │ │                        │
-  │   WXX.csv per week)   │ │  Bron: instelling    │ │  Bron: instelling     │ │  Bron: instelling      │
+  │   WXX.csv per week)   │ │  Bron: Studielink    │ │  Bron: instelling     │ │  Bron: instelling      │
   │                       │ │                      │ │  (SIS/datawarehouse)  │ │                        │
   └───────────┬───────────┘ └──────────┬───────────┘ └───────────┬───────────┘ └────────────┬───────────┘
               │                        │                         │                          │
@@ -281,17 +283,9 @@ flowchart TD
 │                                                                              │
 │  1. Load configuration    (configuration/configuration.json)                 │
 │  2. Load data             (scripts/load_data.py)                             │
-│  3. Initialize dataholder (keuze op basis van -d flag):                      │
-│     ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐         │
-│     │ -d i             │  │ -d c             │  │ -d b (default)   │         │
-│     │ Individual       │  │ Cumulative       │  │ BothDatasets     │         │
-│     │ SARIMA op        │  │ SARIMA op        │  │ Combinatie van   │         │
-│     │ vooraanmeldingen │  │ vooraanmeldingen │  │ beide + ensemble │         │
-│     │ _individueel.csv │  │ _cumulatief.csv  │  │ weging           │         │
-│     └──────────────────┘  └──────────────────┘  └──────────────────┘         │
-│  4. Preprocess            (scripts/transform_data.py)                        │
-│  5. Predict               (SARIMA + ratio-model + ensemble weging)           │
-│  6. Postprocess           (voegt studentaantallen, faculteit, etc. toe)      │
+│  3. Preprocess            (scripts/transform_data.py)                        │
+│  4. Predict               (SARIMA → XGBoost)                                 │
+│  5. Enrich output         (voegt ensemble, fouten, etc. toe)                 │
 │                                                                              │
 └──────────────────────────────────┬───────────────────────────────────────────┘
                                    │
@@ -340,7 +334,8 @@ flowchart TD
   │                                                               │
   │  Input:  student_count_first-years.xlsx                       │
   │          student_count_higher-years.xlsx                      │
-  │          ratiobestand.xlsx (bestaand)                         │
+  │          oktober-bestand (1-cijfer HO)                        │
+  │          ratiobestand.xlsx (leeg als Excel niet bestaat)      │
   │  Acties: Berekent doorstroomratio's eerstejaars →             │
   │          hogerjaars per opleiding/herkomst                    │
   │  Output: ratiobestand.xlsx (bijgewerkt)                       │
@@ -362,9 +357,9 @@ Afhankelijkheden samengevat:
   Afstanden (instelling) ────────────────────────────────────────►  data/input/
 
   POST-PROCESSING (feedback loop):
-  data/output/ ──► stap A (ensemble weights) ──► data/input/ensemble_weights.xlsx
-  data/output/ ──► stap B (append + errors)  ──► data/input/totaal_*.xlsx
-  stap 3       ──► stap C (fill ratiofile)   ──► data/input/ratiobestand.xlsx
+  data/output/          ──► stap A (ensemble weights) ──► data/input/ensemble_weights.xlsx
+  data/output/ + SC     ──► stap B (append + errors)  ──► data/input/totaal_*.xlsx
+  SC + OKT + ratiobestand ► stap C (fill ratiofile)   ──► data/input/ratiobestand.xlsx
 ```
 
 </details>
@@ -387,7 +382,7 @@ Afhankelijkheden samengevat:
 |------|--------|-------|--------|
 | A | `scripts/standalone/calculate_ensemble_weights.py` | `totaal_cumulatief.xlsx` + `ensemble_weights.xlsx` | `ensemble_weights.xlsx` (bijgewerkt) |
 | B | `scripts/standalone/append_studentcount_and_compute_errors.py` | `totaal_*.xlsx` + `student_count_*.xlsx` | `totaal_*.xlsx` (bijgewerkt met werkelijke aantallen + fouten) |
-| C | `scripts/higher_years/fill_in_ratiofile.py` | `student_count_*.xlsx` + `ratiobestand.xlsx` | `ratiobestand.xlsx` (bijgewerkt) |
+| C | `scripts/higher_years/fill_in_ratiofile.py` | `student_count_*.xlsx` + oktober-bestand + `ratiobestand.xlsx` | `ratiobestand.xlsx` (bijgewerkt) |
 
 ---
 
