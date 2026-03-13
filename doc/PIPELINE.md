@@ -47,10 +47,10 @@ flowchart LR
     %% ══════════════════════════════════════
     subgraph bronnen ["Externe bronnen"]
         direction TB
-        SL(["Studielink Telbestanden<br><i>telbestandY2024WXX.csv</i>"]):::bron
-        OKT(["Oktober-bestand<br><i>1-cijfer HO</i>"]):::bron
-        SIS(["Individuele aanmelddata<br><i>SIS / datawarehouse</i>"]):::bron
-        AFI(["Afstanden woonplaats<br><i>vanuit instelling</i>"]):::bron
+        SL(["Studielink Telbestanden<br><i>telbestandY2024WXX.csv</i><br><i>Bron: Studielink</i>"]):::bron
+        OKT(["Oktober-bestand<br><i>1-cijfer HO</i><br><i>Bron: Studielink</i>"]):::bron
+        SIS(["Individuele aanmelddata<br><i>SIS / datawarehouse</i><br><i>Bron: instelling</i>"]):::bron
+        AFI(["Afstanden woonplaats<br><i>Bron: instelling</i>"]):::bron
     end
 
     %% ══════════════════════════════════════
@@ -61,7 +61,6 @@ flowchart LR
         S1["1 · rowbind_and_reformat<br><i>⚠ handmatige hernoem-stap</i>"]:::script
         S2["2 · interpolate.py<br><i>lineaire interpolatie</i>"]:::script
         S3["3 · calculate_student_count.py<br><i>berekent studentaantallen</i>"]:::script
-        PC["C · fill_in_ratiofile.py<br><i>berekent doorstroomratio's</i>"]:::script
     end
 
     %% ══════════════════════════════════════
@@ -69,17 +68,17 @@ flowchart LR
     %% ══════════════════════════════════════
     subgraph verplicht_blok ["data/input/ — verplicht"]
         direction TB
-        VC["vooraanmeldingen_cumulatief.csv<br><i>bij -d c of -d b</i>"]:::verplicht
-        VI["vooraanmeldingen_individueel.csv<br><i>bij -d i of -d b</i>"]:::verplicht
-        SC["student_count_first-years.xlsx&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<br>student_count_higher-years.xlsx<br>student_volume.xlsx"]:::verplicht
+        VC["vooraanmeldingen_cumulatief.csv"]:::verplicht
+        VI["vooraanmeldingen_individueel.csv"]:::verplicht
+        SC["1. student_count_first-years.xlsx<br>2. student_count_higher-years.xlsx<br>3. student_volume.xlsx"]:::verplicht
     end
 
     subgraph optioneel_blok ["data/input/ — optioneel"]
         direction TB
-        RB["ratiobestand.xlsx<br><i>doorstroomratio's</i>"]:::optioneel
+        AF["afstanden.xlsx<br><i>distance-feature</i>"]:::optioneel
         EW["ensemble_weights.xlsx<br><i>ensemble weging</i>"]:::optioneel
         TC["totaal_cumulatief/individueel.xlsx<br><i>historische voorspellingen</i>"]:::optioneel
-        AF["afstanden.xlsx<br><i>distance-feature</i>"]:::optioneel
+        RB["ratiobestand.xlsx<br><i>doorstroomratio's</i>"]:::optioneel
     end
 
     %% ══════════════════════════════════════
@@ -99,6 +98,7 @@ flowchart LR
         direction TB
         PA["A · calculate_ensemble_weights.py<br><i>berekent optimale gewichten</i>"]:::script
         PB["B · append_studentcount_and_compute_errors.py<br><i>voegt werkelijke aantallen toe</i>"]:::script
+        PC["C · fill_in_ratiofile.py<br><i>input:</i><br><i>1. student_count_first-years.xlsx</i><br><i>2. student_count_higher-years.xlsx</i><br><i>3. oktober-bestand</i><br><i>4. ratiobestand.xlsx</i>"]:::script
     end
 
     %% ── Bronnen → Pre-processing ──
@@ -106,9 +106,6 @@ flowchart LR
     OKT --> S3 --> SC
     SIS ----> VI
     AFI ----> AF
-
-    %% ── Pre-processing: ratiobestand ──
-    SC --> PC --> RB
 
     %% ── data/input → Model ──
     VC & VI & SC --> MODEL
@@ -119,10 +116,13 @@ flowchart LR
     OUT --> PA
     OUT --> PB
     SC --> PB
+    SC --> PC
+    OKT --> PC
 
     %% ── Feedback loop (post-processing → data/input) ──
     PA -.-> EW
     PB -.-> TC
+    PC -.-> RB
 
     %% ── Subgraph styling ──
     style bronnen fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
