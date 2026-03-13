@@ -32,7 +32,7 @@ Onderstaande tabel geeft een overzicht van de bestanden die een instelling moet 
 ## Overzicht
 
 ```mermaid
-flowchart LR
+flowchart TD
     classDef bron fill:#3d3d3d,color:#fff,stroke:#555,stroke-width:2px,text-align:left
     classDef script fill:#1a6dd4,color:#fff,stroke:#0d4ea6,stroke-width:2px,text-align:left
     classDef verplicht fill:#1a8a3e,color:#fff,stroke:#136b2e,stroke-width:2px,text-align:left
@@ -46,7 +46,7 @@ flowchart LR
     %% LAAG 1 — Externe bronnen
     %% ══════════════════════════════════════
     subgraph bronnen ["Externe bronnen"]
-        direction TB
+        direction LR
         SL["Studielink Telbestanden<br><i>telbestandY2024WXX.csv</i><br><i>Bron: Studielink</i>"]:::bron
         OKT["Oktober-bestand<br><i>1-cijfer HO</i><br><i>Bron: Studielink</i>"]:::bron
         SIS["Individuele aanmelddata<br><i>SIS / datawarehouse</i><br><i>Bron: instelling</i>"]:::bron
@@ -57,7 +57,7 @@ flowchart LR
     %% LAAG 2 — Pre-processing scripts
     %% ══════════════════════════════════════
     subgraph preproc ["Pre-processing scripts"]
-        direction TB
+        direction LR
         S1["1 · rowbind_and_reformat<br><i>⚠ handmatige hernoem-stap</i>"]:::script
         S2["2 · interpolate.py<br><i>lineaire interpolatie</i>"]:::script
         S3["3 · calculate_student_count.py<br><i>berekent studentaantallen</i>"]:::script
@@ -67,14 +67,14 @@ flowchart LR
     %% LAAG 3 — data/input/
     %% ══════════════════════════════════════
     subgraph verplicht_blok ["data/input/ — verplicht"]
-        direction TB
+        direction LR
         VC["vooraanmeldingen_cumulatief.csv"]:::verplicht
         VI["vooraanmeldingen_individueel.csv"]:::verplicht
         SC["1. student_count_first-years.xlsx<br>2. student_count_higher-years.xlsx<br>3. student_volume.xlsx"]:::verplicht
     end
 
     subgraph optioneel_blok ["data/input/ — optioneel"]
-        direction TB
+        direction LR
         AF["afstanden.xlsx<br><i>distance-feature</i>"]:::optioneel
         EW["ensemble_weights.xlsx<br><i>ensemble weging</i>"]:::optioneel
         TC["totaal_cumulatief/individueel.xlsx<br><i>historische voorspellingen</i>"]:::optioneel
@@ -95,7 +95,7 @@ flowchart LR
     %% LAAG 6 — Post-processing scripts
     %% ══════════════════════════════════════
     subgraph postproc ["Post-processing scripts"]
-        direction TB
+        direction LR
         PA["A · calculate_ensemble_weights.py<br><i>berekent optimale gewichten</i>"]:::script
         PB["B · append_studentcount_and_compute_errors.py<br><i>voegt werkelijke aantallen toe</i>"]:::script
         PC["C · fill_in_ratiofile.py<br><i>input:</i><br><i>1. student_count_first-years.xlsx</i><br><i>2. student_count_higher-years.xlsx</i><br><i>3. oktober-bestand</i><br><i>4. ratiobestand.xlsx (leeg als Excel niet bestaat)</i>"]:::script
