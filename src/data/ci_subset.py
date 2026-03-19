@@ -20,9 +20,6 @@ def apply_ci_test_subset(
     using a hardcoded seed so all colleagues get identical results.
     """
 
-    # Gather unique programs from whichever datasets are available.
-    # Cumulative data uses "Groepeernaam Croho" (not yet renamed at this stage).
-    # Individual data uses "Croho groepeernaam" (already renamed in load_data).
     all_programs = set()
 
     if data_individual is not None and "Croho groepeernaam" in data_individual.columns:
@@ -44,7 +41,6 @@ def apply_ci_test_subset(
             data_weighted_ensemble,
         )
 
-    # Sort for determinism across platforms before sampling
     sorted_programs = sorted(all_programs)
     max_programs = len(sorted_programs)
 
@@ -64,21 +60,18 @@ def apply_ci_test_subset(
     for prog in sorted(selected_programs):
         print(f"  - {prog}")
 
-    # Filter individual data
     if data_individual is not None:
         data_individual = data_individual[
             (data_individual["Collegejaar"] >= CI_MIN_YEAR)
             & (data_individual["Croho groepeernaam"].isin(selected_set))
         ]
 
-    # Filter cumulative data (column is still "Groepeernaam Croho" at this stage)
     if data_cumulative is not None:
         data_cumulative = data_cumulative[
             (data_cumulative["Collegejaar"] >= CI_MIN_YEAR)
             & (data_cumulative["Groepeernaam Croho"].isin(selected_set))
         ]
 
-    # Filter student numbers
     if data_student_numbers_first_years is not None:
         if "Croho groepeernaam" in data_student_numbers_first_years.columns:
             mask = data_student_numbers_first_years["Croho groepeernaam"].isin(selected_set)
@@ -86,7 +79,6 @@ def apply_ci_test_subset(
                 mask = mask & (data_student_numbers_first_years["Collegejaar"] >= CI_MIN_YEAR)
             data_student_numbers_first_years = data_student_numbers_first_years[mask]
 
-    # Filter latest data
     if data_latest is not None:
         if (
             "Collegejaar" in data_latest.columns
@@ -97,9 +89,6 @@ def apply_ci_test_subset(
                 & (data_latest["Croho groepeernaam"].isin(selected_set))
             ]
 
-    # data_distances is a geographic lookup table — no filtering needed
-
-    # Filter ensemble weights (uses "Programme" column, not "Croho groepeernaam")
     if data_weighted_ensemble is not None:
         if (
             "Collegejaar" in data_weighted_ensemble.columns

@@ -1,10 +1,5 @@
-import os as os
-import pandas as pd
 import numpy as np
-import sys
-
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-# from scripts.load_data import load_configuration
+import pandas as pd
 
 
 class AddWeeksWherePreapplicantsAreZero:
@@ -102,83 +97,7 @@ class AddWeeksWherePreapplicantsAreZero:
         )
 
         data_cumulative["Weeknummer"] = data_cumulative["Weeknummer"].astype(int)
-        data_cumulative["Weeknummer rapportage"] = data_cumulative["Weeknummer rapportage"].astype(
-            int
-        )
+        data_cumulative["Weeknummer rapportage"] = data_cumulative["Weeknummer rapportage"].astype(int)
         data_cumulative["Collegejaar"] = data_cumulative["Collegejaar"].astype(int)
 
         self.data_cumulative = data_cumulative
-
-
-if __name__ == "__main__":
-    # configuration = load_configuration("configuration/configuration.json")
-    path_cumulative = "\\\\ru.nl\\wrkgrp\\TeamIR\\Man_info\\Student Analytics\\Prognosemodel RU\\Syntax\\Python\\studentprognose\\data\\input\\vooraanmeldingen_cumulatief.csv"
-    data_cumulative = pd.read_csv(path_cumulative, sep=";", skiprows=[1], low_memory=True)
-
-    years = [2024]
-    weeks = [
-        1,
-        2,
-        3,
-        4,
-        5,
-        6,
-        7,
-        8,
-        9,
-        10,
-        11,
-        12,
-        13,
-        14,
-        15,
-        16,
-        17,
-        18,
-        19,
-        20,
-        21,
-        22,
-        23,
-        24,
-        25,
-        26,
-        27,
-        28,
-        29,
-        30,
-        31,
-        32,
-        33,
-        34,
-        35,
-        36,
-        37,
-        38,
-        39,
-        40,
-        41,
-        42,
-        43,
-        44,
-        45,
-        46,
-        47,
-        48,
-        49,
-        50,
-        51,
-        52,
-    ]
-
-    add_weeks_where_preapplicants_are_zero = AddWeeksWherePreapplicantsAreZero(
-        data_cumulative, years, weeks
-    )
-
-    add_weeks_where_preapplicants_are_zero.add_weeks()
-
-    new_data_cumulative = add_weeks_where_preapplicants_are_zero.data_cumulative
-
-    CWD = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    outfile = os.path.join(CWD, "data/output/vooraanmeldingen_cumulatief_zerorows.csv")
-    new_data_cumulative.to_csv(outfile, sep=";", index=False)

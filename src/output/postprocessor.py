@@ -1,45 +1,54 @@
-from scripts.transform_data import *
-from scripts.helper import *
 import numpy as np
 import pandas as pd
 import os
 from statistics import mean
 
+from src.utils.weeks import (
+    DataOption, StudentYearPrediction, increment_week, convert_nan_to_zero,
+)
+from src.models.ratio import predict_with_ratio as _predict_with_ratio
+from src.data.preprocessing.transforms import replace_latest_data
 
-class HelperMethods:
-    """This class consists of the methods used for operations on dataholders and is loaded in
-    the initialisation of DataHolderSuperclass (dataholder_superclass.py) as a variable. The
-    methods in this class are used for several varying tasks in main.py and for adding the
-    predicted preregistrations when calculating the cumulative values.
+
+class PostProcessor:
+    """Handles output preparation, ensemble calculation, error metrics, and file saving.
+
+    Replaces the old HelperMethods god-object with the same interface but importing
+    from the new src/ modules.
     """
 
-    def __init__(self, configuration, helpermethods_initialise_material):
-        self.data_latest = helpermethods_initialise_material[0]
-        self.ensemble_weights = helpermethods_initialise_material[1]
-        self.data_studentcount = helpermethods_initialise_material[2]
+    @staticmethod
+    def check_output_writable(data_option, student_year_prediction, ci_test_n, filtering_path):
+        """Verify output files can be written (not locked by Excel)."""
+        mode_suffix = data_option.filename_suffix
+        ci_suffix = f"_ci_test_N{ci_test_n}" if ci_test_n is not None else ""
+        try:
+            open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
+            if "test" not in filtering_path:
+                match student_year_prediction:
+                    case StudentYearPrediction.FIRST_YEARS:
+                        open(f"data/output/output_first-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
+                    case StudentYearPrediction.HIGHER_YEARS:
+                        open(f"data/output/output_higher-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
+                    case StudentYearPrediction.VOLUME:
+                        open(f"data/output/output_volume_{mode_suffix}{ci_suffix}.xlsx", "w").close()
+        except IOError:
+            input(
+                "Could not open output files because they are (probably) opened by another process. "
+                "Please close Excel. Press Enter to continue."
+            )
 
+    def __init__(self, configuration, data_latest, ensemble_weights,
+                 data_studentcount, cwd, data_option, ci_test_n):
+        self.data_latest = data_latest
+        self.ensemble_weights = ensemble_weights
+        self.data_studentcount = data_studentcount
         self.numerus_fixus_list = configuration["numerus_fixus"]
-
-        self.CWD = helpermethods_initialise_material[3]
-
-        self.data_option = helpermethods_initialise_material[4]
-        self.ci_test_n = helpermethods_initialise_material[5] if len(helpermethods_initialise_material) > 5 else None
+        self.CWD = cwd
+        self.data_option = data_option
+        self.ci_test_n = ci_test_n
         self.data = None
 
-    # This method used when calculating the cumulative value. The input is the data_to_predict
-    # this method adds for every row the 'Voorspelde vooraanmelders' until week 38. It also adds
-    # a column called 'SARIMA_cumulative' with only NaN values. This will be filled in later.
-    # Output of this method could look like this:
-
-    #     Weeknummer  Collegejaar Faculteit Examentype Herkomst Croho groepeernaam  ...  Inschrijvingen  Aantal_studenten      ts  SARIMA_individual  Voorspelde vooraanmelders  SARIMA_cumulative
-    # 0           12         2024       FdM   Bachelor      EER    B Bedrijfskunde  ...             0.0               NaN   52.83                NaN                        NaN                NaN
-    # 1           12         2024       FdM   Bachelor       NL    B Bedrijfskunde  ...             0.0               NaN  109.00                NaN                        NaN                NaN
-    # 2           13         2024       FdM   Bachelor      EER    B Bedrijfskunde  ...             NaN               NaN     NaN                NaN                  53.740341                NaN
-    # ...
-    # 27          38         2024       FdM   Bachelor      EER    B Bedrijfskunde  ...             NaN               NaN     NaN                NaN                  36.319705                NaN
-    # 28          13         2024       FdM   Bachelor       NL    B Bedrijfskunde  ...             NaN               NaN     NaN                NaN                 126.392052                NaN
-    # ...
-    # 53          38         2024       FdM   Bachelor       NL    B Bedrijfskunde  ...             NaN               NaN     NaN                NaN                 370.173031                NaN
     def add_predicted_preregistrations(self, data, predicted_preregistrations):
         dict = {
             "Collegejaar": [],
@@ -59,10 +68,6 @@ class HelperMethods:
                 print(f"Index {index} out of range: {len(predicted_preregistrations)}")
                 continue
 
-            # The current_predicted_preregistrations is a list out of a list of lists that
-            # belongs to a row of the data_to_predict and contains values that are filled in
-            # in the dataframe in the column of 'Voorspelde vooraanmelders' that will be created
-            # for the next weeks.
             current_predicted_preregistrations = predicted_preregistrations[index]
 
             current_week = increment_week(row["Weeknummer"])
@@ -81,12 +86,8 @@ class HelperMethods:
 
             index += 1
 
-        # This concatenation method concats the data_to_predict with newly created dataframe. The
-        # ignore_index=True makes sure that the dataframe will be indexed from 0 to n-1.
         return pd.concat([data, pd.DataFrame(dict)], ignore_index=True)
 
-    # Helper function for prepare_data() (see below). Makes sure there will not be more predicted
-    # students for a numerus fixus programme than the number of students that are allowed.
     def _numerus_fixus_cap(self, data, year, week):
         for nf in self.numerus_fixus_list:
             nf_data = data[
@@ -138,14 +139,10 @@ class HelperMethods:
             ] = self.numerus_fixus_list[nf] * mean(distribution_per_herkomst[herkomst])
         return data
 
-    # This method is used in the main class after predicting the number of students and processes
-    # the data to be ready for output. The only calculation done is the numerus fixus cap. For the
-    # rest it is only merging some dataframes, removing columns and replacing faculty codes.
     def prepare_data_for_output_prelim(self, data, year, week, data_cumulative=None, skip_years=0):
         self.data = data
         self.data = self._numerus_fixus_cap(self.data, year, week)
 
-        # We will remove redundant columns we don't want in our output_prelim.
         columns_to_select = [
             "Croho groepeernaam",
             "Faculteit",
@@ -161,7 +158,6 @@ class HelperMethods:
             columns_to_select = columns_to_select + ["Skip_prediction"]
         self.data = self.data[columns_to_select]
 
-        # We will add a column with the studentcount ('Aantal_studenten') if this data exists.
         if self.data_studentcount is not None:
             self.data = self.data.merge(
                 self.data_studentcount,
@@ -170,12 +166,8 @@ class HelperMethods:
             )
 
         if data_cumulative is not None:
-            # In the data_cumulative are wrong faculty codes because they haven't been replaced.
-            # This causes mistakes with merging. Therefore we drop these 'old' ones.
             data_cumulative = data_cumulative.drop(columns="Faculteit")
 
-            # This merge adds the following columns: 'Gewogen vooraanmelders', 'Ongewogen
-            # vooraanmelders', 'Aantal aanmelders met 1 aanmelding', 'Inschrijvingen'
             self.data = self.data.merge(
                 data_cumulative,
                 on=[
@@ -188,144 +180,25 @@ class HelperMethods:
                 how="left",
             )
 
-        # Exportation to .xlsx
         ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
         output_path = os.path.join(self.CWD, "data", "output", f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx")
         self.data.to_excel(output_path, index=False)
 
-    # This method predicts the influx of students by looking at the ratio between pre-registrants
-    # in every calender week and the actual influx of students and it takes the average of the
-    # relevant ratio of every year since 2021.
     def predict_with_ratio(self, data_cumulative, predict_year):
-        average_ratio_between = (predict_year - 3, predict_year - 1)
-        if self.data_studentcount is not None:
-            data_vooraanmeldingen = data_cumulative[
-                [
-                    "Collegejaar",
-                    "Weeknummer",
-                    "Examentype",
-                    "Croho groepeernaam",
-                    "Herkomst",
-                    "Ongewogen vooraanmelders",
-                    "Inschrijvingen",
-                ]
-            ]
+        self.data = _predict_with_ratio(
+            self.data, data_cumulative, self.data_studentcount,
+            self.numerus_fixus_list, predict_year
+        )
 
-            # Convert it's type to float to use the number for calculations.
-            data_vooraanmeldingen["Ongewogen vooraanmelders"] = data_vooraanmeldingen[
-                "Ongewogen vooraanmelders"
-            ].astype("float")
-
-            data_vooraanmeldingen["Aanmeldingen"] = (
-                data_vooraanmeldingen["Ongewogen vooraanmelders"]
-                + data_vooraanmeldingen["Inschrijvingen"]
-            )
-
-            # We can only use the data from previous years because we don't know yet how many
-            # students will apply this year. Therefore we can't calculate the ratio of this year.
-            data_vooraanmeldingen = data_vooraanmeldingen[
-                (data_vooraanmeldingen["Collegejaar"] >= average_ratio_between[0])
-                & (data_vooraanmeldingen["Collegejaar"] <= average_ratio_between[1])
-            ]
-
-            # Adding the actual studentcounts of last year to the dataframe.
-            data_merged = pd.merge(
-                left=data_vooraanmeldingen,
-                right=self.data_studentcount,
-                on=["Collegejaar", "Examentype", "Croho groepeernaam", "Herkomst"],
-                how="left",
-            )
-
-            # Calculating the actual ratio for every programme, for every year and week.
-            data_merged["Average_Ratio"] = data_merged["Aanmeldingen"].divide(
-                data_merged["Aantal_studenten"]
-            )
-
-            # We replace the infinite values with NaN's because this would otherwise lead to a
-            # prediction of an infinite influx of students.
-            data_merged["Average_Ratio"] = data_merged["Average_Ratio"].replace(np.inf, np.nan)
-
-            # We remove the redundant columns so that we can merge it with self.data in a bit.
-            average_ratios = (
-                data_merged[
-                    [
-                        "Croho groepeernaam",
-                        "Examentype",
-                        "Herkomst",
-                        "Weeknummer",
-                        "Average_Ratio",
-                    ]
-                ]
-                .groupby(
-                    ["Croho groepeernaam", "Examentype", "Herkomst", "Weeknummer"],
-                    as_index=False,
-                )
-                .mean()
-            )
-
-            self.data = self.data.rename(columns={"Aantal eerstejaarsopleiding": "EOI_vorigjaar"})
-
-            self.data["Ongewogen vooraanmelders"] = self.data["Ongewogen vooraanmelders"].astype(
-                "float"
-            )
-            self.data["Aanmelding"] = (
-                self.data["Ongewogen vooraanmelders"] + self.data["Inschrijvingen"]
-            )
-
-            self.data["Ratio"] = (self.data["Aanmelding"]).divide(self.data["Aantal_studenten"])
-            self.data["Ratio"] = self.data["Ratio"].replace(np.inf, np.nan)
-
-            self.data = pd.merge(
-                left=self.data,
-                right=average_ratios,
-                how="left",
-                on=["Croho groepeernaam", "Examentype", "Herkomst", "Weeknummer"],
-            )
-
-            # Calculating the actual prognose ratio.
-            for i, row in self.data.iterrows():
-                if row["Average_Ratio"] != 0:
-                    self.data.at[i, "Prognose_ratio"] = row["Aanmelding"] / row["Average_Ratio"]
-
-            # Check if numerus fixus values are below the numerus fixus cap
-            NFs = self.numerus_fixus_list
-            for year in self.data["Collegejaar"].unique():
-                for week in self.data["Weeknummer"].unique():
-                    for nf in NFs:
-                        nf_data = self.data[
-                            (self.data["Collegejaar"] == year)
-                            & (self.data["Weeknummer"] == week)
-                            & (self.data["Croho groepeernaam"] == nf)
-                        ]
-
-                        if np.sum(nf_data["Prognose_ratio"]) > NFs[nf]:
-                            self.data.loc[
-                                (self.data["Collegejaar"] == year)
-                                & (self.data["Weeknummer"] == week)
-                                & (self.data["Croho groepeernaam"] == nf)
-                                & (self.data["Herkomst"] == "NL"),
-                                "Prognose_ratio",
-                            ] = nf_data[nf_data["Herkomst"] == "NL"]["Prognose_ratio"] - (
-                                np.sum(nf_data["Prognose_ratio"]) - NFs[nf]
-                            )
-
-    # Postprocess the total data by adding the forecasted and latest data and adding the ensemble
-    # and error values.
     def postprocess(self, predict_year, predict_week):
-        # Postprocess the total data, i.e. the forecasted and latest data
         if self.data_latest is not None:
             self.data = replace_latest_data(
                 self.data_latest, self.data, predict_year, predict_week
             )
 
-        # Calculate and add ensemble values ('Ensemble_prediction, 'Weighted_ensemble_prediction'
-        # and 'Average_ensemble_prediction')
-        # Only do this when predicting both datasets because the ensemble values won't be valid
-        # otherwise.
         if self.data_option == DataOption.BOTH_DATASETS:
             self._create_ensemble_columns(predict_year, predict_week)
 
-        # Calculate and add error values ('MAE_...' and 'MAPE_...')
         self._create_error_columns()
 
         self.data = self.data.drop_duplicates()
@@ -338,7 +211,6 @@ class HelperMethods:
         )
         self.data = self.data.reset_index(drop=True)
 
-        # Initialize columns
         self.data.loc[
             (self.data["Collegejaar"] == predict_year) & (self.data["Weeknummer"] == predict_week),
             "Ensemble_prediction",
@@ -347,8 +219,6 @@ class HelperMethods:
             (self.data["Collegejaar"] == predict_year) & (self.data["Weeknummer"] == predict_week),
             "Weighted_ensemble_prediction",
         ] = -1.0
-
-        # Compute ensemble predictions using vectorized operations
 
         for examentype in self.data[
             (self.data["Collegejaar"] == predict_year) & (self.data["Weeknummer"] == predict_week)
@@ -367,7 +237,6 @@ class HelperMethods:
             )
 
             if self.ensemble_weights is not None:
-                # Merge weights into data for vectorized calculations
                 weights = self.ensemble_weights.rename(columns={"Programme": "Croho groepeernaam"})
                 if "Average_ensemble_prediction" not in self.data.columns:
                     weights = weights.rename(
@@ -445,17 +314,14 @@ class HelperMethods:
                     axis=1,
                 )
 
-        # Compute average ensemble predictions
         self.data["Average_ensemble_prediction"] = np.nan
 
-        # Use groupby and rolling to calculate averages
         self.data["Average_ensemble_prediction"] = self.data.groupby(
             ["Croho groepeernaam", "Examentype", "Herkomst", "Collegejaar"]
         )["Ensemble_prediction"].transform(
             lambda x: x.rolling(window=4, min_periods=1).mean().shift().bfill()
         )
 
-        # Update Weighted_ensemble_prediction where needed
         self.data["Weighted_ensemble_prediction"] = np.where(
             self.data["Weighted_ensemble_prediction"] == -1.0,
             self.data["Average_ensemble_prediction"],
@@ -484,7 +350,6 @@ class HelperMethods:
             return sarima_individual * 0.5 + sarima_cumulative * 0.5
 
     def _create_error_columns(self):
-        # Only calculate the error values for the predictions that are made.
         if self.data_option == DataOption.BOTH_DATASETS:
             predictions = [
                 "Weighted_ensemble_prediction",
@@ -494,12 +359,10 @@ class HelperMethods:
                 "SARIMA_cumulative",
                 "SARIMA_individual",
             ]
-
         elif self.data_option == DataOption.INDIVIDUAL:
             predictions = [
                 "SARIMA_individual",
             ]
-
         elif self.data_option == DataOption.CUMULATIVE:
             predictions = [
                 "Prognose_ratio",
@@ -522,28 +385,6 @@ class HelperMethods:
             self.data[f"MAPE_{pred}"] = (
                 abs(self.data["Aantal_studenten"] - predicted) / self.data["Aantal_studenten"]
             ).where(valid_rows, np.nan)
-
-    def _calculate_errors(self, row):
-        actual = row["Aantal_studenten"]
-        errors = {}
-        for key in [
-            "Weighted_ensemble_prediction",
-            "Average_ensemble_prediction",
-            "Ensemble_prediction",
-            "Prognose_ratio",
-            "SARIMA_cumulative",
-            "SARIMA_individual",
-        ]:
-            predicted = convert_nan_to_zero(row[key])
-            errors[f"MAE_{key}"] = self._mean_absolute_error(actual, predicted)
-            errors[f"MAPE_{key}"] = self._mean_absolute_percentage_error(actual, predicted)
-        return errors
-
-    def _mean_absolute_error(self, actual, predicted):
-        return abs(actual - predicted)
-
-    def _mean_absolute_percentage_error(self, actual, predicted):
-        return abs((actual - predicted) / actual) if actual != 0 else np.nan
 
     def ready_new_data(self):
         self.data_latest = self.data

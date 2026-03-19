@@ -9,7 +9,7 @@ import os
 from statistics import mean
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from scripts.load_data import load_configuration
+from src.config import load_configuration
 
 
 class ApplyWeightsOnDifferentYear:

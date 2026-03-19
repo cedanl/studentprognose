@@ -1,6 +1,7 @@
-scrips/__pycache__/
+__pycache__/
 *.pyc
 .venv/
+.vscode/
 
 #Data files can be ignored
 data/*
@@ -15,5 +16,7 @@ data/output/*
 !data/output/blank.xlsx
 
 !data/metadata
+
+!data/input_raw
 
 
