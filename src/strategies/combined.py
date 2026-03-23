@@ -7,8 +7,8 @@ from src.strategies.base import PredictionStrategy
 from src.strategies.individual import IndividualStrategy
 from src.strategies.cumulative import CumulativeStrategy
 from src.utils.weeks import get_weeks_list
-from src.data.preprocessing.transforms import transform_data
-from src.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
+from src.data.s05_transforms import transform_data
+from src.models.s07_sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
 
 
 class CombinedStrategy(PredictionStrategy):
@@ -60,7 +60,7 @@ class CombinedStrategy(PredictionStrategy):
             how="left",
         )
 
-        from src.models.xgboost_classifier import predict_applicant
+        from src.models.s06_xgboost_classifier import predict_applicant
         print("Predicting preapplicants...")
         predicties = predict_applicant(
             self.individual.data_individual, self.predict_year, self.predict_week,

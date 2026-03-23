@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from src.utils.weeks import get_max_week
-from src.output.postprocessor import PostProcessor
+from src.output.s10_postprocessor import PostProcessor
 
 
 class PredictionStrategy(ABC):

@@ -10,8 +10,8 @@ warnings.simplefilter("ignore", ConvergenceWarning)
 
 from src.strategies.base import PredictionStrategy
 from src.utils.weeks import increment_week
-from src.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
-from src.models.xgboost_regressor import predict_with_xgboost
+from src.models.s07_sarima import predict_with_sarima_cumulative, _get_transformed_data
+from src.models.s08_xgboost_regressor import predict_with_xgboost
 
 
 class CumulativeStrategy(PredictionStrategy):

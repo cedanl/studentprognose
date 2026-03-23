@@ -8,9 +8,9 @@ import collections
 
 from src.strategies.base import PredictionStrategy
 from src.utils.weeks import get_weeks_list, get_all_weeks_valid, decrement_week
-from src.data.preprocessing.transforms import transform_data
-from src.models.xgboost_classifier import predict_applicant
-from src.models.sarima import predict_with_sarima_individual
+from src.data.s05_transforms import transform_data
+from src.models.s06_xgboost_classifier import predict_applicant
+from src.models.s07_sarima import predict_with_sarima_individual
 
 
 class IndividualStrategy(PredictionStrategy):

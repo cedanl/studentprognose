@@ -42,7 +42,7 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
     Returns:
         list: predictions for each future week, or empty list on error.
     """
-    from src.data.preprocessing.transforms import transform_data
+    from src.data.s05_transforms import transform_data
 
     programme = row["Croho groepeernaam"]
     herkomst = row["Herkomst"]
@@ -90,7 +90,7 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
     Returns:
         float: predicted value, or np.nan on error.
     """
-    from src.data.preprocessing.transforms import transform_data
+    from src.data.s05_transforms import transform_data
 
     data = data_individual.copy()
     programme = row["Croho groepeernaam"]
@@ -199,7 +199,7 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
 
 def _get_transformed_data(data):
     """Helper to transform cumulative data for SARIMA."""
-    from src.data.preprocessing.transforms import transform_data
+    from src.data.s05_transforms import transform_data
 
     data = data.drop_duplicates()
     data = data[data["Collegejaar"] >= 2016]

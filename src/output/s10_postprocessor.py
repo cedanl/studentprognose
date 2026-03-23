@@ -6,8 +6,8 @@ from statistics import mean
 from src.utils.weeks import (
     DataOption, StudentYearPrediction, increment_week, convert_nan_to_zero,
 )
-from src.models.ratio import predict_with_ratio as _predict_with_ratio
-from src.data.preprocessing.transforms import replace_latest_data
+from src.models.s09_ratio import predict_with_ratio as _predict_with_ratio
+from src.data.s05_transforms import replace_latest_data
 
 
 class PostProcessor:
