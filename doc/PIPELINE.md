@@ -80,10 +80,12 @@ flowchart TD
     %% ══════════════════════════════════════
     %% LAAG 4 — Prognosemodel (main.py)
     %% ══════════════════════════════════════
-    subgraph pipeline ["Prognosemodel — main.py"]
+    subgraph pipeline ["Prognosemodel"]
         direction TD
 
+        MAIN["<b>main.py</b><br/><i>CLI parsing + orchestratie</i>"]:::model
         LOAD["<b>s02_loader</b> → <b>s03_add_zero_weeks</b><br/><i>data laden + nulweken toevoegen</i>"]:::script
+        MAIN --> LOAD
         CISUB["<b>s04_ci_subset</b><br/><i>optioneel: subset voor CI</i>"]:::script
 
         LOAD --> CISUB
