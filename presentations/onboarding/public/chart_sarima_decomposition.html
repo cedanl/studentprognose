@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const n = 104; // 2 years of weeks
+const weeks = Array.from({length: n}, (_, i) => i + 1);
+const trend = weeks.map(w => 100 + w * 0.8);
+const seasonal = weeks.map(w => 30 * Math.sin(2 * Math.PI * w / 52));
+const observed = weeks.map((w, i) => trend[i] + seasonal[i] + (Math.sin(i * 7) * 8));
+const traces = [
+  { x: weeks, y: observed, name: 'Waargenomen', xaxis: 'x', yaxis: 'y',
+    line: { color: '#2563eb', width: 1 } },
+  { x: weeks, y: trend, name: 'Trend', xaxis: 'x', yaxis: 'y2',
+    line: { color: '#16a34a', width: 1.5 } },
+  { x: weeks, y: seasonal, name: 'Seizoenscomponent (52 weken)', xaxis: 'x', yaxis: 'y3',
+    line: { color: '#f59e0b', width: 1 }, fill: 'tozeroy', fillcolor: 'rgba(245,158,11,0.1)' },
+].map(t => ({ ...t, mode: 'lines' }));
+const layout = {
+  title: { text: 'SARIMA decompostie: trend + seizoen', font: { size: 14 } },
+  xaxis: { title: 'Week (2 jaar)', anchor: 'y3' },
+  yaxis: { domain: [0.68, 1], title: { text: 'Totaal', font: { size: 10 } } },
+  yaxis2: { domain: [0.36, 0.63], title: { text: 'Trend', font: { size: 10 } } },
+  yaxis3: { domain: [0, 0.30], title: { text: 'Seizoen', font: { size: 10 } } },
+  legend: { orientation: 'h', itemwidth: 40, tracegroupgap: 30, y: 1.12, x: 0.5, xanchor: 'center', font: { size: 10 } },
+  margin: { t: 55, b: 45, l: 50, r: 20 },
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+};
+Plotly.newPlot('chart', traces, layout, { responsive: true, displayModeBar: false });
+</script></body></html>

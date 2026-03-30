@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const steps = ['Data laden','Preprocessing','XGBoost Classifier','SARIMA Individual','SARIMA Cumulatief','XGBoost Regressor','Ratio berekening','Ensemble','Output schrijven'];
+const starts = [0, 2, 5, 5, 5, 18, 18, 22, 25];
+const durations = [2, 3, 8, 13, 13, 4, 3, 3, 2];
+const colors = ['#94a3b8','#64748b','#7c3aed','#3b82f6','#f59e0b','#16a34a','#a855f7','#dc2626','#94a3b8'];
+const data = steps.map((step, i) => ({
+  type: 'bar', orientation: 'h', name: step,
+  y: [step], x: [durations[i]], base: [starts[i]],
+  marker: { color: colors[i] }, showlegend: false,
+  text: [step + ' (' + durations[i] + 's)'], textposition: 'inside', textfont: { size: 11, color: '#fff' },
+  hovertext: [step + ': ' + starts[i] + 's - ' + (starts[i] + durations[i]) + 's'], hoverinfo: 'text'
+}));
+const layout = {
+  title: { text: 'Pipeline uitvoertijd (indicatief, per stap)', font: { size: 14 } },
+  xaxis: { title: 'Seconden' }, barmode: 'stack',
+  margin: { t: 45, b: 50, l: 130, r: 20 },
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+  annotations: [
+    { x: 12, y: 'SARIMA Individual', text: 'Parallel', showarrow: false, font: { size: 9, color: '#fff' } },
+    { x: 12, y: 'SARIMA Cumulatief', text: 'Parallel', showarrow: false, font: { size: 9, color: '#fff' } }
+  ]
+};
+Plotly.newPlot('chart', data, layout, { responsive: true, displayModeBar: false });
+</script></body></html>
