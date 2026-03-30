@@ -7,16 +7,15 @@ from src.strategies.combined import CombinedStrategy
 def create_strategy(cfg, datasets, configuration, cwd):
     """Select and instantiate the appropriate prediction strategy.
 
-    datasets is the 6-tuple returned by load_data():
+    datasets is the 5-tuple returned by load_data():
         (data_individual, data_cumulative, data_student_numbers,
-         data_latest, data_distances, ensemble_weights)
+         data_latest, ensemble_weights)
     """
     (
         data_individual,
         data_cumulative,
         data_student_numbers,
         data_latest,
-        data_distances,
         ensemble_weights,
     ) = datasets
 
@@ -35,7 +34,7 @@ def create_strategy(cfg, datasets, configuration, cwd):
             raise Exception("Cumulative dataset not found")
         try:
             return CombinedStrategy(
-                data_individual, data_cumulative, data_distances,
+                data_individual, data_cumulative,
                 data_student_numbers, configuration, data_latest,
                 ensemble_weights, cwd, cfg.data_option, cfg.ci_test_n,
                 cfg.years,
@@ -51,7 +50,7 @@ def create_strategy(cfg, datasets, configuration, cwd):
         if data_individual is None:
             raise Exception("Individual dataset not found")
         return IndividualStrategy(
-            data_individual, data_distances, configuration,
+            data_individual, configuration,
             data_latest, ensemble_weights, data_student_numbers,
             cwd, cfg.data_option, cfg.ci_test_n,
         )

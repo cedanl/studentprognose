@@ -4,7 +4,6 @@
         "path_latest_individual": "data/input/totaal_individueel.xlsx",
         "path_latest_cumulative": "data/input/totaal_cumulatief.xlsx",
         "path_cumulative_new": "",
-        "path_distances": "data/input/afstanden.xlsx",
         "path_ensemble_weights": "data/input/ensemble_weights.xlsx",
         "path_october": "data/input/[JOUW_BESTAND_WAAR_JE_STUDENTAANTALLEN_VANDAAN_HAALT].xlsx",
         "path_student_count_first-years": "data/input/student_count_first-years_inclusief_pre-master_DEMO.xlsx",
@@ -13,8 +12,7 @@
         "path_ratios": "data/input/ratiobestand.xlsx",
         "path_individual": "data/input/vooraanmeldingen_individueel_DEMO.csv",
         "path_raw_telbestanden": "data/input_raw/telbestanden",
-        "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv",
-        "path_raw_afstanden": "data/input_raw/afstanden.xlsx"
+        "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
     },
     "numerus_fixus": {
         "B Opleiding": 0

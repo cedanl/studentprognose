@@ -6,7 +6,7 @@ from sklearn.compose import ColumnTransformer
 from src.utils.weeks import get_weeks_list
 
 
-def predict_applicant(data, predict_year, predict_week, max_year, data_distances, data_cumulative=None):
+def predict_applicant(data, predict_year, predict_week, max_year, data_cumulative=None):
     """
     Train an XGBoost classifier to predict individual applicant enrollment probability.
 
@@ -78,15 +78,7 @@ def predict_applicant(data, predict_year, predict_week, max_year, data_distances
     if len(X_test) == 0:
         return np.nan
 
-    if data_distances is not None:
-        numeric_cols = [
-            "Collegejaar",
-            "Sleutel_count",
-            "is_numerus_fixus",
-            "Afstand",
-        ]
-    else:
-        numeric_cols = ["Collegejaar", "Sleutel_count", "is_numerus_fixus"]
+    numeric_cols = ["Collegejaar", "Sleutel_count", "is_numerus_fixus"]
 
     categorical_cols = [
         "Examentype",

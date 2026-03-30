@@ -14,14 +14,13 @@ from src.models.s07_sarima import predict_with_sarima_individual
 
 
 class IndividualStrategy(PredictionStrategy):
-    def __init__(self, data_individual, data_distances, configuration,
+    def __init__(self, data_individual, configuration,
                  data_latest, ensemble_weights, data_studentcount,
                  cwd, data_option, ci_test_n):
         super().__init__(configuration, data_latest, ensemble_weights,
                          data_studentcount, cwd, data_option, ci_test_n)
 
         self.data_individual = data_individual
-        self.data_distances = data_distances
         self.faculty_transformation = configuration["faculty"]
 
     def preprocess(self):
@@ -86,13 +85,6 @@ class IndividualStrategy(PredictionStrategy):
         values_to_change = nationaliteit_counts[nationaliteit_counts < 100].index
         data["Nationaliteit"] = data["Nationaliteit"].replace(values_to_change, "Overig")
 
-        if self.data_distances is not None:
-            afstanden = self.data_distances
-            data["Afstand"] = np.nan
-            data["Afstand"] = data["Geverifieerd adres plaats"].map(
-                afstanden.set_index("Geverifieerd adres plaats")["Afstand"]
-            )
-
         def get_new_column(row):
             if (
                 row["Weeknummer"] == 17
@@ -139,7 +131,7 @@ class IndividualStrategy(PredictionStrategy):
         print("Predicting preapplicants...")
         predicties = predict_applicant(
             self.data_individual, self.predict_year, self.predict_week,
-            self.max_year, self.data_distances
+            self.max_year
         )
 
         self.data_individual.loc[

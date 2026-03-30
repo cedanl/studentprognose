@@ -10,7 +10,6 @@ def apply_ci_test_subset(
     data_cumulative,
     data_student_numbers_first_years,
     data_latest,
-    data_distances,
     data_weighted_ensemble,
 ):
     """
@@ -37,7 +36,6 @@ def apply_ci_test_subset(
             data_cumulative,
             data_student_numbers_first_years,
             data_latest,
-            data_distances,
             data_weighted_ensemble,
         )
 
@@ -104,6 +102,5 @@ def apply_ci_test_subset(
         data_cumulative,
         data_student_numbers_first_years,
         data_latest,
-        data_distances,
         data_weighted_ensemble,
     )

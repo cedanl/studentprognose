@@ -12,7 +12,7 @@ from src.models.s07_sarima import predict_with_sarima_individual, predict_with_s
 
 
 class CombinedStrategy(PredictionStrategy):
-    def __init__(self, data_individual, data_cumulative, data_distances,
+    def __init__(self, data_individual, data_cumulative,
                  data_studentcount, configuration,
                  data_latest, ensemble_weights, cwd, data_option, ci_test_n,
                  years):
@@ -20,7 +20,7 @@ class CombinedStrategy(PredictionStrategy):
                          data_studentcount, cwd, data_option, ci_test_n)
 
         self.individual = IndividualStrategy(
-            data_individual, data_distances, configuration,
+            data_individual, configuration,
             data_latest, ensemble_weights, data_studentcount,
             cwd, data_option, ci_test_n,
         )
@@ -64,7 +64,7 @@ class CombinedStrategy(PredictionStrategy):
         print("Predicting preapplicants...")
         predicties = predict_applicant(
             self.individual.data_individual, self.predict_year, self.predict_week,
-            self.individual.max_year, self.individual.data_distances,
+            self.individual.max_year,
             self.cumulative.data_cumulative,
         )
         self.individual.data_individual.loc[

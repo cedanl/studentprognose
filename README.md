@@ -136,7 +136,6 @@ uv run main.py -y 2025 -w 5 -d c
 | **student_count_first-years** | Werkelijk aantal eerstejaars studenten per jaar, opleiding en herkomst. |
 | **student_count_higher-years** | Werkelijk aantal hogerjaars studenten per jaar, opleiding en herkomst. |
 | **student_volume** | Werkelijk totaal aantal studenten (eerstejaars + hogerjaars) per jaar, opleiding en herkomst. |
-| **distances** | Afstanden van woonplaatsen in Nederland tot de universiteit. Wordt samengevoegd met individuele data voor XGBoost. |
 | **weighted_ensemble** | Gewichten per model voor de ensemble-voorspelling. |
 
 ### Output

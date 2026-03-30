@@ -16,8 +16,6 @@ def run_etl(configuration):
     # ETL always writes to canonical (non-DEMO) paths
     output_cumulative = os.path.join(cwd, "data", "input", "vooraanmeldingen_cumulatief.csv")
     output_individual = os.path.join(cwd, "data", "input", "vooraanmeldingen_individueel.csv")
-    output_distances = os.path.join(cwd, "data", "input", "afstanden.xlsx")
-
     # Step 1: Rowbind telbestanden → vooraanmeldingen_cumulatief.csv
     telbestanden_dir = os.path.join(cwd, paths.get("path_raw_telbestanden", "data/input_raw/telbestanden"))
 
@@ -43,7 +41,7 @@ def run_etl(configuration):
         print(f"[3/4] Skipping student counts (oktober-bestand not found: {paths['path_october']})")
 
     # Step 4: Copy direct files (raw → canonical input paths)
-    copied = _copy_direct_files(cwd, paths, output_individual, output_distances)
+    copied = _copy_direct_files(cwd, paths, output_individual)
     if copied:
         print(f"[4/4] Copying direct files...           → {', '.join(copied)}")
     else:
@@ -380,12 +378,11 @@ def _calculate_student_counts(path_october, cwd):
     result_higher.to_excel(os.path.join(cwd, "data", "input", "student_count_higher-years.xlsx"), index=False)
 
 
-def _copy_direct_files(cwd, paths, output_individual, output_distances):
+def _copy_direct_files(cwd, paths, output_individual):
     """Copy files that need no transformation from input_raw to input."""
     copied = []
 
     copies = [
-        (paths.get("path_raw_afstanden", "data/input_raw/afstanden.xlsx"), output_distances),
         (paths.get("path_raw_individueel", "data/input_raw/individuele_aanmelddata.csv"), output_individual),
     ]
 

@@ -20,7 +20,6 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 
 | Bestand | Beschrijving | Bron |
 |---------|-------------|------|
-| `afstanden.xlsx` | Afstanden woonplaats → instelling per plaats | Direct van instelling |
 | `ensemble_weights.xlsx` | Gewichten per model voor de ensemble-voorspelling | Gegenereerd door post-processing stap A |
 | `totaal_cumulatief.xlsx` / `totaal_individueel.xlsx` | Historische voorspellingen (eerdere model-runs) | Gegenereerd door post-processing stap B |
 
@@ -49,7 +48,6 @@ flowchart TD
         SL["Studielink Telbestanden<br/><i>telbestandY2024WXX.csv</i>"]:::bron
         OKT["Oktober-bestand<br/><i>1-cijfer HO</i>"]:::bron
         SIS["Individuele aanmelddata<br/><i>SIS / datawarehouse</i>"]:::bron
-        AFI["Afstanden woonplaats<br/><i>instelling</i>"]:::bron
     end
 
     %% ══════════════════════════════════════
@@ -60,7 +58,7 @@ flowchart TD
         S1["1 · Rowbind + reformat<br/><i>samenvoegen telbestanden</i>"]:::script
         S2["2 · Interpolate<br/><i>ontbrekende weken</i>"]:::script
         S3["3 · Calculate student count<br/><i>oktober → aantallen</i>"]:::script
-        S4["4 · Copy bestanden<br/><i>individueel + afstanden</i>"]:::script
+        S4["4 · Copy bestanden<br/><i>individueel</i>"]:::script
     end
 
     %% ══════════════════════════════════════
@@ -75,7 +73,6 @@ flowchart TD
 
     subgraph input_optioneel ["data/input/ — optioneel"]
         direction LR
-        AF["afstanden.xlsx"]:::optioneel
         EW["ensemble_weights.xlsx"]:::optioneel
         TC["totaal_cumulatief.xlsx<br/>totaal_individueel.xlsx"]:::optioneel
     end
@@ -145,12 +142,11 @@ flowchart TD
     SL --> S1 --> S2 --> VC
     OKT --> S3 --> SC
     SIS --> S4 --> VI
-    AFI --> S4
     S4 --> AF
 
     %% ── data/input → Model ──
     VC & VI & SC --> LOAD
-    AF & EW & TC -.-> LOAD
+    EW & TC -.-> LOAD
 
     %% ── Model → Output ──
     S10 ==> OUT
@@ -187,7 +183,7 @@ Het ETL-script (`uv run main.py --etl`) transformeert ruwe data in `data/input_r
 | 1 | Rowbind + reformat | `data/input_raw/telbestanden/*.csv` | Samengevoegd CSV |
 | 2 | Interpolatie | Samengevoegd CSV | `vooraanmeldingen_cumulatief.csv` |
 | 3 | Studentaantallen | Oktober-bestand (1-cijfer HO) | `student_count_*.xlsx`, `student_volume.xlsx` |
-| 4 | Kopieren | Individuele data + afstanden | `vooraanmeldingen_individueel.csv`, `afstanden.xlsx` |
+| 4 | Kopieren | Individuele data | `vooraanmeldingen_individueel.csv` |
 
 ---
 

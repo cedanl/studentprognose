@@ -16,17 +16,10 @@ def load_data(configuration, data_option):
     paths = configuration["paths"]
 
     data_individual = None
-    data_distances = None
     if data_option == DataOption.INDIVIDUAL or data_option == DataOption.BOTH_DATASETS:
         data_individual = (
             pd.read_csv(paths["path_individual"], sep=";", skiprows=[1])
             if (paths["path_individual"] != "" and os.path.exists(paths["path_individual"]))
-            else None
-        )
-
-        data_distances = (
-            pd.read_excel(paths["path_distances"])
-            if (paths["path_distances"] != "" and os.path.exists(paths["path_distances"]))
             else None
         )
 
@@ -156,6 +149,5 @@ def load_data(configuration, data_option):
         data_cumulative,
         data_student_numbers_first_years,
         data_latest,
-        data_distances,
         data_weighted_ensemble,
     )
