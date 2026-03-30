@@ -55,10 +55,10 @@ flowchart TD
     %% ══════════════════════════════════════
     subgraph etl ["ETL — s01_etl.py (--etl)"]
         direction LR
-        S1["1 · Rowbind + reformat<br/><i>samenvoegen telbestanden</i>"]:::script
-        S2["2 · Interpolate<br/><i>ontbrekende weken</i>"]:::script
-        S3["3 · Calculate student count<br/><i>oktober → aantallen</i>"]:::script
-        S4["4 · Copy bestanden<br/><i>individueel</i>"]:::script
+        S1["Rowbind + reformat<br/><i>samenvoegen telbestanden</i>"]:::script
+        S2["Interpolate<br/><i>ontbrekende weken</i>"]:::script
+        S3["Calculate student count<br/><i>oktober → aantallen</i>"]:::script
+        S4["Copy bestanden<br/><i>individueel</i>"]:::script
     end
 
     %% ══════════════════════════════════════
@@ -142,7 +142,6 @@ flowchart TD
     SL --> S1 --> S2 --> VC
     OKT --> S3 --> SC
     SIS --> S4 --> VI
-    S4 --> AF
 
     %% ── data/input → Model ──
     VC & VI & SC --> LOAD
