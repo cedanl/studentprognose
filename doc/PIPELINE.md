@@ -53,7 +53,7 @@ flowchart TD
     %% ══════════════════════════════════════
     %% LAAG 2 — ETL (s01_etl.py)
     %% ══════════════════════════════════════
-    subgraph etl ["ETL — s01_etl.py (--etl)"]
+    subgraph etl ["ETL — s01_etl.py (standaard, skip met --noetl)"]
         direction LR
         S1["Rowbind + reformat<br/><i>samenvoegen telbestanden</i>"]:::script
         S2["Interpolate<br/><i>ontbrekende weken</i>"]:::script
@@ -177,7 +177,7 @@ flowchart TD
 
 ## ETL Scripts (s01_etl.py)
 
-Het ETL-script (`uv run main.py --etl`) transformeert ruwe data in `data/input_raw/` naar verwerkte bestanden in `data/input/`.
+Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` naar verwerkte bestanden in `data/input/`. Gebruik `--noetl` om deze stap over te slaan.
 
 | Stap | Actie | Input | Output |
 |------|-------|-------|--------|
@@ -203,7 +203,7 @@ Het ETL-script (`uv run main.py --etl`) transformeert ruwe data in `data/input_r
 | 12 | Ratio model | — | `s09_ratio` | `s09_ratio` |
 | 13 | Postprocessing | `s10_postprocessor` | `s10_postprocessor` | `s10_postprocessor` |
 
-<small>* alleen met `--etl` resp. `--ci test N`</small>
+<small>* standaard aan (skip met `--noetl`) resp. alleen met `--ci test N`</small>
 
 ---
 

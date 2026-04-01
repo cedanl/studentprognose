@@ -17,7 +17,7 @@ class PipelineConfig:
     student_year_prediction: StudentYearPrediction = StudentYearPrediction.FIRST_YEARS
     skip_years: int = 0
     ci_test_n: int | None = None
-    etl: bool = False
+    noetl: bool = False
 
 
 def _expand_slices(tokens):
@@ -67,12 +67,12 @@ def parse_args(argv):
     parser.add_argument("-sy", "-SY", "-studentyear", choices=list(STUDENT_YEAR_MAP.keys()), default=None, dest="studentyear")
     parser.add_argument("-sk", "-SK", "-skipyears", type=int, default=0, dest="skipyears")
     parser.add_argument("--ci", nargs=2, metavar=("test", "N"), default=None)
-    parser.add_argument("--etl", action="store_true")
+    parser.add_argument("--noetl", action="store_true")
 
     args = parser.parse_args(argv[1:])
 
     cfg = PipelineConfig()
-    cfg.etl = args.etl
+    cfg.noetl = args.noetl
 
     # Configuration path
     if args.configuration and os.path.exists(args.configuration):

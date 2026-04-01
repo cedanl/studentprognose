@@ -158,7 +158,7 @@ uv run main.py -y 2025 -w 5 -d c
 | Stap | Fase | Bestand |
 |------|------|---------|
 | 1 | CLI parsing | `cli.py` |
-| 2 | ETL (indien `--etl`) | `s01_etl` |
+| 2 | ETL (skip met `--noetl`) | `s01_etl` |
 | 3 | Configuratie laden | `config.py` |
 | 4 | Data laden | `s02_loader` → `s03_add_zero_weeks` |
 | 5 | CI subset (indien `--ci`) | `s04_ci_subset` |

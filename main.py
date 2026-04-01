@@ -13,12 +13,10 @@ from src.utils.weeks import DataOption, StudentYearPrediction, HIGHER_YEARS_COLU
 def main(argv):
     cfg = parse_args(argv)
 
-    # Step 0: ETL (optional — raw data → input data)
-    if cfg.etl:
+    # Step 0: ETL (default — raw data → input data, skip with --noetl)
+    if not cfg.noetl:
         from src.data.s01_etl import run_etl
         run_etl(load_configuration(cfg.configuration_path))
-        if not cfg.weeks_specified:
-            return
 
     print("Predicting for years: ", cfg.years, " and weeks: ", cfg.weeks)
 
@@ -31,6 +29,8 @@ def main(argv):
     datasets = load_data(configuration, cfg.data_option)
     if cfg.ci_test_n is not None:
         datasets = apply_ci_test_subset(cfg.ci_test_n, *datasets)
+
+    _check_data_range(datasets, cfg)
 
     # Step 2: Initialize strategy (Individual / Cumulative / Combined)
     cwd = os.path.dirname(os.path.abspath(__file__))
@@ -57,6 +57,34 @@ def main(argv):
 
     # Step 6: Save output
     _save_results(strategy, cfg)
+
+
+def _check_data_range(datasets, cfg):
+    """Check if requested years/weeks exist in the loaded data and warn if not."""
+    data_individual, data_cumulative, *_ = datasets
+
+    # Pick whichever dataset is loaded based on the chosen mode
+    data = data_cumulative if data_cumulative is not None else data_individual
+    if data is None:
+        return
+
+    available_years = sorted(int(y) for y in data["Collegejaar"].dropna().unique())
+    available_weeks = sorted(int(w) for w in data["Weeknummer"].dropna().unique())
+
+    if not available_years:
+        return
+
+    missing_years = [y for y in cfg.years if y not in available_years]
+    missing_weeks = [w for w in cfg.weeks if w not in available_weeks]
+
+    if missing_years or missing_weeks:
+        year_range = f"{available_years[0]}-{available_years[-1]}" if len(available_years) > 1 else str(available_years[0])
+        week_range = f"{available_weeks[0]}-{available_weeks[-1]}" if len(available_weeks) > 1 else str(available_weeks[0])
+        print(f"\nWaarschuwing: de gevraagde combinatie is niet (volledig) beschikbaar in de data.")
+        print(f"  Beschikbare data: jaren {year_range}, weken {week_range}.")
+        print(f"  Pas je flags aan tussen -y {year_range} en -w {week_range},")
+        print(f"  of voeg nieuwe trainingsdata toe in data/input_raw/ om je gewenste tijdstip te voorspellen.")
+        sys.exit(1)
 
 
 def _preprocess(strategy, student_year_prediction):

@@ -33,7 +33,7 @@ def run_etl(configuration):
         print("[2/4] Skipping interpolation (no cumulative file)")
 
     # Step 3: Calculate student counts from oktober-bestand
-    path_october = os.path.join(cwd, paths["path_october"])
+    path_october = os.path.join(cwd, paths["path_raw_october"])
     if os.path.exists(path_october):
         print("[3/4] Calculating student counts...     → data/input/student_count_*.xlsx")
         _calculate_student_counts(path_october, cwd)
@@ -84,8 +84,8 @@ def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
     )
 
     data["Weeknummer rapportage"] = data["Weeknummer"]
-    data["Groepeernaam Croho"] = data["Croho"]
-    data["Naam Croho opleiding Nederlands"] = data["Croho"]
+    data["Groepeernaam Croho"] = data.get("Groepeernaam", data["Croho"])
+    data["Naam Croho opleiding Nederlands"] = data.get("Groepeernaam", data["Croho"])
     data["Aantal aanmelders met 1 aanmelding"] = None
     data["Inschrijvingen"] = None
 

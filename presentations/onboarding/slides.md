@@ -401,7 +401,7 @@ studentprognose/
 | 12 | Ratio model | — | `s09_ratio` | `s09_ratio` |
 | 13 | Postprocessing | `s10_postprocessor` | `s10_postprocessor` | `s10_postprocessor` |
 
-<small>* alleen met `--etl` resp. `--ci test N`</small>
+<small>* standaard aan (skip met `--noetl`) resp. alleen met `--ci test N`</small>
 
 ---
 layout: center
