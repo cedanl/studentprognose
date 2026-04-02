@@ -21,17 +21,29 @@ class PipelineConfig:
 
 
 def _expand_slices(tokens):
-    """Expand a list of tokens like ['12', ':', '20'] into [12, 13, ..., 20]."""
+    """Expand a list of tokens like ['12', ':', '20'] or ['12:20'] into [12, 13, ..., 20]."""
+    # First, split tokens that contain ':' without spaces (e.g. '11:15' → ['11', ':', '15'])
+    expanded_tokens = []
+    for token in tokens:
+        if ":" in token and token != ":":
+            for part in token.split(":"):
+                if part:
+                    expanded_tokens.append(part)
+                expanded_tokens.append(":")
+            expanded_tokens.pop()  # remove trailing ':'
+        else:
+            expanded_tokens.append(token)
+
     result = []
     i = 0
-    while i < len(tokens):
-        if i + 2 < len(tokens) and tokens[i + 1] == ":":
-            start = int(tokens[i])
-            end = int(tokens[i + 2])
+    while i < len(expanded_tokens):
+        if i + 2 < len(expanded_tokens) and expanded_tokens[i + 1] == ":":
+            start = int(expanded_tokens[i])
+            end = int(expanded_tokens[i + 2])
             result.extend(range(start, end + 1))
             i += 3
         else:
-            result.append(int(tokens[i]))
+            result.append(int(expanded_tokens[i]))
             i += 1
     return result
 

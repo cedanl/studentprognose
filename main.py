@@ -18,8 +18,6 @@ def main(argv):
         from src.data.s01_etl import run_etl
         run_etl(load_configuration(cfg.configuration_path))
 
-    print("Predicting for years: ", cfg.years, " and weeks: ", cfg.weeks)
-
     # Step 1: Load configuration and data
     print("Loading configuration...")
     configuration = load_configuration(cfg.configuration_path)
@@ -50,7 +48,8 @@ def main(argv):
         filtering["filtering"]["examentype"],
     )
 
-    # Step 5: Predict + evaluate (per year × week)
+    # Step 5: Print summary + predict (per year × week)
+    _print_summary(datasets, cfg, strategy)
     for year in cfg.years:
         for week in cfg.weeks:
             _predict_and_postprocess(strategy, cfg, data_cumulative, year, week)
@@ -85,6 +84,42 @@ def _check_data_range(datasets, cfg):
         print(f"  Pas je flags aan tussen -y {year_range} en -w {week_range},")
         print(f"  of voeg nieuwe trainingsdata toe in data/input_raw/ om je gewenste tijdstip te voorspellen.")
         sys.exit(1)
+
+
+def _print_summary(datasets, cfg, strategy):
+    """Print a summary of what will be trained on and predicted."""
+    data_individual, data_cumulative, *_ = datasets
+    data = data_cumulative if data_cumulative is not None else data_individual
+
+    # Training data range
+    train_years = sorted(int(y) for y in data["Collegejaar"].dropna().unique()) if data is not None else []
+    train_year_str = f"{train_years[0]}-{train_years[-1]}" if len(train_years) > 1 else str(train_years[0]) if train_years else "?"
+
+    # Programmes
+    programmes = strategy.programme_filtering
+    if not programmes and data is not None:
+        for col in ("Croho groepeernaam", "Groepeernaam Croho"):
+            if col in data.columns:
+                programmes = sorted(data[col].dropna().unique())
+                break
+
+    # Prediction details per week
+    pred_details = []
+    for week in cfg.weeks:
+        pred_len = (38 + 52 - week) if week > 38 else (38 - week)
+        end_week = 38
+        start_week = week + 1 if week < 38 else (week + 1 if week < 52 else 1)
+        pred_details.append(f"week {start_week} t/m {end_week} ({pred_len} weken vooruit)")
+
+    print(f"\n{'=' * 40}")
+    print(f"  Dataset:       {cfg.data_option.filename_suffix}")
+    print(f"  Trainingsdata: jaren {train_year_str}")
+    print(f"  Voorspelling:  jaar {cfg.years}, vanaf week {cfg.weeks}")
+    for i, detail in enumerate(pred_details):
+        prefix = "                 " if i > 0 else "  Voorspelt:     "
+        print(f"{prefix}{detail}")
+    print(f"  Opleidingen:   {', '.join(str(p) for p in programmes)}")
+    print(f"{'=' * 40}\n")
 
 
 def _preprocess(strategy, student_year_prediction):
