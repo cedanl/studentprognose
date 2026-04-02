@@ -23,7 +23,6 @@ class CumulativeStrategy(PredictionStrategy):
         self.data_cumulative = data_cumulative
         self.data_studentcount = data_studentcount
         self.skip_years = 0
-        self.faculty_transformation = configuration["faculty"]
 
     def preprocess(self):
         data = self.data_cumulative
@@ -144,9 +143,6 @@ class CumulativeStrategy(PredictionStrategy):
             self.data_cumulative["Gewogen vooraanmelders"] + self.data_cumulative["Inschrijvingen"]
         )
         self.data_cumulative = self.data_cumulative.drop_duplicates()
-        self.data_cumulative["Faculteit"] = self.data_cumulative["Faculteit"].replace(
-            self.faculty_transformation,
-        )
 
         if int(self.predict_week) > 38:
             self.pred_len = 38 + 52 - int(self.predict_week)

@@ -68,15 +68,5 @@
             "Aantal aanmelders met 1 aanmelding": "Aantal aanmelders met 1 aanmelding",
             "Inschrijvingen": "Inschrijvingen"
         }
-    },
-    "faculty": {
-        "LET": "FdL",
-        "SOW": "FSW",
-        "RU": "FdM",
-        "MAN": "FdM",
-        "NWI": "FNWI",
-        "MED": "FMW",
-        "FTR": "FFTR",
-        "JUR": "FdR"
     }
 }

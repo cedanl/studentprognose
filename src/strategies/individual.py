@@ -21,7 +21,6 @@ class IndividualStrategy(PredictionStrategy):
                          data_studentcount, cwd, data_option, ci_test_n)
 
         self.data_individual = data_individual
-        self.faculty_transformation = configuration["faculty"]
 
     def preprocess(self):
         data = self.data_individual
@@ -69,8 +68,6 @@ class IndividualStrategy(PredictionStrategy):
             data["Ingangsdatum"].str.contains("01-09-")
             | data["Ingangsdatum"].str.contains("01-10-")
         ]
-
-        data.Faculteit = data["Faculteit"].replace("RU", self.faculty_transformation["RU"])
 
         data["is_numerus_fixus"] = (
             data["Croho groepeernaam"].isin(self.numerus_fixus_list)

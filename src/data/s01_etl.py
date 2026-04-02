@@ -89,11 +89,7 @@ def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
     data["Aantal aanmelders met 1 aanmelding"] = None
     data["Inschrijvingen"] = None
 
-    # Apply faculty mapping from configuration if available
-    faculty_map = configuration.get("faculty", {})
-    if faculty_map and "Faculteit" in data.columns:
-        data["Faculteit"] = data["Faculteit"].replace(faculty_map)
-    elif "Faculteit" not in data.columns:
+    if "Faculteit" not in data.columns:
         data["Faculteit"] = None
 
     data["Type hoger onderwijs"] = data["Type hoger onderwijs"].replace(
