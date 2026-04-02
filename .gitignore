@@ -12,7 +12,7 @@ data/input/*
 
 !data/output
 data/output/*
-!data/output/blank.xlsx
+!data/output/.gitkeep
 
 !data/metadata
 
