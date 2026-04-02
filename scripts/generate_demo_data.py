@@ -122,63 +122,87 @@ def generate_oktober_bestand():
 
 
 def generate_individuele_aanmelddata():
-    """Generate individual application data for 2024."""
+    """Generate individual application data for years 2020-2024."""
     rows = []
     sleutel = 1000
 
-    for _, type_ho, naam, _, base_nl, base_eer, _ in PROGRAMMES:
-        examentype = "Propedeuse Bachelor" if type_ho == "B" else "Master"
-        faculteit_map = {
-            "B Psychologie": "FSW",
-            "B Politicologie": "FdM",
-            "M Rechtsgeleerdheid": "FdR",
-        }
-        faculteit = faculteit_map.get(naam, "FNWI")
+    faculteit_map = {
+        "B Psychologie": "FSW",
+        "B Politicologie": "FdM",
+        "M Rechtsgeleerdheid": "FdR",
+    }
 
-        for herkomst_label, count, eer in [("NL", base_nl, "N"), ("EER", base_eer, "J")]:
-            for i in range(count):
-                week = random.randint(1, 19)
-                day = random.randint(1, 7)
-                date_str = f"{day + week * 7 % 28:02d}-{((week - 1) // 4) + 1:02d}-2024"
+    for year in YEARS:
+        year_factor = 1 + 0.03 * (year - 2020)
 
-                rows.append({
-                    "Sleutel": sleutel,
-                    "Datum Verzoek Inschr": date_str,
-                    "Ingangsdatum": "01-09-2024",
-                    "Collegejaar": 2024,
-                    "Datum intrekking vooraanmelding": "",
-                    "Inschrijfstatus": random.choice(["Ingeschreven", "Verzoek tot inschrijving", "Verzoek tot inschrijving"]),
-                    "Faculteit": faculteit,
-                    "Examentype": examentype,
-                    "Croho": naam.split(" ", 1)[1] if " " in naam else naam,
-                    "Croho groepeernaam": naam,
-                    "Opleiding": naam,
-                    "Hoofdopleiding": naam,
-                    "Eerstejaars croho jaar": 2024,
-                    "Is eerstejaars croho opleiding": 1,
-                    "Is hogerejaars": 0,
-                    "BBC ontvangen": random.choice(["Ja", "Nee"]),
-                    "Type vooropleiding": "VWO" if type_ho == "B" else "WO Bachelor",
-                    "Nationaliteit": "Nederlandse" if eer == "N" else "Duitse",
-                    "EER": eer,
-                    "Geslacht": random.choice(["M", "V"]),
-                    "Geverifieerd adres postcode": f"{random.randint(1000, 9999)}AA",
-                    "Geverifieerd adres plaats": "Nijmegen",
-                    "Geverifieerd adres land": "NL" if eer == "N" else "DE",
-                    "Studieadres postcode": f"{random.randint(1000, 9999)}BB",
-                    "Studieadres land": "NL",
-                    "School code eerste vooropleiding": f"{random.randint(10000, 99999)}",
-                    "School eerste vooropleiding": "Demo School",
-                    "Plaats code eerste vooropleiding": "0268",
-                    "Land code eerste vooropleiding": "6030",
-                    "Aantal studenten": 1,
-                })
-                sleutel += 1
+        for _, type_ho, naam, _, base_nl, base_eer, _ in PROGRAMMES:
+            examentype = "Propedeuse Bachelor" if type_ho == "B" else "Master"
+            faculteit = faculteit_map.get(naam, "FNWI")
+
+            for herkomst_label, base, eer in [("NL", base_nl, "N"), ("EER", base_eer, "J")]:
+                # Generate enough records to cover all weeks in the academic year
+                # Need at least 1 per week (52 weeks), scale up with base count
+                count = max(52, int(base * year_factor * 10))
+                for i in range(count):
+                    # Spread across full academic year: ~30% in weeks 39-52, ~70% in weeks 1-30
+                    if random.random() < 0.3:
+                        week = random.randint(39, 52)
+                        # Autumn weeks fall in the previous calendar year
+                        cal_year = year - 1
+                    else:
+                        week = random.randint(1, 37)
+                        cal_year = year
+                    # Convert week number to a plausible date
+                    import datetime as _dt
+                    jan1 = _dt.date(cal_year, 1, 4)  # ISO week 1 always contains Jan 4
+                    monday = jan1 - _dt.timedelta(days=jan1.weekday())
+                    target_date = monday + _dt.timedelta(weeks=week - 1, days=random.randint(0, 6))
+                    date_str = target_date.strftime("%d-%m-%Y")
+
+                    # Most are enrolled in historical years, mix for predict year
+                    if year < max(YEARS):
+                        status = random.choice(["Ingeschreven", "Ingeschreven", "Ingeschreven", "Geannuleerd"])
+                    else:
+                        status = random.choice(["Ingeschreven", "Verzoek tot inschrijving", "Verzoek tot inschrijving"])
+
+                    rows.append({
+                        "Sleutel": sleutel,
+                        "Datum Verzoek Inschr": date_str,
+                        "Ingangsdatum": f"01-09-{year}",
+                        "Collegejaar": year,
+                        "Datum intrekking vooraanmelding": "",
+                        "Inschrijfstatus": status,
+                        "Faculteit": faculteit,
+                        "Examentype": examentype,
+                        "Croho": naam.split(" ", 1)[1] if " " in naam else naam,
+                        "Croho groepeernaam": naam,
+                        "Opleiding": naam,
+                        "Hoofdopleiding": naam,
+                        "Eerstejaars croho jaar": year,
+                        "Is eerstejaars croho opleiding": 1,
+                        "Is hogerejaars": 0,
+                        "BBC ontvangen": 0,
+                        "Type vooropleiding": "VWO" if type_ho == "B" else "WO Bachelor",
+                        "Nationaliteit": "Nederlandse" if eer == "N" else "Duitse",
+                        "EER": eer,
+                        "Geslacht": random.choice(["M", "V"]),
+                        "Geverifieerd adres postcode": f"{random.randint(1000, 9999)}AA",
+                        "Geverifieerd adres plaats": "Nijmegen",
+                        "Geverifieerd adres land": "NL" if eer == "N" else "DE",
+                        "Studieadres postcode": f"{random.randint(1000, 9999)}BB",
+                        "Studieadres land": "NL",
+                        "School code eerste vooropleiding": f"{random.randint(10000, 99999)}",
+                        "School eerste vooropleiding": "Demo School",
+                        "Plaats code eerste vooropleiding": "0268",
+                        "Land code eerste vooropleiding": "6030",
+                        "Aantal studenten": 1,
+                    })
+                    sleutel += 1
 
     df = pd.DataFrame(rows)
     path = os.path.join(RAW_DIR, "individuele_aanmelddata.csv")
     df.to_csv(path, sep=";", index=False)
-    print(f"Generated individuele_aanmelddata.csv ({len(df)} rows)")
+    print(f"Generated individuele_aanmelddata.csv ({len(df)} rows, years {list(YEARS)})")
 
 
 if __name__ == "__main__":

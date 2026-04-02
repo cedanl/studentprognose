@@ -76,13 +76,19 @@ def _check_data_range(datasets, cfg):
         return
 
     available_years = sorted(int(y) for y in data["Collegejaar"].dropna().unique())
-    available_weeks = sorted(int(w) for w in data["Weeknummer"].dropna().unique())
 
     if not available_years:
         return
 
     missing_years = [y for y in cfg.years if y not in available_years]
-    missing_weeks = [w for w in cfg.weeks if w not in available_weeks]
+
+    # Individual dataset has no Weeknummer column before preprocessing
+    if "Weeknummer" in data.columns:
+        available_weeks = sorted(int(w) for w in data["Weeknummer"].dropna().unique())
+        missing_weeks = [w for w in cfg.weeks if w not in available_weeks]
+    else:
+        available_weeks = []
+        missing_weeks = []
 
     if missing_years or missing_weeks:
         year_range = f"{available_years[0]}-{available_years[-1]}" if len(available_years) > 1 else str(available_years[0])

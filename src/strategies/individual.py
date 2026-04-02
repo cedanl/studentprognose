@@ -95,6 +95,10 @@ class IndividualStrategy(PredictionStrategy):
 
         data = data.drop(["Sleutel"], axis=1)
 
+        # Ensure numeric types for flag columns (raw data may contain strings like "Nee"/"Ja")
+        for col in ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"]:
+            data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0).astype(int)
+
         data.loc[
             data["Examentype"] == "Pre-master",
             ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"],
@@ -243,6 +247,9 @@ class IndividualStrategy(PredictionStrategy):
                         input_data[week] = 0
                     else:
                         input_data[week] = input_data[str(decrement_week(int(week)))]
+            else:
+                for week in missing_weeks:
+                    input_data[week] = 0
 
             input_data = input_data.fillna(0)
             input_data = input_data.melt(
