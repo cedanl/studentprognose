@@ -48,13 +48,21 @@ def main(argv):
         filtering["filtering"]["examentype"],
     )
 
-    # Step 5: Print summary + predict (per year × week)
+    # Step 5: Validate prediction horizon
+    invalid_weeks = [w for w in cfg.weeks if w == 38]
+    if invalid_weeks:
+        print(f"\nFout: week 38 is de laatste week van het academisch jaar.")
+        print(f"  Er valt niets meer te voorspellen vanaf week 38 (pred_len = 0).")
+        print(f"  Kies een eerdere week, bijvoorbeeld -w 37 of -w 1:37.")
+        sys.exit(1)
+
+    # Step 6: Print summary + predict (per year × week)
     _print_summary(datasets, cfg, strategy)
     for year in cfg.years:
         for week in cfg.weeks:
             _predict_and_postprocess(strategy, cfg, data_cumulative, year, week)
 
-    # Step 6: Save output
+    # Step 7: Save output
     _save_results(strategy, cfg)
 
 
