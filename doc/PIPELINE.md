@@ -10,11 +10,11 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 
 | Bestand | Beschrijving | Bron | Wanneer nodig |
 |---------|-------------|------|---------------|
-| `vooraanmeldingen_cumulatief.csv` | Gewogen/ongewogen vooraanmelders per opleiding, herkomst, week, jaar | Studielink telbestanden → ETL stap 1 + 2 | Bij `-d c` of `-d b` (default) |
-| `vooraanmeldingen_individueel.csv` | Een rij per student-aanmelding met persoonskenmerken | Direct uit SIS/datawarehouse van de instelling | Bij `-d i` of `-d b` (default) |
-| `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | Oktober-bestand (1-cijfer HO) → ETL stap 3 | Altijd |
-| `student_count_higher-years.xlsx` | Werkelijk aantal hogerjaars per opleiding/herkomst/jaar | Oktober-bestand (1-cijfer HO) → ETL stap 3 | Altijd |
-| `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | Oktober-bestand (1-cijfer HO) → ETL stap 3 | Altijd |
+| `vooraanmeldingen_cumulatief.csv` | Gewogen/ongewogen vooraanmelders per opleiding, herkomst, week, jaar | Studielink telbestanden (extern) → ETL stap 1 + 2 | Bij `-d c` of `-d b` (default) |
+| `vooraanmeldingen_individueel.csv` | Een rij per student-aanmelding met persoonskenmerken | Osiris/Usis (intern) → ETL stap 4 | Bij `-d i` of `-d b` (default) |
+| `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
+| `student_count_higher-years.xlsx` | Werkelijk aantal hogerjaars per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
+| `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
 
 ### Optionele bestanden
 
@@ -43,11 +43,15 @@ flowchart TD
     %% ══════════════════════════════════════
     %% LAAG 1 — Externe bronnen
     %% ══════════════════════════════════════
-    subgraph bronnen ["Externe bronnen"]
+    subgraph bronnen_extern ["Externe bronnen"]
         direction LR
-        SL["Studielink Telbestanden<br/><i>telbestandY2024WXX.csv</i>"]:::bron
-        OKT["Oktober-bestand<br/><i>1-cijfer HO</i>"]:::bron
-        SIS["Individuele aanmelddata<br/><i>SIS / datawarehouse</i>"]:::bron
+        SL["Studielink Telbestanden<br/><i>telbestandY2024WXX.csv</i><br/><b>Bron: Studielink</b>"]:::bron
+        OKT["Oktober-bestand<br/><i>1-cijfer HO</i><br/><b>Bron: DUO</b>"]:::bron
+    end
+
+    subgraph bronnen_intern ["Interne bronnen"]
+        direction LR
+        SIS["Individuele aanmelddata<br/><i>per student-aanmelding</i><br/><b>Bron: Osiris / Usis</b>"]:::bron
     end
 
     %% ══════════════════════════════════════
@@ -78,14 +82,12 @@ flowchart TD
     end
 
     %% ══════════════════════════════════════
-    %% LAAG 4 — Prognosemodel (main.py)
+    %% LAAG 4 — Prognosemodel
     %% ══════════════════════════════════════
     subgraph pipeline ["Prognosemodel"]
         direction TD
 
-        MAIN["<b>main.py</b><br/><i>CLI parsing + orchestratie</i>"]:::model
         LOAD["<b>s02_loader</b> → <b>s03_add_zero_weeks</b><br/><i>data laden + nulweken toevoegen</i>"]:::script
-        MAIN --> LOAD
         CISUB["<b>s04_ci_subset</b><br/><i>optioneel: subset voor CI</i>"]:::script
 
         LOAD --> CISUB
@@ -105,8 +107,7 @@ flowchart TD
             C_PRE["strategies/cumulative<br/><i>preprocessing</i>"]
             C_S07["<b>s07</b>_sarima → <b>s06</b><br/><i>SARIMA cumulative</i>"]
             C_S08["<b>s08</b>_xgboost_regressor<br/><i>vooraanmelders → inschrijvingen</i>"]
-            C_S09["<b>s09</b>_ratio<br/><i>historische verhoudingen</i>"]
-            C_PRE --> C_S07 --> C_S08 --> C_S09
+            C_PRE --> C_S07 --> C_S08
         end
 
         subgraph BOTH_PATH ["-d both (standaard)"]
@@ -116,14 +117,13 @@ flowchart TD
             B_S06["<b>s06</b>_transforms"]
             B_S07["<b>s07</b>_sarima<br/><i>individual + cumulative</i>"]
             B_S08["<b>s08</b>_xgboost_regressor"]
-            B_S09["<b>s09</b>_ratio"]
-            B_PRE --> B_S05 --> B_S06 --> B_S07 --> B_S08 --> B_S09
+            B_PRE --> B_S05 --> B_S06 --> B_S07 --> B_S08
         end
 
-        S10["<b>s10_postprocessor</b><br/><i>ensemble, foutmaten, opslaan</i>"]:::script
+        S10["<b>s10_postprocessor</b><br/><i>ratio (cum/both), ensemble, foutmaten, opslaan</i>"]:::script
         I_S07 --> S10
-        C_S09 --> S10
-        B_S09 --> S10
+        C_S08 --> S10
+        B_S08 --> S10
     end
 
     %% ══════════════════════════════════════
@@ -162,7 +162,8 @@ flowchart TD
     PB -.-> TC
 
     %% ── Subgraph styling ──
-    style bronnen fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
+    style bronnen_extern fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
+    style bronnen_intern fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
     style etl fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
     style input_verplicht fill:#f0fdf4,stroke:#86efac,stroke-width:1px,color:#166534
     style input_optioneel fill:#fffbeb,stroke:#fcd34d,stroke-width:1px,color:#92400e
@@ -190,7 +191,7 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 
 ## Pipeline Executievolgorde
 
-**Gedeelde stappen (alle modi):** `cli.py` → `s01_etl`* → `config.py` → `s02_loader` → `s03_add_zero_weeks` → `s04_ci_subset`*
+**Gedeelde stappen (alle modi):** `main.py` → `cli.py` → `s01_etl`* → `config.py` → `s02_loader` → `s03_add_zero_weeks` → `s04_ci_subset`*
 
 | Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
 |------|------|---------------------|---------------------|---------------|
@@ -200,8 +201,7 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 | 9 | Transformatie | `s06_transforms` | — | `s06_transforms` |
 | 10 | SARIMA | `s07_sarima` (individual) | `s07_sarima` → `s06_transforms` | `s07_sarima` (both) |
 | 11 | XGBoost regressor | — | `s08_xgboost_regressor` | `s08_xgboost_regressor` |
-| 12 | Ratio model | — | `s09_ratio` | `s09_ratio` |
-| 13 | Postprocessing | `s10_postprocessor` | `s10_postprocessor` | `s10_postprocessor` |
+| 12 | Postprocessing | `s10_postprocessor` | `s10_postprocessor` (incl. `s09_ratio`) | `s10_postprocessor` (incl. `s09_ratio`) |
 
 <small>* standaard aan (skip met `--noetl`) resp. alleen met `--ci test N`</small>
 
@@ -209,14 +209,14 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 
 ## Twee databronnen, twee sporen
 
-**Cumulatief spoor (Studielink → model)**
+**Cumulatief spoor (extern: Studielink → model)**
 Studielink levert wekelijks telbestanden met geaggregeerde aanmeldcijfers per opleiding. Het ETL-script voegt deze samen (stap 1), interpoleert ontbrekende weken (stap 2), en schrijft `vooraanmeldingen_cumulatief.csv`. Dit vormt de basis voor de `SARIMA_cumulative` voorspelling.
 
-**Individueel spoor (instelling → model)**
-De instelling levert per-student aanmelddata uit het eigen SIS/datawarehouse. Dit bestand wordt direct aangeleverd als `vooraanmeldingen_individueel.csv`. Het vormt de basis voor de `SARIMA_individual` voorspelling.
+**Individueel spoor (intern: Osiris/Usis → model)**
+De instelling levert per-student aanmelddata uit Osiris/Usis. Dit bestand wordt via ETL stap 4 gekopieerd naar `vooraanmeldingen_individueel.csv`. Het vormt de basis voor de `SARIMA_individual` voorspelling.
 
-**Studentaantallen (oktober-bestand → ground truth)**
-Het oktober-bestand (1-cijfer HO) bevat de werkelijke inschrijvingen na 1 oktober. Het ETL-script leidt hieruit de ground truth af die het model als referentie gebruikt.
+**Studentaantallen (extern: DUO oktober-bestand → ground truth)**
+Het DUO oktober-bestand (1-cijfer HO) bevat de werkelijke inschrijvingen na 1 oktober. Het ETL-script leidt hieruit de ground truth af die het model als referentie gebruikt.
 
 Het prognosemodel combineert beide sporen via ensemble weging om een voorspelling te maken van het verwachte aantal studenten.
 
