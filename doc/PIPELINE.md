@@ -72,7 +72,7 @@ flowchart TD
         direction LR
         VC["vooraanmeldingen_cumulatief.csv"]:::verplicht
         VI["vooraanmeldingen_individueel.csv"]:::verplicht
-        SC["student_count_first-years.xlsx<br/>student_count_higher-years.xlsx<br/>student_volume.xlsx"]:::verplicht
+        SC["student_count_first-years.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br/>student_count_higher-years.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br/>student_volume.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;"]:::verplicht
     end
 
     %% ══════════════════════════════════════
@@ -141,6 +141,8 @@ flowchart TD
         direction LR
         PA["A · calculate_ensemble_weights.py<br/><i>optimale gewichten</i>"]:::script
         PB["B · append_studentcount_and_compute_errors.py<br/><i>werkelijke aantallen + fouten</i>"]:::script
+        FOOTNOTE["** Optionele flow: post-processing scripts genereren bestanden<br/>(ensemble_weights.xlsx, totaal_*.xlsx) die als input kunnen<br/>worden gebruikt bij de volgende model-run."]
+        style FOOTNOTE fill:none,stroke:none,color:#666
     end
 
     %% ── Bronnen → ETL ──
@@ -171,9 +173,6 @@ flowchart TD
     style S10 fill:#fef2f2,stroke:#fca5a5,stroke-width:1px,color:#991b1b
     style BOTH_PATH fill:#ede9fe,stroke:#c4b5fd,stroke-width:1px,color:#5b21b6
     style postproc fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
-
-    FOOTNOTE["** Optionele flow: post-processing scripts genereren bestanden<br/>(ensemble_weights.xlsx, totaal_*.xlsx) die als input kunnen<br/>worden gebruikt bij de volgende model-run."]
-    style FOOTNOTE fill:none,stroke:none,color:#666,font-size:12px
 ```
 
 ---
