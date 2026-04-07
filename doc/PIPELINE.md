@@ -137,7 +137,7 @@ flowchart TD
     %% ══════════════════════════════════════
     %% LAAG 6 — Post-processing (archive/)
     %% ══════════════════════════════════════
-    subgraph postproc ["Post-processing scripts (archive/) *"]
+    subgraph postproc ["Post-processing scripts (archive/) **"]
         direction LR
         PA["A · calculate_ensemble_weights.py<br/><i>optimale gewichten</i>"]:::script
         PB["B · append_studentcount_and_compute_errors.py<br/><i>werkelijke aantallen + fouten</i>"]:::script
@@ -172,7 +172,7 @@ flowchart TD
     style BOTH_PATH fill:#ede9fe,stroke:#c4b5fd,stroke-width:1px,color:#5b21b6
     style postproc fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
 
-    FOOTNOTE["* Optionele flow: post-processing scripts genereren bestanden<br/>(ensemble_weights.xlsx, totaal_*.xlsx) die als input kunnen<br/>worden gebruikt bij de volgende model-run."]
+    FOOTNOTE["** Optionele flow: post-processing scripts genereren bestanden<br/>(ensemble_weights.xlsx, totaal_*.xlsx) die als input kunnen<br/>worden gebruikt bij de volgende model-run."]
     style FOOTNOTE fill:none,stroke:none,color:#666,font-size:12px
 ```
 
