@@ -75,19 +75,13 @@ flowchart TD
         SC["student_count_first-years.xlsx<br/>student_count_higher-years.xlsx<br/>student_volume.xlsx"]:::verplicht
     end
 
-    subgraph input_optioneel ["data/input/ — optioneel"]
-        direction LR
-        EW["ensemble_weights.xlsx"]:::optioneel
-        TC["totaal_cumulatief.xlsx<br/>totaal_individueel.xlsx"]:::optioneel
-    end
-
     %% ══════════════════════════════════════
     %% LAAG 4 — Prognosemodel
     %% ══════════════════════════════════════
     subgraph pipeline ["Prognosemodel"]
         direction TD
 
-        LOAD["<b>s02_loader</b> → <b>s03_add_zero_weeks</b><br/><i>data laden + nulweken toevoegen</i>"]:::script
+        LOAD["<b>s02_loader</b> → <b>s03_add_zero_weeks</b> *<br/><i>data laden + nulweken toevoegen</i>"]:::script
         CISUB["<b>s04_ci_subset</b><br/><i>optioneel: subset voor CI</i>"]:::script
 
         LOAD --> CISUB
@@ -156,7 +150,6 @@ flowchart TD
 
     %% ── data/input → Model ──
     VC & VI & SC --> LOAD
-    EW & TC -.-> LOAD
 
     %% ── Postprocessor → Output ──
     S10C ==> OUT
@@ -166,17 +159,12 @@ flowchart TD
     OUT --> PB
     SC --> PB
 
-    %% ── Feedback loop ──
-    PA -.-> EW
-    PB -.-> TC
-
     %% ── Subgraph styling ──
     style bronnen fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
     style bronnen_extern fill:#f5f5f5,stroke:#999,stroke-width:1px,color:#333
     style bronnen_intern fill:#f5f5f5,stroke:#999,stroke-width:1px,color:#333
     style etl fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
     style input_verplicht fill:#f0fdf4,stroke:#86efac,stroke-width:1px,color:#166534
-    style input_optioneel fill:#fffbeb,stroke:#fcd34d,stroke-width:1px,color:#92400e
     style pipeline fill:#faf5ff,stroke:#c4b5fd,stroke-width:2px,color:#5b21b6
     style IND_PATH fill:#dcfce7,stroke:#86efac,stroke-width:1px,color:#166534
     style CUM_PATH fill:#fef3c7,stroke:#fcd34d,stroke-width:1px,color:#92400e
@@ -184,6 +172,8 @@ flowchart TD
     style BOTH_PATH fill:#ede9fe,stroke:#c4b5fd,stroke-width:1px,color:#5b21b6
     style postproc fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
 ```
+
+<small>* De loader leest optioneel ook `ensemble_weights.xlsx` en `totaal_cumulatief.xlsx` / `totaal_individueel.xlsx` uit `data/input/`. Deze bestanden worden gegenereerd door de post-processing scripts (A en B) en zijn pas beschikbaar na de eerste model-run.</small>
 
 ---
 
