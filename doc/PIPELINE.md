@@ -75,12 +75,6 @@ flowchart TD
         SC["student_count_first-years.xlsx<br/>student_count_higher-years.xlsx<br/>student_volume.xlsx"]:::verplicht
     end
 
-    subgraph input_optioneel ["data/input/ — optioneel *"]
-        direction LR
-        EW["ensemble_weights.xlsx"]:::optioneel
-        TC["totaal_cumulatief.xlsx<br/>totaal_individueel.xlsx"]:::optioneel
-    end
-
     %% ══════════════════════════════════════
     %% LAAG 4 — Prognosemodel
     %% ══════════════════════════════════════
@@ -171,7 +165,6 @@ flowchart TD
     style bronnen_intern fill:#f5f5f5,stroke:#999,stroke-width:1px,color:#333
     style etl fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
     style input_verplicht fill:#f0fdf4,stroke:#86efac,stroke-width:1px,color:#166534
-    style input_optioneel fill:#fffbeb,stroke:#fcd34d,stroke-width:1px,color:#92400e
     style pipeline fill:#faf5ff,stroke:#c4b5fd,stroke-width:2px,color:#5b21b6
     style IND_PATH fill:#dcfce7,stroke:#86efac,stroke-width:1px,color:#166534
     style CUM_PATH fill:#fef3c7,stroke:#fcd34d,stroke-width:1px,color:#92400e
@@ -180,7 +173,7 @@ flowchart TD
     style postproc fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
 ```
 
-<small>* De optionele bestanden en de post-processing scripts vormen een feedback loop: script A genereert `ensemble_weights.xlsx`, script B genereert `totaal_cumulatief.xlsx` / `totaal_individueel.xlsx`. De loader leest deze optioneel in bij de volgende model-run. Bij een eerste run zijn deze bestanden nog niet beschikbaar — het model draait zonder.</small>
+<small>* Optionele flow: de post-processing scripts genereren bestanden (`ensemble_weights.xlsx`, `totaal_*.xlsx`) die als input kunnen worden gebruikt bij de volgende model-run.</small>
 
 ---
 
