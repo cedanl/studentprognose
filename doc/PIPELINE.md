@@ -102,7 +102,7 @@ flowchart TD
             C_PRE --> C_S07 --> C_S08
         end
 
-        subgraph BOTH_PATH ["-d both (standaard)"]
+        subgraph BOTH_PATH ["-d both"]
             direction TD
             B_PRE["strategies/combined<br/><i>preprocessing beide</i>"]
             B_S05["<b>s05</b>_xgboost_classifier"]
