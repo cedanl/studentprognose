@@ -43,7 +43,7 @@ flowchart TD
     %% ══════════════════════════════════════
     %% LAAG 1 — Databronnen
     %% ══════════════════════════════════════
-    subgraph bronnen ["Databronnen"]
+    subgraph bronnen ["Databronnen — data/input_raw/"]
         direction LR
         subgraph bronnen_extern ["Externe bronnen"]
             SL["Studielink Telbestanden<br/><i>telbestandY2024WXX.csv</i><br/><b>Bron: Studielink</b>"]:::bron
@@ -68,7 +68,7 @@ flowchart TD
     %% ══════════════════════════════════════
     %% LAAG 3 — data/input/
     %% ══════════════════════════════════════
-    subgraph input_verplicht ["data/input/ — verplicht"]
+    subgraph input_verplicht ["Databronnen — data/input/"]
         direction LR
         VC["vooraanmeldingen_cumulatief.csv"]:::verplicht
         VI["vooraanmeldingen_individueel.csv"]:::verplicht
