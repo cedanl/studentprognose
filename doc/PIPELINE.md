@@ -41,17 +41,17 @@ flowchart TD
     linkStyle default stroke:#888,stroke-width:1.5px
 
     %% ══════════════════════════════════════
-    %% LAAG 1 — Externe bronnen
+    %% LAAG 1 — Databronnen
     %% ══════════════════════════════════════
-    subgraph bronnen_extern ["Externe bronnen"]
+    subgraph bronnen ["Databronnen"]
         direction LR
-        SL["Studielink Telbestanden<br/><i>telbestandY2024WXX.csv</i><br/><b>Bron: Studielink</b>"]:::bron
-        OKT["Oktober-bestand<br/><i>1-cijfer HO</i><br/><b>Bron: DUO</b>"]:::bron
-    end
-
-    subgraph bronnen_intern ["Interne bronnen"]
-        direction LR
-        SIS["Individuele aanmelddata<br/><i>per student-aanmelding</i><br/><b>Bron: Osiris / Usis</b>"]:::bron
+        subgraph bronnen_extern ["Externe bronnen"]
+            SL["Studielink Telbestanden<br/><i>telbestandY2024WXX.csv</i><br/><b>Bron: Studielink</b>"]:::bron
+            OKT["Oktober-bestand<br/><i>1-cijfer HO</i><br/><b>Bron: DUO</b>"]:::bron
+        end
+        subgraph bronnen_intern ["Interne bronnen"]
+            SIS["Individuele aanmelddata<br/><i>per student-aanmelding</i><br/><b>Bron: Osiris / Usis</b>"]:::bron
+        end
     end
 
     %% ══════════════════════════════════════
@@ -162,8 +162,9 @@ flowchart TD
     PB -.-> TC
 
     %% ── Subgraph styling ──
-    style bronnen_extern fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
-    style bronnen_intern fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
+    style bronnen fill:#f5f5f5,stroke:#bbb,stroke-width:1px,color:#333
+    style bronnen_extern fill:#f5f5f5,stroke:#999,stroke-width:1px,color:#333
+    style bronnen_intern fill:#f5f5f5,stroke:#999,stroke-width:1px,color:#333
     style etl fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
     style input_verplicht fill:#f0fdf4,stroke:#86efac,stroke-width:1px,color:#166534
     style input_optioneel fill:#fffbeb,stroke:#fcd34d,stroke-width:1px,color:#92400e
