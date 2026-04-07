@@ -120,16 +120,25 @@ flowchart TD
             B_PRE --> B_S05 --> B_S06 --> B_S07 --> B_S08
         end
 
-        S10["<b>s10_postprocessor</b><br/><i>ratio (cum/both), ensemble, foutmaten, opslaan</i>"]:::script
-        I_S07 --> S10
-        C_S08 --> S10
-        B_S08 --> S10
+        subgraph S10 ["s10_postprocessor"]
+            direction TD
+            S10A["<b>prepare_data_for_output_prelim</b><br/><i>NF-cap, kolommen, merges</i>"]:::script
+            S10B["<b>predict_with_ratio</b><br/><i>s09_ratio (alleen cum/both)</i>"]:::script
+            S10C["<b>postprocess</b><br/><i>ensemble (both), foutmaten</i>"]:::script
+            S10A --> S10B --> S10C
+        end
+
+        I_S07 --> S10A
+        C_S08 --> S10A
+        B_S08 --> S10A
     end
 
     %% ══════════════════════════════════════
     %% LAAG 5 — Output
     %% ══════════════════════════════════════
-    OUT["<b>data/output/</b><br/><br/>output_prelim_*.xlsx<br/>output_first-years_*.xlsx<br/>output_higher-years_*.xlsx<br/>output_volume_*.xlsx"]:::output
+    S10A -.-> OUT_PRELIM
+    OUT_PRELIM["<b>data/output/</b><br/><i>output_prelim_*.xlsx</i><br/>(tussenresultaat)"]:::output
+    OUT["<b>data/output/</b><br/><br/>output_first-years_*.xlsx<br/>output_higher-years_*.xlsx<br/>output_volume_*.xlsx"]:::output
 
     %% ══════════════════════════════════════
     %% LAAG 6 — Post-processing (archive/)
@@ -149,8 +158,8 @@ flowchart TD
     VC & VI & SC --> LOAD
     EW & TC -.-> LOAD
 
-    %% ── Model → Output ──
-    S10 ==> OUT
+    %% ── Postprocessor → Output ──
+    S10C ==> OUT
 
     %% ── Output → Post-processing ──
     OUT --> PA
@@ -171,6 +180,7 @@ flowchart TD
     style pipeline fill:#faf5ff,stroke:#c4b5fd,stroke-width:2px,color:#5b21b6
     style IND_PATH fill:#dcfce7,stroke:#86efac,stroke-width:1px,color:#166534
     style CUM_PATH fill:#fef3c7,stroke:#fcd34d,stroke-width:1px,color:#92400e
+    style S10 fill:#fef2f2,stroke:#fca5a5,stroke-width:1px,color:#991b1b
     style BOTH_PATH fill:#ede9fe,stroke:#c4b5fd,stroke-width:1px,color:#5b21b6
     style postproc fill:#eff6ff,stroke:#93c5fd,stroke-width:1px,color:#1e40af
 ```
@@ -202,7 +212,11 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 | 9 | Transformatie | `s06_transforms` | — | `s06_transforms` |
 | 10 | SARIMA | `s07_sarima` (individual) | `s07_sarima` → `s06_transforms` | `s07_sarima` (both) |
 | 11 | XGBoost regressor | — | `s08_xgboost_regressor` | `s08_xgboost_regressor` |
-| 12 | Postprocessing | `s10_postprocessor` | `s10_postprocessor` (incl. `s09_ratio`) | `s10_postprocessor` (incl. `s09_ratio`) |
+| 12 | Prelim output | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` |
+| | | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` |
+| 13 | Ratio model | — | `predict_with_ratio` (`s09_ratio`) | `predict_with_ratio` (`s09_ratio`) |
+| 14 | Postprocessing | `postprocess` | `postprocess` | `postprocess` (incl. ensemble) |
+| 15 | Output opslaan | `save_output` | `save_output` | `save_output` |
 
 <small>* standaard aan (skip met `--noetl`) resp. alleen met `--ci test N`</small>
 
@@ -236,12 +250,12 @@ Na een model-run kunnen de volgende scripts worden gedraaid om de input voor de 
 
 ## Output bestanden
 
-| Bestand | Beschrijving |
-|---------|-------------|
-| `output_prelim_*.xlsx` | Voorlopige voorspellingen (tussenresultaat) |
-| `output_first-years_*.xlsx` | Eerstejaars voorspellingen (eindresultaat) |
-| `output_higher-years_*.xlsx` | Hogerjaars voorspellingen (eindresultaat) |
-| `output_volume_*.xlsx` | Volume-voorspellingen (totaal) |
+| Bestand | Fase | Beschrijving |
+|---------|------|-------------|
+| `output_prelim_*.xlsx` | Tussenresultaat (stap 12) | Voorlopige voorspellingen, vóór ratio/ensemble/foutmaten |
+| `output_first-years_*.xlsx` | Eindresultaat (stap 15) | Eerstejaars voorspellingen |
+| `output_higher-years_*.xlsx` | Eindresultaat (stap 15) | Hogerjaars voorspellingen |
+| `output_volume_*.xlsx` | Eindresultaat (stap 15) | Volume-voorspellingen (totaal) |
 
 ### Kolommen in output
 
