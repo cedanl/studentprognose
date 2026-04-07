@@ -194,17 +194,16 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 
 | Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
 |------|------|---------------------|---------------------|---------------|
-| 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative |
-| 7 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` |
-| 8 | Classificatie | `s05_xgboost_classifier` | — | `s05_xgboost_classifier` |
-| 9 | Transformatie | `s06_transforms` | — | `s06_transforms` |
-| 10 | SARIMA | `s07_sarima` (individual) | `s07_sarima` → `s06_transforms` | `s07_sarima` (both) |
-| 11 | XGBoost regressor | — | `s08_xgboost_regressor` | `s08_xgboost_regressor` |
-| 12 | Prelim output | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` |
+| 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | `strategies/combined` (individual → cumulative) |
+| 7 | Classificatie | `s05_xgboost_classifier` | — | `s05_xgboost_classifier` |
+| 8 | Transformatie | `s06_transforms` | — | `s06_transforms` |
+| 9 | SARIMA | `s07_sarima` (individual) | `s07_sarima` → `s06_transforms` | `s07_sarima` (both) |
+| 10 | XGBoost regressor | — | `s08_xgboost_regressor` | `s08_xgboost_regressor` |
+| 11 | Prelim output | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` |
 | | | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` |
-| 13 | Ratio model | — | `predict_with_ratio` (`s09_ratio`) | `predict_with_ratio` (`s09_ratio`) |
-| 14 | Postprocessing | `postprocess` | `postprocess` | `postprocess` (incl. ensemble) |
-| 15 | Output opslaan | `save_output` | `save_output` | `save_output` |
+| 12 | Ratio model | — | `predict_with_ratio` (`s09_ratio`) | `predict_with_ratio` (`s09_ratio`) |
+| 13 | Postprocessing | `postprocess` | `postprocess` | `postprocess` (incl. ensemble) |
+| 14 | Output opslaan | `save_output` | `save_output` | `save_output` |
 
 <small>* standaard aan (skip met `--noetl`) resp. alleen met `--ci test N`</small>
 
@@ -231,8 +230,8 @@ Na een model-run kunnen de volgende scripts worden gedraaid om de input voor de 
 
 | Stap | Script | Input | Output |
 |------|--------|-------|--------|
-| A | `archive/calculate_ensemble_weights.py` | `totaal_cumulatief.xlsx` + `ensemble_weights.xlsx` | `ensemble_weights.xlsx` (bijgewerkt) |
-| B | `archive/append_studentcount_and_compute_errors.py` | `totaal_*.xlsx` + `student_count_*.xlsx` | `totaal_*.xlsx` (bijgewerkt met werkelijke aantallen + fouten) |
+| A | `archive/calculate_ensemble_weights.py` | `output_*.xlsx` (model-output) + `ensemble_weights.xlsx` | `ensemble_weights.xlsx` (bijgewerkt) |
+| B | `archive/append_studentcount_and_compute_errors.py` | `output_*.xlsx` (model-output) + `student_count_*.xlsx` | `totaal_*.xlsx` (bijgewerkt met werkelijke aantallen + fouten) |
 
 ---
 
