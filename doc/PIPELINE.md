@@ -72,7 +72,7 @@ flowchart TD
         direction LR
         VC["vooraanmeldingen_cumulatief.csv"]:::verplicht
         VI["vooraanmeldingen_individueel.csv"]:::verplicht
-        SC["student_count_first-years.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br/>student_count_higher-years.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br/>student_volume.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;"]:::verplicht
+        SC["student_count_first-years.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br/>student_count_higher-years.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;<br/>student_volume.xlsx &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;"]:::verplicht
     end
 
     %% ══════════════════════════════════════
