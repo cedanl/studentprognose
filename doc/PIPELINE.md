@@ -82,10 +82,8 @@ flowchart TD
         direction TD
 
         LOAD["<b>s02_loader</b> → <b>s03_add_zero_weeks</b> *<br/><i>data laden + nulweken toevoegen</i>"]:::script
-        CISUB["<b>s04_ci_subset</b><br/><i>optioneel: subset voor CI</i>"]:::script
 
-        LOAD --> CISUB
-        CISUB --> IND_PATH & CUM_PATH & BOTH_PATH
+        LOAD --> IND_PATH & CUM_PATH & BOTH_PATH
 
         subgraph IND_PATH ["-d individual"]
             direction TD
