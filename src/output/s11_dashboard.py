@@ -366,9 +366,14 @@ class DashboardBuilder:
         buttons = []
         for prog in programmes:
             vis = [False] * total
+            show = [False] * total
             for idx, is_default in prog_traces[prog]:
                 vis[idx] = True if is_default else "legendonly"
-            buttons.append(dict(label=prog, method="update", args=[{"visible": vis}]))
+                show[idx] = True
+            buttons.append(dict(
+                label=prog, method="update",
+                args=[{"visible": vis, "showlegend": show}],
+            ))
 
         fig.update_layout(
             xaxis=dict(title="Week"),
