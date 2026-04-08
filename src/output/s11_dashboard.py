@@ -281,10 +281,11 @@ class DashboardBuilder:
         has_forecast = "Voorspelde vooraanmelders" in self.data.columns
 
         fig = go.Figure()
-        buttons = []
+        # Collect trace indices per programme; build buttons after all traces exist
+        prog_traces = {}  # prog -> list of (trace_index, is_default_visible)
 
         for pi, prog in enumerate(programmes):
-            traces_this = []
+            prog_traces[prog] = []
 
             for yi, year in enumerate(years):
                 year_data = dc[
@@ -298,15 +299,21 @@ class DashboardBuilder:
                 color = "#1f77b4" if is_pred_year else year_palette[yi % len(year_palette)]
                 width = 3 if is_pred_year else 1.5
 
+                # Only prediction year visible by default; others in legend only
+                if pi == 0:
+                    init_vis = True if is_pred_year else "legendonly"
+                else:
+                    init_vis = False
+
                 fig.add_trace(go.Scatter(
                     x=agg["week_str"], y=agg["Gewogen vooraanmelders"],
                     name=str(year), mode="lines+markers",
                     line=dict(color=color, width=width),
                     marker=dict(size=3 if not is_pred_year else 5),
-                    visible=pi == 0,
+                    visible=init_vis,
                     legendgroup=str(year), showlegend=pi == 0,
                 ))
-                traces_this.append(len(fig.data) - 1)
+                prog_traces[prog].append((len(fig.data) - 1, is_pred_year))
 
             # Add SARIMA multi-week forecast (Voorspelde vooraanmelders)
             if has_forecast:
@@ -349,15 +356,18 @@ class DashboardBuilder:
                             mode="lines+markers",
                             line=dict(color="#d62728", width=3, dash="dash"),
                             marker=dict(size=5),
-                            visible=pi == 0,
+                            visible=True if pi == 0 else False,
                             legendgroup="prognose", showlegend=pi == 0,
                         ))
-                        traces_this.append(len(fig.data) - 1)
+                        prog_traces[prog].append((len(fig.data) - 1, True))
 
-            # Build visibility toggle
-            vis = [False] * len(fig.data)
-            for idx in traces_this:
-                vis[idx] = True
+        # Build buttons now that all traces exist (correct array length)
+        total = len(fig.data)
+        buttons = []
+        for prog in programmes:
+            vis = [False] * total
+            for idx, is_default in prog_traces[prog]:
+                vis[idx] = True if is_default else "legendonly"
             buttons.append(dict(label=prog, method="update", args=[{"visible": vis}]))
 
         fig.update_layout(
