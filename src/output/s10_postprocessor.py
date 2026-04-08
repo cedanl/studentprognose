@@ -48,6 +48,8 @@ class PostProcessor:
         self.data_option = data_option
         self.ci_test_n = ci_test_n
         self.data = None
+        self.predict_week = None
+        self._data_cumulative = None
 
     def add_predicted_preregistrations(self, data, predicted_preregistrations):
         dict = {
@@ -140,6 +142,8 @@ class PostProcessor:
         return data
 
     def prepare_data_for_output_prelim(self, data, year, week, data_cumulative=None, skip_years=0):
+        if data_cumulative is not None:
+            self._data_cumulative = data_cumulative
         self.data = data
         self.data = self._numerus_fixus_cap(self.data, year, week)
 
@@ -191,6 +195,7 @@ class PostProcessor:
         )
 
     def postprocess(self, predict_year, predict_week):
+        self.predict_week = predict_week
         if self.data_latest is not None:
             self.data = replace_latest_data(
                 self.data_latest, self.data, predict_year, predict_week
@@ -411,3 +416,20 @@ class PostProcessor:
         )
 
         self.data.to_excel(output_path, index=False)
+
+        try:
+            from src.output.s11_dashboard import DashboardBuilder
+            dashboard = DashboardBuilder(
+                data=self.data,
+                data_option=self.data_option,
+                numerus_fixus_list=self.numerus_fixus_list,
+                student_year_prediction=student_year_prediction,
+                ci_test_n=self.ci_test_n,
+                cwd=self.CWD,
+                predict_week=self.predict_week,
+                data_cumulative=self._data_cumulative,
+                data_studentcount=self.data_studentcount,
+            )
+            dashboard.build_and_save()
+        except Exception as e:
+            print(f"Warning: dashboard generation failed: {e}")
