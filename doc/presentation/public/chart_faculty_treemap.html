@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const data = [{
+  type: 'treemap',
+  labels: ['Radboud','FdL','FSW','FNWI','FdR','FMW','FdM','FFTR',
+           'Taalwetenschap','Geschiedenis','Psychologie','Pedagogiek','Informatica','Biologie','Rechten','Geneeskunde','Bedrijfskunde','Theologie'],
+  parents: ['','Radboud','Radboud','Radboud','Radboud','Radboud','Radboud','Radboud',
+            'FdL','FdL','FSW','FSW','FNWI','FNWI','FdR','FMW','FdM','FFTR'],
+  values: [0, 0, 0, 0, 0, 0, 0, 0, 120, 95, 420, 180, 210, 165, 285, 330, 310, 45],
+  marker: { colors: ['','#60a5fa','#fb923c','#4ade80','#c084fc','#f87171','#fbbf24','#94a3b8',
+    '#93c5fd','#93c5fd','#fdba74','#fdba74','#86efac','#86efac','#d8b4fe','#fca5a5','#fde68a','#cbd5e1'] },
+  textinfo: 'label+value',
+  textfont: { size: 12 }
+}];
+const layout = {
+  title: { text: 'Studentverdeling per faculteit en opleiding', font: { size: 15 } },
+  margin: { t: 45, b: 10, l: 10, r: 10 },
+  paper_bgcolor: 'rgba(0,0,0,0)'
+};
+Plotly.newPlot('chart', data, layout, { responsive: true, displayModeBar: false });
+</script></body></html>

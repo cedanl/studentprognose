@@ -1,19 +1,21 @@
-scrips/__pycache__/
+__pycache__/
 *.pyc
 .venv/
+.vscode/
 
 #Data files can be ignored
 data/*
 
 !data/input
 data/input/*
-!data/input/blank.xlsx
-!data/input/vooraanmeldingen_individueel_DEMO.csv
+!data/input/.gitkeep
 
 !data/output
 data/output/*
-!data/output/blank.xlsx
+!data/output/.gitkeep
 
 !data/metadata
+
+!data/input_raw
 
 

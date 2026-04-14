@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const data = [{
+  values: [62, 24, 14],
+  labels: ['NL', 'EER', 'Niet-EER'],
+  type: 'pie',
+  hole: 0.45,
+  marker: { colors: ['#3b82f6','#f59e0b','#ef4444'] },
+  textinfo: 'label+percent',
+  textfont: { size: 13 },
+  pull: [0.02, 0.02, 0.02]
+}];
+const layout = {
+  title: { text: 'Verdeling studenten naar herkomst', font: { size: 15 } },
+  legend: { orientation: 'h', itemwidth: 40, tracegroupgap: 30, y: 1.05, x: 0.5, xanchor: 'center', font: { size: 10 } },
+  margin: { t: 45, b: 40, l: 20, r: 20 },
+  paper_bgcolor: 'rgba(0,0,0,0)',
+  annotations: [{ text: '<b>Herkomst</b>', showarrow: false, font: { size: 14 } }]
+};
+Plotly.newPlot('chart', data, layout, { responsive: true, displayModeBar: false });
+</script></body></html>

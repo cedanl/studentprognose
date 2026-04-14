@@ -136,7 +136,6 @@ uv run main.py -y 2025 -w 5 -d c
 | **student_count_first-years** | Werkelijk aantal eerstejaars studenten per jaar, opleiding en herkomst. |
 | **student_count_higher-years** | Werkelijk aantal hogerjaars studenten per jaar, opleiding en herkomst. |
 | **student_volume** | Werkelijk totaal aantal studenten (eerstejaars + hogerjaars) per jaar, opleiding en herkomst. |
-| **distances** | Afstanden van woonplaatsen in Nederland tot de universiteit. Wordt samengevoegd met individuele data voor XGBoost. |
 | **weighted_ensemble** | Gewichten per model voor de ensemble-voorspelling. |
 
 ### Output
@@ -151,6 +150,31 @@ uv run main.py -y 2025 -w 5 -d c
 ---
 
 ## 🏗️ Architectuur
+
+### Pipeline executievolgorde
+
+**Gedeelde stappen (alle modi):**
+
+| Stap | Fase | Bestand |
+|------|------|---------|
+| 1 | CLI parsing | `cli.py` |
+| 2 | ETL (skip met `--noetl`) | `etl` |
+| 3 | Configuratie laden | `config.py` |
+| 4 | Data laden | `loader` → `preprocessing/add_zero_weeks` |
+| 5 | CI subset (indien `--ci`) | `utils/ci_subset` |
+
+**Modus-specifieke stappen:**
+
+| Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
+|------|------|---------------------|---------------------|---------------|
+| 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative |
+| 7 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` |
+| 8 | Classificatie | `xgboost_classifier` | — | `xgboost_classifier` |
+| 9 | Transformatie | `transforms` | — | `transforms` |
+| 10 | SARIMA | `sarima` (individual) | `sarima` → `transforms` | `sarima` (both) |
+| 11 | XGBoost regressor | — | `xgboost_regressor` | `xgboost_regressor` |
+| 12 | Ratio model | — | `ratio` | `ratio` |
+| 13 | Postprocessing + Opslaan | `postprocessor` | `postprocessor` | `postprocessor` |
 
 Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de architectuur.
 

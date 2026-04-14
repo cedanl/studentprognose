@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body { margin: 0; background: transparent; } #chart { width: 100%; height: 100vh; }</style>
+</head>
+<body>
+<div id="chart"></div>
+<script>
+const weeks = ['w1','w3','w5','w7','w9','w11','w13','w15','w17','w19','w21','w23','w25','w27','w29','w31','w33','w35','w37','w38'];
+
+// MAPE decreasing over weeks as more data comes in
+const mapeInd =      [42,38,34,30,27,24,21,19,17,15,13,12,11,10,9,8,7,5,3,2];
+const mapeCum =      [48,44,39,35,31,28,25,22,20,18,16,14,13,11,10,9,7,6,4,3];
+const mapeEnsemble = [38,34,30,26,23,20,18,16,14,12,11,10,9,8,7,6,5,4,2,1.5];
+
+const traceInd = {
+  x: weeks, y: mapeInd, mode: 'lines+markers', name: 'SARIMA Individual',
+  line: { color: '#3b82f6', width: 1.5 }, marker: { size: 4 },
+  fill: 'tozeroy', fillcolor: 'rgba(59,130,246,0.05)'
+};
+const traceCum = {
+  x: weeks, y: mapeCum, mode: 'lines+markers', name: 'SARIMA Cumulatief',
+  line: { color: '#f59e0b', width: 1.5 }, marker: { size: 4 },
+  fill: 'tozeroy', fillcolor: 'rgba(245,158,11,0.05)'
+};
+const traceEns = {
+  x: weeks, y: mapeEnsemble, mode: 'lines+markers', name: 'Ensemble',
+  line: { color: '#16a34a', width: 2 }, marker: { size: 5 },
+  fill: 'tozeroy', fillcolor: 'rgba(22,163,74,0.08)'
+};
+
+const layout = {
+  title: { text: 'Voorspelnauwkeurigheid: fout neemt af naarmate meer data binnenkomt', font: { size: 15 } },
+  xaxis: { title: 'Week van voorspelling', tickangle: -45 },
+  yaxis: { title: 'MAPE (%)', range: [0, 55], ticksuffix: '%' },
+  legend: { orientation: 'h', itemwidth: 40, tracegroupgap: 30, y: 1.12, x: 0.5, xanchor: 'center', font: { size: 10 } },
+  margin: { t: 65, b: 60, l: 55, r: 30 },
+  paper_bgcolor: 'rgba(0,0,0,0)',
+  plot_bgcolor: 'rgba(0,0,0,0)',
+  annotations: [
+    { x: 'w9', y: 30, text: 'Vroege weken:<br>grote onzekerheid', showarrow: false, font: { size: 11, color: '#6b7280' } },
+    { x: 'w33', y: 15, text: '<b>Ensemble wint</b>', showarrow: true, ax: 30, ay: -30, font: { size: 12, color: '#16a34a' } }
+  ]
+};
+
+Plotly.newPlot('chart', [traceCum, traceInd, traceEns], layout, { responsive: true, displayModeBar: false });
+</script>
+</body>
+</html>

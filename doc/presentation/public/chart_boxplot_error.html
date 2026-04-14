@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+function genErrors(n, spread, seed) {
+  const d = []; let r = seed;
+  for (let i = 0; i < n; i++) {
+    r = (r * 16807) % 2147483647;
+    d.push(((r / 2147483647) - 0.5) * spread * 2);
+  }
+  return d;
+}
+const t1 = { y: genErrors(50, 25, 111), name: 'SARIMA Ind.', type: 'box',
+  marker: { color: '#3b82f6' }, boxmean: true };
+const t2 = { y: genErrors(50, 30, 222), name: 'SARIMA Cum.', type: 'box',
+  marker: { color: '#f59e0b' }, boxmean: true };
+const t3 = { y: genErrors(50, 28, 333), name: 'Ratio', type: 'box',
+  marker: { color: '#a855f7' }, boxmean: true };
+const t4 = { y: genErrors(50, 15, 444), name: 'Ensemble', type: 'box',
+  marker: { color: '#16a34a' }, boxmean: true };
+const layout = {
+  title: { text: 'Verdeling voorspelfouten per model (boxplot)', font: { size: 14 } },
+  yaxis: { title: 'Fout (werkelijk - voorspeld)', zeroline: true },
+  legend: { orientation: 'h', itemwidth: 40, tracegroupgap: 30, y: 1.1, x: 0.5, xanchor: 'center', font: { size: 10 } },
+  margin: { t: 55, b: 40, l: 55, r: 20 },
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+};
+Plotly.newPlot('chart', [t1, t2, t3, t4], layout, { responsive: true, displayModeBar: false });
+</script></body></html>
