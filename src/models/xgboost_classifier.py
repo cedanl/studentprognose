@@ -5,8 +5,19 @@ from sklearn.compose import ColumnTransformer
 
 from src.utils.weeks import get_weeks_list
 
+DEFAULT_STATUS_MAP = {
+    "Ingeschreven": 1,
+    "Geannuleerd": 0,
+    "Uitgeschreven": 1,
+    "Verzoek tot inschrijving": 0,
+    "Studie gestaakt": 0,
+    "Aanmelding vervolgen": 0,
+}
 
-def predict_applicant(data, predict_year, predict_week, max_year, data_cumulative=None):
+MIN_TRAINING_YEAR = 2016
+
+
+def predict_applicant(data, predict_year, predict_week, max_year, data_cumulative=None, configuration=None):
     """
     Train an XGBoost classifier to predict individual applicant enrollment probability.
 
@@ -21,10 +32,14 @@ def predict_applicant(data, predict_year, predict_week, max_year, data_cumulativ
 
     model = XGBClassifier(objective="binary:logistic", eval_metric="auc")
 
+    model_config = configuration.get("model_config", {}) if configuration else {}
+    status_map = model_config.get("status_mapping", DEFAULT_STATUS_MAP)
+    min_year = model_config.get("min_training_year", MIN_TRAINING_YEAR)
+
     if predict_year == max_year:
         train = data_train[
             (data_train["Collegejaar"] < predict_year)
-            & (data_train["Collegejaar"] >= 2016)
+            & (data_train["Collegejaar"] >= min_year)
         ]
         test = data_train[
             (data_train["Collegejaar"] == predict_year)
@@ -33,7 +48,7 @@ def predict_applicant(data, predict_year, predict_week, max_year, data_cumulativ
     else:
         train = data_train[
             (data_train["Collegejaar"] != predict_year)
-            & (data_train["Collegejaar"] >= 2016)
+            & (data_train["Collegejaar"] >= min_year)
             & (data_train["Collegejaar"] != max_year)
         ]
         test = data_train[
@@ -57,15 +72,6 @@ def predict_applicant(data, predict_year, predict_week, max_year, data_cumulativ
                 | (train["Datum intrekking vooraanmelding"] < 39)
             )
         ]
-
-    status_map = {
-        "Ingeschreven": 1,
-        "Geannuleerd": 0,
-        "Uitgeschreven": 1,
-        "Verzoek tot inschrijving": 0,
-        "Studie gestaakt": 0,
-        "Aanmelding vervolgen": 0,
-    }
 
     train["Inschrijfstatus"] = train["Inschrijfstatus"].map(status_map)
 

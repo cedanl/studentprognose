@@ -1,4 +1,5 @@
 from src.utils.weeks import *
+from src.models.xgboost_classifier import DEFAULT_STATUS_MAP
 
 import pandas as pd
 import numpy as np
@@ -55,17 +56,8 @@ def transform(
 
     data["Weeknummer"] = data["Weeknummer"].astype(str)
 
-    status_map = {
-        "Ingeschreven": 1,
-        "Geannuleerd": 0,
-        "Uitgeschreven": 1,
-        "Verzoek tot inschrijving": 0,
-        "Studie gestaakt": 0,
-        "Aanmelding vervolgen": 0,
-    }
-
     if old_method:
-        data["Inschrijfstatus"] = data["Inschrijfstatus"].map(status_map)
+        data["Inschrijfstatus"] = data["Inschrijfstatus"].map(DEFAULT_STATUS_MAP)
 
     data = data.groupby(group_cols + ["Weeknummer"]).sum(numeric_only=False).reset_index()
 

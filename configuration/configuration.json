@@ -14,6 +14,17 @@
         "path_raw_telbestanden": "data/input_raw/telbestanden",
         "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
     },
+    "model_config": {
+        "status_mapping": {
+            "Ingeschreven": 1,
+            "Geannuleerd": 0,
+            "Uitgeschreven": 1,
+            "Verzoek tot inschrijving": 0,
+            "Studie gestaakt": 0,
+            "Aanmelding vervolgen": 0
+        },
+        "min_training_year": 2016
+    },
     "numerus_fixus": {
         "B Opleiding": 0
     },

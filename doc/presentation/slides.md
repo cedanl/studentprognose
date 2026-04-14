@@ -357,23 +357,26 @@ studentprognose/
     cli.py                          # CLI argument parsing
     config.py                       # JSON configuratie laden
     data/
-      s01_etl.py                    # ETL: ruwe data → input data
-      s02_loader.py                 # Data inladen (CSV/Excel)
-      s03_add_zero_weeks.py         # Ontbrekende nulweken toevoegen
-      s04_ci_subset.py              # CI-testmodus subsetting
-      s06_transforms.py             # Pivots en cumulatieve sommen
+      etl.py                        # ETL: ruwe data → input data
+      loader.py                     # Data inladen (CSV/Excel)
+      preprocessing/
+        add_zero_weeks.py           # Ontbrekende nulweken toevoegen
+      transforms.py                 # Pivots en cumulatieve sommen
     models/
-      s05_xgboost_classifier.py     # Individuele kansvoorspelling
-      s07_sarima.py                 # Tijdreeksvoorspelling
-      s08_xgboost_regressor.py      # Vooraanmelders → inschrijvingen
-      s09_ratio.py                  # Historische verhoudingen
+      xgboost_classifier.py        # Individuele kansvoorspelling
+      sarima.py                     # Tijdreeksvoorspelling
+      xgboost_regressor.py          # Vooraanmelders → inschrijvingen
+      ratio.py                      # Historische verhoudingen
     strategies/
       base.py                       # Abstracte basisklasse
       individual.py                 # Individueel spoor
       cumulative.py                 # Cumulatief spoor
       combined.py                   # Gecombineerde strategie
+    utils/
+      weeks.py                      # Week-utilities en enums
+      ci_subset.py                  # CI-testmodus subsetting
     output/
-      s10_postprocessor.py          # Ensemble, foutmaten, output
+      postprocessor.py              # Ensemble, foutmaten, output
   configuration/                    # JSON configuratie + filters
   data/
     input/                          # Invoerbestanden (CSV/Excel)
@@ -388,18 +391,18 @@ studentprognose/
 
 # Pipeline Executievolgorde
 
-**Gedeeld:** `cli.py` → `s01_etl`* → `config.py` → `s02_loader` → `s03_add_zero_weeks` → `s04_ci_subset`*
+**Gedeeld:** `cli.py` → `etl`* → `config.py` → `loader` → `preprocessing/add_zero_weeks` → `utils/ci_subset`*
 
 | Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
 |------|------|---------------------|---------------------|---------------|
 | 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative |
 | 7 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` |
-| 8 | Classificatie | `s05_xgboost_classifier` | — | `s05_xgboost_classifier` |
-| 9 | Transformatie | `s06_transforms` | — | `s06_transforms` |
-| 10 | SARIMA | `s07_sarima` (individual) | `s07_sarima` → `s06_transforms` | `s07_sarima` (both) |
-| 11 | XGBoost regressor | — | `s08_xgboost_regressor` | `s08_xgboost_regressor` |
-| 12 | Ratio model | — | `s09_ratio` | `s09_ratio` |
-| 13 | Postprocessing | `s10_postprocessor` | `s10_postprocessor` | `s10_postprocessor` |
+| 8 | Classificatie | `xgboost_classifier` | — | `xgboost_classifier` |
+| 9 | Transformatie | `transforms` | — | `transforms` |
+| 10 | SARIMA | `sarima` (individual) | `sarima` → `transforms` | `sarima` (both) |
+| 11 | XGBoost regressor | — | `xgboost_regressor` | `xgboost_regressor` |
+| 12 | Ratio model | — | `ratio` | `ratio` |
+| 13 | Postprocessing | `postprocessor` | `postprocessor` | `postprocessor` |
 
 <small>* standaard aan (skip met `--noetl`) resp. alleen met `--ci test N`</small>
 

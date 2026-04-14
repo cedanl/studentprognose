@@ -3,9 +3,9 @@ import sys
 
 from src.cli import parse_args
 from src.config import load_configuration
-from src.data.s02_loader import load_data
-from src.data.s04_ci_subset import apply_ci_test_subset
-from src.output.s10_postprocessor import PostProcessor
+from src.data.loader import load_data
+from src.utils.ci_subset import apply_ci_test_subset
+from src.output.postprocessor import PostProcessor
 from src.strategies import create_strategy
 from src.utils.weeks import DataOption, StudentYearPrediction, HIGHER_YEARS_COLUMNS
 
@@ -15,7 +15,7 @@ def main(argv):
 
     # Step 0: ETL (default — raw data → input data, skip with --noetl)
     if not cfg.noetl:
-        from src.data.s01_etl import run_etl
+        from src.data.etl import run_etl
         run_etl(load_configuration(cfg.configuration_path))
 
     # Step 1: Load configuration and data

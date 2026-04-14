@@ -158,10 +158,10 @@ uv run main.py -y 2025 -w 5 -d c
 | Stap | Fase | Bestand |
 |------|------|---------|
 | 1 | CLI parsing | `cli.py` |
-| 2 | ETL (skip met `--noetl`) | `s01_etl` |
+| 2 | ETL (skip met `--noetl`) | `etl` |
 | 3 | Configuratie laden | `config.py` |
-| 4 | Data laden | `s02_loader` → `s03_add_zero_weeks` |
-| 5 | CI subset (indien `--ci`) | `s04_ci_subset` |
+| 4 | Data laden | `loader` → `preprocessing/add_zero_weeks` |
+| 5 | CI subset (indien `--ci`) | `utils/ci_subset` |
 
 **Modus-specifieke stappen:**
 
@@ -169,12 +169,12 @@ uv run main.py -y 2025 -w 5 -d c
 |------|------|---------------------|---------------------|---------------|
 | 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative |
 | 7 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` |
-| 8 | Classificatie | `s05_xgboost_classifier` | — | `s05_xgboost_classifier` |
-| 9 | Transformatie | `s06_transforms` | — | `s06_transforms` |
-| 10 | SARIMA | `s07_sarima` (individual) | `s07_sarima` → `s06_transforms` | `s07_sarima` (both) |
-| 11 | XGBoost regressor | — | `s08_xgboost_regressor` | `s08_xgboost_regressor` |
-| 12 | Ratio model | — | `s09_ratio` | `s09_ratio` |
-| 13 | Postprocessing + Opslaan | `s10_postprocessor` | `s10_postprocessor` | `s10_postprocessor` |
+| 8 | Classificatie | `xgboost_classifier` | — | `xgboost_classifier` |
+| 9 | Transformatie | `transforms` | — | `transforms` |
+| 10 | SARIMA | `sarima` (individual) | `sarima` → `transforms` | `sarima` (both) |
+| 11 | XGBoost regressor | — | `xgboost_regressor` | `xgboost_regressor` |
+| 12 | Ratio model | — | `ratio` | `ratio` |
+| 13 | Postprocessing + Opslaan | `postprocessor` | `postprocessor` | `postprocessor` |
 
 Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de architectuur.
 

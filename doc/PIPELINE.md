@@ -55,9 +55,9 @@ flowchart TD
     end
 
     %% ══════════════════════════════════════
-    %% LAAG 2 — ETL (s01_etl.py)
+    %% LAAG 2 — ETL (etl.py)
     %% ══════════════════════════════════════
-    subgraph etl ["ETL — s01_etl.py (standaard, skip met --noetl)"]
+    subgraph etl ["ETL — etl.py (standaard, skip met --noetl)"]
         direction LR
         S1["Rowbind + reformat<br/><i>samenvoegen telbestanden</i>"]:::script
         S2["Interpolate<br/><i>ontbrekende weken</i>"]:::script
@@ -81,41 +81,41 @@ flowchart TD
     subgraph pipeline ["Prognosemodel"]
         direction TD
 
-        LOAD["<b>s02_loader</b> → <b>s03_add_zero_weeks</b> *<br/><i>data laden + nulweken toevoegen</i>"]:::script
+        LOAD["<b>loader</b> → <b>preprocessing/add_zero_weeks</b> *<br/><i>data laden + nulweken toevoegen</i>"]:::script
 
         LOAD --> IND_PATH & CUM_PATH & BOTH_PATH
 
         subgraph IND_PATH ["-d individual"]
             direction TD
             I_PRE["strategies/individual<br/><i>preprocessing</i>"]
-            I_S05["<b>s05</b>_xgboost_classifier<br/><i>kans per student</i>"]
-            I_S06["<b>s06</b>_transforms<br/><i>pivot + cumsum</i>"]
-            I_S07["<b>s07</b>_sarima<br/><i>SARIMA individual</i>"]
+            I_S05["<b>xgboost_classifier</b><br/><i>kans per student</i>"]
+            I_S06["<b>transforms</b><br/><i>pivot + cumsum</i>"]
+            I_S07["<b>sarima</b><br/><i>SARIMA individual</i>"]
             I_PRE --> I_S05 --> I_S06 --> I_S07
         end
 
         subgraph CUM_PATH ["-d cumulative"]
             direction TD
             C_PRE["strategies/cumulative<br/><i>preprocessing</i>"]
-            C_S07["<b>s07</b>_sarima → <b>s06</b><br/><i>SARIMA cumulative</i>"]
-            C_S08["<b>s08</b>_xgboost_regressor<br/><i>vooraanmelders → inschrijvingen</i>"]
+            C_S07["<b>sarima</b> → <b>transforms</b><br/><i>SARIMA cumulative</i>"]
+            C_S08["<b>xgboost_regressor</b><br/><i>vooraanmelders → inschrijvingen</i>"]
             C_PRE --> C_S07 --> C_S08
         end
 
         subgraph BOTH_PATH ["-d both"]
             direction TD
             B_PRE["strategies/combined<br/><i>preprocessing beide</i>"]
-            B_S05["<b>s05</b>_xgboost_classifier"]
-            B_S06["<b>s06</b>_transforms"]
-            B_S07["<b>s07</b>_sarima<br/><i>individual + cumulative</i>"]
-            B_S08["<b>s08</b>_xgboost_regressor"]
+            B_S05["<b>xgboost_classifier</b>"]
+            B_S06["<b>transforms</b>"]
+            B_S07["<b>sarima</b><br/><i>individual + cumulative</i>"]
+            B_S08["<b>xgboost_regressor</b>"]
             B_PRE --> B_S05 --> B_S06 --> B_S07 --> B_S08
         end
 
-        subgraph S10 ["s10_postprocessor"]
+        subgraph S10 ["postprocessor"]
             direction TD
             S10A["<b>prepare_data_for_output_prelim</b><br/><i>NF-cap, kolommen, merges</i>"]:::script
-            S10B["<b>predict_with_ratio</b><br/><i>s09_ratio (alleen cum/both)</i>"]:::script
+            S10B["<b>predict_with_ratio</b><br/><i>ratio (alleen cum/both)</i>"]:::script
             S10C["<b>postprocess</b><br/><i>ensemble (both), foutmaten</i>"]:::script
             S10A --> S10B --> S10C
         end
@@ -175,7 +175,7 @@ flowchart TD
 
 ---
 
-## ETL Scripts (s01_etl.py)
+## ETL Scripts (etl.py)
 
 Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` naar verwerkte bestanden in `data/input/`. Gebruik `--noetl` om deze stap over te slaan.
 
@@ -190,18 +190,18 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 
 ## Pipeline Executievolgorde
 
-**Gedeelde stappen (alle modi):** `main.py` → `cli.py` → `s01_etl`* → `config.py` → `s02_loader` → `s03_add_zero_weeks` → `s04_ci_subset`*
+**Gedeelde stappen (alle modi):** `main.py` → `cli.py` → `etl`* → `config.py` → `loader` → `preprocessing/add_zero_weeks` → `utils/ci_subset`*
 
 | Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
 |------|------|---------------------|---------------------|---------------|
 | 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | `strategies/combined` (individual → cumulative) |
-| 7 | Classificatie | `s05_xgboost_classifier` | — | `s05_xgboost_classifier` |
-| 8 | Transformatie | `s06_transforms` | — | `s06_transforms` |
-| 9 | SARIMA | `s07_sarima` (individual) | `s07_sarima` → `s06_transforms` | `s07_sarima` (both) |
-| 10 | XGBoost regressor | — | `s08_xgboost_regressor` | `s08_xgboost_regressor` |
+| 7 | Classificatie | `xgboost_classifier` | — | `xgboost_classifier` |
+| 8 | Transformatie | `transforms` | — | `transforms` |
+| 9 | SARIMA | `sarima` (individual) | `sarima` → `transforms` | `sarima` (both) |
+| 10 | XGBoost regressor | — | `xgboost_regressor` | `xgboost_regressor` |
 | 11 | Prelim output | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` |
 | | | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` |
-| 12 | Ratio model | — | `predict_with_ratio` (`s09_ratio`) | `predict_with_ratio` (`s09_ratio`) |
+| 12 | Ratio model | — | `predict_with_ratio` (`ratio`) | `predict_with_ratio` (`ratio`) |
 | 13 | Postprocessing | `postprocess` | `postprocess` | `postprocess` (incl. ensemble) |
 | 14 | Output opslaan | `save_output` | `save_output` | `save_output` |
 

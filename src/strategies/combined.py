@@ -7,8 +7,8 @@ from src.strategies.base import PredictionStrategy
 from src.strategies.individual import IndividualStrategy
 from src.strategies.cumulative import CumulativeStrategy
 from src.utils.weeks import get_weeks_list
-from src.data.s06_transforms import transform_data
-from src.models.s07_sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
+from src.data.transforms import transform_data
+from src.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
 
 
 class CombinedStrategy(PredictionStrategy):
@@ -60,12 +60,13 @@ class CombinedStrategy(PredictionStrategy):
             how="left",
         )
 
-        from src.models.s05_xgboost_classifier import predict_applicant
+        from src.models.xgboost_classifier import predict_applicant
         print("Predicting preapplicants...")
         predicties = predict_applicant(
             self.individual.data_individual, self.predict_year, self.predict_week,
             self.individual.max_year,
             self.cumulative.data_cumulative,
+            configuration=self.configuration,
         )
         self.individual.data_individual.loc[
             (self.individual.data_individual["Collegejaar"] == self.predict_year)

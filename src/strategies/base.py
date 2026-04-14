@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 
 from src.utils.weeks import get_max_week
-from src.output.s10_postprocessor import PostProcessor
+from src.output.postprocessor import PostProcessor
 
 
 class PredictionStrategy(ABC):
@@ -12,6 +12,7 @@ class PredictionStrategy(ABC):
 
     def __init__(self, configuration, data_latest, ensemble_weights,
                  data_studentcount, cwd, data_option, ci_test_n):
+        self.configuration = configuration
         self.numerus_fixus_list = configuration["numerus_fixus"]
 
         self.postprocessor = PostProcessor(

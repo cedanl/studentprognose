@@ -8,9 +8,9 @@ import collections
 
 from src.strategies.base import PredictionStrategy
 from src.utils.weeks import get_weeks_list, get_all_weeks_valid, decrement_week
-from src.data.s06_transforms import transform_data
-from src.models.s05_xgboost_classifier import predict_applicant
-from src.models.s07_sarima import predict_with_sarima_individual
+from src.data.transforms import transform_data
+from src.models.xgboost_classifier import predict_applicant, DEFAULT_STATUS_MAP
+from src.models.sarima import predict_with_sarima_individual
 
 
 class IndividualStrategy(PredictionStrategy):
@@ -132,7 +132,7 @@ class IndividualStrategy(PredictionStrategy):
         print("Predicting preapplicants...")
         predicties = predict_applicant(
             self.data_individual, self.predict_year, self.predict_week,
-            self.max_year
+            self.max_year, configuration=self.configuration
         )
 
         self.data_individual.loc[
@@ -206,15 +206,9 @@ class IndividualStrategy(PredictionStrategy):
         data = data[group_cols + ["Inschrijvingen_predictie", "Inschrijfstatus", "Weeknummer"]]
         data["Weeknummer"] = data["Weeknummer"].astype(str)
 
-        status_map = {
-            "Ingeschreven": 1,
-            "Geannuleerd": 0,
-            "Uitgeschreven": 1,
-            "Verzoek tot inschrijving": 0,
-            "Studie gestaakt": 0,
-            "Aanmelding vervolgen": 0,
-        }
-
+        status_map = self.configuration.get("model_config", {}).get(
+            "status_mapping", DEFAULT_STATUS_MAP
+        )
         data["Inschrijfstatus"] = data["Inschrijfstatus"].map(status_map)
 
         data = data.groupby(group_cols + ["Weeknummer"]).sum(numeric_only=False).reset_index()
