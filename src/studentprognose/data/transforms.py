@@ -1,5 +1,5 @@
-from src.utils.weeks import *
-from src.models.xgboost_classifier import DEFAULT_STATUS_MAP
+from studentprognose.utils.weeks import *
+from studentprognose.models.xgboost_classifier import DEFAULT_STATUS_MAP
 
 import pandas as pd
 import numpy as np

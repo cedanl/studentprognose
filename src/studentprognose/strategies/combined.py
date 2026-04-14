@@ -3,12 +3,12 @@ import joblib
 import os
 import math
 
-from src.strategies.base import PredictionStrategy
-from src.strategies.individual import IndividualStrategy
-from src.strategies.cumulative import CumulativeStrategy
-from src.utils.weeks import get_weeks_list
-from src.data.transforms import transform_data
-from src.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
+from studentprognose.strategies.base import PredictionStrategy
+from studentprognose.strategies.individual import IndividualStrategy
+from studentprognose.strategies.cumulative import CumulativeStrategy
+from studentprognose.utils.weeks import get_weeks_list
+from studentprognose.data.transforms import transform_data
+from studentprognose.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
 
 
 class CombinedStrategy(PredictionStrategy):
@@ -60,7 +60,7 @@ class CombinedStrategy(PredictionStrategy):
             how="left",
         )
 
-        from src.models.xgboost_classifier import predict_applicant
+        from studentprognose.models.xgboost_classifier import predict_applicant
         print("Predicting preapplicants...")
         predicties = predict_applicant(
             self.individual.data_individual, self.predict_year, self.predict_week,

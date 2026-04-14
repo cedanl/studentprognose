@@ -5,19 +5,40 @@ build-backend = "hatchling.build"
 [project]
 name = "studentprognose"
 dynamic = ["version"]
-description = "Add your description here"
+description = "Studentprognose tool voor het voorspellen van eerstejaars instroom in het hoger onderwijs"
 readme = "README.md"
 requires-python = ">=3.12"
+license = {text = "MIT"}
+authors = [
+    {name = "CEDA", email = "info@cedanl.nl"},
+]
+keywords = ["prognose", "instroom", "hoger-onderwijs", "machine-learning", "onderwijs"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Education",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Education",
+]
 dependencies = [
     "matplotlib>=3.10.0",
     "pillow>=12.2.0",
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
     "scikit-learn>=1.6.1",
+    "scipy>=1.13.0",
     "statsmodels>=0.14.4",
     "tqdm>=4.67.1",
     "xgboost>=2.1.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/cedanl/studentprognose"
+Repository = "https://github.com/cedanl/studentprognose"
+Issues = "https://github.com/cedanl/studentprognose/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -25,13 +46,22 @@ dev = [
 ]
 
 [project.scripts]
-studentprognose = "src.main:cli"
+studentprognose = "studentprognose.main:cli"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
 
 [tool.hatch.version]
 source = "vcs"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src"]
+packages = ["src/studentprognose"]
 
 [tool.hatch.build.targets.sdist]
 exclude = ["data/"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

@@ -1,13 +1,13 @@
 import os
 import sys
 
-from src.cli import parse_args
-from src.config import load_configuration
-from src.data.loader import load_data
-from src.utils.ci_subset import apply_ci_test_subset
-from src.output.postprocessor import PostProcessor
-from src.strategies import create_strategy
-from src.utils.weeks import DataOption, StudentYearPrediction, HIGHER_YEARS_COLUMNS
+from studentprognose.cli import parse_args
+from studentprognose.config import load_configuration
+from studentprognose.data.loader import load_data
+from studentprognose.utils.ci_subset import apply_ci_test_subset
+from studentprognose.output.postprocessor import PostProcessor
+from studentprognose.strategies import create_strategy
+from studentprognose.utils.weeks import DataOption, StudentYearPrediction, HIGHER_YEARS_COLUMNS
 
 
 def main(argv):
@@ -15,7 +15,7 @@ def main(argv):
 
     # Step 0: ETL (default — raw data → input data, skip with --noetl)
     if not cfg.noetl:
-        from src.data.etl import run_etl
+        from studentprognose.data.etl import run_etl
         run_etl(load_configuration(cfg.configuration_path))
 
     # Step 1: Load configuration and data
@@ -31,7 +31,7 @@ def main(argv):
     _check_data_range(datasets, cfg)
 
     # Step 2: Initialize strategy (Individual / Cumulative / Combined)
-    cwd = os.path.dirname(os.path.abspath(__file__))
+    cwd = os.getcwd()
     strategy = create_strategy(cfg, datasets, configuration, cwd)
 
     PostProcessor.check_output_writable(

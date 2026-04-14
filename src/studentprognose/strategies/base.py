@@ -3,8 +3,8 @@ import collections
 import numpy as np
 import pandas as pd
 
-from src.utils.weeks import get_max_week
-from src.output.postprocessor import PostProcessor
+from studentprognose.utils.weeks import get_max_week
+from studentprognose.output.postprocessor import PostProcessor
 
 
 class PredictionStrategy(ABC):

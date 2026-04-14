@@ -3,7 +3,7 @@ import datetime
 import os
 from dataclasses import dataclass, field
 
-from src.utils.weeks import DataOption, StudentYearPrediction
+from studentprognose.utils.weeks import DataOption, StudentYearPrediction
 
 
 @dataclass

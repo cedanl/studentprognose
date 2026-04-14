@@ -3,7 +3,7 @@ from xgboost import XGBClassifier
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
-from src.utils.weeks import get_weeks_list
+from studentprognose.utils.weeks import get_weeks_list
 
 DEFAULT_STATUS_MAP = {
     "Ingeschreven": 1,
