@@ -10,6 +10,7 @@
     <a href="https://github.com/cedanl"><img src="https://img.shields.io/badge/Onderhouden_door-CEDA-blue" alt="CEDA"></a>
     <img src="https://badgen.net/github/contributors/cedanl/studentprognose" alt="Contributors">
     <img src="https://img.shields.io/github/license/cedanl/studentprognose" alt="GitHub License">
+    <a href="https://pypi.org/project/studentprognose/"><img src="https://img.shields.io/pypi/v/studentprognose" alt="PyPI"></a>
     <br>
     <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
     <img src="https://badgen.net/github/last-commit/cedanl/studentprognose" alt="GitHub Last Commit">
@@ -23,6 +24,15 @@
 ---
 
 ## 📦 Aan de slag
+
+**Via pip** (aanbevolen voor gebruik):
+
+```bash
+pip install studentprognose
+studentprognose -w 6 -y 2024
+```
+
+**Via de broncode** (aanbevolen voor ontwikkeling / demodata):
 
 ```bash
 # 1. Installeer uv (zie https://docs.astral.sh/uv/getting-started/installation/)
@@ -38,6 +48,9 @@ uv run main.py
 
 > [!NOTE]
 > Demodata is meegeleverd in `data/input`, zodat je direct kunt starten. Controleer welke jaren en weken beschikbaar zijn — zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data.
+
+> [!TIP]
+> Na `pip install studentprognose` is het commando `studentprognose` beschikbaar en kun je alle `uv run main.py` voorbeelden vervangen door `studentprognose`.
 
 ---
 
