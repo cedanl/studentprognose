@@ -4,7 +4,7 @@ import numpy as np
 import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from src.config import load_configuration
+from studentprognose.config import load_configuration
 
 
 class AppendStudentCountAndComputeErrors:

@@ -858,13 +858,9 @@ dependencies = [
     { name = "xgboost" },
 ]
 
-[package.optional-dependencies]
-dev = [
-    { name = "pre-commit" },
-]
-
 [package.dev-dependencies]
 dev = [
+    { name = "pre-commit" },
     { name = "pytest" },
 ]
 
@@ -874,17 +870,18 @@ requires-dist = [
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pillow", specifier = ">=12.2.0" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.1.0" },
     { name = "scikit-learn", specifier = ">=1.6.1" },
     { name = "scipy", specifier = ">=1.13.0" },
     { name = "statsmodels", specifier = ">=0.14.4" },
     { name = "tqdm", specifier = ">=4.67.1" },
     { name = "xgboost", specifier = ">=2.1.3" },
 ]
-provides-extras = ["dev"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "pytest", specifier = ">=9.0.2" }]
+dev = [
+    { name = "pre-commit", specifier = ">=4.1.0" },
+    { name = "pytest", specifier = ">=9.0.2" },
+]
 
 [[package]]
 name = "threadpoolctl"

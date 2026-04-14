@@ -40,16 +40,12 @@ Homepage = "https://github.com/cedanl/studentprognose"
 Repository = "https://github.com/cedanl/studentprognose"
 Issues = "https://github.com/cedanl/studentprognose/issues"
 
-[project.optional-dependencies]
-dev = [
-    "pre-commit>=4.1.0",
-]
-
 [project.scripts]
 studentprognose = "studentprognose.main:cli"
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.1.0",
     "pytest>=9.0.2",
 ]
 
