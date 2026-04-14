@@ -1,7 +1,7 @@
-from src.utils.weeks import DataOption
-from src.strategies.individual import IndividualStrategy
-from src.strategies.cumulative import CumulativeStrategy
-from src.strategies.combined import CombinedStrategy
+from studentprognose.utils.weeks import DataOption
+from studentprognose.strategies.individual import IndividualStrategy
+from studentprognose.strategies.cumulative import CumulativeStrategy
+from studentprognose.strategies.combined import CombinedStrategy
 
 
 def create_strategy(cfg, datasets, configuration, cwd):

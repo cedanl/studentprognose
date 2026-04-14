@@ -1,7 +1,7 @@
 import pandas as pd
 import os
-from src.utils.weeks import DataOption
-from src.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
+from studentprognose.utils.weeks import DataOption
+from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
 
 
 def get_path_latest(paths, data_option):

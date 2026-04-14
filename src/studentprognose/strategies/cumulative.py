@@ -8,10 +8,10 @@ import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
 warnings.simplefilter("ignore", ConvergenceWarning)
 
-from src.strategies.base import PredictionStrategy
-from src.utils.weeks import increment_week
-from src.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
-from src.models.xgboost_regressor import predict_with_xgboost
+from studentprognose.strategies.base import PredictionStrategy
+from studentprognose.utils.weeks import increment_week
+from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
+from studentprognose.models.xgboost_regressor import predict_with_xgboost
 
 
 class CumulativeStrategy(PredictionStrategy):

@@ -3,7 +3,7 @@ from xgboost import XGBRegressor
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
-from src.utils.weeks import get_weeks_list
+from studentprognose.utils.weeks import get_weeks_list
 
 
 def predict_with_xgboost(train, test, data_studentcount):
