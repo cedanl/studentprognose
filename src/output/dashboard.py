@@ -296,8 +296,16 @@ class DashboardBuilder:
         ratio = below_10 / total if total else 0
         below_cls = "good" if ratio >= 0.70 else ("warn" if ratio >= 0.40 else "bad")
 
+        # Sanity check: totaal voorspeld vs totaal actueel (meest recente jaar)
+        latest = ha[ha["Collegejaar"] == ha["Collegejaar"].max()]
+        total_pred = latest["predicted"].sum()
+        total_act = latest["actual"].sum()
+        sanity_pct = abs(total_pred - total_act) / total_act if total_act > 0 else 0
+        sanity_cls = "good" if sanity_pct <= 0.05 else ("warn" if sanity_pct <= 0.15 else "bad")
+
         return f"""<div class="kpi-row">
   <div class="kpi-card {avg_cls}"><div class="label">Gem. afwijking (historisch)</div><div class="value">{avg_mape:.1%}</div></div>
+  <div class="kpi-card {sanity_cls}"><div class="label">Totaal voorspeld vs actueel ({int(latest['Collegejaar'].iloc[0])})</div><div class="value">{total_pred:.0f} / {total_act:.0f}</div></div>
   <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
   <div class="kpi-card good"><div class="label">Best presterend</div><div class="value">{best}<br><span style="font-size:16px">{prog_mapes[best]:.1%}</span></div></div>
   <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
@@ -366,34 +374,62 @@ class DashboardBuilder:
         return fig
 
     def _bias_per_programme(self) -> go.Figure | None:
-        """Bar chart: mean signed error per programme (positive = overestimate)."""
+        """Bar chart: mean signed error per programme with per-year scatter overlay."""
         ha = self._hist_accuracy()
         if ha is None or ha.empty:
             return None
         ha = ha.copy()
         ha["signed_error"] = (ha["predicted"] - ha["actual"]) / ha["actual"]
-        prog_bias = ha.groupby("Croho groepeernaam")["signed_error"].mean().sort_values()
+
+        prog_stats = ha.groupby("Croho groepeernaam")["signed_error"].agg(["mean", "std"])
+        prog_stats = prog_stats.sort_values("mean")
 
         colours = [
             "#d62728" if v > 0.05 else ("#2ca02c" if v < -0.05 else "#999999")
-            for v in prog_bias.values
+            for v in prog_stats["mean"].values
         ]
 
-        fig = go.Figure(go.Bar(
-            x=prog_bias.index.tolist(),
-            y=prog_bias.values,
+        fig = go.Figure()
+
+        # Bars with error bars (std)
+        fig.add_trace(go.Bar(
+            x=prog_stats.index.tolist(),
+            y=prog_stats["mean"].values,
             marker_color=colours,
-            text=[f"{v:+.1%}" for v in prog_bias.values],
+            text=[f"{v:+.1%}" for v in prog_stats["mean"].values],
             textposition="outside",
+            error_y=dict(
+                type="data",
+                array=prog_stats["std"].fillna(0).values,
+                visible=True,
+                color="#666666",
+                thickness=1.5,
+            ),
+            name="Gemiddelde bias",
         ))
+
+        # Individual year dots
+        for prog in prog_stats.index:
+            pts = ha[ha["Croho groepeernaam"] == prog]
+            fig.add_trace(go.Scatter(
+                x=[prog] * len(pts),
+                y=pts["signed_error"].values,
+                mode="markers",
+                marker=dict(size=7, color="rgba(0,0,0,0.4)", symbol="circle"),
+                text=pts["Collegejaar"].apply(lambda y: str(int(y))),
+                hovertemplate="%{text}: %{y:+.1%}<extra></extra>",
+                showlegend=False,
+            ))
+
         fig.add_hline(y=0, line_dash="dash", line_color="grey")
         fig.update_layout(
             title="Structurele over-/onderschatting per opleiding",
             xaxis_title="Opleiding",
-            yaxis_title="Gemiddelde afwijking (positief = overschatting)",
+            yaxis_title="Afwijking (positief = overschatting)",
             yaxis=dict(tickformat="+.0%"),
             xaxis=dict(tickangle=-45),
             height=450,
+            showlegend=False,
         )
         return fig
 
@@ -423,9 +459,24 @@ class DashboardBuilder:
         if df.shape[1] < 2:
             return None
 
-        hover = df.map(
-            lambda v: f"MAPE: {v:.1%}" if pd.notna(v) else ""
-        ).values
+        # Mark best model per programme with ★
+        best_per_prog = df.idxmin(axis=1)
+        hover = np.empty(df.shape, dtype=object)
+        annotations = []
+        for i, prog in enumerate(df.index):
+            for j, model in enumerate(df.columns):
+                val = df.iloc[i, j]
+                is_best = model == best_per_prog[prog]
+                if pd.notna(val):
+                    label = f"★ {val:.1%}" if is_best else f"{val:.1%}"
+                    hover[i, j] = f"MAPE: {val:.1%}" + (" ★ best" if is_best else "")
+                    if is_best:
+                        annotations.append(dict(
+                            x=model, y=prog, text="★",
+                            showarrow=False, font=dict(size=14, color="white"),
+                        ))
+                else:
+                    hover[i, j] = ""
 
         fig = go.Figure(go.Heatmap(
             z=df.values,
@@ -437,9 +488,10 @@ class DashboardBuilder:
             text=hover, hoverinfo="text+x+y",
         ))
         fig.update_layout(
-            title="Modelvergelijking per opleiding",
+            title="Modelvergelijking per opleiding (★ = best)",
             xaxis_title="Model", yaxis_title="Opleiding",
             height=max(400, len(programmes) * 25 + 150),
+            annotations=annotations,
         )
         return fig
 
@@ -471,11 +523,23 @@ class DashboardBuilder:
             hoverinfo="text",
         ))
         fig.add_hline(y=0, line_dash="dash", line_color="grey")
+
+        # Linear trend line to surface heteroscedasticity
+        valid = ha.dropna(subset=["predicted", "residual"])
+        if len(valid) >= 2:
+            coeffs = np.polyfit(valid["predicted"], valid["residual"], 1)
+            x_range = np.array([valid["predicted"].min(), valid["predicted"].max()])
+            fig.add_trace(go.Scatter(
+                x=x_range, y=np.polyval(coeffs, x_range),
+                mode="lines", name="Trendlijn",
+                line=dict(color="rgba(0,0,0,0.4)", dash="dot", width=2),
+            ))
+
         fig.update_layout(
             title="Residual-analyse (voorspeld vs fout)",
             xaxis_title="Voorspeld aantal",
             yaxis_title="Residual (voorspeld − realisatie)",
-            height=450,
+            height=450, showlegend=False,
         )
         return fig
 
