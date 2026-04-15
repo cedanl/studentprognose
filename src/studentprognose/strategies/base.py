@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import collections
 import numpy as np
 import pandas as pd
 
@@ -58,28 +57,18 @@ class PredictionStrategy(ABC):
 
         all_programmes = data["Croho groepeernaam"].unique()
         if programme_filtering is not None and len(programme_filtering) > 0:
-            all_programmes = list(
-                (
-                    collections.Counter(all_programmes) & collections.Counter(programme_filtering)
-                ).elements()
-            )
+            filter_set = set(programme_filtering)
+            all_programmes = [p for p in all_programmes if p in filter_set]
 
         all_herkomsts = data["Herkomst"].unique()
         if herkomst_filtering is not None and len(herkomst_filtering) > 0:
-            all_herkomsts = list(
-                (
-                    collections.Counter(all_herkomsts) & collections.Counter(herkomst_filtering)
-                ).elements()
-            )
+            filter_set = set(herkomst_filtering)
+            all_herkomsts = [h for h in all_herkomsts if h in filter_set]
 
         all_examentypes = data["Examentype"].unique()
         if examentype_filtering is not None and len(examentype_filtering) > 0:
-            all_examentypes = list(
-                (
-                    collections.Counter(all_examentypes)
-                    & collections.Counter(examentype_filtering)
-                ).elements()
-            )
+            filter_set = set(examentype_filtering)
+            all_examentypes = [e for e in all_examentypes if e in filter_set]
 
         for programme in np.sort(all_programmes):
             available_examentypes_for_programme = data[
@@ -87,12 +76,10 @@ class PredictionStrategy(ABC):
                 & (data["Collegejaar"] == self.predict_year)
             ]["Examentype"].unique()
 
-            examentypes_to_consider = list(
-                (
-                    collections.Counter(available_examentypes_for_programme)
-                    & collections.Counter(all_examentypes)
-                ).elements()
-            )
+            available_set = set(all_examentypes)
+            examentypes_to_consider = [
+                e for e in available_examentypes_for_programme if e in available_set
+            ]
             for examentype in np.sort(examentypes_to_consider):
                 for herkomst in np.sort(all_herkomsts):
                     predict_dict["Croho groepeernaam"].append(programme)

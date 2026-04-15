@@ -4,7 +4,6 @@ import pandas as pd
 import joblib
 import os
 import math
-import collections
 
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import get_weeks_list, get_all_weeks_valid, decrement_week
@@ -220,11 +219,8 @@ class IndividualStrategy(PredictionStrategy):
             ).reset_index()
 
             input_data.columns = map(str, input_data.columns)
-            available_weeks = list(
-                (
-                    collections.Counter(weeknummers) & collections.Counter(input_data.columns)
-                ).elements()
-            )
+            col_set = set(input_data.columns)
+            available_weeks = [w for w in weeknummers if w in col_set]
             colnames = group_cols + available_weeks
 
             missing_weeks = []
