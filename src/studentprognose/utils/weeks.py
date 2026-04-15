@@ -69,6 +69,8 @@ def get_max_week(predict_year, max_year, data, key):
         max_week = get_max_week_from_weeks(data[data[key] == predict_year]["Weeknummer"])
     else:
         if predict_year == 2021:
+            # COVID-jaar: het aanmeldpatroon week 38 week was afwijkend waardoor
+            # get_max_week_from_weeks() een onjuiste waarde teruggeeft. Zie #84.
             max_week = 38
         else:
             max_week = get_max_week_from_weeks(data[data[key] == predict_year]["Weeknummer"])

@@ -11,7 +11,7 @@ def run_etl(configuration):
     print("==== Processing raw input data ====")
 
     paths = configuration["paths"]
-    cwd = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    cwd = os.getcwd()
 
     # ETL always writes to canonical (non-DEMO) paths
     output_cumulative = os.path.join(cwd, "data", "input", "vooraanmeldingen_cumulatief.csv")

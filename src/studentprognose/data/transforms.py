@@ -1,4 +1,4 @@
-from studentprognose.utils.weeks import *
+from studentprognose.utils.weeks import convert_nan_to_zero, get_all_weeks_valid
 from studentprognose.models.xgboost_classifier import DEFAULT_STATUS_MAP
 
 import pandas as pd
@@ -202,12 +202,12 @@ def calculate_volume_predicted_data(
     predict_mask = (data["Collegejaar"] == predict_year) & (data["Weeknummer"] == predict_week)
     data.loc[predict_mask, "SARIMA_cumulative"] = (
         data.loc[predict_mask, ["SARIMA_cumulative_x", "SARIMA_cumulative_y"]]
-        .applymap(convert_nan_to_zero)
+        .map(convert_nan_to_zero)
         .sum(axis=1)
     )
     data.loc[predict_mask, "SARIMA_individual"] = (
         data.loc[predict_mask, ["SARIMA_individual_x", "SARIMA_individual_y"]]
-        .applymap(convert_nan_to_zero)
+        .map(convert_nan_to_zero)
         .sum(axis=1)
     )
 
@@ -216,7 +216,7 @@ def calculate_volume_predicted_data(
             ~predict_mask,
             ["Voorspelde vooraanmelders_x", "Voorspelde vooraanmelders_y"],
         ]
-        .applymap(convert_nan_to_zero)
+        .map(convert_nan_to_zero)
         .sum(axis=1)
     )
 
@@ -251,12 +251,12 @@ def sum_volume_data_cumulative(data_first_years, data_second_years):
 
     data["Gewogen vooraanmelders"] = (
         data[["Gewogen vooraanmelders_x", "Gewogen vooraanmelders_y"]]
-        .applymap(convert_nan_to_zero)
+        .map(convert_nan_to_zero)
         .sum(axis=1)
     )
     data["Ongewogen vooraanmelders"] = (
         data[["Ongewogen vooraanmelders_x", "Ongewogen vooraanmelders_y"]]
-        .applymap(convert_nan_to_zero)
+        .map(convert_nan_to_zero)
         .sum(axis=1)
     )
     data["Aantal aanmelders met 1 aanmelding"] = (
@@ -266,11 +266,11 @@ def sum_volume_data_cumulative(data_first_years, data_second_years):
                 "Aantal aanmelders met 1 aanmelding_y",
             ]
         ]
-        .applymap(convert_nan_to_zero)
+        .map(convert_nan_to_zero)
         .sum(axis=1)
     )
     data["Inschrijvingen"] = (
-        data[["Inschrijvingen_x", "Inschrijvingen_y"]].applymap(convert_nan_to_zero).sum(axis=1)
+        data[["Inschrijvingen_x", "Inschrijvingen_y"]].map(convert_nan_to_zero).sum(axis=1)
     )
 
     return data[

@@ -14,16 +14,16 @@ def main(argv):
     cfg = parse_args(argv)
 
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
+    print("Loading configuration...")
+    configuration = load_configuration(cfg.configuration_path)
+
     if not cfg.noetl:
         from studentprognose.data.validation import validate_raw_data
         from studentprognose.data.etl import run_etl
-        pipeline_configuration = load_configuration(cfg.configuration_path)
-        validate_raw_data(pipeline_configuration, yes=cfg.yes)
-        run_etl(pipeline_configuration)
+        validate_raw_data(configuration, yes=cfg.yes)
+        run_etl(configuration)
 
-    # Step 1: Load configuration and data
-    print("Loading configuration...")
-    configuration = load_configuration(cfg.configuration_path)
+    # Step 1: Load data
     filtering = load_configuration(cfg.filtering_path)
 
     print("Loading data...")

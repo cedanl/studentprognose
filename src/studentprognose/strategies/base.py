@@ -45,7 +45,7 @@ class PredictionStrategy(ABC):
         self.examentype_filtering = examentype_filtering
 
     def get_data_to_predict(
-        self, data, programme_filtering=[], herkomst_filtering=[], examentype_filtering=[]
+        self, data, programme_filtering=None, herkomst_filtering=None, examentype_filtering=None
     ):
         predict_dict = {
             "Croho groepeernaam": [],
@@ -57,7 +57,7 @@ class PredictionStrategy(ABC):
         }
 
         all_programmes = data["Croho groepeernaam"].unique()
-        if programme_filtering != []:
+        if programme_filtering is not None and len(programme_filtering) > 0:
             all_programmes = list(
                 (
                     collections.Counter(all_programmes) & collections.Counter(programme_filtering)
@@ -65,7 +65,7 @@ class PredictionStrategy(ABC):
             )
 
         all_herkomsts = data["Herkomst"].unique()
-        if herkomst_filtering != []:
+        if herkomst_filtering is not None and len(herkomst_filtering) > 0:
             all_herkomsts = list(
                 (
                     collections.Counter(all_herkomsts) & collections.Counter(herkomst_filtering)
@@ -73,7 +73,7 @@ class PredictionStrategy(ABC):
             )
 
         all_examentypes = data["Examentype"].unique()
-        if examentype_filtering != []:
+        if examentype_filtering is not None and len(examentype_filtering) > 0:
             all_examentypes = list(
                 (
                     collections.Counter(all_examentypes)
