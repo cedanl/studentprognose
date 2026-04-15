@@ -120,6 +120,12 @@ def validate_raw_data(configuration, yes=False):
     print("==== Valideren van ruwe inputdata ====")
 
     paths = configuration["paths"]
+    # Top-level merge: voegt flat overrides toe (bijv. nan_error_threshold).
+    # Nested sub-dicts (telbestand, individueel, oktober) worden hier shallow
+    # vervangen als de gebruiker ze overschrijft. Elke _validate_*-functie
+    # doet daarom een tweede sub-merge met _DEFAULT_VALIDATION_CFG als basis,
+    # zodat een partial override nooit sleutels verliest. Voeg je een nieuwe
+    # sectie toe, volg dan hetzelfde patroon: zie _validate_telbestanden.
     validation_cfg = {**_DEFAULT_VALIDATION_CFG, **configuration.get("validation", {})}
     columns_cfg = configuration.get("columns", {})
     cwd = os.getcwd()
@@ -288,7 +294,7 @@ def _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result):
 
     nan_warn = validation_cfg["nan_warning_threshold"]
     nan_error = validation_cfg["nan_error_threshold"]
-    for canonical in ["Collegejaar", "Croho", "Inschrijfstatus"]:
+    for canonical in critical_columns:
         actual = _resolve_column(canonical, col_map)
         _check_nan_rate(df, actual, "individuele_aanmelddata.csv", nan_warn, nan_error, result)
 
@@ -347,7 +353,7 @@ def _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result):
 
     nan_warn = validation_cfg["nan_warning_threshold"]
     nan_error = validation_cfg["nan_error_threshold"]
-    for canonical in ["Collegejaar", "Aantal eerstejaars croho", "Aantal Hoofdinschrijvingen"]:
+    for canonical in critical_columns:
         actual = _resolve_column(canonical, col_map)
         _check_nan_rate(df, actual, "oktober_bestand.xlsx", nan_warn, nan_error, result)
 
