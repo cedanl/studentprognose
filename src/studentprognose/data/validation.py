@@ -1,3 +1,46 @@
+"""Pre-ETL datakwaliteitscontrole.
+
+Dit module valideert alle ruwe inputbestanden voordat de ETL-pipeline start.
+Ongeldige data wordt nooit stilzwijgend omgezet — de gebruiker wordt altijd
+gewaarschuwd of de pipeline stopt.
+
+Gedrag per type bevinding
+--------------------------
+hard error  → pipeline stopt direct, los op en probeer opnieuw
+soft error  → pre-flight prompt; gebruik ``--yes`` om door te gaan (CI/CD)
+warning     → gelogd, pipeline loopt door
+
+Configuratie
+------------
+``_DEFAULT_VALIDATION_CFG`` is de **enige bron van waarheid** voor
+validatiedefaults. De waarden staan hier in de code, niet in
+``configuration.json``, om dubbele definities te vermijden.
+
+Wil je een instelling overschrijven voor jouw installatie? Voeg een
+``"validation"``-blok toe aan je ``configuration.json``. Je hoeft alleen de
+waarden op te nemen die afwijken van de defaults:
+
+.. code-block:: json
+
+    {
+        "validation": {
+            "nan_error_threshold": 0.20,
+            "telbestand": {
+                "herkomst_allowed": ["N", "E", "R", "ONBEKEND"]
+            }
+        }
+    }
+
+Een nieuw validatiecheck toevoegen
+-----------------------------------
+1. Voeg de configuratiesleutel toe aan ``_DEFAULT_VALIDATION_CFG``
+   (en eventueel als override-voorbeeld in de README).
+2. Schrijf een helperfunctie ``_check_*`` die een ``ValidationResult``
+   als parameter accepteert en fouten/waarschuwingen appended.
+3. Roep de functie aan vanuit de betreffende ``_validate_*``-functie.
+4. Schrijf een test in ``tests/studentprognose/test_validation.py``.
+"""
+
 import datetime
 import os
 import re
@@ -7,8 +50,9 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 
-# Mirrors the "validation" block in configuration.json.
-# These defaults are used when no validation config is present (e.g. older configs).
+# Enige bron van waarheid voor validatiedefaults.
+# Waarden hier worden gebruikt tenzij configuration.json ze overschrijft.
+# Zie de module-docstring hierboven voor uitleg en het override-patroon.
 _DEFAULT_VALIDATION_CFG = {
     "collegejaar_min_offset": 15,
     "collegejaar_max_offset": 2,
