@@ -41,6 +41,19 @@ In het individuele spoor kan een deadlineweek-variabele als exogene regresssor w
 - Opleiding met sterke interjaarse variatie in aanmeldpatroon
 - Vroeg in het jaar (weinig datapunten beschikbaar; de voorspelling is dan een lange extrapolatie)
 
+## Bekende hardgecodeerde uitzondering: 2021
+
+In `utils/weeks.py` staat een expliciete uitzondering voor collegejaar 2021:
+
+```python
+if predict_year == 2021:
+    max_week = 38
+```
+
+Dit forceert de maximale week voor dat jaar op 38 (de standaard inschrijfdeadline), in plaats van die te berekenen uit de data. De vermoedelijke reden is dat de aanmeldingscyclus in 2021 een afwijkend patroon had door COVID, waardoor de normale berekening geen betrouwbaar resultaat gaf. De achterliggende reden is nog niet formeel gedocumenteerd — zie issue [#84](https://github.com/cedanl/studentprognose/issues/84).
+
+Dit illustreert een bredere aanname: **het model gaat ervan uit dat historische aanmeldpatronen representatief zijn**. Uitzonderingsjaren zoals 2021 moeten handmatig worden afgehandeld.
+
 ## Relatie tot andere modellen
 
 SARIMA levert een voorspelling per opleiding per week. In het `-d b` scenario wordt deze gecombineerd met de XGBoost-uitkomsten via het ensemble. Zie [Ensemble](ensemble.md).
