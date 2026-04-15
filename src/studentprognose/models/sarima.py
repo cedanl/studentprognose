@@ -35,7 +35,7 @@ def create_time_series(data, pred_len):
     return np.array(ts_data)
 
 
-def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_week, pred_len, skip_years=0, already_printed=False):
+def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_week, pred_len, skip_years=0, already_printed=False) -> list:
     """
     Predicts pre-registrations with SARIMA per programme/origin/week for cumulative data.
 
@@ -83,7 +83,7 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
         return []
 
 
-def predict_with_sarima_individual(data_individual, row, predict_year, predict_week, max_year, numerus_fixus_list, data_exog=None, already_printed=False):
+def predict_with_sarima_individual(data_individual, row, predict_year, predict_week, max_year, numerus_fixus_list, data_exog=None, already_printed=False) -> float:
     """
     Predicts nr of students with SARIMA per programme/origin/week for individual data.
 

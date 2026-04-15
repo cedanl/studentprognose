@@ -6,7 +6,7 @@ from sklearn.compose import ColumnTransformer
 from studentprognose.utils.weeks import get_weeks_list
 
 
-def predict_with_xgboost(train, test, data_studentcount):
+def predict_with_xgboost(train, test, data_studentcount) -> np.ndarray | float:
     """
     Train an XGBoost regressor to predict student counts from cumulative pre-application data.
 

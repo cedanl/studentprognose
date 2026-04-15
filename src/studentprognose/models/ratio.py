@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 
 
-def predict_with_ratio(data, data_cumulative, data_studentcount, numerus_fixus_list, predict_year):
+def predict_with_ratio(data: pd.DataFrame, data_cumulative: pd.DataFrame, data_studentcount: pd.DataFrame | None, numerus_fixus_list: dict, predict_year: int) -> pd.DataFrame:
     """
     Predict student influx using the ratio between pre-registrants and actual enrollments.
 

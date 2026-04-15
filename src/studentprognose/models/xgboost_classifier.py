@@ -17,7 +17,7 @@ DEFAULT_STATUS_MAP = {
 MIN_TRAINING_YEAR = 2016
 
 
-def predict_applicant(data, predict_year, predict_week, max_year, data_cumulative=None, configuration=None):
+def predict_applicant(data, predict_year, predict_week, max_year, data_cumulative=None, configuration=None) -> np.ndarray | float:
     """
     Train an XGBoost classifier to predict individual applicant enrollment probability.
 
