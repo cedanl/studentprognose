@@ -6,13 +6,6 @@ from tqdm import tqdm
 
 tqdm.pandas()
 
-import warnings
-
-warnings.filterwarnings("ignore", category=RuntimeWarning)
-warnings.filterwarnings("ignore", category=UserWarning)
-
-pd.options.mode.chained_assignment = None  # default='warn'
-
 
 def transform_data(data_input: pd.DataFrame, targ_col: str) -> pd.DataFrame:
     """Makes a certain pivot_wider where it transforms the data from long to wide."""

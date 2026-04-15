@@ -1,4 +1,3 @@
-import gc
 import numpy as np
 from numpy import linalg as LA
 import statsmodels.api as sm
@@ -53,8 +52,6 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
             f"Prediction for {programme}, {herkomst}, year: {predict_year}, week: {predict_week}"
         )
 
-    gc.collect()
-
     data_cumulative = data_cumulative.astype(
         {"Weeknummer": "int32", "Collegejaar": "int32"}
     )
@@ -101,8 +98,6 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
         print(
             f"Prediction for {programme}, {herkomst}, {examentype}, year: {predict_year}, week: {predict_week}"
         )
-
-    gc.collect()
 
     def filter_data(data, programme, herkomst, examentype, jaar, max_year):
         data = data[data["Herkomst"] == herkomst]
