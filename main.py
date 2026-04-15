@@ -6,6 +6,7 @@ from src.config import load_configuration
 from src.data.loader import load_data
 from src.utils.ci_subset import apply_ci_test_subset
 from src.output.postprocessor import PostProcessor
+from src.output.dashboard import DashboardBuilder
 from src.strategies import create_strategy
 from src.utils.weeks import DataOption, StudentYearPrediction, HIGHER_YEARS_COLUMNS
 
@@ -167,6 +168,24 @@ def _save_results(strategy, cfg):
         if strategy.postprocessor.data is not None:
             print("Saving output...")
             strategy.postprocessor.save_output(cfg.student_year_prediction)
+
+            data_cumulative = getattr(strategy, "data_cumulative", None)
+            if data_cumulative is None:
+                data_cumulative = getattr(
+                    getattr(strategy, "cumulative", None), "data_cumulative", None,
+                )
+            dashboard = DashboardBuilder(
+                data=strategy.postprocessor.data,
+                data_option=cfg.data_option,
+                numerus_fixus_list=strategy.postprocessor.numerus_fixus_list,
+                student_year_prediction=cfg.student_year_prediction,
+                ci_test_n=cfg.ci_test_n,
+                cwd=os.getcwd(),
+                predict_week=cfg.weeks[-1] if cfg.weeks else None,
+                data_cumulative=data_cumulative,
+                data_studentcount=strategy.postprocessor.data_studentcount,
+            )
+            dashboard.build_and_save()
         else:
             print("No data to save. Saving output skipped.")
 
