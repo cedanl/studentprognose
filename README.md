@@ -103,6 +103,52 @@ uv run main.py -D cumulative
 uv run main.py -dataset both
 ```
 
+### Datakwaliteitscontrole
+
+Bij elke run wordt de ruwe inputdata automatisch gevalideerd **voordat de ETL start**. Zo weet je zeker dat je nooit 20 minuten wacht voor een prognose op basis van corrupte data.
+
+Er zijn drie soorten bevindingen:
+
+| Type | Voorbeeld | Wat er gebeurt |
+|---|---|---|
+| **Fout** | Ontbrekend bestand, ontbrekende kolom | Pipeline stopt direct |
+| **Probleem** | Negatieve waarden, onbekende herkomstcode | Prompt: doorgaan of stoppen? |
+| **Waarschuwing** | Klein percentage ontbrekende waarden, weekgaten | Gelogd, pipeline loopt door |
+
+```
+Validatie gevonden problemen die prognoses kunnen beïnvloeden:
+  [PROBLEEM] telbestandY2025W10.csv: meercode_V = 0 voor 1 opleiding(en): B Opleiding X
+
+Als je doorgaat, kunnen sommige opleidingen worden overgeslagen of
+onbetrouwbare prognoses opleveren.
+
+Wil je doorgaan met de pipeline? [j/N]
+```
+
+Gebruik `--yes` om de prompt te omzeilen in geautomatiseerde runs (bijv. CI/CD):
+
+```bash
+studentprognose -w 6 -y 2025 --yes
+```
+
+> [!NOTE]
+> Met `--noetl` worden ETL én validatie overgeslagen. Gebruik dit alleen als de ruwe data al eerder succesvol verwerkt en gevalideerd is.
+
+#### Validatie-instellingen aanpassen
+
+De standaardwaarden (jaarbereiken, NaN-drempels, toegestane categorische waarden) staan in de broncode. Je kunt ze overschrijven door een `"validation"`-blok toe te voegen aan je `configuration.json`. Vermeld alleen de waarden die afwijken:
+
+```json
+{
+    "validation": {
+        "nan_error_threshold": 0.20,
+        "telbestand": {
+            "herkomst_allowed": ["N", "E", "R", "ONBEKEND"]
+        }
+    }
+}
+```
+
 ### Configuratie
 
 Het standaard configuratiebestand is `configuration/configuration.json`. Dit kan worden overschreven:
@@ -171,10 +217,11 @@ uv run main.py -y 2025 -w 5 -d c
 | Stap | Fase | Bestand |
 |------|------|---------|
 | 1 | CLI parsing | `cli.py` |
-| 2 | ETL (skip met `--noetl`) | `etl` |
-| 3 | Configuratie laden | `config.py` |
-| 4 | Data laden | `loader` → `preprocessing/add_zero_weeks` |
-| 5 | CI subset (indien `--ci`) | `utils/ci_subset` |
+| 2 | Validatie ruwe data (skip met `--noetl`) | `data/validation` |
+| 3 | ETL (skip met `--noetl`) | `data/etl` |
+| 4 | Configuratie laden | `config.py` |
+| 5 | Data laden | `loader` → `preprocessing/add_zero_weeks` |
+| 6 | CI subset (indien `--ci`) | `utils/ci_subset` |
 
 **Modus-specifieke stappen:**
 

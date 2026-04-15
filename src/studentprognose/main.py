@@ -13,10 +13,13 @@ from studentprognose.utils.weeks import DataOption, StudentYearPrediction, HIGHE
 def main(argv):
     cfg = parse_args(argv)
 
-    # Step 0: ETL (default — raw data → input data, skip with --noetl)
+    # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
     if not cfg.noetl:
+        from studentprognose.data.validation import validate_raw_data
         from studentprognose.data.etl import run_etl
-        run_etl(load_configuration(cfg.configuration_path))
+        pipeline_configuration = load_configuration(cfg.configuration_path)
+        validate_raw_data(pipeline_configuration, yes=cfg.yes)
+        run_etl(pipeline_configuration)
 
     # Step 1: Load configuration and data
     print("Loading configuration...")
