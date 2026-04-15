@@ -53,8 +53,7 @@ docs/                    # MkDocs bronbestanden
 ## Development Commands
 
 ```bash
-# Applicatie draaien (via CLI entry point)
-studentprognose --help
+# Applicatie draaien
 uv run studentprognose --help
 
 # Tests
