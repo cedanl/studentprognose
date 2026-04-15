@@ -80,7 +80,7 @@ def parse_args(argv):
     parser.add_argument("-sy", "-SY", "-studentyear", choices=list(STUDENT_YEAR_MAP.keys()), default=None, dest="studentyear")
     parser.add_argument("-sk", "-SK", "-skipyears", type=int, default=0, dest="skipyears")
     parser.add_argument("--ci", nargs=2, metavar=("test", "N"), default=None)
-    parser.add_argument("--noetl", action="store_true")
+    parser.add_argument("--noetl", action="store_true", help="Sla ETL én validatie over (gebruik dit alleen als de ruwe data al eerder verwerkt en gevalideerd is)")
     parser.add_argument("--yes", action="store_true", help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)")
 
     args = parser.parse_args(argv[1:])

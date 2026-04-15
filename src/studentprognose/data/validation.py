@@ -7,28 +7,56 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 
+# Mirrors the "validation" block in configuration.json.
+# These defaults are used when no validation config is present (e.g. older configs).
+_DEFAULT_VALIDATION_CFG = {
+    "collegejaar_min_offset": 15,
+    "collegejaar_max_offset": 2,
+    "weeknummer_min": 1,
+    "weeknummer_max": 52,
+    "nan_warning_threshold": 0.05,
+    "nan_error_threshold": 0.30,
+    "telbestand": {
+        "required_columns": [
+            "Studiejaar", "Isatcode", "Groepeernaam", "Aantal", "meercode_V",
+            "Herinschrijving", "Hogerejaars", "Herkomst",
+        ],
+        "herkomst_allowed": ["N", "E", "R"],
+        "herinschrijving_allowed": ["J", "N"],
+        "hogerejaars_allowed": ["J", "N"],
+    },
+    "individueel": {
+        "required_columns": [
+            "Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr",
+        ],
+    },
+    "oktober": {
+        "required_columns": [
+            "Collegejaar", "Groepeernaam Croho", "Aantal eerstejaars croho",
+            "EER-NL-nietEER", "Examentype code", "Aantal Hoofdinschrijvingen",
+        ],
+    },
+}
+
+
 @dataclass
 class ValidationResult:
     hard_errors: list = field(default_factory=list)
     soft_errors: list = field(default_factory=list)
     warnings: list = field(default_factory=list)
 
-    @property
-    def has_hard_errors(self):
-        return bool(self.hard_errors)
-
-    @property
-    def has_soft_errors(self):
-        return bool(self.soft_errors)
-
 
 def validate_raw_data(configuration, yes=False):
-    """Validate all raw input files before ETL. Blocks on hard errors, prompts on soft errors."""
+    """Validate all raw input files before ETL. Blocks on hard errors, prompts on soft errors.
+
+    Skipped automatically when --noetl is used, on the assumption that if ETL has
+    run before, the data was validated at that point.
+    """
     print("==== Valideren van ruwe inputdata ====")
 
     paths = configuration["paths"]
-    validation_cfg = configuration.get("validation", {})
-    cwd = _resolve_cwd()
+    validation_cfg = {**_DEFAULT_VALIDATION_CFG, **configuration.get("validation", {})}
+    cwd = os.getcwd()
     result = ValidationResult()
 
     _validate_telbestanden(cwd, paths, validation_cfg, result)
@@ -37,12 +65,6 @@ def validate_raw_data(configuration, yes=False):
 
     _handle_result(result, yes)
     print("==== Validatie voltooid ====\n")
-
-
-def _resolve_cwd():
-    return os.path.dirname(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -75,23 +97,18 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result):
     _check_telbestand_completeness(files, validation_cfg, result)
 
     current_year = datetime.date.today().year
-    min_offset = validation_cfg.get("collegejaar_min_offset", 15)
-    max_offset = validation_cfg.get("collegejaar_max_offset", 2)
-    year_min = current_year - min_offset
-    year_max = current_year + max_offset
-    weeknummer_min = validation_cfg.get("weeknummer_min", 1)
-    weeknummer_max = validation_cfg.get("weeknummer_max", 52)
-    nan_warn = validation_cfg.get("nan_warning_threshold", 0.05)
-    nan_error = validation_cfg.get("nan_error_threshold", 0.30)
+    year_min = current_year - validation_cfg["collegejaar_min_offset"]
+    year_max = current_year + validation_cfg["collegejaar_max_offset"]
+    weeknummer_min = validation_cfg["weeknummer_min"]
+    weeknummer_max = validation_cfg["weeknummer_max"]
+    nan_warn = validation_cfg["nan_warning_threshold"]
+    nan_error = validation_cfg["nan_error_threshold"]
 
-    telbestand_cfg = validation_cfg.get("telbestand", {})
-    required_columns = telbestand_cfg.get("required_columns", [
-        "Studiejaar", "Isatcode", "Groepeernaam", "Aantal", "meercode_V",
-        "Herinschrijving", "Hogerejaars", "Herkomst",
-    ])
-    herkomst_allowed = telbestand_cfg.get("herkomst_allowed", ["N", "E", "R"])
-    herinschrijving_allowed = telbestand_cfg.get("herinschrijving_allowed", ["J", "N"])
-    hogerejaars_allowed = telbestand_cfg.get("hogerejaars_allowed", ["J", "N"])
+    telbestand_cfg = {**_DEFAULT_VALIDATION_CFG["telbestand"], **validation_cfg.get("telbestand", {})}
+    required_columns = telbestand_cfg["required_columns"]
+    herkomst_allowed = telbestand_cfg["herkomst_allowed"]
+    herinschrijving_allowed = telbestand_cfg["herinschrijving_allowed"]
+    hogerejaars_allowed = telbestand_cfg["hogerejaars_allowed"]
 
     for filename in files:
         filepath = os.path.join(telbestanden_dir, filename)
@@ -172,17 +189,15 @@ def _validate_individueel(cwd, paths, validation_cfg, result):
         return
 
     try:
-        df = pd.read_csv(path, sep=";", low_memory=False, nrows=5000)
+        df = pd.read_csv(path, sep=";", low_memory=False)
     except Exception as e:
         result.hard_errors.append(
             f"individuele_aanmelddata.csv: kan bestand niet lezen ({e})"
         )
         return
 
-    individueel_cfg = validation_cfg.get("individueel", {})
-    required_columns = individueel_cfg.get("required_columns", [
-        "Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr",
-    ])
+    individueel_cfg = {**_DEFAULT_VALIDATION_CFG["individueel"], **validation_cfg.get("individueel", {})}
+    required_columns = individueel_cfg["required_columns"]
 
     missing_cols = [c for c in required_columns if c not in df.columns]
     if missing_cols:
@@ -191,8 +206,8 @@ def _validate_individueel(cwd, paths, validation_cfg, result):
         )
         return
 
-    nan_warn = validation_cfg.get("nan_warning_threshold", 0.05)
-    nan_error = validation_cfg.get("nan_error_threshold", 0.30)
+    nan_warn = validation_cfg["nan_warning_threshold"]
+    nan_error = validation_cfg["nan_error_threshold"]
     for col in ["Collegejaar", "Croho", "Inschrijfstatus"]:
         _check_nan_rate(df, col, "individuele_aanmelddata.csv", nan_warn, nan_error, result)
 
@@ -216,15 +231,8 @@ def _validate_oktober(cwd, paths, validation_cfg, result):
         )
         return
 
-    oktober_cfg = validation_cfg.get("oktober", {})
-    required_columns = oktober_cfg.get("required_columns", [
-        "Collegejaar",
-        "Groepeernaam Croho",
-        "Aantal eerstejaars croho",
-        "EER-NL-nietEER",
-        "Examentype code",
-        "Aantal Hoofdinschrijvingen",
-    ])
+    oktober_cfg = {**_DEFAULT_VALIDATION_CFG["oktober"], **validation_cfg.get("oktober", {})}
+    required_columns = oktober_cfg["required_columns"]
 
     missing_cols = [c for c in required_columns if c not in df.columns]
     if missing_cols:
@@ -234,10 +242,8 @@ def _validate_oktober(cwd, paths, validation_cfg, result):
         return
 
     current_year = datetime.date.today().year
-    min_offset = validation_cfg.get("collegejaar_min_offset", 15)
-    max_offset = validation_cfg.get("collegejaar_max_offset", 2)
-    year_min = current_year - min_offset
-    year_max = current_year + max_offset
+    year_min = current_year - validation_cfg["collegejaar_min_offset"]
+    year_max = current_year + validation_cfg["collegejaar_max_offset"]
 
     invalid_years = (
         df[~df["Collegejaar"].between(year_min, year_max)]["Collegejaar"]
@@ -250,8 +256,8 @@ def _validate_oktober(cwd, paths, validation_cfg, result):
             f"{sorted(invalid_years)} (verwacht: {year_min}–{year_max})"
         )
 
-    nan_warn = validation_cfg.get("nan_warning_threshold", 0.05)
-    nan_error = validation_cfg.get("nan_error_threshold", 0.30)
+    nan_warn = validation_cfg["nan_warning_threshold"]
+    nan_error = validation_cfg["nan_error_threshold"]
     for col in ["Collegejaar", "Aantal eerstejaars croho", "Aantal Hoofdinschrijvingen"]:
         _check_nan_rate(df, col, "oktober_bestand.xlsx", nan_warn, nan_error, result)
 
@@ -337,7 +343,7 @@ def _handle_result(result, yes):
     for w in result.warnings:
         print(f"  [WAARSCHUWING] {w}")
 
-    if result.has_hard_errors:
+    if result.hard_errors:
         print("\nValidatie mislukt — de pipeline kan niet worden gestart:")
         for e in result.hard_errors:
             print(f"  [FOUT] {e}")
@@ -347,25 +353,23 @@ def _handle_result(result, yes):
         )
         sys.exit(1)
 
-    if result.has_soft_errors:
+    if result.soft_errors:
         print("\nValidatie gevonden problemen die prognoses kunnen beïnvloeden:")
         for e in result.soft_errors:
             print(f"  [PROBLEEM] {e}")
 
-        n = len(result.soft_errors)
-
         if yes:
             print(
-                f"\n--yes opgegeven: pipeline wordt gestart ondanks {n} "
-                f"probleem/problemen. Prognoses voor de betreffende opleidingen "
-                f"kunnen onbetrouwbaar zijn of worden overgeslagen."
+                "\n--yes opgegeven: pipeline wordt gestart ondanks bovenstaande problemen. "
+                "Prognoses voor de betreffende opleidingen kunnen onbetrouwbaar zijn "
+                "of worden overgeslagen."
             )
             return
 
         print(
-            f"\n{n} probleem/problemen gevonden. Als je doorgaat, kunnen sommige "
-            "opleidingen worden overgeslagen of onbetrouwbare prognoses opleveren. "
-            "Je zou dan minder opleidingen terugkrijgen dan verwacht."
+            "\nAls je doorgaat, kunnen sommige opleidingen worden overgeslagen of "
+            "onbetrouwbare prognoses opleveren. Je zou dan minder opleidingen "
+            "terugkrijgen dan verwacht."
         )
         print(
             "Tip: gebruik --yes om deze prompt te omzeilen in geautomatiseerde runs."
