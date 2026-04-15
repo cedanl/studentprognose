@@ -11,7 +11,10 @@ from studentprognose.data.validation import (
     _check_categoricals_per_programme,
     _check_nan_rate,
     _check_telbestand_completeness,
+    _coerce_to_numeric,
     _handle_result,
+    _normalize_series,
+    _resolve_column,
     _DEFAULT_VALIDATION_CFG,
     validate_raw_data,
 )
@@ -222,7 +225,8 @@ def _make_valid_telbestand(path, year=2024, week=1):
     df.to_csv(path, sep=";", index=False)
 
 
-def _make_configuration(tmp_path, telbestanden_dir, with_individueel=False, with_oktober=False):
+def _make_configuration(tmp_path, telbestanden_dir, with_individueel=False, with_oktober=False,
+                        individueel_col_map=None, oktober_col_map=None):
     cfg = {
         "paths": {
             "path_raw_telbestanden": str(telbestanden_dir),
@@ -230,13 +234,30 @@ def _make_configuration(tmp_path, telbestanden_dir, with_individueel=False, with
             "path_raw_october": str(tmp_path / "oktober_bestand.xlsx") if with_oktober else "nonexistent.xlsx",
         },
         "validation": {},
+        "columns": {
+            "individual": individueel_col_map or {
+                "Collegejaar": "Collegejaar",
+                "Croho": "Croho",
+                "Inschrijfstatus": "Inschrijfstatus",
+                "Datum Verzoek Inschr": "Datum Verzoek Inschr",
+            },
+            "oktober": oktober_col_map or {
+                "Collegejaar": "Collegejaar",
+                "Groepeernaam Croho": "Groepeernaam Croho",
+                "Aantal eerstejaars croho": "Aantal eerstejaars croho",
+                "EER-NL-nietEER": "EER-NL-nietEER",
+                "Examentype code": "Examentype code",
+                "Aantal Hoofdinschrijvingen": "Aantal Hoofdinschrijvingen",
+            },
+        },
     }
     if with_individueel:
+        col_map = cfg["columns"]["individual"]
         pd.DataFrame({
-            "Collegejaar": [2024],
-            "Croho": ["12345"],
-            "Inschrijfstatus": ["Ingeschreven"],
-            "Datum Verzoek Inschr": ["2024-01-01"],
+            col_map.get("Collegejaar", "Collegejaar"): [2024],
+            col_map.get("Croho", "Croho"): ["12345"],
+            col_map.get("Inschrijfstatus", "Inschrijfstatus"): ["Ingeschreven"],
+            col_map.get("Datum Verzoek Inschr", "Datum Verzoek Inschr"): ["2024-01-01"],
         }).to_csv(tmp_path / "individuele_aanmelddata.csv", sep=";", index=False)
     return cfg
 
@@ -322,3 +343,145 @@ class TestValidateRawDataIntegration:
         cfg = _make_configuration(tmp_path, telbestanden_dir)
         monkeypatch.chdir(tmp_path)
         validate_raw_data(cfg, yes=True)
+
+    def test_whitespace_in_herkomst_produces_warning_not_error(self, tmp_path, monkeypatch):
+        telbestanden_dir = tmp_path / "telbestanden"
+        telbestanden_dir.mkdir()
+        df = pd.DataFrame({
+            "Studiejaar": [2024],
+            "Isatcode": ["12345"],
+            "Groepeernaam": ["B Opleiding"],
+            "Aantal": [10],
+            "meercode_V": [2],
+            "Herinschrijving": ["N"],
+            "Hogerejaars": ["N"],
+            "Herkomst": ["N "],  # trailing whitespace
+        })
+        df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
+        cfg = _make_configuration(tmp_path, telbestanden_dir)
+        monkeypatch.chdir(tmp_path)
+        validate_raw_data(cfg, yes=True)
+
+    def test_string_studiejaar_produces_warning_not_error(self, tmp_path, monkeypatch):
+        telbestanden_dir = tmp_path / "telbestanden"
+        telbestanden_dir.mkdir()
+        df = pd.DataFrame({
+            "Studiejaar": ["2024"],  # string instead of int
+            "Isatcode": ["12345"],
+            "Groepeernaam": ["B Opleiding"],
+            "Aantal": [10],
+            "meercode_V": [2],
+            "Herinschrijving": ["N"],
+            "Hogerejaars": ["N"],
+            "Herkomst": ["N"],
+        })
+        df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
+        cfg = _make_configuration(tmp_path, telbestanden_dir)
+        monkeypatch.chdir(tmp_path)
+        validate_raw_data(cfg, yes=True)
+
+    def test_institution_specific_column_names_in_individueel(self, tmp_path, monkeypatch):
+        telbestanden_dir = tmp_path / "telbestanden"
+        telbestanden_dir.mkdir()
+        _make_valid_telbestand(telbestanden_dir / "telbestandY2024W01.csv")
+
+        col_map = {
+            "Collegejaar": "Academic Year",
+            "Croho": "Programme Code",
+            "Inschrijfstatus": "Status",
+            "Datum Verzoek Inschr": "Request Date",
+        }
+        cfg = _make_configuration(tmp_path, telbestanden_dir, with_individueel=True,
+                                  individueel_col_map=col_map)
+        monkeypatch.chdir(tmp_path)
+        validate_raw_data(cfg, yes=True)
+
+    def test_canonical_column_names_in_individueel_fail_when_mapped(self, tmp_path, monkeypatch):
+        """If config maps 'Collegejaar' → 'Academic Year' but file still has 'Collegejaar', it fails."""
+        telbestanden_dir = tmp_path / "telbestanden"
+        telbestanden_dir.mkdir()
+        _make_valid_telbestand(telbestanden_dir / "telbestandY2024W01.csv")
+
+        col_map = {
+            "Collegejaar": "Academic Year",
+            "Croho": "Croho",
+            "Inschrijfstatus": "Inschrijfstatus",
+            "Datum Verzoek Inschr": "Datum Verzoek Inschr",
+        }
+        cfg = _make_configuration(tmp_path, telbestanden_dir, with_individueel=False,
+                                  individueel_col_map=col_map)
+        # Write file with canonical names, but mapping expects 'Academic Year'
+        pd.DataFrame({
+            "Collegejaar": [2024], "Croho": ["12345"],
+            "Inschrijfstatus": ["Ingeschreven"], "Datum Verzoek Inschr": ["2024-01-01"],
+        }).to_csv(tmp_path / "individuele_aanmelddata.csv", sep=";", index=False)
+        cfg["paths"]["path_raw_individueel"] = str(tmp_path / "individuele_aanmelddata.csv")
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            validate_raw_data(cfg, yes=True)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for new helpers
+# ---------------------------------------------------------------------------
+
+class TestResolveColumn:
+    def test_returns_mapped_name(self):
+        assert _resolve_column("Collegejaar", {"Collegejaar": "Academic Year"}) == "Academic Year"
+
+    def test_returns_canonical_when_not_in_map(self):
+        assert _resolve_column("Collegejaar", {}) == "Collegejaar"
+
+    def test_returns_canonical_when_mapping_is_identity(self):
+        assert _resolve_column("Collegejaar", {"Collegejaar": "Collegejaar"}) == "Collegejaar"
+
+
+class TestNormalizeSeries:
+    def test_strips_whitespace(self):
+        s = pd.Series(["N ", " E", " R "])
+        normalized, was_changed = _normalize_series(s)
+        assert list(normalized) == ["N", "E", "R"]
+        assert was_changed is True
+
+    def test_clean_series_not_changed(self):
+        s = pd.Series(["N", "E", "R"])
+        _, was_changed = _normalize_series(s)
+        assert was_changed is False
+
+    def test_non_string_series_returned_as_is(self):
+        s = pd.Series([1, 2, 3])
+        normalized, was_changed = _normalize_series(s)
+        assert was_changed is False
+        assert list(normalized) == [1, 2, 3]
+
+    def test_nan_not_treated_as_changed(self):
+        s = pd.Series(["N", None])
+        _, was_changed = _normalize_series(s)
+        assert was_changed is False
+
+
+class TestCoerceToNumeric:
+    def test_already_numeric_not_coerced(self):
+        s = pd.Series([2024, 2025])
+        result, was_coerced = _coerce_to_numeric(s)
+        assert was_coerced is False
+        assert list(result) == [2024, 2025]
+
+    def test_string_integers_coerced(self):
+        s = pd.Series(["2024", "2025"])
+        result, was_coerced = _coerce_to_numeric(s)
+        assert was_coerced is True
+        assert list(result) == [2024.0, 2025.0]
+
+    def test_dutch_decimal_notation_coerced(self):
+        s = pd.Series(["2.024", "2.025"])
+        result, was_coerced = _coerce_to_numeric(s)
+        assert was_coerced is True
+        assert list(result) == [2024.0, 2025.0]
+
+    def test_unparseable_becomes_nan(self):
+        s = pd.Series(["abc", "2024"])
+        result, was_coerced = _coerce_to_numeric(s)
+        assert was_coerced is True
+        assert pd.isna(result.iloc[0])
+        assert result.iloc[1] == 2024.0

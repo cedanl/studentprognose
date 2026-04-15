@@ -34,9 +34,10 @@ def run_etl(configuration):
 
     # Step 3: Calculate student counts from oktober-bestand
     path_october = os.path.join(cwd, paths["path_raw_october"])
+    oktober_columns = configuration.get("columns", {}).get("oktober", {})
     if os.path.exists(path_october):
         print("[3/4] Calculating student counts...     → data/input/student_count_*.xlsx")
-        _calculate_student_counts(path_october, cwd)
+        _calculate_student_counts(path_october, cwd, oktober_columns)
     else:
         print(f"[3/4] Skipping student counts (oktober-bestand not found: {paths['path_october']})")
 
@@ -342,9 +343,18 @@ def _calculate_student_count(data, volume):
     return pd.DataFrame(result)
 
 
-def _calculate_student_counts(path_october, cwd):
-    """Calculate student count files from the oktober-bestand."""
+def _calculate_student_counts(path_october, cwd, oktober_columns=None):
+    """Calculate student count files from the oktober-bestand.
+
+    oktober_columns maps canonical column names to institution-specific names,
+    matching the structure of configuration["columns"]["oktober"]. Columns are
+    renamed to canonical names before processing so downstream logic stays clean.
+    """
     data = pd.read_excel(path_october)
+    if oktober_columns:
+        rename_map = {inst: canonical for canonical, inst in oktober_columns.items() if inst != canonical}
+        if rename_map:
+            data = data.rename(columns=rename_map)
 
     # First-years
     dict_count = _calculate_student_count(data, volume=False)

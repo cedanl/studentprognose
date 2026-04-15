@@ -61,6 +61,14 @@
             "Land code eerste vooropleiding": "Land code eerste vooropleiding",
             "Aantal studenten": "Aantal studenten"
         },
+        "oktober": {
+            "Collegejaar": "Collegejaar",
+            "Groepeernaam Croho": "Groepeernaam Croho",
+            "Aantal eerstejaars croho": "Aantal eerstejaars croho",
+            "EER-NL-nietEER": "EER-NL-nietEER",
+            "Examentype code": "Examentype code",
+            "Aantal Hoofdinschrijvingen": "Aantal Hoofdinschrijvingen"
+        },
         "cumulative": {
             "Korte naam instelling": "Korte naam instelling",
             "Collegejaar": "Collegejaar",

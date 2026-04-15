@@ -10,15 +10,36 @@ hard error  → pipeline stopt direct, los op en probeer opnieuw
 soft error  → pre-flight prompt; gebruik ``--yes`` om door te gaan (CI/CD)
 warning     → gelogd, pipeline loopt door
 
+Tolerantie voor institutie-specifieke data
+------------------------------------------
+Elke instelling kan kolomnamen en lichte type-afwijkingen hebben.
+Dit module probeert data te normaliseren voordat het valideert:
+
+- **Kolomnamen** voor ``individuele_aanmelddata`` en ``oktober_bestand``
+  worden opgezocht via ``configuration["columns"]["individual"]`` en
+  ``configuration["columns"]["oktober"]``. Pas die mapping aan in
+  ``configuration.json`` als jouw instelling andere namen gebruikt.
+  Telbestanden komen van Studielink en zijn gestandaardiseerd; die
+  kolomnamen zijn vast.
+
+- **Witruimte** in categorische waarden (``"J "`` → ``"J"``) wordt
+  automatisch gestript. Een waarschuwing verschijnt als normalisatie
+  nodig was.
+
+- **Numerieke strings** (``"2024"`` of ``"2.024"``) worden gecoerceerd
+  naar getallen voor bereikcontroles. Een waarschuwing verschijnt als
+  coercering nodig was. Dit is consistent met hoe de ETL
+  (``_convert_to_float``) dezelfde variaties al afhandelt.
+
 Configuratie
 ------------
 ``_DEFAULT_VALIDATION_CFG`` is de **enige bron van waarheid** voor
 validatiedefaults. De waarden staan hier in de code, niet in
 ``configuration.json``, om dubbele definities te vermijden.
 
-Wil je een instelling overschrijven voor jouw installatie? Voeg een
-``"validation"``-blok toe aan je ``configuration.json``. Je hoeft alleen de
-waarden op te nemen die afwijken van de defaults:
+Wil je een instelling overschrijven? Voeg een ``"validation"``-blok toe
+aan je ``configuration.json``. Je hoeft alleen de afwijkende waarden op
+te nemen:
 
 .. code-block:: json
 
@@ -69,13 +90,13 @@ _DEFAULT_VALIDATION_CFG = {
         "herinschrijving_allowed": ["J", "N"],
         "hogerejaars_allowed": ["J", "N"],
     },
+    # critical_columns zijn kanonieke namen; de werkelijke kolomnamen worden
+    # opgezocht via configuration["columns"]["individual"] / ["oktober"].
     "individueel": {
-        "required_columns": [
-            "Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr",
-        ],
+        "critical_columns": ["Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr"],
     },
     "oktober": {
-        "required_columns": [
+        "critical_columns": [
             "Collegejaar", "Groepeernaam Croho", "Aantal eerstejaars croho",
             "EER-NL-nietEER", "Examentype code", "Aantal Hoofdinschrijvingen",
         ],
@@ -100,12 +121,13 @@ def validate_raw_data(configuration, yes=False):
 
     paths = configuration["paths"]
     validation_cfg = {**_DEFAULT_VALIDATION_CFG, **configuration.get("validation", {})}
+    columns_cfg = configuration.get("columns", {})
     cwd = os.getcwd()
     result = ValidationResult()
 
     _validate_telbestanden(cwd, paths, validation_cfg, result)
-    _validate_individueel(cwd, paths, validation_cfg, result)
-    _validate_oktober(cwd, paths, validation_cfg, result)
+    _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result)
+    _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result)
 
     _handle_result(result, yes)
     print("==== Validatie voltooid ====\n")
@@ -178,26 +200,34 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result):
                     f"[{weeknummer_min}, {weeknummer_max}]"
                 )
 
-        invalid_years = (
-            df[~df["Studiejaar"].between(year_min, year_max)]["Studiejaar"]
-            .dropna()
-            .unique()
-        )
+        studiejaar, was_coerced = _coerce_to_numeric(df["Studiejaar"])
+        if was_coerced:
+            result.warnings.append(
+                f"{filename}: kolom 'Studiejaar' is geen numeriek type — "
+                f"waarden worden automatisch geconverteerd"
+            )
+        invalid_years = studiejaar[~studiejaar.between(year_min, year_max)].dropna().unique()
         if len(invalid_years) > 0:
             result.soft_errors.append(
                 f"{filename}: Studiejaar bevat onverwachte waarden: "
                 f"{sorted(invalid_years)} (verwacht: {year_min}–{year_max})"
             )
 
-        _check_categoricals_per_programme(
-            df, "Herinschrijving", herinschrijving_allowed, "Groepeernaam", filename, result
-        )
-        _check_categoricals_per_programme(
-            df, "Hogerejaars", hogerejaars_allowed, "Groepeernaam", filename, result
-        )
-        _check_categoricals_per_programme(
-            df, "Herkomst", herkomst_allowed, "Groepeernaam", filename, result
-        )
+        for col, allowed in [
+            ("Herinschrijving", herinschrijving_allowed),
+            ("Hogerejaars", hogerejaars_allowed),
+            ("Herkomst", herkomst_allowed),
+        ]:
+            normalized, was_normalized = _normalize_series(df[col])
+            if was_normalized:
+                result.warnings.append(
+                    f"{filename}: kolom '{col}' bevat witruimte — "
+                    f"waarden worden automatisch gestript"
+                )
+            _check_categoricals_per_programme(
+                df.assign(**{col: normalized}),
+                col, allowed, "Groepeernaam", filename, result,
+            )
 
         zero_meercode = df[df["meercode_V"] == 0]
         if not zero_meercode.empty:
@@ -221,7 +251,7 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result):
             _check_nan_rate(df, col, filename, nan_warn, nan_error, result)
 
 
-def _validate_individueel(cwd, paths, validation_cfg, result):
+def _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result):
     path = os.path.join(
         cwd, paths.get("path_raw_individueel", "data/input_raw/individuele_aanmelddata.csv")
     )
@@ -240,10 +270,15 @@ def _validate_individueel(cwd, paths, validation_cfg, result):
         )
         return
 
+    col_map = columns_cfg.get("individual", {})
     individueel_cfg = {**_DEFAULT_VALIDATION_CFG["individueel"], **validation_cfg.get("individueel", {})}
-    required_columns = individueel_cfg["required_columns"]
+    critical_columns = individueel_cfg["critical_columns"]
 
-    missing_cols = [c for c in required_columns if c not in df.columns]
+    missing_cols = [
+        f"{_resolve_column(c, col_map)} (verwacht als '{c}')"
+        for c in critical_columns
+        if _resolve_column(c, col_map) not in df.columns
+    ]
     if missing_cols:
         result.hard_errors.append(
             f"individuele_aanmelddata.csv: ontbrekende kolommen: {', '.join(missing_cols)}"
@@ -252,11 +287,12 @@ def _validate_individueel(cwd, paths, validation_cfg, result):
 
     nan_warn = validation_cfg["nan_warning_threshold"]
     nan_error = validation_cfg["nan_error_threshold"]
-    for col in ["Collegejaar", "Croho", "Inschrijfstatus"]:
-        _check_nan_rate(df, col, "individuele_aanmelddata.csv", nan_warn, nan_error, result)
+    for canonical in ["Collegejaar", "Croho", "Inschrijfstatus"]:
+        actual = _resolve_column(canonical, col_map)
+        _check_nan_rate(df, actual, "individuele_aanmelddata.csv", nan_warn, nan_error, result)
 
 
-def _validate_oktober(cwd, paths, validation_cfg, result):
+def _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result):
     path = os.path.join(
         cwd, paths.get("path_raw_october", "data/input_raw/oktober_bestand.xlsx")
     )
@@ -275,40 +311,80 @@ def _validate_oktober(cwd, paths, validation_cfg, result):
         )
         return
 
+    col_map = columns_cfg.get("oktober", {})
     oktober_cfg = {**_DEFAULT_VALIDATION_CFG["oktober"], **validation_cfg.get("oktober", {})}
-    required_columns = oktober_cfg["required_columns"]
+    critical_columns = oktober_cfg["critical_columns"]
 
-    missing_cols = [c for c in required_columns if c not in df.columns]
+    missing_cols = [
+        f"{_resolve_column(c, col_map)} (verwacht als '{c}')"
+        for c in critical_columns
+        if _resolve_column(c, col_map) not in df.columns
+    ]
     if missing_cols:
         result.hard_errors.append(
             f"oktober_bestand.xlsx: ontbrekende kolommen: {', '.join(missing_cols)}"
         )
         return
 
+    collegejaar_col = _resolve_column("Collegejaar", col_map)
+    collegejaar, was_coerced = _coerce_to_numeric(df[collegejaar_col])
+    if was_coerced:
+        result.warnings.append(
+            f"oktober_bestand.xlsx: kolom '{collegejaar_col}' is geen numeriek type — "
+            f"waarden worden automatisch geconverteerd"
+        )
+
     current_year = datetime.date.today().year
     year_min = current_year - validation_cfg["collegejaar_min_offset"]
     year_max = current_year + validation_cfg["collegejaar_max_offset"]
-
-    invalid_years = (
-        df[~df["Collegejaar"].between(year_min, year_max)]["Collegejaar"]
-        .dropna()
-        .unique()
-    )
+    invalid_years = collegejaar[~collegejaar.between(year_min, year_max)].dropna().unique()
     if len(invalid_years) > 0:
         result.soft_errors.append(
-            f"oktober_bestand.xlsx: Collegejaar bevat onverwachte waarden: "
+            f"oktober_bestand.xlsx: {collegejaar_col} bevat onverwachte waarden: "
             f"{sorted(invalid_years)} (verwacht: {year_min}–{year_max})"
         )
 
     nan_warn = validation_cfg["nan_warning_threshold"]
     nan_error = validation_cfg["nan_error_threshold"]
-    for col in ["Collegejaar", "Aantal eerstejaars croho", "Aantal Hoofdinschrijvingen"]:
-        _check_nan_rate(df, col, "oktober_bestand.xlsx", nan_warn, nan_error, result)
+    for canonical in ["Collegejaar", "Aantal eerstejaars croho", "Aantal Hoofdinschrijvingen"]:
+        actual = _resolve_column(canonical, col_map)
+        _check_nan_rate(df, actual, "oktober_bestand.xlsx", nan_warn, nan_error, result)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+def _resolve_column(canonical, col_map):
+    """Resolve a canonical column name to the institution-specific name via the columns config."""
+    return col_map.get(canonical, canonical)
+
+
+def _normalize_series(series):
+    """Strip leading/trailing whitespace from a string series.
+
+    Returns (normalized_series, was_changed).
+    """
+    if not (pd.api.types.is_object_dtype(series) or pd.api.types.is_string_dtype(series)):
+        return series, False
+    normalized = series.str.strip()
+    was_changed = bool((normalized.fillna("") != series.fillna("")).any())
+    return normalized, was_changed
+
+
+def _coerce_to_numeric(series):
+    """Coerce a series to numeric, handling Dutch decimal notation (comma separator).
+
+    Returns (coerced_series, was_coerced). If already numeric, returns as-is.
+    """
+    if pd.api.types.is_numeric_dtype(series):
+        return series, False
+    coerced = pd.to_numeric(
+        series.astype(str).str.replace(".", "", regex=False).str.replace(",", ".", regex=False),
+        errors="coerce",
+    )
+    return coerced, True
+
 
 def _check_telbestand_completeness(files, validation_cfg, result):
     """Warn when there are unexpected gaps (> 2 weeks) between telbestanden within a year."""
