@@ -303,45 +303,179 @@ class DashboardBuilder:
   <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
 </div>"""
 
-    def _scatter_from_hist_accuracy(self) -> go.Figure | None:
-        """Scatter plot: week-38 Gewogen vooraanmelders vs Aantal_studenten (fallback)."""
+    def _programme_year_accuracy_heatmap(self) -> go.Figure | None:
+        """Heatmap: programmes (y) × collegejaar (x), coloured by MAPE.
+
+        Hover shows predicted enrolment, actual enrolment, and MAPE.
+        """
+        ha = self._hist_accuracy()
+        if ha is None or ha.empty:
+            return None
+
+        pivot_mape = ha.pivot_table(
+            index="Croho groepeernaam", columns="Collegejaar",
+            values="mape", aggfunc="mean",
+        )
+        pivot_pred = ha.pivot_table(
+            index="Croho groepeernaam", columns="Collegejaar",
+            values="predicted", aggfunc="sum",
+        )
+        pivot_act = ha.pivot_table(
+            index="Croho groepeernaam", columns="Collegejaar",
+            values="actual", aggfunc="sum",
+        )
+
+        pivot_mape.columns = [str(int(c)) for c in pivot_mape.columns]
+        pivot_pred.columns = [str(int(c)) for c in pivot_pred.columns]
+        pivot_act.columns = [str(int(c)) for c in pivot_act.columns]
+
+        programmes = sorted(pivot_mape.index)
+        pivot_mape = pivot_mape.reindex(index=programmes)
+        pivot_pred = pivot_pred.reindex(index=programmes, columns=pivot_mape.columns)
+        pivot_act = pivot_act.reindex(index=programmes, columns=pivot_mape.columns)
+
+        hover = np.empty(pivot_mape.shape, dtype=object)
+        for i, prog in enumerate(programmes):
+            for j, col in enumerate(pivot_mape.columns):
+                m = pivot_mape.iloc[i, j]
+                p = pivot_pred.iloc[i, j]
+                a = pivot_act.iloc[i, j]
+                if pd.notna(m):
+                    hover[i, j] = (
+                        f"MAPE: {m:.1%}<br>"
+                        f"Voorspeld: {p:.0f}<br>"
+                        f"Actueel: {a:.0f}"
+                    )
+                else:
+                    hover[i, j] = ""
+
+        fig = go.Figure(go.Heatmap(
+            z=pivot_mape.values,
+            x=pivot_mape.columns.tolist(),
+            y=pivot_mape.index.tolist(),
+            colorscale=[[0, "green"], [0.15, "yellow"], [0.5, "red"], [1.0, "darkred"]],
+            zmin=0, zmax=0.5,
+            colorbar=dict(title="MAPE", tickformat=".0%"),
+            text=hover, hoverinfo="text+x+y",
+        ))
+        fig.update_layout(
+            title="Modelnauwkeurigheid per opleiding × jaar",
+            xaxis_title="Collegejaar", yaxis_title="Opleiding",
+            height=max(400, len(programmes) * 25 + 150),
+        )
+        return fig
+
+    def _bias_per_programme(self) -> go.Figure | None:
+        """Bar chart: mean signed error per programme (positive = overestimate)."""
         ha = self._hist_accuracy()
         if ha is None or ha.empty:
             return None
         ha = ha.copy()
-        ha["error_pct"] = (ha["mape"] * 100).clip(upper=30)
-        max_val = max(ha["predicted"].max(), ha["actual"].max()) * 1.05
+        ha["signed_error"] = (ha["predicted"] - ha["actual"]) / ha["actual"]
+        prog_bias = ha.groupby("Croho groepeernaam")["signed_error"].mean().sort_values()
+
+        colours = [
+            "#d62728" if v > 0.05 else ("#2ca02c" if v < -0.05 else "#999999")
+            for v in prog_bias.values
+        ]
+
+        fig = go.Figure(go.Bar(
+            x=prog_bias.index.tolist(),
+            y=prog_bias.values,
+            marker_color=colours,
+            text=[f"{v:+.1%}" for v in prog_bias.values],
+            textposition="outside",
+        ))
+        fig.add_hline(y=0, line_dash="dash", line_color="grey")
+        fig.update_layout(
+            title="Structurele over-/onderschatting per opleiding",
+            xaxis_title="Opleiding",
+            yaxis_title="Gemiddelde afwijking (positief = overschatting)",
+            yaxis=dict(tickformat="+.0%"),
+            xaxis=dict(tickangle=-45),
+            height=450,
+        )
+        return fig
+
+    def _model_comparison_heatmap(self) -> go.Figure | None:
+        """Heatmap: programmes (y) × models (x), coloured by average MAPE."""
+        hist = self._hist_data()
+        if hist.empty:
+            return None
+
+        all_mape_cols = [c for c in hist.columns if c.startswith("MAPE_")]
+        if len(all_mape_cols) < 2:
+            return None
+
+        programmes = sorted(hist["Croho groepeernaam"].unique())
+        data = {}
+        for col in all_mape_cols:
+            model_name = col.replace("MAPE_", "")
+            mapes = []
+            for prog in programmes:
+                sub = hist[hist["Croho groepeernaam"] == prog]
+                val = sub[col].dropna().mean()
+                mapes.append(float(val) if pd.notna(val) else np.nan)
+            data[model_name] = mapes
+
+        df = pd.DataFrame(data, index=programmes)
+        df = df.dropna(axis=1, how="all")
+        if df.shape[1] < 2:
+            return None
+
+        hover = df.map(
+            lambda v: f"MAPE: {v:.1%}" if pd.notna(v) else ""
+        ).values
+
+        fig = go.Figure(go.Heatmap(
+            z=df.values,
+            x=df.columns.tolist(),
+            y=df.index.tolist(),
+            colorscale=[[0, "green"], [0.15, "yellow"], [0.5, "red"], [1.0, "darkred"]],
+            zmin=0, zmax=0.5,
+            colorbar=dict(title="MAPE", tickformat=".0%"),
+            text=hover, hoverinfo="text+x+y",
+        ))
+        fig.update_layout(
+            title="Modelvergelijking per opleiding",
+            xaxis_title="Model", yaxis_title="Opleiding",
+            height=max(400, len(programmes) * 25 + 150),
+        )
+        return fig
+
+    def _residual_plot(self) -> go.Figure | None:
+        """Scatter: predicted (x) vs residual (y). Diagnoses heteroscedasticity."""
+        ha = self._hist_accuracy()
+        if ha is None or ha.empty:
+            return None
+        ha = ha.copy()
+        ha["residual"] = ha["predicted"] - ha["actual"]
 
         fig = go.Figure()
         fig.add_trace(go.Scatter(
-            x=ha["predicted"], y=ha["actual"], mode="markers",
+            x=ha["predicted"], y=ha["residual"], mode="markers",
             marker=dict(
-                color=ha["error_pct"],
+                size=8, color=ha["mape"] * 100,
                 colorscale=[[0, "green"], [0.5, "yellow"], [1, "red"]],
                 cmin=0, cmax=30,
-                colorbar=dict(title="Fout %"), size=8,
+                colorbar=dict(title="MAPE %"),
             ),
             text=ha.apply(
                 lambda r: (
                     f"{r['Croho groepeernaam']}<br>Jaar: {int(r['Collegejaar'])}"
-                    f"<br>Vooraanmelders wk38: {r['predicted']:.0f}"
+                    f"<br>Voorspeld: {r['predicted']:.0f}"
                     f"<br>Realisatie: {r['actual']:.0f}"
-                    f"<br>Fout: {r['error_pct']:.1f}%"
+                    f"<br>Residual: {r['residual']:+.0f}"
                 ), axis=1,
             ),
             hoverinfo="text",
         ))
-        fig.add_trace(go.Scatter(
-            x=[0, max_val], y=[0, max_val], mode="lines",
-            line=dict(dash="dash", color="grey"), showlegend=False,
-        ))
+        fig.add_hline(y=0, line_dash="dash", line_color="grey")
         fig.update_layout(
-            title="Gewogen vooraanmelders (wk 38) vs Realisatie",
-            xaxis_title="Vooraanmelders week 38",
-            yaxis_title="Werkelijk ingeschreven",
-            xaxis=dict(range=[0, max_val]),
-            yaxis=dict(range=[0, max_val], scaleanchor="x"),
-            height=550,
+            title="Residual-analyse (voorspeld vs fout)",
+            xaxis_title="Voorspeld aantal",
+            yaxis_title="Residual (voorspeld − realisatie)",
+            height=450,
         )
         return fig
 
@@ -413,8 +547,14 @@ class DashboardBuilder:
     # Shared chart builders
     # ════════════════════════════════════════════════════════════════
 
-    def _error_progression(self, mape_cols: list[str], title_suffix: str = "") -> go.Figure | None:
-        """Line plot of mean MAPE per week over historical years, clipped at 200 %."""
+    def _error_progression(
+        self, mape_cols: list[str], title_suffix: str = "", weighted: bool = False,
+    ) -> go.Figure | None:
+        """Line plot of mean MAPE per week over historical years, clipped at 200 %.
+
+        When *weighted* is True, MAPE is weighted by Aantal_studenten so that
+        large programmes contribute more than small ones.
+        """
         hist = self._hist_data()
         if hist.empty:
             return None
@@ -423,7 +563,22 @@ class DashboardBuilder:
             if col not in hist.columns:
                 continue
             model = col.replace("MAPE_", "")
-            weekly = hist.groupby("Weeknummer")[col].mean().reset_index()
+
+            if weighted and "Aantal_studenten" in hist.columns:
+                tmp = hist[["Weeknummer", col, "Aantal_studenten"]].dropna(subset=[col])
+                tmp = tmp.copy()
+                tmp["_w"] = tmp["Aantal_studenten"].replace(0, np.nan)
+                tmp["_wm"] = tmp[col] * tmp["_w"]
+                weekly = (
+                    tmp.groupby("Weeknummer")
+                    .agg(_wm_sum=("_wm", "sum"), _w_sum=("_w", "sum"))
+                    .reset_index()
+                )
+                weekly[col] = weekly["_wm_sum"] / weekly["_w_sum"]
+                weekly = weekly[["Weeknummer", col]]
+            else:
+                weekly = hist.groupby("Weeknummer")[col].mean().reset_index()
+
             weekly[col] = weekly[col].clip(upper=2.0)
             weekly = weekly.sort_values("Weeknummer", key=_sort_weeks_series)
             fig.add_trace(go.Scatter(
@@ -431,8 +586,10 @@ class DashboardBuilder:
                 mode="lines+markers", name=model,
                 line=dict(color=MODEL_COLOURS.get(model)),
             ))
+
+        title_prefix = "Gewogen " if weighted else ""
         fig.update_layout(
-            title=f"MAPE per week{title_suffix}",
+            title=f"{title_prefix}MAPE per week{title_suffix}",
             xaxis_title="Weeknummer", yaxis_title="Gemiddelde MAPE",
             yaxis=dict(tickformat=".0%"), hovermode="x unified", height=450,
         )
@@ -463,7 +620,11 @@ class DashboardBuilder:
                 color=agg["error_pct"],
                 colorscale=[[0, "green"], [0.5, "yellow"], [1, "red"]],
                 cmin=0, cmax=30,
-                colorbar=dict(title="Fout %"), size=8,
+                colorbar=dict(title="Fout %"),
+                size=agg["actual"],
+                sizemode="area",
+                sizeref=2.0 * agg["actual"].max() / (40.0**2),
+                sizemin=4,
             ),
             text=agg.apply(
                 lambda r: (
@@ -487,11 +648,19 @@ class DashboardBuilder:
         )
         return fig
 
-    def _error_heatmap(self, mape_cols: list[str]) -> go.Figure | None:
-        """Heatmap: programmes (y) x weeks (x), mean MAPE as colour."""
+    def _error_heatmap(
+        self, mape_cols: list[str], recent_n: int | None = None,
+    ) -> go.Figure | None:
+        """Heatmap: programmes (y) x weeks (x), mean MAPE as colour.
+
+        When *recent_n* is set, only the last N collegejaren are included.
+        """
         hist = self._hist_data()
         if hist.empty:
             return None
+        if recent_n is not None:
+            recent_years = sorted(hist["Collegejaar"].unique())[-recent_n:]
+            hist = hist[hist["Collegejaar"].isin(recent_years)]
         valid_cols = [c for c in mape_cols if c in hist.columns]
         if not valid_cols:
             return None
@@ -505,6 +674,10 @@ class DashboardBuilder:
         ordered = [w for w in ACADEMIC_WEEKS if w in pivot.columns]
         pivot = pivot.reindex(columns=ordered)
 
+        title = "Fout-heatmap (gemiddelde MAPE)"
+        if recent_n is not None:
+            title += f" — laatste {recent_n} jaar"
+
         fig = go.Figure(go.Heatmap(
             z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
             colorscale=[[0, "green"], [0.15, "yellow"], [0.5, "red"], [1.0, "darkred"]],
@@ -512,7 +685,7 @@ class DashboardBuilder:
             colorbar=dict(title="MAPE", tickformat=".0%"),
         ))
         fig.update_layout(
-            title="Fout-heatmap (gemiddelde MAPE)",
+            title=title,
             xaxis_title="Weeknummer", yaxis_title="Opleiding",
             height=max(400, len(pivot) * 25 + 150),
         )
@@ -865,20 +1038,32 @@ class DashboardBuilder:
                         ))
                         prog_traces[prog].append((idx, True))
 
-            # ── Realisation stars (week 38 per historical year) ──────────
+            # ── Actual enrolment stars (week 38) ───────────────────────
             if self.data_studentcount is not None:
-                for yr in hist_years:
-                    sc = self.data_studentcount
+                sc = self.data_studentcount
+                star_years = hist_years + [self.prediction_year]
+                first_star = True
+                for yr in star_years:
                     total = sc[(sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == yr)]["Aantal_studenten"].sum()
                     if total > 0:
+                        is_pred_yr = yr == self.prediction_year
                         idx = len(fig.data)
                         fig.add_trace(go.Scatter(
-                            x=["38"], y=[total], mode="markers",
-                            name=f"Realisatie {int(yr)}",
-                            marker=dict(symbol="star", size=12, color="#333333"),
-                            visible=False, showlegend=False,
+                            x=["38"], y=[total], mode="markers+text",
+                            name="Actuele inschrijvingen" if first_star else f"Realisatie {int(yr)}",
+                            marker=dict(
+                                symbol="star", size=14,
+                                color="#d62728" if is_pred_yr else "#333333",
+                            ),
+                            text=[str(int(yr))],
+                            textposition="middle right",
+                            textfont=dict(size=9),
+                            visible=False,
+                            showlegend=first_star,
+                            legendgroup="actuele_inschrijvingen",
                         ))
-                        prog_traces[prog].append((idx, "legendonly"))
+                        prog_traces[prog].append((idx, True))
+                        first_star = False
 
             # ── Predicted enrolment diamond (week 38) ────────────────────
             # Use XGBoost/ensemble prediction (actual enrolments), not SARIMA
@@ -1000,40 +1185,47 @@ class DashboardBuilder:
         ]
         charts: list[tuple[str, go.Figure]] = []
 
+        # ── Overzicht ───────────────────────────────────────────────
+        fig = self._programme_year_accuracy_heatmap()
+        if fig:
+            charts.append(("Modelnauwkeurigheid per opleiding × jaar", fig))
+
+        fig = self._model_comparison_heatmap()
+        if fig:
+            charts.append(("Modelvergelijking per opleiding", fig))
+
+        fig = self._bias_per_programme()
+        if fig:
+            charts.append(("Structurele over-/onderschatting", fig))
+
+        # ── Detail ──────────────────────────────────────────────────
         fig = self._yearly_trend()
         if fig:
             charts.append(("Verloop per opleiding — alle jaren", fig))
 
-        fig = self._error_progression(mape_cols, " (cumulatief)")
+        fig = self._error_progression(mape_cols, " (cumulatief)", weighted=True)
         if fig:
-            charts.append(("MAPE per week", fig))
+            charts.append(("Gewogen MAPE per week", fig))
 
-        # Scatter: try model-based first, fall back to hist accuracy
-        scatter_added = False
         for pc in ("SARIMA_cumulative", "Prognose_ratio"):
             fig = self._predicted_vs_actual_scatter(pc)
             if fig:
                 charts.append((f"Voorspeld vs Realisatie ({pc})", fig))
-                scatter_added = True
                 break
-        if not scatter_added:
-            fig = self._scatter_from_hist_accuracy()
-            if fig:
-                charts.append(("Voorspeld vs Realisatie (historisch)", fig))
 
-        # Heatmap: MAPE-based if available, then weekly year-on-year
-        fig = self._error_heatmap(mape_cols)
+        # ── Diagnostiek ─────────────────────────────────────────────
+        fig = self._error_heatmap(mape_cols, recent_n=3)
         if fig:
             charts.append(("Fout-heatmap", fig))
-
-        fig = self._weekly_yoy_heatmap()
-        if fig:
-            charts.append(("Jaar-op-jaar verandering", fig))
 
         for pc in ("SARIMA_cumulative", "Prognose_ratio"):
             fig = self._error_heatmap_animated(pc)
             if fig:
                 charts.append((f"Fout-heatmap per jaar ({pc})", fig))
+
+        fig = self._residual_plot()
+        if fig:
+            charts.append(("Residual-analyse", fig))
 
         fig = self._model_consensus()
         if fig:
@@ -1360,6 +1552,10 @@ class DashboardBuilder:
         fig = self._prognose_vs_vorig_jaar()
         if fig:
             charts.append(("Prognose vs Vorig Jaar", fig))
+
+        fig = self._weekly_yoy_heatmap()
+        if fig:
+            charts.append(("Jaar-op-jaar verandering", fig))
 
         fig = self._origin_stacked_bar()
         if fig:
