@@ -1,0 +1,96 @@
+site_name: Studentprognose
+site_description: Methodologische documentatie voor het voorspellen van eerstejaars instroom in het hoger onderwijs
+site_url: https://cedanl.github.io/studentprognose/
+repo_url: https://github.com/cedanl/studentprognose
+repo_name: cedanl/studentprognose
+edit_uri: edit/main/docs/
+
+docs_dir: docs
+site_dir: site
+
+theme:
+  name: material
+  language: nl
+  logo: assets/header.svg
+  favicon: assets/header.svg
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Donker thema
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Licht thema
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.indexes
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.tabs.link
+
+plugins:
+  - search:
+      lang: nl
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+          options:
+            docstring_style: google
+            show_source: false
+            show_root_heading: true
+            show_symbol_type_heading: true
+            members_order: source
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.snippets:
+      base_path: ["."]
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - Home: index.md
+  - Aan de slag: aan-de-slag.md
+  - Je data voorbereiden: je-data-voorbereiden.md
+  - Configuratie: configuratie.md
+  - Validatie: validatie.md
+  - Output begrijpen: output-begrijpen.md
+  - Methodologie:
+    - methodologie/index.md
+    - SARIMA: methodologie/sarima.md
+    - XGBoost: methodologie/xgboost.md
+    - Ratio-model: methodologie/ratio-model.md
+    - Ensemble: methodologie/ensemble.md
+  - API-referentie:
+    - api/index.md
+    - Modellen: api/models.md
+    - Strategies: api/strategies.md

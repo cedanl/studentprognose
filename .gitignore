@@ -2,6 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 .vscode/
+site/
 
 #Data files can be ignored
 data/*

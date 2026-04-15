@@ -1,5 +1,10 @@
 # Technische README
 
+> **Verouderd** — Dit document is niet bijgewerkt na de refactor in #56 en verwijst nog naar de oude `scripts/`-structuur.
+> De actuele documentatie staat op de [MkDocs-site](https://cedanl.github.io/studentprognose/) (zie `docs/`).
+
+
+
 ## Installatie
 
 ### Vereisten
