@@ -78,6 +78,8 @@ De documentatie in `docs/` is gericht op **analisten en onderzoekers**: niet all
 
 Gebruik de onderstaande mapping om te bepalen welke pagina('s) bijgewerkt moeten worden. Als een wijziging een pagina raakt, **moet die pagina worden meegenomen in de PR**. Een PR zonder bijbehorende docs-update is onvolledig.
 
+**Deze check is verplicht voor elke PR, ook bij refactors en interne fixes.** "Geen gebruikersgerichte wijziging" is een conclusie die je trekt *nadat* je de tabel hebt doorlopen — niet een reden om de check over te slaan.
+
 | Als je dit wijzigt... | ...update dan deze docs-pagina |
 |-----------------------|-------------------------------|
 | CLI-vlaggen / `cli.py` / `main.py` | `docs/aan-de-slag.md` |
