@@ -75,8 +75,9 @@ Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
 
 !!! warning "Let op bij `-d b`"
     Als je `-d both` (standaard) gebruikt maar de individuele aanmelddata ontbreekt of
-    bevat niet de verwachte jaren, **degradeert de pipeline stilzwijgend naar `-d cumulative`**.
-    De output bevat dan alleen cumulatieve voorspellingen — geen ensemble, geen `SARIMA_individual`.
+    bevat niet de verwachte jaren, **valt de pipeline terug op `-d cumulative`**.
+    De tool toont dan een waarschuwing, maar de output bevat alleen cumulatieve
+    voorspellingen — geen ensemble, geen `SARIMA_individual`.
 
     Controleer altijd of `SARIMA_individual` kolommen aanwezig zijn in je output als je
-    het ensemble verwacht. Zie issue [#86](https://github.com/cedanl/studentprognose/issues/86).
+    het ensemble verwacht.
