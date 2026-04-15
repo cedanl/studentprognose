@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+import sys
 from statistics import mean
 
 from studentprognose.utils.weeks import (
@@ -33,10 +34,11 @@ class PostProcessor:
                     case StudentYearPrediction.VOLUME:
                         open(f"data/output/output_volume_{mode_suffix}{ci_suffix}.xlsx", "w").close()
         except IOError:
-            input(
-                "Could not open output files because they are (probably) opened by another process. "
-                "Please close Excel. Press Enter to continue."
+            print(
+                "Fout: outputbestand kan niet geopend worden, waarschijnlijk staat het nog open in Excel. "
+                "Sluit het bestand en probeer opnieuw."
             )
+            sys.exit(1)
 
     def __init__(self, configuration, data_latest, ensemble_weights,
                  data_studentcount, cwd, data_option, ci_test_n):
