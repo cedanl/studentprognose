@@ -56,7 +56,7 @@ source = "vcs"
 packages = ["src/studentprognose"]
 
 [tool.hatch.build.targets.sdist]
-exclude = ["data/"]
+exclude = ["/data/"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
