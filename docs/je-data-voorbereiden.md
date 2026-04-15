@@ -2,7 +2,7 @@
 
 TODO: uitwerken op basis van PIPELINE.md en datakwaliteitscontroles.
 
-Zie ook `doc/PIPELINE.md` voor de volledige dataflow inclusief ETL-stappen.
+Zie ook de [PIPELINE.md](https://github.com/cedanl/studentprognose/blob/main/doc/PIPELINE.md) voor de volledige dataflow inclusief ETL-stappen en Mermaid-diagram.
 
 ## Verplichte inputbestanden
 

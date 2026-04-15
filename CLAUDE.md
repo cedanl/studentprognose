@@ -53,8 +53,9 @@ docs/                    # MkDocs bronbestanden
 ## Development Commands
 
 ```bash
-# Applicatie draaien
-uv run main.py
+# Applicatie draaien (via CLI entry point)
+studentprognose --help
+uv run studentprognose --help
 
 # Tests
 uv run pytest

@@ -11,8 +11,8 @@ site_dir: site
 theme:
   name: material
   language: nl
-  logo: assets/npuls_logo.png
-  favicon: assets/npuls_logo.png
+  logo: assets/header.svg
+  favicon: assets/header.svg
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
@@ -33,7 +33,6 @@ theme:
     - navigation.sections
     - navigation.top
     - navigation.indexes
-    - toc.integrate
     - search.suggest
     - search.highlight
     - content.code.copy
@@ -75,6 +74,7 @@ markdown_extensions:
       generic: true
 
 extra_javascript:
+  - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
 
 nav:
@@ -90,3 +90,7 @@ nav:
     - XGBoost: methodologie/xgboost.md
     - Ratio-model: methodologie/ratio-model.md
     - Ensemble: methodologie/ensemble.md
+  - API-referentie:
+    - api/index.md
+    - Modellen: api/models.md
+    - Strategies: api/strategies.md
