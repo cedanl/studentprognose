@@ -173,11 +173,12 @@ class TestHandleResult:
         _handle_result(r, yes=False)
         assert "let op dit" in capsys.readouterr().out
 
-    def test_hard_error_exits(self):
+    def test_hard_error_exits_with_code_1(self):
         r = ValidationResult()
         r.hard_errors.append("kritieke fout")
-        with pytest.raises(SystemExit):
+        with pytest.raises(SystemExit) as exc_info:
             _handle_result(r, yes=False)
+        assert exc_info.value.code == 1
 
     def test_soft_error_with_yes_does_not_prompt(self, capsys):
         r = ValidationResult()
@@ -192,19 +193,132 @@ class TestHandleResult:
             _handle_result(r, yes=False)
         assert "Doorgaan" in capsys.readouterr().out
 
-    def test_soft_error_without_yes_prompts_and_n_exits(self):
+    def test_soft_error_without_yes_prompts_and_n_exits_with_code_0(self):
         r = ValidationResult()
         r.soft_errors.append("klein probleem")
         with patch("builtins.input", return_value="n"):
-            with pytest.raises(SystemExit):
+            with pytest.raises(SystemExit) as exc_info:
                 _handle_result(r, yes=False)
+        assert exc_info.value.code == 0
 
-    def test_soft_error_eof_exits_gracefully(self):
+    def test_soft_error_eof_exits_gracefully_with_code_0(self):
         r = ValidationResult()
         r.soft_errors.append("klein probleem")
         with patch("builtins.input", side_effect=EOFError):
-            with pytest.raises(SystemExit):
+            with pytest.raises(SystemExit) as exc_info:
                 _handle_result(r, yes=False)
+        assert exc_info.value.code == 0
+
+
+# ---------------------------------------------------------------------------
+# _validate_oktober unit tests
+# ---------------------------------------------------------------------------
+
+def _make_valid_oktober(path, year=2024, col_map=None):
+    """Write a minimal valid oktober_bestand.xlsx to path."""
+    col_map = col_map or {}
+    cols = {
+        "Collegejaar": year,
+        "Groepeernaam Croho": "B Opleiding",
+        "Aantal eerstejaars croho": 1,
+        "EER-NL-nietEER": "NL",
+        "Examentype code": "Bachelor eerstejaars",
+        "Aantal Hoofdinschrijvingen": 100,
+    }
+    # Apply institution-specific column names if provided
+    renamed = {col_map.get(k, k): v for k, v in cols.items()}
+    pd.DataFrame([renamed]).to_excel(path, index=False)
+
+
+class TestValidateOktober:
+    def _cfg(self, tmp_path, col_map=None):
+        return {
+            "paths": {"path_raw_october": str(tmp_path / "oktober_bestand.xlsx")},
+            "validation": {},
+            "columns": {"oktober": col_map or {
+                "Collegejaar": "Collegejaar",
+                "Groepeernaam Croho": "Groepeernaam Croho",
+                "Aantal eerstejaars croho": "Aantal eerstejaars croho",
+                "EER-NL-nietEER": "EER-NL-nietEER",
+                "Examentype code": "Examentype code",
+                "Aantal Hoofdinschrijvingen": "Aantal Hoofdinschrijvingen",
+            }},
+        }
+
+    def test_valid_file_passes(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        _make_valid_oktober(tmp_path / "oktober_bestand.xlsx")
+        from studentprognose.data.validation import _validate_oktober, _DEFAULT_VALIDATION_CFG
+        result = ValidationResult()
+        cfg = self._cfg(tmp_path)
+        validation_cfg = {**_DEFAULT_VALIDATION_CFG, **cfg.get("validation", {})}
+        _validate_oktober(str(tmp_path), cfg["paths"], validation_cfg, cfg["columns"], result)
+        assert not result.hard_errors
+        assert not result.soft_errors
+
+    def test_missing_file_produces_warning(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        from studentprognose.data.validation import _validate_oktober, _DEFAULT_VALIDATION_CFG
+        result = ValidationResult()
+        cfg = self._cfg(tmp_path)
+        validation_cfg = {**_DEFAULT_VALIDATION_CFG}
+        _validate_oktober(str(tmp_path), cfg["paths"], validation_cfg, cfg["columns"], result)
+        assert not result.hard_errors
+        assert len(result.warnings) == 1
+        assert "Oktober-bestand" in result.warnings[0]
+
+    def test_missing_column_produces_hard_error(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        pd.DataFrame({"Collegejaar": [2024]}).to_excel(
+            tmp_path / "oktober_bestand.xlsx", index=False
+        )
+        from studentprognose.data.validation import _validate_oktober, _DEFAULT_VALIDATION_CFG
+        result = ValidationResult()
+        cfg = self._cfg(tmp_path)
+        validation_cfg = {**_DEFAULT_VALIDATION_CFG}
+        _validate_oktober(str(tmp_path), cfg["paths"], validation_cfg, cfg["columns"], result)
+        assert len(result.hard_errors) == 1
+        assert "ontbrekende kolommen" in result.hard_errors[0]
+
+    def test_out_of_range_collegejaar_produces_soft_error(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        _make_valid_oktober(tmp_path / "oktober_bestand.xlsx", year=1990)
+        from studentprognose.data.validation import _validate_oktober, _DEFAULT_VALIDATION_CFG
+        result = ValidationResult()
+        cfg = self._cfg(tmp_path)
+        validation_cfg = {**_DEFAULT_VALIDATION_CFG}
+        _validate_oktober(str(tmp_path), cfg["paths"], validation_cfg, cfg["columns"], result)
+        assert len(result.soft_errors) == 1
+        assert "1990" in result.soft_errors[0]
+
+    def test_year_displayed_as_int_not_float(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        _make_valid_oktober(tmp_path / "oktober_bestand.xlsx", year=1990)
+        from studentprognose.data.validation import _validate_oktober, _DEFAULT_VALIDATION_CFG
+        result = ValidationResult()
+        cfg = self._cfg(tmp_path)
+        validation_cfg = {**_DEFAULT_VALIDATION_CFG}
+        _validate_oktober(str(tmp_path), cfg["paths"], validation_cfg, cfg["columns"], result)
+        assert "1990.0" not in result.soft_errors[0]
+        assert "1990" in result.soft_errors[0]
+
+    def test_institution_specific_column_names_pass(self, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        col_map = {
+            "Collegejaar": "Academic Year",
+            "Groepeernaam Croho": "Programme",
+            "Aantal eerstejaars croho": "First Year Count",
+            "EER-NL-nietEER": "Origin",
+            "Examentype code": "Exam Type",
+            "Aantal Hoofdinschrijvingen": "Enrolments",
+        }
+        _make_valid_oktober(tmp_path / "oktober_bestand.xlsx", col_map=col_map)
+        from studentprognose.data.validation import _validate_oktober, _DEFAULT_VALIDATION_CFG
+        result = ValidationResult()
+        cfg = self._cfg(tmp_path, col_map=col_map)
+        validation_cfg = {**_DEFAULT_VALIDATION_CFG}
+        _validate_oktober(str(tmp_path), cfg["paths"], validation_cfg, cfg["columns"], result)
+        assert not result.hard_errors
 
 
 # ---------------------------------------------------------------------------

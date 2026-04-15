@@ -78,7 +78,7 @@ _DEFAULT_VALIDATION_CFG = {
     "collegejaar_min_offset": 15,
     "collegejaar_max_offset": 2,
     "weeknummer_min": 1,
-    "weeknummer_max": 52,
+    "weeknummer_max": 53,  # ISO 8601: sommige jaren hebben week 53 (bijv. 2026)
     "nan_warning_threshold": 0.05,
     "nan_error_threshold": 0.30,
     "telbestand": {
@@ -210,7 +210,7 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result):
         if len(invalid_years) > 0:
             result.soft_errors.append(
                 f"{filename}: Studiejaar bevat onverwachte waarden: "
-                f"{sorted(invalid_years)} (verwacht: {year_min}–{year_max})"
+                f"{sorted(int(y) for y in invalid_years)} (verwacht: {year_min}–{year_max})"
             )
 
         for col, allowed in [
@@ -229,7 +229,8 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result):
                 col, allowed, "Groepeernaam", filename, result,
             )
 
-        zero_meercode = df[df["meercode_V"] == 0]
+        meercode_v, _ = _coerce_to_numeric(df["meercode_V"])
+        zero_meercode = df[meercode_v == 0]
         if not zero_meercode.empty:
             programmes = zero_meercode["Groepeernaam"].dropna().unique()
             result.soft_errors.append(
@@ -341,7 +342,7 @@ def _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result):
     if len(invalid_years) > 0:
         result.soft_errors.append(
             f"oktober_bestand.xlsx: {collegejaar_col} bevat onverwachte waarden: "
-            f"{sorted(invalid_years)} (verwacht: {year_min}–{year_max})"
+            f"{sorted(int(y) for y in invalid_years)} (verwacht: {year_min}–{year_max})"
         )
 
     nan_warn = validation_cfg["nan_warning_threshold"]

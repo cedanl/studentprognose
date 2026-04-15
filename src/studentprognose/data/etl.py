@@ -39,7 +39,7 @@ def run_etl(configuration):
         print("[3/4] Calculating student counts...     → data/input/student_count_*.xlsx")
         _calculate_student_counts(path_october, cwd, oktober_columns)
     else:
-        print(f"[3/4] Skipping student counts (oktober-bestand not found: {paths['path_october']})")
+        print(f"[3/4] Skipping student counts (oktober-bestand not found: {paths['path_raw_october']})")
 
     # Step 4: Copy direct files (raw → canonical input paths)
     copied = _copy_direct_files(cwd, paths, output_individual)
