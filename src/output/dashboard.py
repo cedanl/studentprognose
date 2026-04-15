@@ -547,6 +547,107 @@ class DashboardBuilder:
         )
         return fig
 
+    def _validation_gantt(self) -> go.Figure | None:
+        """Gantt-style chart showing the expanding-window validation strategy.
+
+        Per prediction year: which years were used for training (full),
+        which year is the test year, and within the test year which weeks
+        are known vs predicted.
+        """
+        if self.data_cumulative is None:
+            return None
+
+        all_data_years = sorted(self.data_cumulative["Collegejaar"].unique())
+        pred_years = sorted(self.data["Collegejaar"].unique())
+
+        # Only meaningful for multi-year runs
+        if len(pred_years) < 2:
+            return None
+
+        pw = self.predict_week
+        # Fraction of academic year known at predict_week
+        # Academic year: week 39→52 (14 weeks) then 1→38 (38 weeks) = 52 weeks total
+        if pw is not None:
+            if pw >= 39:
+                known_weeks = pw - 39 + 1
+            else:
+                known_weeks = 14 + pw  # 14 weeks (39-52) + weeks in new year
+            known_frac = known_weeks / 52
+        else:
+            known_frac = 0
+
+        fig = go.Figure()
+
+        for i, pred_yr in enumerate(pred_years):
+            train_years = [y for y in all_data_years if y < pred_yr]
+            y_label = f"Pred {int(pred_yr)}"
+
+            # Training years (full bars)
+            for ty in train_years:
+                fig.add_trace(go.Bar(
+                    x=[1], y=[y_label], orientation="h",
+                    base=[ty - 0.45],
+                    marker_color="#1f77b4",
+                    width=0.6,
+                    showlegend=bool(i == 0 and ty == train_years[0]),
+                    name="Training",
+                    legendgroup="training",
+                    hovertemplate=f"Training: {int(ty)}<extra></extra>",
+                ))
+
+            # Test year — known portion (wk 39 to predict_week)
+            if pw is not None:
+                fig.add_trace(go.Bar(
+                    x=[known_frac], y=[y_label], orientation="h",
+                    base=[pred_yr - 0.45],
+                    marker_color="#2ca02c",
+                    width=0.6,
+                    showlegend=bool(i == 0),
+                    name=f"Test (bekend t/m wk {pw})",
+                    legendgroup="known",
+                    hovertemplate=f"Test {int(pred_yr)}: wk 39–{pw} (bekend)<extra></extra>",
+                ))
+
+                # Test year — predicted portion (predict_week+1 to 38)
+                fig.add_trace(go.Bar(
+                    x=[1 - known_frac], y=[y_label], orientation="h",
+                    base=[pred_yr - 0.45 + known_frac],
+                    marker_color="#ff7f0e",
+                    width=0.6,
+                    showlegend=bool(i == 0),
+                    name=f"Test (voorspeld wk {pw + 1}–38)",
+                    legendgroup="predicted",
+                    hovertemplate=f"Test {int(pred_yr)}: wk {pw + 1}–38 (voorspeld)<extra></extra>",
+                ))
+            else:
+                fig.add_trace(go.Bar(
+                    x=[1], y=[y_label], orientation="h",
+                    base=[pred_yr - 0.45],
+                    marker_color="#ff7f0e",
+                    width=0.6,
+                    showlegend=bool(i == 0),
+                    name="Test (voorspeld)",
+                    legendgroup="predicted",
+                    hovertemplate=f"Test {int(pred_yr)}<extra></extra>",
+                ))
+
+        all_years = sorted(set(all_data_years) | set(pred_years))
+        fig.update_layout(
+            title=f"Validatiestrategie: expanding window, predict_week = {pw}",
+            xaxis=dict(
+                tickmode="array",
+                tickvals=[int(y) for y in all_years],
+                ticktext=[str(int(y)) for y in all_years],
+                range=[min(all_years) - 0.6, max(all_years) + 0.6],
+                title="Collegejaar",
+            ),
+            yaxis=dict(autorange="reversed"),
+            barmode="stack",
+            height=max(250, len(pred_years) * 50 + 150),
+            legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center"),
+        )
+        return fig
+
     def _accuracy_table(self) -> go.Figure | None:
         """Table: opleiding × voorspeld × realisatie × delta × MAPE.
 
@@ -839,10 +940,6 @@ class DashboardBuilder:
                 ), axis=1,
             ),
             hoverinfo="text",
-        ))
-        fig.add_trace(go.Scatter(
-            x=[0, max_val], y=[0, max_val], mode="lines",
-            line=dict(dash="dash", color="grey"), showlegend=False,
         ))
         fig.update_layout(
             title=f"Voorspeld vs Realisatie ({_display(pred_col)})",
@@ -1509,6 +1606,10 @@ class DashboardBuilder:
         charts: list[tuple[str, go.Figure]] = []
 
         # ── Overzicht ───────────────────────────────────────────────
+        fig = self._yearly_trend()
+        if fig:
+            charts.append(("Verloop per opleiding — alle jaren", fig))
+
         fig = self._accuracy_table()
         if fig:
             charts.append(("Voorspelling vs realisatie", fig))
@@ -1526,10 +1627,6 @@ class DashboardBuilder:
             charts.append(("Modelvergelijking per opleiding", fig))
 
         # ── Detail ──────────────────────────────────────────────────
-        fig = self._yearly_trend()
-        if fig:
-            charts.append(("Verloop per opleiding — alle jaren", fig))
-
         for pc in ("SARIMA_cumulative", "Prognose_ratio"):
             fig = self._predicted_vs_actual_scatter(pc)
             if fig:
@@ -1541,6 +1638,11 @@ class DashboardBuilder:
             fig = self._error_bar_per_year(pc)
             if fig:
                 charts.append((f"Voorspelfout per opleiding ({_display(pc)})", fig))
+
+        # ── Methodologie ───────────────────────────────────────────
+        fig = self._validation_gantt()
+        if fig:
+            charts.append(("Validatiestrategie", fig))
 
         # KPI: try MAPE-based first, fall back to hist accuracy
         kpi = self._build_kpi_cards(mape_cols)
