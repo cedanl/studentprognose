@@ -25,6 +25,34 @@
         },
         "min_training_year": 2016
     },
+    "validation": {
+        "collegejaar_min_offset": 15,
+        "collegejaar_max_offset": 2,
+        "weeknummer_min": 1,
+        "weeknummer_max": 52,
+        "nan_warning_threshold": 0.05,
+        "nan_error_threshold": 0.30,
+        "telbestand": {
+            "required_columns": [
+                "Studiejaar", "Isatcode", "Groepeernaam", "Aantal", "meercode_V",
+                "Herinschrijving", "Hogerejaars", "Herkomst"
+            ],
+            "herkomst_allowed": ["N", "E", "R"],
+            "herinschrijving_allowed": ["J", "N"],
+            "hogerejaars_allowed": ["J", "N"]
+        },
+        "individueel": {
+            "required_columns": [
+                "Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr"
+            ]
+        },
+        "oktober": {
+            "required_columns": [
+                "Collegejaar", "Groepeernaam Croho", "Aantal eerstejaars croho",
+                "EER-NL-nietEER", "Examentype code", "Aantal Hoofdinschrijvingen"
+            ]
+        }
+    },
     "numerus_fixus": {
         "B Opleiding": 0
     },

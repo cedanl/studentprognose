@@ -18,6 +18,7 @@ class PipelineConfig:
     skip_years: int = 0
     ci_test_n: int | None = None
     noetl: bool = False
+    yes: bool = False
 
 
 def _expand_slices(tokens):
@@ -80,11 +81,13 @@ def parse_args(argv):
     parser.add_argument("-sk", "-SK", "-skipyears", type=int, default=0, dest="skipyears")
     parser.add_argument("--ci", nargs=2, metavar=("test", "N"), default=None)
     parser.add_argument("--noetl", action="store_true")
+    parser.add_argument("--yes", action="store_true", help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)")
 
     args = parser.parse_args(argv[1:])
 
     cfg = PipelineConfig()
     cfg.noetl = args.noetl
+    cfg.yes = args.yes
 
     # Configuration path
     if args.configuration and os.path.exists(args.configuration):
