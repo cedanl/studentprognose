@@ -10,7 +10,7 @@ Studentprognose is een open-source CEDA/Npuls tool voor het voorspellen van eers
 
 - **Python 3.12+** met **uv** voor dependency management
 - **pandas / numpy** voor dataverwerking
-- **pmdarima** voor SARIMA (auto_arima)
+- **statsmodels** voor SARIMA (SARIMAX met vaste parameters)
 - **xgboost** voor classificatie en regressie
 - **Rich** voor CLI-output
 - **MkDocs + Material** voor documentatie (gehost via GitHub Pages)
