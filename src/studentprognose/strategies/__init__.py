@@ -40,7 +40,8 @@ def create_strategy(cfg, datasets, configuration, cwd):
                 cfg.years,
             )
         except ValueError as e:
-            print(e)
+            print(f"\nWaarschuwing: kan niet draaien in 'beide' modus ({e})")
+            print("  Terugvallen op cumulatief spoor.\n")
             return CumulativeStrategy(
                 data_cumulative, data_student_numbers, configuration,
                 data_latest, ensemble_weights, cwd, cfg.data_option, cfg.ci_test_n,

@@ -1,5 +1,4 @@
 import pandas as pd
-import collections
 from enum import Enum
 
 
@@ -100,9 +99,8 @@ def convert_nan_to_zero(number):
 
 
 def get_all_weeks_valid(columns):
-    return list(
-        (collections.Counter(get_all_weeks_ordered()) & collections.Counter(columns)).elements()
-    )
+    col_set = set(columns)
+    return [w for w in get_all_weeks_ordered() if w in col_set]
 
 
 def get_all_weeks_ordered():
