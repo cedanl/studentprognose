@@ -290,8 +290,8 @@ class DashboardBuilder:
         below_cls = "good" if ratio >= 0.70 else ("warn" if ratio >= 0.40 else "bad")
 
         return f"""<div class="kpi-row">
-  <div class="kpi-card {avg_cls}"><div class="label">Gemiddelde MAPE</div><div class="value">{avg_mape:.1%}</div></div>
-  <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
+  <div class="kpi-card {avg_cls}"><div class="label">Gem. model-MAPE (out-of-sample)</div><div class="value">{avg_mape:.1%}</div></div>
+  <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% model-fout</div><div class="value">{below_10} van {total}</div></div>
   <div class="kpi-card good"><div class="label">Best presterend</div><div class="value">{names[best_idx]}<br><span style="font-size:16px">{mapes[best_idx]:.1%}</span></div></div>
   <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{names[worst_idx]}<br><span style="font-size:16px">{mapes[worst_idx]:.1%}</span></div></div>
 </div>"""
@@ -478,9 +478,16 @@ class DashboardBuilder:
         if hist.empty:
             return None
 
+        # Filter to predict_week only (XGBoost/ratio produce one prediction)
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
         all_mape_cols = [c for c in hist.columns if c.startswith("MAPE_")]
         if len(all_mape_cols) < 2:
             return None
+
+        years = sorted(hist["Collegejaar"].unique())
+        year_str = f"{int(years[0])}-{int(years[-1])}" if len(years) > 1 else str(int(years[0]))
 
         programmes = sorted(hist["Croho groepeernaam"].unique())
         data = {}
@@ -520,20 +527,105 @@ class DashboardBuilder:
                 else:
                     hover[i, j] = ""
 
+        flat = df.values[~np.isnan(df.values)].flatten()
+        zmax = max(float(np.percentile(flat, 90)), 0.15) if len(flat) > 0 else 0.5
+
         fig = go.Figure(go.Heatmap(
             z=df.values,
             x=df.columns.tolist(),
             y=df.index.tolist(),
-            colorscale=[[0, "green"], [0.15, "yellow"], [0.5, "red"], [1.0, "darkred"]],
-            zmin=0, zmax=0.5,
+            colorscale=[[0, "#2ca02c"], [0.4, "#f0ad4e"], [0.75, "#e74c3c"], [1.0, "#8b0000"]],
+            zmin=0, zmax=zmax,
             colorbar=dict(title="MAPE", tickformat=".0%"),
             text=hover, hoverinfo="text+x+y",
         ))
         fig.update_layout(
-            title="Modelvergelijking per opleiding (★ = best)",
+            title=f"Modelvergelijking per opleiding (★ = best, gem. {year_str})",
             xaxis_title="Model", yaxis_title="Opleiding",
             height=max(400, len(programmes) * 25 + 150),
             annotations=annotations,
+        )
+        return fig
+
+    def _accuracy_table(self) -> go.Figure | None:
+        """Table: opleiding × voorspeld × realisatie × delta × MAPE.
+
+        Dropdown to switch between available years. Defaults to most recent.
+        """
+        hist = self._hist_data()
+        if hist.empty:
+            return None
+
+        best_col = self._best_prediction_col()
+        if best_col is None or best_col not in hist.columns:
+            return None
+
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
+        agg = (
+            hist.groupby(["Collegejaar", "Croho groepeernaam"])
+            .agg(predicted=(best_col, "sum"), actual=("Aantal_studenten", "first"))
+            .reset_index()
+        )
+        agg = agg.dropna(subset=["predicted", "actual"])
+        agg = agg[agg["actual"] > 0]
+        if agg.empty:
+            return None
+
+        years = sorted(agg["Collegejaar"].unique())
+        fig = go.Figure()
+        buttons = []
+
+        for idx, yr in enumerate(years):
+            yr_data = agg[agg["Collegejaar"] == yr].copy()
+            yr_data["delta"] = yr_data["predicted"] - yr_data["actual"]
+            yr_data["mape"] = abs(yr_data["delta"]) / yr_data["actual"]
+            yr_data = yr_data.sort_values("mape")
+
+            colors = [
+                "#d4edda" if m <= 0.10 else "#fff3cd" if m <= 0.25 else "#f8d7da"
+                for m in yr_data["mape"]
+            ]
+
+            visible = idx == len(years) - 1
+
+            fig.add_trace(go.Table(
+                header=dict(
+                    values=["Opleiding", "Voorspelde inschrijvingen", "Werkelijke inschrijvingen", "Delta", "MAPE"],
+                    fill_color="#1f77b4", font=dict(color="white", size=13),
+                    align="left",
+                ),
+                cells=dict(
+                    values=[
+                        yr_data["Croho groepeernaam"].tolist(),
+                        [f"{v:.0f}" for v in yr_data["predicted"]],
+                        [f"{v:.0f}" for v in yr_data["actual"]],
+                        [f"{v:+.0f}" for v in yr_data["delta"]],
+                        [f"{v:.1%}" for v in yr_data["mape"]],
+                    ],
+                    fill_color=[colors, colors, colors, colors, colors],
+                    align="left", font=dict(size=12),
+                ),
+                visible=visible,
+            ))
+
+            vis = [False] * len(years)
+            vis[idx] = True
+            buttons.append(dict(
+                label=str(int(yr)), method="update",
+                args=[{"visible": vis}, {"title": f"Voorspelling vs realisatie ({_display(best_col)}, {int(yr)})"}],
+            ))
+
+        default_yr = years[-1]
+        n_progs = agg["Croho groepeernaam"].nunique()
+        fig.update_layout(
+            title=f"Voorspelling vs realisatie ({_display(best_col)}, {int(default_yr)})",
+            height=max(300, n_progs * 30 + 100),
+            updatemenus=[dict(
+                active=len(years) - 1, buttons=buttons,
+                x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
+            )],
         )
         return fig
 
@@ -709,6 +801,11 @@ class DashboardBuilder:
         hist = self._hist_data()
         if hist.empty or pred_col not in hist.columns:
             return None
+
+        # Use only predict_week rows (XGBoost/ratio produce one prediction per programme)
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
         agg = (
             hist.groupby(["Collegejaar", "Croho groepeernaam"])
             .agg(predicted=(pred_col, "sum"), actual=("Aantal_studenten", "first"))
@@ -737,7 +834,7 @@ class DashboardBuilder:
             text=agg.apply(
                 lambda r: (
                     f"{r['Croho groepeernaam']}<br>Jaar: {int(r['Collegejaar'])}"
-                    f"<br>Voorspeld: {r['predicted']:.0f}<br>Realisatie: {r['actual']:.0f}"
+                    f"<br>Voorspelde inschrijvingen: {r['predicted']:.0f}<br>Werkelijke inschrijvingen: {r['actual']:.0f}"
                     f"<br>Fout: {r['error_pct']:.1f}%"
                 ), axis=1,
             ),
@@ -749,7 +846,7 @@ class DashboardBuilder:
         ))
         fig.update_layout(
             title=f"Voorspeld vs Realisatie ({_display(pred_col)})",
-            xaxis_title="Voorspeld", yaxis_title="Werkelijk",
+            xaxis_title="Voorspelde inschrijvingen", yaxis_title="Werkelijke inschrijvingen",
             xaxis=dict(range=[0, max_val]),
             yaxis=dict(range=[0, max_val], scaleanchor="x"),
             height=550,
@@ -1412,6 +1509,10 @@ class DashboardBuilder:
         charts: list[tuple[str, go.Figure]] = []
 
         # ── Overzicht ───────────────────────────────────────────────
+        fig = self._accuracy_table()
+        if fig:
+            charts.append(("Voorspelling vs realisatie", fig))
+
         fig = self._model_accuracy_heatmap()
         if fig:
             charts.append(("Modelnauwkeurigheid per opleiding × jaar", fig))
@@ -1440,10 +1541,6 @@ class DashboardBuilder:
             fig = self._error_bar_per_year(pc)
             if fig:
                 charts.append((f"Voorspelfout per opleiding ({_display(pc)})", fig))
-
-        fig = self._residual_plot()
-        if fig:
-            charts.append(("Conversiegap-analyse", fig))
 
         # KPI: try MAPE-based first, fall back to hist accuracy
         kpi = self._build_kpi_cards(mape_cols)
