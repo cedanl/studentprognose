@@ -62,6 +62,36 @@ Een object met opleidingsnamen als sleutels en het maximale inschrijvingsaantal 
 
 Als de gesommeerde voorspelling over herkomstgroepen het maximum overschrijdt, wordt het overschot afgetrokken van de NL-herkomstgroep. Opleidingen die hier niet staan worden niet gecapped.
 
+## `ensemble_override_cumulative` — ensemble-uitzondering per opleiding
+
+Een lijst van opleidingsnamen (op `Croho groepeernaam`) waarvoor de ensemble-logica altijd het SARIMA-cumulatief model gebruikt, ongeacht weeknummer of examentype.
+
+```json
+{
+    "ensemble_override_cumulative": [
+        "B Geneeskunde",
+        "B Biomedische Wetenschappen",
+        "B Tandheelkunde"
+    ]
+}
+```
+
+Gebruik dit voor opleidingen met een numerus fixus of een sterk afwijkend aanmeldpatroon waarbij het cumulatieve SARIMA-model aantoonbaar beter presteert. Lege lijst (`[]`) schakelt de uitzondering uit. Standaard: de bovenstaande drie opleidingen (Radboud-referentiewaarden).
+
+## `exclude_from_combined` — uitsluiting van combined-modus
+
+Een lijst van opleidingsnamen (op `Croho groepeernaam`) die worden overgeslagen in de combined-modus (`-d both`). Opleidingen op deze lijst worden niet meegenomen in de combined-voorspelling.
+
+```json
+{
+    "exclude_from_combined": [
+        "M Educatie in de Mens- en Maatschappijwetenschappen"
+    ]
+}
+```
+
+Gebruik dit voor opleidingen waarvoor de combined-modus aantoonbaar slechter werkt dan het cumulatieve spoor alleen. Lege lijst schakelt de uitsluiting uit. Standaard: bovenstaande opleiding (Radboud-referentiewaarde).
+
 ## `columns` — kolomnamen mapping
 
 Maakt het mogelijk dat instellingen andere kolomnamen gebruiken dan de kanonieke namen die de pipeline intern hanteert. Specificeer alleen de namen die afwijken — ontbrekende sleutels vallen terug op de kanonieke naam.

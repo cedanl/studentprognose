@@ -28,6 +28,14 @@
     "numerus_fixus": {
         "B Opleiding": 0
     },
+    "ensemble_override_cumulative": [
+        "B Geneeskunde",
+        "B Biomedische Wetenschappen",
+        "B Tandheelkunde"
+    ],
+    "exclude_from_combined": [
+        "M Educatie in de Mens- en Maatschappijwetenschappen"
+    ],
     "columns": {
         "individual": {
             "Sleutel": "Sleutel",
