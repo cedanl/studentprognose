@@ -4,12 +4,17 @@ import statsmodels.api as sm
 
 from studentprognose.models.base import BaseForecaster
 from studentprognose.utils.weeks import get_all_weeks_valid
+from studentprognose.utils.constants import (
+    FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR, MIN_TRAINING_YEAR,
+    SARIMA_ORDER, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
+    SARIMA_BACHELOR_DEADLINE_WEEKS,
+)
 
 
 class SARIMAForecaster(BaseForecaster):
     """Unified SARIMA forecaster used by both individual and cumulative strategies."""
 
-    def __init__(self, order=(1, 0, 1), seasonal_order=(1, 1, 1, 52)):
+    def __init__(self, order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER):
         self.order = order
         self.seasonal_order = seasonal_order
         self._results = None
@@ -41,8 +46,6 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
     Returns:
         list: predictions for each future week, or empty list on error.
     """
-    from studentprognose.data.transforms import transform_data
-
     programme = row["Croho groepeernaam"]
     herkomst = row["Herkomst"]
     examentype = row["Examentype"]
@@ -69,7 +72,7 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
     ts_data = create_time_series(data, pred_len)
 
     try:
-        model = SARIMAForecaster(order=(1, 0, 1), seasonal_order=(1, 1, 1, 52))
+        model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
         model.fit(ts_data)
         pred = model.forecast(steps=pred_len)
         return pred
@@ -139,17 +142,17 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
         if data_exog is not None:
             data_exog = transform_data(data_exog, "Deadline")
 
-        if predict_week == 38:
+        if predict_week == FINAL_ACADEMIC_WEEK:
             ts_data = data.loc[:, get_all_weeks_valid(data.columns)].values.flatten()
             try:
                 return ts_data[-1]
             except IndexError:
                 return np.nan
 
-        if int(predict_week) > 38:
-            pred_len = 38 + 52 - int(predict_week)
+        if int(predict_week) > FINAL_ACADEMIC_WEEK:
+            pred_len = FINAL_ACADEMIC_WEEK + WEEKS_PER_YEAR - int(predict_week)
         else:
-            pred_len = 38 - int(predict_week)
+            pred_len = FINAL_ACADEMIC_WEEK - int(predict_week)
 
         def create_exogenous(data, pred_len):
             exg_data = data.loc[:, get_all_weeks_valid(data.columns)].values.flatten()
@@ -168,11 +171,10 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             return np.nan
 
         try:
-            weeknummers = [17, 18, 19, 20, 21]
-            if programme.startswith("B") and predict_week in weeknummers:
-                model = SARIMAForecaster(order=(1, 0, 1), seasonal_order=(1, 1, 1, 52))
+            if programme.startswith("B") and predict_week in SARIMA_BACHELOR_DEADLINE_WEEKS:
+                model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
             else:
-                model = SARIMAForecaster(order=(1, 1, 1), seasonal_order=(1, 1, 0, 52))
+                model = SARIMAForecaster(order=(1, 1, 1), seasonal_order=SARIMA_SEASONAL_ORDER_ALT)
 
             model.fit(ts_data, exog=exogenous_train_1)
 
@@ -197,6 +199,6 @@ def _get_transformed_data(data):
     from studentprognose.data.transforms import transform_data
 
     data = data.drop_duplicates()
-    data = data[data["Collegejaar"] >= 2016]
+    data = data[data["Collegejaar"] >= MIN_TRAINING_YEAR]
     data = transform_data(data, "ts")
     return data

@@ -36,6 +36,12 @@
     "exclude_from_combined": [
         "M Educatie in de Mens- en Maatschappijwetenschappen"
     ],
+    "ensemble_weights": {
+        "master_week_17_23": {"individual": 0.2, "cumulative": 0.8},
+        "week_30_34":        {"individual": 0.6, "cumulative": 0.4},
+        "week_35_37":        {"individual": 0.7, "cumulative": 0.3},
+        "default":           {"individual": 0.5, "cumulative": 0.5}
+    },
     "columns": {
         "individual": {
             "Sleutel": "Sleutel",
