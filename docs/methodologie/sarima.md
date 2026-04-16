@@ -31,7 +31,7 @@ In het individuele spoor kan een deadlineweek-variabele als exogene regresssor w
 ## Aannames
 
 1. **Herhaalbaar seizoenspatroon** — het model gaat ervan uit dat het patroon van dit jaar op het patroon van voorgaande jaren lijkt. Dit geldt niet bij structurele veranderingen (nieuwe opleiding, beleidsingreep, COVID).
-2. **Voldoende historische data** — trainingsdata start vanaf 2016. Bij opleidingen met minder dan ~3 jaar data zijn de seizoensschattingen onbetrouwbaar.
+2. **Voldoende historische data** — trainingsdata start vanaf het jaar ingesteld via `min_training_year` in `configuration.json` (standaard 2016). Bij opleidingen met minder dan ~3 jaar data zijn de seizoensschattingen onbetrouwbaar.
 3. **Stationariteit** — het model past één seizoensdifferentiatie toe (`D=1`). Als de trend structureel niet-stationair is, kan de differentiatie onvoldoende zijn.
 
 ## Wanneer vertrouw je het niet?

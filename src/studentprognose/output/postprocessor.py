@@ -7,6 +7,7 @@ from statistics import mean
 from studentprognose.utils.weeks import (
     DataOption, StudentYearPrediction, increment_week, convert_nan_to_zero,
 )
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, LOOKBACK_YEARS
 from studentprognose.models.ratio import predict_with_ratio as _predict_with_ratio
 from studentprognose.data.transforms import replace_latest_data
 
@@ -47,6 +48,12 @@ class PostProcessor:
         self.data_studentcount = data_studentcount
         self.numerus_fixus_list = configuration["numerus_fixus"]
         self.ensemble_override_cumulative = configuration.get("ensemble_override_cumulative", [])
+        self.ensemble_weights_config = configuration.get("ensemble_weights", {
+            "master_week_17_23": {"individual": 0.5, "cumulative": 0.5},
+            "week_30_34":        {"individual": 0.5, "cumulative": 0.5},
+            "week_35_37":        {"individual": 0.5, "cumulative": 0.5},
+            "default":           {"individual": 0.5, "cumulative": 0.5},
+        })
         self.CWD = cwd
         self.data_option = data_option
         self.ci_test_n = ci_test_n
@@ -115,12 +122,12 @@ class PostProcessor:
     ):
         last_years_data = data_latest[
             (data_latest["Collegejaar"] < year)
-            & (data_latest["Collegejaar"] >= year - 3)
+            & (data_latest["Collegejaar"] >= year - LOOKBACK_YEARS)
             & (data_latest["Weeknummer"] == week)
             & (data_latest["Croho groepeernaam"] == nf)
         ].fillna(0)
         distribution_per_herkomst = {"EER": [], "NL": [], "Niet-EER": []}
-        for last_year in range(year - 3, year):
+        for last_year in range(year - LOOKBACK_YEARS, year):
             total_students = last_years_data[last_years_data["Collegejaar"] == last_year][
                 "Aantal_studenten"
             ].sum()
@@ -334,19 +341,20 @@ class PostProcessor:
     def _get_normal_ensemble(self, row):
         sarima_cumulative = convert_nan_to_zero(row["SARIMA_cumulative"])
         sarima_individual = convert_nan_to_zero(row["SARIMA_individual"])
+        w = self.ensemble_weights_config
 
         if row["Croho groepeernaam"] in self.ensemble_override_cumulative:
             return sarima_cumulative
         elif row["Weeknummer"] in range(17, 24) and row["Examentype"] == "Master":
-            return sarima_individual * 0.2 + sarima_cumulative * 0.8
+            return sarima_individual * w["master_week_17_23"]["individual"] + sarima_cumulative * w["master_week_17_23"]["cumulative"]
         elif row["Weeknummer"] in range(30, 35):
-            return sarima_individual * 0.6 + sarima_cumulative * 0.4
-        elif row["Weeknummer"] in range(35, 38):
-            return sarima_individual * 0.7 + sarima_cumulative * 0.3
-        elif row["Weeknummer"] == 38:
+            return sarima_individual * w["week_30_34"]["individual"] + sarima_cumulative * w["week_30_34"]["cumulative"]
+        elif row["Weeknummer"] in range(35, FINAL_ACADEMIC_WEEK):
+            return sarima_individual * w["week_35_37"]["individual"] + sarima_cumulative * w["week_35_37"]["cumulative"]
+        elif row["Weeknummer"] == FINAL_ACADEMIC_WEEK:
             return sarima_individual
         else:
-            return sarima_individual * 0.5 + sarima_cumulative * 0.5
+            return sarima_individual * w["default"]["individual"] + sarima_cumulative * w["default"]["cumulative"]
 
     def _create_error_columns(self):
         if self.data_option == DataOption.BOTH_DATASETS:

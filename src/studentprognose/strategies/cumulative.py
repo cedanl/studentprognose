@@ -81,7 +81,7 @@ class CumulativeStrategy(PredictionStrategy):
             {"Weeknummer": "int32", "Collegejaar": "int32"}
         )
 
-        full_data = _get_transformed_data(self.data_cumulative.copy(deep=True))
+        full_data = _get_transformed_data(self.data_cumulative.copy(deep=True), self.min_training_year)
         full_data["39"] = 0
 
         self.skip_years = skip_years
@@ -152,7 +152,7 @@ class CumulativeStrategy(PredictionStrategy):
     def _predict_sarima(self, row, already_printed=False):
         return predict_with_sarima_cumulative(
             self.data_cumulative, row, self.predict_year, self.predict_week,
-            self.pred_len, self.skip_years, already_printed
+            self.pred_len, self.skip_years, already_printed, self.min_training_year
         )
 
     def _predict_students_with_preapplicants(self, data, predictions, data_to_predict):

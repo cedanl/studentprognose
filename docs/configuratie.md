@@ -96,6 +96,33 @@ Gebruik dit voor opleidingen waarvoor de combined-modus aantoonbaar slechter wer
 
 De waarde in de demo-configuratie is Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.**
 
+## `ensemble_weights` — weging SARIMA-individueel vs. SARIMA-cumulatief
+
+Bepaalt per weekperiode hoe zwaar het individuele en het cumulatieve SARIMA-model meewegen in de ensemble-voorspelling. Elke sleutel is een situatie; de waarde is een object met `individual` en `cumulative` (moeten optellen tot 1.0).
+
+```json
+{
+    "ensemble_weights": {
+        "master_week_17_23": {"individual": 0.2, "cumulative": 0.8},
+        "week_30_34":        {"individual": 0.6, "cumulative": 0.4},
+        "week_35_37":        {"individual": 0.7, "cumulative": 0.3},
+        "default":           {"individual": 0.5, "cumulative": 0.5}
+    }
+}
+```
+
+| Sleutel | Van toepassing wanneer |
+|---------|----------------------|
+| `master_week_17_23` | Examentype = Master én weeknummer 17–23 |
+| `week_30_34` | Weeknummer 30–34 |
+| `week_35_37` | Weeknummer 35–37 |
+| `default` | Alle overige gevallen |
+
+Week 38 is altijd 100% individueel en wordt niet door deze instelling beïnvloed. Zie [Ensemble](methodologie/ensemble.md) voor achtergrond bij de keuze van gewichten.
+
+!!! note "Weekgrenzen zijn niet configureerbaar"
+    De sleutelnamen (zoals `week_30_34`) beschrijven de weekperiode waarop een gewicht van toepassing is, maar de weekgrenzen zelf zijn in de code vastgelegd. Alleen de **gewichten** zijn instelbaar via dit blok. Wil je de weekgrenzen aanpassen, dan vereist dat een codewijziging in `output/postprocessor.py`.
+
 ## `columns` — kolomnamen mapping
 
 Maakt het mogelijk dat instellingen andere kolomnamen gebruiken dan de kanonieke namen die de pipeline intern hanteert. Specificeer alleen de namen die afwijken — ontbrekende sleutels vallen terug op de kanonieke naam.

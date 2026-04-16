@@ -95,7 +95,7 @@ class CombinedStrategy(PredictionStrategy):
 
         self.cumulative._prepare_data()
 
-        full_data = _get_transformed_data(self.cumulative.data_cumulative.copy(deep=True))
+        full_data = _get_transformed_data(self.cumulative.data_cumulative.copy(deep=True), self.min_training_year)
         full_data["39"] = 0
 
         self.skip_years = skip_years
@@ -163,6 +163,7 @@ class CombinedStrategy(PredictionStrategy):
             predicted_preregistration = predict_with_sarima_cumulative(
                 self.cumulative.data_cumulative, row, self.predict_year, self.predict_week,
                 self.cumulative.pred_len, self.cumulative.skip_years, already_printed=True,
+                min_training_year=self.min_training_year,
             )
 
         return sarima_individual, predicted_preregistration

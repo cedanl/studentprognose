@@ -1,5 +1,6 @@
 import pandas as pd
 from enum import Enum
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
 
 
 class DataOption(Enum):
@@ -42,22 +43,22 @@ HIGHER_YEARS_COLUMNS = [
 
 
 def get_max_week_from_weeks(weeks: pd.Series) -> int:
-    if len(weeks.unique()) == 52:
-        max_week = 38
+    if len(weeks.unique()) == WEEKS_PER_YEAR:
+        max_week = FINAL_ACADEMIC_WEEK
     else:
-        max_week = 38 + len(weeks.unique())
-        if max_week > 52:
-            max_week = max_week - 52
+        max_week = FINAL_ACADEMIC_WEEK + len(weeks.unique())
+        if max_week > WEEKS_PER_YEAR:
+            max_week = max_week - WEEKS_PER_YEAR
 
     return max_week
 
 
 def get_weeks_list(weeknummer: int) -> list:
     weeks = []
-    if int(weeknummer) > 38:
-        weeks = weeks + [i for i in range(39, int(weeknummer) + 1)]
-    elif int(weeknummer) < 39:
-        weeks = weeks + [i for i in range(39, 53)]
+    if int(weeknummer) > FINAL_ACADEMIC_WEEK:
+        weeks = weeks + [i for i in range(FINAL_ACADEMIC_WEEK + 1, int(weeknummer) + 1)]
+    elif int(weeknummer) < FINAL_ACADEMIC_WEEK + 1:
+        weeks = weeks + [i for i in range(FINAL_ACADEMIC_WEEK + 1, WEEKS_PER_YEAR + 1)]
         weeks = weeks + [i for i in range(1, int(weeknummer) + 1)]
 
     return weeks
@@ -70,7 +71,7 @@ def get_max_week(predict_year, max_year, data, key):
         if predict_year == 2021:
             # COVID-jaar: het aanmeldpatroon week 38 week was afwijkend waardoor
             # get_max_week_from_weeks() een onjuiste waarde teruggeeft. Zie #84.
-            max_week = 38
+            max_week = FINAL_ACADEMIC_WEEK
         else:
             max_week = get_max_week_from_weeks(data[data[key] == predict_year]["Weeknummer"])
 
@@ -78,7 +79,7 @@ def get_max_week(predict_year, max_year, data, key):
 
 
 def increment_week(week):
-    if week == 52:
+    if week == WEEKS_PER_YEAR:
         return 1
     else:
         return week + 1
@@ -86,7 +87,7 @@ def increment_week(week):
 
 def decrement_week(week):
     if week == 1:
-        return 52
+        return WEEKS_PER_YEAR
     else:
         return week - 1
 

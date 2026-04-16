@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from studentprognose.utils.constants import LOOKBACK_YEARS
 
 
 def predict_with_ratio(data: pd.DataFrame, data_cumulative: pd.DataFrame, data_studentcount: pd.DataFrame | None, numerus_fixus_list: dict, predict_year: int) -> pd.DataFrame:
@@ -18,7 +19,7 @@ def predict_with_ratio(data: pd.DataFrame, data_cumulative: pd.DataFrame, data_s
     Returns:
         pd.DataFrame: The data with Prognose_ratio column added.
     """
-    average_ratio_between = (predict_year - 3, predict_year - 1)
+    average_ratio_between = (predict_year - LOOKBACK_YEARS, predict_year - 1)
     if data_studentcount is not None:
         data_vooraanmeldingen = data_cumulative[
             [

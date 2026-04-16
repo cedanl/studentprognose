@@ -30,3 +30,31 @@ In de output staan zowel de individuele modelvoorspellingen (`SARIMA_individual`
 - De toegevoegde waarde van het ensemble te beoordelen t.o.v. het ratio-model als simpele baseline
 
 Zie [Output begrijpen](../output-begrijpen.md) voor uitleg over de outputkolommen.
+
+## Configureerbare ensemble-gewichten
+
+De gewichten die bepalen hoe zwaar SARIMA-individueel en SARIMA-cumulatief meewegen zijn instelbaar via `configuration.json`:
+
+```json
+{
+    "ensemble_weights": {
+        "master_week_17_23": {"individual": 0.2, "cumulative": 0.8},
+        "week_30_34":        {"individual": 0.6, "cumulative": 0.4},
+        "week_35_37":        {"individual": 0.7, "cumulative": 0.3},
+        "default":           {"individual": 0.5, "cumulative": 0.5}
+    }
+}
+```
+
+De gewichten gelden voor specifieke weekperiodes en examentypes:
+
+| Sleutel | Situatie |
+|---------|----------|
+| `master_week_17_23` | Master-opleidingen in weken 17–23 (vlak voor HBO-inschrijfdeadline) |
+| `week_30_34` | Weken 30–34 (zomerperiode, cumulatief minder betrouwbaar) |
+| `week_35_37` | Weken 35–37 (vlak voor einddeadline) |
+| `default` | Alle overige situaties |
+
+Week 38 (einddeadline) gebruikt altijd 100% het individuele SARIMA-model en is niet configureerbaar.
+
+Pas de gewichten aan op basis van validatieresultaten voor jouw instelling. Zie [Configuratie](../configuratie.md) voor de volledige optiedocumentatie.
