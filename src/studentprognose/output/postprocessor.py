@@ -46,6 +46,7 @@ class PostProcessor:
         self.ensemble_weights = ensemble_weights
         self.data_studentcount = data_studentcount
         self.numerus_fixus_list = configuration["numerus_fixus"]
+        self.ensemble_override_cumulative = configuration.get("ensemble_override_cumulative", [])
         self.CWD = cwd
         self.data_option = data_option
         self.ci_test_n = ci_test_n
@@ -334,11 +335,7 @@ class PostProcessor:
         sarima_cumulative = convert_nan_to_zero(row["SARIMA_cumulative"])
         sarima_individual = convert_nan_to_zero(row["SARIMA_individual"])
 
-        if row["Croho groepeernaam"] in [
-            "B Geneeskunde",
-            "B Biomedische Wetenschappen",
-            "B Tandheelkunde",
-        ]:
+        if row["Croho groepeernaam"] in self.ensemble_override_cumulative:
             return sarima_cumulative
         elif row["Weeknummer"] in range(17, 24) and row["Examentype"] == "Master":
             return sarima_individual * 0.2 + sarima_cumulative * 0.8
