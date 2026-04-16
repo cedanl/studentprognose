@@ -1692,6 +1692,19 @@ class DashboardBuilder:
                     "Kleuren onderscheiden collegejaren."))
 
         # ── Diagnostiek ─────────────────────────────────────────────
+        fig = self._error_progression(mape_cols, " (cumulatief)")
+        if fig:
+            charts.append(("MAPE per week (cumulatief)", fig,
+                "Gemiddelde voorspelfout per week over alle opleidingen. "
+                "Dalende lijn = model wordt nauwkeuriger naarmate het jaar vordert."))
+
+        fig = self._residual_plot()
+        if fig:
+            charts.append(("Conversiegap-analyse", fig,
+                "Verschil tussen gewogen vooraanmelders (week 38) en werkelijke inschrijvingen per opleiding. "
+                "Punten boven de nullijn = meer vooraanmelders dan inschrijvingen. "
+                "Kleur toont de afwijking; de trendlijn laat zien of grote opleidingen systematisch afwijken."))
+
         for pc in ("SARIMA_cumulative", "Prognose_ratio"):
             fig = self._error_bar_per_year(pc)
             if fig:
@@ -1754,9 +1767,10 @@ class DashboardBuilder:
 
             # Delta %
             if realisatie > 0:
-                delta = abs(prognose - realisatie) / realisatie
-                rows["delta"].append(f"{delta:.1%}")
-                delta_colors.append("#2ca02c" if delta <= 0.05 else ("#f0ad4e" if delta <= 0.15 else "#d62728"))
+                delta = (prognose - realisatie) / realisatie
+                rows["delta"].append(f"{delta:+.1%}")
+                abs_delta = abs(delta)
+                delta_colors.append("#2ca02c" if abs_delta <= 0.05 else ("#f0ad4e" if abs_delta <= 0.15 else "#d62728"))
             else:
                 rows["delta"].append("–")
                 delta_colors.append("#666666")
@@ -1813,11 +1827,36 @@ class DashboardBuilder:
             ]
             rows["bronmodellen"].append(", ".join(_display(c) for c in model_cols) if model_cols else "–")
 
+        # ── Totaalrij ───────────────────────────────────────────────
+        total_prog = sum(float(v) for v in rows["prognose"])
+        total_real = sum(float(v) for v in rows["realisatie"] if v != "–")
+        if total_real > 0:
+            total_delta = (total_prog - total_real) / total_real
+            total_delta_str = f"{total_delta:+.1%}"
+            abs_td = abs(total_delta)
+            total_delta_color = "#2ca02c" if abs_td <= 0.05 else ("#f0ad4e" if abs_td <= 0.15 else "#d62728")
+        else:
+            total_delta_str = "–"
+            total_delta_color = "#666666"
+
+        rows["opleiding"].append("Totaal")
+        rows["prognose"].append(f"{total_prog:.0f}")
+        rows["realisatie"].append(f"{total_real:.0f}" if total_real > 0 else "–")
+        rows["delta"].append(total_delta_str)
+        rows["confidence"].append("")
+        rows["bronmodellen"].append("")
+        delta_colors.append(total_delta_color)
+        conf_colors.append("#666666")
+
         def _tint(hex_color: str) -> str:
             r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
             return f"rgba({r},{g},{b},0.15)"
 
-        n = len(programmes)
+        n = len(rows["opleiding"])
+        # Bold styling for total row
+        row_bg = ["white"] * (n - 1) + ["#e8e8e8"]
+        bold = [11] * (n - 1) + [13]
+
         fig = go.Figure(go.Table(
             header=dict(
                 values=["Opleiding", f"Prognose {self.prediction_year}",
@@ -1830,12 +1869,12 @@ class DashboardBuilder:
                     rows["delta"], rows["confidence"], rows["bronmodellen"],
                 ],
                 fill_color=[
-                    ["white"] * n, ["white"] * n, ["white"] * n,
-                    [_tint(c) for c in delta_colors],
-                    [_tint(c) for c in conf_colors],
-                    ["white"] * n,
+                    row_bg, row_bg, row_bg,
+                    [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(delta_colors)],
+                    [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)],
+                    row_bg,
                 ],
-                font=dict(size=11), align="left",
+                font=dict(size=bold), align="left",
             ),
         ))
         fig.update_layout(
@@ -1980,7 +2019,7 @@ class DashboardBuilder:
         return fig
 
     def _numerus_fixus_bars(self) -> go.Figure | None:
-        """Horizontal bars with red dashed capacity line per numerus-fixus programme."""
+        """Horizontal grouped bars: current stand + prognosis, with capacity line."""
         if not self.numerus_fixus_list:
             return None
         best_col = self._best_prediction_col()
@@ -1988,32 +2027,57 @@ class DashboardBuilder:
             return None
 
         pred = self.data[self.data["Collegejaar"] == self.prediction_year]
-        progs, vals, caps = [], [], []
+        progs, prog_vals, curr_vals, caps = [], [], [], []
         for prog, cap in self.numerus_fixus_list.items():
             sub = pred[pred["Croho groepeernaam"] == prog]
             if sub.empty:
                 continue
             progs.append(prog)
-            vals.append(sub[best_col].sum())
+            prog_vals.append(sub[best_col].sum())
             caps.append(cap)
+
+            # Current stand: Gewogen vooraanmelders up to predict_week
+            current = 0
+            if self.data_cumulative is not None and self.predict_week is not None:
+                dc = self.data_cumulative
+                pw_key = _week_sort_key(self.predict_week)
+                mask = (
+                    (dc["Croho groepeernaam"] == prog)
+                    & (dc["Collegejaar"] == self.prediction_year)
+                    & (dc["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key))
+                )
+                sub_dc = dc.loc[mask]
+                if not sub_dc.empty:
+                    current = sub_dc.groupby("Weeknummer")["Gewogen vooraanmelders"].sum().max()
+            curr_vals.append(current)
 
         if not progs:
             return None
 
         fig = go.Figure()
         fig.add_trace(go.Bar(
-            y=progs, x=vals, orientation="h",
-            name="Prognose", marker_color="#1f77b4",
+            y=progs, x=curr_vals, orientation="h",
+            name=f"Huidige stand (week {self.predict_week})",
+            marker_color="#aec7e8",
+        ))
+        fig.add_trace(go.Bar(
+            y=progs, x=prog_vals, orientation="h",
+            name="Prognose (eindejaar)", marker_color="#1f77b4",
         ))
         for i, cap in enumerate(caps):
             fig.add_shape(
-                type="line", x0=cap, x1=cap, y0=i - 0.4, y1=i + 0.4,
+                type="line", x0=cap, x1=cap, y0=i - 0.45, y1=i + 0.45,
                 line=dict(color="red", dash="dash", width=2),
+            )
+            fig.add_annotation(
+                x=cap, y=i, text=f"Cap: {cap}", showarrow=False,
+                xanchor="left", xshift=5, font=dict(size=10, color="red"),
             )
         fig.update_layout(
             title="Numerus Fixus Voortgang",
-            xaxis_title="Verwacht aantal studenten",
-            height=max(300, len(progs) * 50 + 150),
+            xaxis_title="Aantal studenten",
+            barmode="group",
+            height=max(300, len(progs) * 70 + 150),
         )
         return fig
 
