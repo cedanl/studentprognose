@@ -81,7 +81,8 @@ class CumulativeStrategy(PredictionStrategy):
             {"Weeknummer": "int32", "Collegejaar": "int32"}
         )
 
-        full_data = _get_transformed_data(self.data_cumulative.copy(deep=True))
+        min_training_year = self.configuration.get("model_config", {}).get("min_training_year", 2016)
+        full_data = _get_transformed_data(self.data_cumulative.copy(deep=True), min_training_year)
         full_data["39"] = 0
 
         self.skip_years = skip_years

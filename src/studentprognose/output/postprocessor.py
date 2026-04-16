@@ -49,12 +49,11 @@ class PostProcessor:
         self.numerus_fixus_list = configuration["numerus_fixus"]
         self.ensemble_override_cumulative = configuration.get("ensemble_override_cumulative", [])
         self.ensemble_weights_config = configuration.get("ensemble_weights", {
-            "master_week_17_23": {"individual": 0.2, "cumulative": 0.8},
-            "week_30_34":        {"individual": 0.6, "cumulative": 0.4},
-            "week_35_37":        {"individual": 0.7, "cumulative": 0.3},
+            "master_week_17_23": {"individual": 0.5, "cumulative": 0.5},
+            "week_30_34":        {"individual": 0.5, "cumulative": 0.5},
+            "week_35_37":        {"individual": 0.5, "cumulative": 0.5},
             "default":           {"individual": 0.5, "cumulative": 0.5},
         })
-        self.lookback_years = LOOKBACK_YEARS
         self.CWD = cwd
         self.data_option = data_option
         self.ci_test_n = ci_test_n
@@ -123,12 +122,12 @@ class PostProcessor:
     ):
         last_years_data = data_latest[
             (data_latest["Collegejaar"] < year)
-            & (data_latest["Collegejaar"] >= year - self.lookback_years)
+            & (data_latest["Collegejaar"] >= year - LOOKBACK_YEARS)
             & (data_latest["Weeknummer"] == week)
             & (data_latest["Croho groepeernaam"] == nf)
         ].fillna(0)
         distribution_per_herkomst = {"EER": [], "NL": [], "Niet-EER": []}
-        for last_year in range(year - self.lookback_years, year):
+        for last_year in range(year - LOOKBACK_YEARS, year):
             total_students = last_years_data[last_years_data["Collegejaar"] == last_year][
                 "Aantal_studenten"
             ].sum()

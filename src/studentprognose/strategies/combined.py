@@ -95,7 +95,8 @@ class CombinedStrategy(PredictionStrategy):
 
         self.cumulative._prepare_data()
 
-        full_data = _get_transformed_data(self.cumulative.data_cumulative.copy(deep=True))
+        min_training_year = self.configuration.get("model_config", {}).get("min_training_year", 2016)
+        full_data = _get_transformed_data(self.cumulative.data_cumulative.copy(deep=True), min_training_year)
         full_data["39"] = 0
 
         self.skip_years = skip_years

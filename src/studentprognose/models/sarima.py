@@ -5,8 +5,8 @@ import statsmodels.api as sm
 from studentprognose.models.base import BaseForecaster
 from studentprognose.utils.weeks import get_all_weeks_valid
 from studentprognose.utils.constants import (
-    FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR, MIN_TRAINING_YEAR,
-    SARIMA_ORDER, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
+    FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR,
+    SARIMA_ORDER, SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
     SARIMA_BACHELOR_DEADLINE_WEEKS,
 )
 
@@ -174,7 +174,7 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             if programme.startswith("B") and predict_week in SARIMA_BACHELOR_DEADLINE_WEEKS:
                 model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
             else:
-                model = SARIMAForecaster(order=(1, 1, 1), seasonal_order=SARIMA_SEASONAL_ORDER_ALT)
+                model = SARIMAForecaster(order=SARIMA_ORDER_INDIVIDUAL, seasonal_order=SARIMA_SEASONAL_ORDER_ALT)
 
             model.fit(ts_data, exog=exogenous_train_1)
 
@@ -194,11 +194,17 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
         return np.nan
 
 
-def _get_transformed_data(data):
-    """Helper to transform cumulative data for SARIMA."""
+def _get_transformed_data(data, min_training_year: int = 2016):
+    """Helper to transform cumulative data for SARIMA.
+
+    Args:
+        data: Cumulative pre-application data.
+        min_training_year: Earliest academic year included in training. Should be
+            read from ``model_config.min_training_year`` in the caller's configuration.
+    """
     from studentprognose.data.transforms import transform_data
 
     data = data.drop_duplicates()
-    data = data[data["Collegejaar"] >= MIN_TRAINING_YEAR]
+    data = data[data["Collegejaar"] >= min_training_year]
     data = transform_data(data, "ts")
     return data
