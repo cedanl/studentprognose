@@ -170,7 +170,7 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
 
 
 def _save_results(strategy, cfg):
-    if "test" not in cfg.filtering_path:
+    if cfg.ci_test_n is None:
         if strategy.postprocessor.data is not None:
             print("Saving output...")
             strategy.postprocessor.save_output(cfg.student_year_prediction)

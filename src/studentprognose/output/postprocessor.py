@@ -25,7 +25,7 @@ class PostProcessor:
         ci_suffix = f"_ci_test_N{ci_test_n}" if ci_test_n is not None else ""
         try:
             open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
-            if "test" not in filtering_path:
+            if ci_test_n is None:
                 match student_year_prediction:
                     case StudentYearPrediction.FIRST_YEARS:
                         open(f"data/output/output_first-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
