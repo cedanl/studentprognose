@@ -215,7 +215,9 @@ class DashboardBuilder:
             html = fig.to_html(full_html=False, include_plotlyjs=(i == 0))
             desc_html = f'<p class="chart-desc">{desc}</p>' if desc else ""
             chart_blocks.append(
-                f'<div class="chart-section"><h2>{title}</h2>{desc_html}{html}</div>'
+                f'<details class="chart-section" open>'
+                f'<summary class="chart-toggle"><h2>{title}</h2></summary>'
+                f'{desc_html}{html}</details>'
             )
 
         nav = self._nav_html(active_label)
@@ -242,7 +244,11 @@ class DashboardBuilder:
   .kpi-card.warn{{border-left:4px solid #f0ad4e}}
   .kpi-card.bad{{border-left:4px solid #d62728}}
   .chart-section{{background:#fff;border-radius:8px;box-shadow:0 1px 4px rgba(0,0,0,.08);padding:20px;margin-bottom:24px}}
-  .chart-section h2{{font-size:16px;margin-bottom:4px;color:#333}}
+  .chart-toggle{{cursor:pointer;list-style:none}}
+  .chart-toggle::-webkit-details-marker{{display:none}}
+  .chart-toggle h2{{font-size:16px;margin-bottom:4px;color:#333;display:inline}}
+  .chart-toggle::before{{content:"▾ ";font-size:14px;color:#999}}
+  .chart-section:not([open]) .chart-toggle::before{{content:"▸ "}}
   .chart-desc{{font-size:13px;color:#666;margin-bottom:12px;line-height:1.4}}
 </style>
 </head>
