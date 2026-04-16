@@ -33,13 +33,17 @@ def run_etl(configuration):
         print("[2/4] Skipping interpolation (no cumulative file)")
 
     # Step 3: Calculate student counts from oktober-bestand
-    path_october = os.path.join(cwd, paths["path_raw_october"])
-    oktober_columns = configuration.get("columns", {}).get("oktober", {})
-    if os.path.exists(path_october):
-        print("[3/4] Calculating student counts...     → data/input/student_count_*.xlsx")
-        _calculate_student_counts(path_october, cwd, oktober_columns)
+    path_october_rel = paths.get("path_raw_october", "")
+    if not path_october_rel:
+        print("[3/4] Skipping student counts (path_raw_october not configured)")
     else:
-        print(f"[3/4] Skipping student counts (oktober-bestand not found: {paths['path_raw_october']})")
+        path_october = os.path.join(cwd, path_october_rel)
+        oktober_columns = configuration.get("columns", {}).get("oktober", {})
+        if os.path.exists(path_october):
+            print("[3/4] Calculating student counts...     → data/input/student_count_*.xlsx")
+            _calculate_student_counts(path_october, cwd, oktober_columns)
+        else:
+            print(f"[3/4] Skipping student counts (oktober-bestand not found: {path_october_rel})")
 
     # Step 4: Copy direct files (raw → canonical input paths)
     copied = _copy_direct_files(cwd, paths, output_individual)
