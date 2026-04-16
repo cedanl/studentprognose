@@ -19,7 +19,7 @@ class PostProcessor:
     """
 
     @staticmethod
-    def check_output_writable(data_option, student_year_prediction, ci_test_n, filtering_path):
+    def check_output_writable(data_option, student_year_prediction, ci_test_n):
         """Verify output files can be written (not locked by Excel)."""
         mode_suffix = data_option.filename_suffix
         ci_suffix = f"_ci_test_N{ci_test_n}" if ci_test_n is not None else ""

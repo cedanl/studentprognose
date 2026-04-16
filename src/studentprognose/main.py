@@ -38,7 +38,7 @@ def main(argv):
     strategy = create_strategy(cfg, datasets, configuration, cwd)
 
     PostProcessor.check_output_writable(
-        cfg.data_option, cfg.student_year_prediction, cfg.ci_test_n, cfg.filtering_path,
+        cfg.data_option, cfg.student_year_prediction, cfg.ci_test_n,
     )
 
     # Step 3: Preprocess (feature engineering)
