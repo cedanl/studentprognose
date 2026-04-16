@@ -4,6 +4,48 @@ from studentprognose.utils.weeks import DataOption
 from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
 
 
+def _merge_new_cumulative_data(data_cumulative, src_path, dst_path):
+    """Merge a new cumulative CSV into the canonical cumulative dataset.
+
+    Writes the merged result to dst_path and removes src_path. The caller is
+    responsible for checking that src_path exists before calling this function.
+
+    Note: crash-safety (atomic write / backup) is not implemented here.
+    See issue #78 for context.
+    """
+    print(f"Merging {src_path} into {dst_path} and removing source file...")
+
+    data_cumulative_new = pd.read_csv(src_path, sep=";", skiprows=[1])
+
+    years = data_cumulative_new["Collegejaar"].unique()
+    weeks = data_cumulative_new["Weeknummer"].unique()
+
+    data_cumulative = pd.concat([data_cumulative, data_cumulative_new], ignore_index=True)
+    data_cumulative = data_cumulative.drop_duplicates(
+        subset=[
+            "Collegejaar",
+            "Weeknummer",
+            "Groepeernaam Croho",
+            "Type hoger onderwijs",
+            "Herinschrijving",
+            "Hogerejaars",
+            "Herkomst",
+        ],
+        keep="last",
+    )
+
+    add_weeks_where_preapplicants_are_zero = AddWeeksWherePreapplicantsAreZero(
+        data_cumulative, years, weeks
+    )
+    add_weeks_where_preapplicants_are_zero.add_weeks()
+    data_cumulative = add_weeks_where_preapplicants_are_zero.data_cumulative
+
+    data_cumulative.to_csv(dst_path, sep=";", index=False)
+    os.remove(src_path)
+
+    return data_cumulative
+
+
 def get_path_latest(paths, data_option):
     if data_option == DataOption.INDIVIDUAL:
         return paths.get("path_latest_individual", "")
@@ -31,35 +73,9 @@ def load_data(configuration, data_option):
             else None
         )
         if os.path.exists(paths["path_cumulative_new"]):
-            data_cumulative_new = pd.read_csv(paths["path_cumulative_new"], sep=";", skiprows=[1])
-
-            years = data_cumulative_new["Collegejaar"].unique()
-            weeks = data_cumulative_new["Weeknummer"].unique()
-
-            data_cumulative = pd.concat([data_cumulative, data_cumulative_new], ignore_index=True)
-            data_cumulative = data_cumulative.drop_duplicates(
-                subset=[
-                    "Collegejaar",
-                    "Weeknummer",
-                    "Groepeernaam Croho",
-                    "Type hoger onderwijs",
-                    "Herinschrijving",
-                    "Hogerejaars",
-                    "Herkomst",
-                ],
-                keep="last",
+            data_cumulative = _merge_new_cumulative_data(
+                data_cumulative, paths["path_cumulative_new"], paths["path_cumulative"]
             )
-
-            add_weeks_where_preapplicants_are_zero = AddWeeksWherePreapplicantsAreZero(
-                data_cumulative, years, weeks
-            )
-
-            add_weeks_where_preapplicants_are_zero.add_weeks()
-
-            data_cumulative = add_weeks_where_preapplicants_are_zero.data_cumulative
-
-            data_cumulative.to_csv(paths["path_cumulative"], sep=";", index=False)
-            os.remove(paths["path_cumulative_new"])
 
     path_latest = get_path_latest(paths, data_option)
     data_latest = (

@@ -107,10 +107,17 @@ Alleen de afwijkende namen hoeven opgegeven te worden. Zie [Configuratie](config
 
 ## Bekende valkuil: `path_cumulative_new`
 
-!!! warning "load_data() overschrijft en verwijdert bestanden"
+!!! warning "path_cumulative_new overschrijft en verwijdert bestanden"
     Als `path_cumulative_new` in je configuratie een bestaand bestand aanwijst, **mergt de
     pipeline dit bestand in `vooraanmeldingen_cumulatief.csv` en verwijdert daarna het bronbestand**.
+    De pipeline toont daarvoor een melding:
+
+    ```
+    Merging data/input/nieuw_bestand.csv into data/input/vooraanmeldingen_cumulatief.csv and removing source file...
+    ```
+
     Bij een crash ná het schrijven maar vóór het verwijderen is de originele data onherstelbaar kwijt.
+    Maak vooraf een backup als je dit mechanisme gebruikt.
 
     Gebruik dit mechanisme alleen als je bewust een nieuw cumulatief bestand wilt inladen.
-    Zet `path_cumulative_new` op `""` als je dit niet nodig hebt. Zie issue [#78](https://github.com/cedanl/studentprognose/issues/78).
+    Zet `path_cumulative_new` op `""` als je dit niet nodig hebt.
