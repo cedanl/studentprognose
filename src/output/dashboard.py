@@ -652,27 +652,35 @@ class DashboardBuilder:
         return fig
 
     def _accuracy_table(self) -> go.Figure | None:
-        """Table: opleiding × voorspeld × realisatie × delta × MAPE.
+        """Table: opleiding × model predictions × realisatie × deltas × MAPEs.
 
+        Shows all available cumulative model columns side-by-side.
         Dropdown to switch between available years. Defaults to most recent.
+        Row colour is based on the lowest MAPE across models.
         """
         hist = self._hist_data()
         if hist.empty:
             return None
 
-        best_col = self._best_prediction_col()
-        if best_col is None or best_col not in hist.columns:
+        # Collect available model columns
+        model_cols = [
+            c for c in ("SARIMA_cumulative", "Prognose_ratio")
+            if c in hist.columns and hist[c].notna().any()
+        ]
+        if not model_cols:
             return None
 
         if self.predict_week is not None:
             hist = hist[hist["Weeknummer"] == self.predict_week]
 
+        # Aggregate per model
+        agg_dict = {c: (c, "sum") for c in model_cols}
+        agg_dict["actual"] = ("Aantal_studenten", "sum")
         agg = (
             hist.groupby(["Collegejaar", "Croho groepeernaam"])
-            .agg(predicted=(best_col, "sum"), actual=("Aantal_studenten", "sum"))
+            .agg(**agg_dict)
             .reset_index()
         )
-        agg = agg.dropna(subset=["predicted", "actual"])
         agg = agg[agg["actual"] > 0]
         if agg.empty:
             return None
@@ -683,32 +691,49 @@ class DashboardBuilder:
 
         for idx, yr in enumerate(years):
             yr_data = agg[agg["Collegejaar"] == yr].copy()
-            yr_data["delta"] = yr_data["predicted"] - yr_data["actual"]
-            yr_data["mape"] = abs(yr_data["delta"]) / yr_data["actual"]
-            yr_data = yr_data.sort_values("mape")
+
+            # Compute delta and MAPE per model
+            for col in model_cols:
+                yr_data[f"delta_{col}"] = yr_data[col] - yr_data["actual"]
+                yr_data[f"mape_{col}"] = (
+                    abs(yr_data[f"delta_{col}"]) / yr_data["actual"]
+                )
+
+            # Row colour based on best (lowest) MAPE across models
+            mape_cols = [f"mape_{c}" for c in model_cols]
+            yr_data["_best_mape"] = yr_data[mape_cols].min(axis=1)
+            yr_data = yr_data.sort_values("_best_mape")
 
             colors = [
                 "#d4edda" if m <= 0.10 else "#fff3cd" if m <= 0.25 else "#f8d7da"
-                for m in yr_data["mape"]
+                for m in yr_data["_best_mape"]
             ]
 
+            # Build header and cell values dynamically
+            header_vals = ["Opleiding"]
+            cell_vals = [yr_data["Croho groepeernaam"].tolist()]
+            for col in model_cols:
+                name = _display(col)
+                header_vals += [f"Voorspeld ({name})", f"MAPE {name}"]
+                cell_vals += [
+                    [f"{v:.0f}" if pd.notna(v) else "–" for v in yr_data[col]],
+                    [f"{v:.1%}" if pd.notna(v) else "–" for v in yr_data[f"mape_{col}"]],
+                ]
+            header_vals.append("Werkelijk")
+            cell_vals.append([f"{v:.0f}" for v in yr_data["actual"]])
+
+            n_cols = len(header_vals)
             visible = idx == len(years) - 1
 
             fig.add_trace(go.Table(
                 header=dict(
-                    values=["Opleiding", "Voorspelde inschrijvingen", "Werkelijke inschrijvingen", "Delta", "MAPE"],
+                    values=header_vals,
                     fill_color="#1f77b4", font=dict(color="white", size=13),
                     align="left",
                 ),
                 cells=dict(
-                    values=[
-                        yr_data["Croho groepeernaam"].tolist(),
-                        [f"{v:.0f}" for v in yr_data["predicted"]],
-                        [f"{v:.0f}" for v in yr_data["actual"]],
-                        [f"{v:+.0f}" for v in yr_data["delta"]],
-                        [f"{v:.1%}" for v in yr_data["mape"]],
-                    ],
-                    fill_color=[colors, colors, colors, colors, colors],
+                    values=cell_vals,
+                    fill_color=[colors] * n_cols,
                     align="left", font=dict(size=12),
                 ),
                 visible=visible,
@@ -718,14 +743,14 @@ class DashboardBuilder:
             vis[idx] = True
             buttons.append(dict(
                 label=str(int(yr)), method="update",
-                args=[{"visible": vis}, {"title": f"Voorspelling vs realisatie ({_display(best_col)}, {int(yr)})"}],
+                args=[{"visible": vis}, {"title": f"Voorspelling vs realisatie — {int(yr)}"}],
             ))
 
         default_yr = years[-1]
         n_progs = agg["Croho groepeernaam"].nunique()
         fig.update_layout(
-            title=f"Voorspelling vs realisatie ({_display(best_col)}, {int(default_yr)})",
-            height=max(300, n_progs * 30 + 100),
+            title=f"Voorspelling vs realisatie — {int(default_yr)}",
+            height=max(300, n_progs * 35 + 120),
             updatemenus=[dict(
                 active=len(years) - 1, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
@@ -1385,7 +1410,7 @@ class DashboardBuilder:
                         mode="lines", name=f"{self.prediction_year} (na voorspelweek)",
                         line=dict(color="#1f77b4", width=1.5, dash="dot"), visible=False,
                     ))
-                    prog_traces[prog].append((idx, True))
+                    prog_traces[prog].append((idx, "legendonly"))
             else:
                 idx = len(fig.data)
                 fig.add_trace(go.Scatter(
@@ -1503,7 +1528,7 @@ class DashboardBuilder:
                             showlegend=first_star,
                             legendgroup="actuele_inschrijvingen",
                         ))
-                        prog_traces[prog].append((idx, True))
+                        prog_traces[prog].append((idx, "legendonly"))
                         first_star = False
 
             # ── Predicted enrolment diamond (week 38) ────────────────────
@@ -1640,8 +1665,9 @@ class DashboardBuilder:
         fig = self._accuracy_table()
         if fig:
             charts.append(("Voorspelling vs realisatie", fig,
-                "Tabel met voorspelde en werkelijke inschrijvingen per opleiding. "
-                "Groen = fout onder 10%, geel = 10-25%, rood = boven 25%. Gebruik de dropdown om per jaar te vergelijken."))
+                "Voorspelling per model (XGBoost en Ratio) naast de werkelijke inschrijvingen. "
+                "Rijkleur is op basis van de beste MAPE: groen &lt; 10%, geel 10-25%, rood &gt; 25%. "
+                "Gebruik de dropdown om per jaar te vergelijken."))
 
         charts.extend(self._model_accuracy_heatmaps(mape_cols))
 
@@ -1991,6 +2017,115 @@ class DashboardBuilder:
         )
         return fig
 
+    def _final_kpi_cards(self) -> str:
+        """KPI cards for the final dashboard: totals, year-on-year change, NF overshoot."""
+        best_col = self._best_prediction_col()
+        if best_col is None:
+            return ""
+
+        pred = self.data[self.data["Collegejaar"] == self.prediction_year]
+        if pred.empty:
+            return ""
+
+        prev_year = self.prediction_year - 1
+        programmes = pred["Croho groepeernaam"].unique()
+
+        # Total prognosis
+        total_prognose = sum(
+            pred[pred["Croho groepeernaam"] == p][best_col].sum() for p in programmes
+        )
+
+        # Total previous year
+        total_prev = 0
+        if self.data_studentcount is not None:
+            sc = self.data_studentcount
+            for p in programmes:
+                total_prev += sc[
+                    (sc["Croho groepeernaam"] == p) & (sc["Collegejaar"] == prev_year)
+                ]["Aantal_studenten"].sum()
+
+        # Year-on-year change
+        if total_prev > 0:
+            yoy_pct = (total_prognose - total_prev) / total_prev
+            yoy_cls = "good" if yoy_pct >= 0 else ("warn" if yoy_pct >= -0.05 else "bad")
+            yoy_val = f"{yoy_pct:+.1%}"
+            yoy_sub = f"{total_prognose:.0f} vs {total_prev:.0f}"
+        else:
+            yoy_cls = "warn"
+            yoy_val = "–"
+            yoy_sub = ""
+
+        # NF overshoot count
+        nf_over = 0
+        nf_total = len(self.numerus_fixus_list)
+        for prog, cap in self.numerus_fixus_list.items():
+            sub = pred[pred["Croho groepeernaam"] == prog]
+            if not sub.empty and sub[best_col].sum() > cap:
+                nf_over += 1
+        nf_cls = "good" if nf_over == 0 else ("warn" if nf_over <= 1 else "bad")
+
+        cards = f"""<div class="kpi-row">
+  <div class="kpi-card good"><div class="label">Totaal verwachte eerstejaars {self.prediction_year}</div><div class="value">{total_prognose:.0f}</div></div>
+  <div class="kpi-card {yoy_cls}"><div class="label">Verandering t.o.v. {prev_year}</div><div class="value">{yoy_val}</div><div class="label">{yoy_sub}</div></div>"""
+
+        if nf_total > 0:
+            cards += f"""
+  <div class="kpi-card {nf_cls}"><div class="label">Numerus fixus boven capaciteit</div><div class="value">{nf_over} van {nf_total}</div></div>"""
+
+        cards += "\n</div>"
+        return cards
+
+    def _growth_bar_chart(self) -> go.Figure | None:
+        """Horizontal bar chart: growth/decline per programme vs previous year."""
+        best_col = self._best_prediction_col()
+        if best_col is None:
+            return None
+
+        pred = self.data[self.data["Collegejaar"] == self.prediction_year]
+        if pred.empty:
+            return None
+        if self.data_studentcount is None:
+            return None
+
+        prev_year = self.prediction_year - 1
+        sc = self.data_studentcount
+        programmes = sorted(pred["Croho groepeernaam"].unique())
+
+        rows = []
+        for prog in programmes:
+            prognose = pred[pred["Croho groepeernaam"] == prog][best_col].sum()
+            prev = sc[
+                (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == prev_year)
+            ]["Aantal_studenten"].sum()
+            if prev > 0:
+                pct = (prognose - prev) / prev
+                rows.append({"prog": prog, "pct": pct, "delta": prognose - prev})
+
+        if not rows:
+            return None
+
+        rows.sort(key=lambda r: r["pct"])
+        progs = [r["prog"] for r in rows]
+        pcts = [r["pct"] for r in rows]
+        deltas = [r["delta"] for r in rows]
+        colors = ["#2ca02c" if p >= 0 else "#d62728" for p in pcts]
+        labels = [f"{d:+.0f}" for d in deltas]
+
+        fig = go.Figure(go.Bar(
+            y=progs, x=pcts, orientation="h",
+            marker_color=colors,
+            text=labels, textposition="outside",
+            hovertemplate="%{y}<br>%{x:.1%} (%{text})<extra></extra>",
+        ))
+        fig.add_vline(x=0, line_color="#333", line_width=1)
+        fig.update_layout(
+            title=f"Verwachte groei/krimp t.o.v. {prev_year}",
+            xaxis=dict(title="Verandering", tickformat="+.0%"),
+            height=max(350, len(progs) * 30 + 150),
+            margin=dict(l=200),
+        )
+        return fig
+
     def _save_final(self) -> None:
         charts: list[tuple[str, go.Figure, str]] = []
 
@@ -2000,17 +2135,11 @@ class DashboardBuilder:
                 "Overzichtstabel met de prognose, realisatie vorig jaar, verschil en betrouwbaarheid per opleiding. "
                 "Lage betrouwbaarheid betekent dat de modellen onderling sterk afwijken."))
 
-        fig = self._prognose_vs_vorig_jaar()
+        fig = self._growth_bar_chart()
         if fig:
-            charts.append(("Prognose vs Vorig Jaar", fig,
-                "Vergelijking van het huidige verloop met vorig jaar per opleiding. "
-                "Ligt de huidige lijn hoger, dan groeit de instroom; lager wijst op daling."))
-
-        fig = self._weekly_yoy_heatmap()
-        if fig:
-            charts.append(("Jaar-op-jaar verandering", fig,
-                "Procentuele verandering in vooraanmelders per week t.o.v. vorig jaar. "
-                "Blauw = groei, rood = daling. Zo spot je trends en uitschieters per opleiding."))
+            charts.append(("Groei en krimp per opleiding", fig,
+                "Verwachte verandering per opleiding t.o.v. vorig jaar. "
+                "Groen = groei, rood = krimp. Het getal toont het absolute verschil in studenten."))
 
         fig = self._origin_stacked_bar()
         if fig:
@@ -2024,7 +2153,14 @@ class DashboardBuilder:
                 "Voorspeld aantal studenten voor numerus-fixusopleidingen afgezet tegen de capaciteitsgrens. "
                 "Balk voorbij de rode lijn = verwachte overschrijding, mogelijk wachtlijst."))
 
-        self._save_page("final", charts, "Eindoverzicht")
+        fig = self._prognose_vs_vorig_jaar()
+        if fig:
+            charts.append(("Prognose vs Vorig Jaar", fig,
+                "Vergelijking van het huidige verloop met vorig jaar per opleiding. "
+                "Ligt de huidige lijn hoger, dan groeit de instroom; lager wijst op daling."))
+
+        kpi = self._final_kpi_cards()
+        self._save_page("final", charts, "Eindoverzicht", kpi)
 
     # ════════════════════════════════════════════════════════════════
     # Entry point
