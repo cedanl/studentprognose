@@ -36,6 +36,7 @@ class CombinedStrategy(PredictionStrategy):
                 f"Selected years {years} not found in individual dataset. Proceeding with cumulative dataset."
             )
         self.years = years
+        self.exclude_from_combined = configuration.get("exclude_from_combined", [])
 
     def preprocess(self):
         print("Preprocessing individual data...")
@@ -99,11 +100,10 @@ class CombinedStrategy(PredictionStrategy):
 
         self.skip_years = skip_years
 
-        exclude_from_combined = self.configuration.get("exclude_from_combined", [])
         data_to_predict = self.cumulative.data_cumulative[
             (self.cumulative.data_cumulative["Collegejaar"] == self.predict_year)
             & (self.cumulative.data_cumulative["Weeknummer"] == self.predict_week)
-            & (~self.cumulative.data_cumulative["Croho groepeernaam"].isin(exclude_from_combined))
+            & (~self.cumulative.data_cumulative["Croho groepeernaam"].isin(self.exclude_from_combined))
         ]
         if self.programme_filtering != []:
             data_to_predict = data_to_predict[

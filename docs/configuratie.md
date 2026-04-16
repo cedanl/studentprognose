@@ -76,7 +76,9 @@ Een lijst van opleidingsnamen (op `Croho groepeernaam`) waarvoor de ensemble-log
 }
 ```
 
-Gebruik dit voor opleidingen met een numerus fixus of een sterk afwijkend aanmeldpatroon waarbij het cumulatieve SARIMA-model aantoonbaar beter presteert. Lege lijst (`[]`) schakelt de uitzondering uit. Standaard: de bovenstaande drie opleidingen (Radboud-referentiewaarden).
+Gebruik dit voor opleidingen met een numerus fixus of een sterk afwijkend aanmeldpatroon waarbij het cumulatieve SARIMA-model aantoonbaar beter presteert. Lege lijst (`[]`) schakelt de uitzondering uit voor alle opleidingen.
+
+De waarden in de demo-configuratie zijn Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.**
 
 ## `exclude_from_combined` — uitsluiting van combined-modus
 
@@ -90,7 +92,9 @@ Een lijst van opleidingsnamen (op `Croho groepeernaam`) die worden overgeslagen 
 }
 ```
 
-Gebruik dit voor opleidingen waarvoor de combined-modus aantoonbaar slechter werkt dan het cumulatieve spoor alleen. Lege lijst schakelt de uitsluiting uit. Standaard: bovenstaande opleiding (Radboud-referentiewaarde).
+Gebruik dit voor opleidingen waarvoor de combined-modus aantoonbaar slechter werkt dan het cumulatieve spoor alleen. Lege lijst schakelt de uitsluiting uit.
+
+De waarde in de demo-configuratie is Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.**
 
 ## `columns` — kolomnamen mapping
 
