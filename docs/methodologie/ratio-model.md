@@ -18,7 +18,7 @@ $$\bar{R}_{t} = \frac{1}{3} \sum_{j=1}^{3} \frac{\text{Aanmelding}_{jaar-j,\, we
 
 $$\hat{y} = \frac{\text{Aanmelding}_{huidig,\, week=t}}{\bar{R}_{t}}$$
 
-Het venster van 3 jaar is hardgecodeerd (`predict_year - 3` t/m `predict_year - 1`).
+Het venster van 3 jaar is vastgelegd in de constante `LOOKBACK_YEARS` (`src/studentprognose/utils/constants.py`) en geldt voor alle modellen die een historisch gemiddelde berekenen.
 
 ## Numerus fixus-correctie
 
