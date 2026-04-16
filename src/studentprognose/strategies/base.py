@@ -13,6 +13,7 @@ class PredictionStrategy(ABC):
                  data_studentcount, cwd, data_option, ci_test_n):
         self.configuration = configuration
         self.numerus_fixus_list = configuration["numerus_fixus"]
+        self.min_training_year = configuration.get("model_config", {}).get("min_training_year", 2016)
 
         self.postprocessor = PostProcessor(
             configuration, data_latest, ensemble_weights,

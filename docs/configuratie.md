@@ -120,6 +120,9 @@ Bepaalt per weekperiode hoe zwaar het individuele en het cumulatieve SARIMA-mode
 
 Week 38 is altijd 100% individueel en wordt niet door deze instelling beïnvloed. Zie [Ensemble](methodologie/ensemble.md) voor achtergrond bij de keuze van gewichten.
 
+!!! note "Weekgrenzen zijn niet configureerbaar"
+    De sleutelnamen (zoals `week_30_34`) beschrijven de weekperiode waarop een gewicht van toepassing is, maar de weekgrenzen zelf zijn in de code vastgelegd. Alleen de **gewichten** zijn instelbaar via dit blok. Wil je de weekgrenzen aanpassen, dan vereist dat een codewijziging in `output/postprocessor.py`.
+
 ## `columns` — kolomnamen mapping
 
 Maakt het mogelijk dat instellingen andere kolomnamen gebruiken dan de kanonieke namen die de pipeline intern hanteert. Specificeer alleen de namen die afwijken — ontbrekende sleutels vallen terug op de kanonieke naam.

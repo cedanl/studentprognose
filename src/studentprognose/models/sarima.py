@@ -39,7 +39,7 @@ def create_time_series(data, pred_len):
     return np.array(ts_data)
 
 
-def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_week, pred_len, skip_years=0, already_printed=False) -> list:
+def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_week, pred_len, skip_years=0, already_printed=False, min_training_year: int = 2016) -> list:
     """
     Predicts pre-registrations with SARIMA per programme/origin/week for cumulative data.
 
@@ -58,7 +58,7 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
     data_cumulative = data_cumulative.astype(
         {"Weeknummer": "int32", "Collegejaar": "int32"}
     )
-    data = _get_transformed_data(data_cumulative.copy(deep=True))
+    data = _get_transformed_data(data_cumulative.copy(deep=True), min_training_year)
 
     data = data[
         (data["Herkomst"] == herkomst)
