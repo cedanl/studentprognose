@@ -4,18 +4,18 @@ from studentprognose.utils.weeks import DataOption
 from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
 
 
-def _merge_new_cumulative_data(data_cumulative, paths):
-    """Merge path_cumulative_new into the canonical cumulative dataset.
+def _merge_new_cumulative_data(data_cumulative, src_path, dst_path):
+    """Merge a new cumulative CSV into the canonical cumulative dataset.
 
-    Overwrites path_cumulative with the merged result and removes the source
-    file. Called only when path_cumulative_new exists — never called silently
-    as a side effect of loading.
+    Writes the merged result to dst_path and removes src_path. The caller is
+    responsible for checking that src_path exists before calling this function.
+
+    Note: crash-safety (atomic write / backup) is not implemented here.
+    See issue #78 for context.
     """
-    src = paths["path_cumulative_new"]
-    dst = paths["path_cumulative"]
-    print(f"Merging {src} into {dst} and removing source file...")
+    print(f"Merging {src_path} into {dst_path} and removing source file...")
 
-    data_cumulative_new = pd.read_csv(src, sep=";", skiprows=[1])
+    data_cumulative_new = pd.read_csv(src_path, sep=";", skiprows=[1])
 
     years = data_cumulative_new["Collegejaar"].unique()
     weeks = data_cumulative_new["Weeknummer"].unique()
@@ -40,8 +40,8 @@ def _merge_new_cumulative_data(data_cumulative, paths):
     add_weeks_where_preapplicants_are_zero.add_weeks()
     data_cumulative = add_weeks_where_preapplicants_are_zero.data_cumulative
 
-    data_cumulative.to_csv(dst, sep=";", index=False)
-    os.remove(src)
+    data_cumulative.to_csv(dst_path, sep=";", index=False)
+    os.remove(src_path)
 
     return data_cumulative
 
@@ -73,7 +73,9 @@ def load_data(configuration, data_option):
             else None
         )
         if os.path.exists(paths["path_cumulative_new"]):
-            data_cumulative = _merge_new_cumulative_data(data_cumulative, paths)
+            data_cumulative = _merge_new_cumulative_data(
+                data_cumulative, paths["path_cumulative_new"], paths["path_cumulative"]
+            )
 
     path_latest = get_path_latest(paths, data_option)
     data_latest = (
