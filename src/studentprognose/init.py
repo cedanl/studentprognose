@@ -63,5 +63,22 @@ def run_init():
             f.write(_INPUT_RAW_README)
         print(f"  Aangemaakt: data/input_raw/README.md")
 
-    print("\nKlaar! Volgende stap: plaats je Studielink-data in data/input_raw/")
-    print("Draai daarna: studentprognose -w <week> -y <jaar>")
+    print("""
+Volgende stappen:
+
+  1. Plaats je telbestanden in:     data/input_raw/telbestanden/
+                                    (bestandsnamen: telbestandY<jaar>W<week>.csv)
+  2. Plaats je individuele data in: data/input_raw/individuele_aanmelddata.csv
+  3. Optioneel — oktober-bestand:  data/input_raw/oktober_bestand.xlsx
+                                    (voor berekening van studentaantallen)
+
+  Draaien:
+    studentprognose -w <week> -y <jaar>
+
+  Voor geautomatiseerde runs (cron, taakplanner):
+    studentprognose -w <week> -y <jaar> --yes
+
+  Afwijkende kolomnamen in je Studielink-export?
+  Voeg een "columns"-blok toe aan configuration/configuration.json.
+  Zie: https://cedanl.github.io/studentprognose/configuratie/
+""")
