@@ -44,6 +44,7 @@ def load_configuration(file_path: str) -> dict:
             user_config = json.load(f)
         cfg = _deep_merge(defaults, user_config)
     except FileNotFoundError:
+        print(f"Waarschuwing: configuratiebestand niet gevonden: {file_path!r} — package defaults worden gebruikt.")
         cfg = defaults
 
     if "excluded_data_points" in cfg:

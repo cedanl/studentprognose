@@ -90,14 +90,19 @@ def parse_args(argv):
     cfg.yes = args.yes
 
     # Configuration path
-    if args.configuration and os.path.exists(args.configuration):
-        cfg.configuration_path = args.configuration
+    if args.configuration:
+        if os.path.exists(args.configuration):
+            cfg.configuration_path = args.configuration
+        elif args.configuration != "configuration/configuration.json":
+            print(f"Waarschuwing: configuratiebestand niet gevonden: {args.configuration!r} — package defaults worden gebruikt.")
 
     # Filtering path (supports multiple files via -f path1 -f path2 or -f path1 path2)
     if args.filtering is not None:
         for path in args.filtering:
             if os.path.exists(path):
                 cfg.filtering_path = path
+            else:
+                print(f"Waarschuwing: filteringbestand niet gevonden: {path!r} — overgeslagen.")
 
     # Dataset
     if args.dataset is not None:

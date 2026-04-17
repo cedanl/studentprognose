@@ -159,6 +159,11 @@ def _preprocess(strategy, student_year_prediction):
         return strategy.preprocess()
 
     if student_year_prediction == StudentYearPrediction.HIGHER_YEARS:
+        if strategy.postprocessor.data_latest is None:
+            print("\nFout: geen 'totaal'-bestand gevonden voor hogerjaarsvoorspelling.")
+            print("  Dit bestand wordt aangemaakt na een eerste first-years run.")
+            print("  Draai eerst: studentprognose -d cumulative (of -d both)")
+            sys.exit(1)
         strategy.postprocessor.data = strategy.postprocessor.data_latest[HIGHER_YEARS_COLUMNS]
         return None
 
