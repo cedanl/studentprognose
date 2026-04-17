@@ -3,6 +3,7 @@ __pycache__/
 .venv/
 .vscode/
 site/
+dist/
 
 #Data files can be ignored
 data/*
