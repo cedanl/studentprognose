@@ -14,6 +14,7 @@ def run_etl(configuration):
     cwd = os.getcwd()
 
     # ETL always writes to canonical (non-DEMO) paths
+    os.makedirs(os.path.join(cwd, "data", "input"), exist_ok=True)
     output_cumulative = os.path.join(cwd, "data", "input", "vooraanmeldingen_cumulatief.csv")
     output_individual = os.path.join(cwd, "data", "input", "vooraanmeldingen_individueel.csv")
     # Step 1: Rowbind telbestanden → vooraanmeldingen_cumulatief.csv

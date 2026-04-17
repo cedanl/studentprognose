@@ -15,6 +15,11 @@ from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
 
 
 def main(argv):
+    if len(argv) > 1 and argv[1] == "init":
+        from studentprognose.init import run_init
+        run_init()
+        return
+
     cfg = parse_args(argv)
 
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
@@ -28,7 +33,8 @@ def main(argv):
         run_etl(configuration)
 
     # Step 1: Load data
-    filtering = load_configuration(cfg.filtering_path)
+    from studentprognose.config import load_filtering
+    filtering = load_filtering(cfg.filtering_path)
 
     print("Loading data...")
     datasets = load_data(configuration, cfg.data_option)

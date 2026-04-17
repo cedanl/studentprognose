@@ -1,15 +1,51 @@
 import json
 import sys
+from importlib.resources import files
 
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
 
-def load_configuration(file_path):
-    with open(file_path) as f:
-        cfg = json.load(f)
-    # load_configuration wordt ook aangeroepen voor filtering.json, dat deze
-    # sleutel nooit mag bevatten. Een .get() met lege lijst-default zou dat
-    # stil doorlaten; de expliciete presence-check maakt de contractbreuk zichtbaar.
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Deep-merge override into base. override wins on conflicts."""
+    result = base.copy()
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
+
+
+def load_defaults() -> dict:
+    """Load the bundled default configuration from package data."""
+    data = files("studentprognose.configuration").joinpath("configuration.json").read_text(encoding="utf-8")
+    return json.loads(data)
+
+
+def load_filtering(file_path: str) -> dict:
+    """Load a filtering config. Falls back to bundled base.json if file_path doesn't exist."""
+    try:
+        with open(file_path, encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        data = files("studentprognose.configuration.filtering").joinpath("base.json").read_text(encoding="utf-8")
+        return json.loads(data)
+
+
+def load_configuration(file_path: str) -> dict:
+    """Load configuration, deep-merged on top of package defaults.
+
+    If file_path does not exist, the bundled defaults are returned as-is.
+    """
+    defaults = load_defaults()
+
+    try:
+        with open(file_path, encoding="utf-8") as f:
+            user_config = json.load(f)
+        cfg = _deep_merge(defaults, user_config)
+    except FileNotFoundError:
+        cfg = defaults
+
     if "excluded_data_points" in cfg:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     return cfg

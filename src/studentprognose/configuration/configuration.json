@@ -1,0 +1,105 @@
+{
+    "paths": {
+        "path_cumulative": "data/input/vooraanmeldingen_cumulatief.csv",
+        "path_latest_individual": "data/input/totaal_individueel.xlsx",
+        "path_latest_cumulative": "data/input/totaal_cumulatief.xlsx",
+        "path_cumulative_new": "",
+        "path_ensemble_weights": "data/input/ensemble_weights.xlsx",
+        "path_raw_october": "data/input_raw/oktober_bestand.xlsx",
+        "path_student_count_first-years": "data/input/student_count_first-years.xlsx",
+        "path_student_count_higher-years": "data/input/student_count_higher-years.xlsx",
+        "path_student_volume": "data/input/student_volume.xlsx",
+        "path_ratios": "data/input/ratiobestand.xlsx",
+        "path_individual": "data/input/vooraanmeldingen_individueel.csv",
+        "path_raw_telbestanden": "data/input_raw/telbestanden",
+        "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
+    },
+    "model_config": {
+        "status_mapping": {
+            "Ingeschreven": 1,
+            "Geannuleerd": 0,
+            "Uitgeschreven": 1,
+            "Verzoek tot inschrijving": 0,
+            "Studie gestaakt": 0,
+            "Aanmelding vervolgen": 0
+        },
+        "min_training_year": 2016
+    },
+    "numerus_fixus": {
+        "B Opleiding": 0
+    },
+    "ensemble_override_cumulative": [
+        "B Geneeskunde",
+        "B Biomedische Wetenschappen",
+        "B Tandheelkunde"
+    ],
+    "exclude_from_combined": [
+        "M Educatie in de Mens- en Maatschappijwetenschappen"
+    ],
+    "ensemble_weights": {
+        "master_week_17_23": {"individual": 0.2, "cumulative": 0.8},
+        "week_30_34":        {"individual": 0.6, "cumulative": 0.4},
+        "week_35_37":        {"individual": 0.7, "cumulative": 0.3},
+        "default":           {"individual": 0.5, "cumulative": 0.5}
+    },
+    "columns": {
+        "individual": {
+            "Sleutel": "Sleutel",
+            "Datum Verzoek Inschr": "Datum Verzoek Inschr",
+            "Ingangsdatum": "Ingangsdatum",
+            "Collegejaar": "Collegejaar",
+            "Datum intrekking vooraanmelding": "Datum intrekking vooraanmelding",
+            "Inschrijfstatus": "Inschrijfstatus",
+            "Faculteit": "Faculteit",
+            "Examentype": "Examentype",
+            "Croho": "Croho",
+            "Croho groepeernaam": "Croho groepeernaam",
+            "Opleiding": "Opleiding",
+            "Hoofdopleiding": "Hoofdopleiding",
+            "Eerstejaars croho jaar": "Eerstejaars croho jaar",
+            "Is eerstejaars croho opleiding": "Is eerstejaars croho opleiding",
+            "Is hogerejaars": "Is hogerejaars",
+            "BBC ontvangen": "BBC ontvangen",
+            "Type vooropleiding": "Type vooropleiding",
+            "Nationaliteit": "Nationaliteit",
+            "EER": "EER",
+            "Geslacht": "Geslacht",
+            "Geverifieerd adres postcode": "Geverifieerd adres postcode",
+            "Geverifieerd adres plaats": "Geverifieerd adres plaats",
+            "Geverifieerd adres land": "Geverifieerd adres land",
+            "Studieadres postcode": "Studieadres postcode",
+            "Studieadres land": "Studieadres land",
+            "School code eerste vooropleiding": "School code eerste vooropleiding",
+            "School eerste vooropleiding": "School eerste vooropleiding",
+            "Plaats code eerste vooropleiding": "Plaats code eerste vooropleiding",
+            "Land code eerste vooropleiding": "Land code eerste vooropleiding",
+            "Aantal studenten": "Aantal studenten"
+        },
+        "oktober": {
+            "Collegejaar": "Collegejaar",
+            "Groepeernaam Croho": "Groepeernaam Croho",
+            "Aantal eerstejaars croho": "Aantal eerstejaars croho",
+            "EER-NL-nietEER": "EER-NL-nietEER",
+            "Examentype code": "Examentype code",
+            "Aantal Hoofdinschrijvingen": "Aantal Hoofdinschrijvingen"
+        },
+        "cumulative": {
+            "Korte naam instelling": "Korte naam instelling",
+            "Collegejaar": "Collegejaar",
+            "Weeknummer rapportage": "Weeknummer rapportage",
+            "Weeknummer": "Weeknummer",
+            "Faculteit": "Faculteit",
+            "Type hoger onderwijs": "Type hoger onderwijs",
+            "Groepeernaam Croho": "Groepeernaam Croho",
+            "Naam Croho opleiding Nederlands": "Naam Croho opleiding Nederlands",
+            "Croho": "Croho",
+            "Herinschrijving": "Herinschrijving",
+            "Hogerejaars": "Hogerejaars",
+            "Herkomst": "Herkomst",
+            "Gewogen vooraanmelders": "Gewogen vooraanmelders",
+            "Ongewogen vooraanmelders": "Ongewogen vooraanmelders",
+            "Aantal aanmelders met 1 aanmelding": "Aantal aanmelders met 1 aanmelding",
+            "Inschrijvingen": "Inschrijvingen"
+        }
+    }
+}

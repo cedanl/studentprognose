@@ -1,0 +1,13 @@
+{
+    "filtering": {
+        "programme": [
+            "B Bedrijfskunde",
+            "B Artificial Intelligence",
+            "M Psychologie"
+        ],
+        "herkomst": [
+            "NL",
+            "EER"
+        ]
+    }
+}
