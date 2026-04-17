@@ -9,3 +9,6 @@ on:
 jobs:
   unit:
     uses: ./.github/workflows/unit.yml
+
+  smoke:
+    uses: ./.github/workflows/package-smoke-test.yml
