@@ -1670,6 +1670,11 @@ class DashboardBuilder:
             if not sarima.empty:
                 sar_prog = sarima[sarima["Croho groepeernaam"] == prog].copy()
                 if not sar_prog.empty:
+                    # Deduplicate: replace_latest_data broadcasts forecast values
+                    # onto individual student rows — keep one per (week, herkomst, examentype)
+                    sar_prog = sar_prog.drop_duplicates(
+                        subset=["Weeknummer", "Herkomst", "Examentype"]
+                    )
                     sar_agg = (
                         sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
                         .sum().reset_index()
