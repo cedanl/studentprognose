@@ -94,6 +94,11 @@ class DashboardBuilder:
 
         self.prediction_year = int(self.data["Collegejaar"].max())
 
+        # Deduplicate: replace_latest_data() broadcasts prediction values onto
+        # individual student rows. The dashboard only needs one row per group.
+        group_cols = ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype", "Weeknummer"]
+        self.data = self.data.drop_duplicates(subset=group_cols)
+
         ci_suffix = f"_ci_test_N{ci_test_n}" if ci_test_n is not None else ""
         self.base_dir = os.path.join(cwd, "data", "output", f"visualisations{ci_suffix}")
 
@@ -1670,11 +1675,6 @@ class DashboardBuilder:
             if not sarima.empty:
                 sar_prog = sarima[sarima["Croho groepeernaam"] == prog].copy()
                 if not sar_prog.empty:
-                    # Deduplicate: replace_latest_data broadcasts forecast values
-                    # onto individual student rows — keep one per (week, herkomst, examentype)
-                    sar_prog = sar_prog.drop_duplicates(
-                        subset=["Weeknummer", "Herkomst", "Examentype"]
-                    )
                     sar_agg = (
                         sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
                         .sum().reset_index()
