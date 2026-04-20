@@ -75,6 +75,7 @@ class DashboardBuilder:
         predict_week: int | None,
         data_cumulative: pd.DataFrame | None,
         data_studentcount: pd.DataFrame | None,
+        data_xgboost_curve: pd.DataFrame | None = None,
     ):
         self.data = data.copy()
         self.data["Weeknummer"] = self.data["Weeknummer"].astype(int)
@@ -89,6 +90,7 @@ class DashboardBuilder:
             data_cumulative["Weeknummer"] = data_cumulative["Weeknummer"].astype(int)
         self.data_cumulative = data_cumulative
         self.data_studentcount = data_studentcount
+        self.data_xgboost_curve = data_xgboost_curve
 
         self.prediction_year = int(self.data["Collegejaar"].max())
 
@@ -334,6 +336,53 @@ class DashboardBuilder:
         return f"""<div class="kpi-row">
   <div class="kpi-card {avg_cls}"><div class="label">Gem. conversieafwijking</div><div class="value">{avg_mape:.1%}</div></div>
   <div class="kpi-card {sanity_cls}"><div class="label">Vooraanmelders vs inschrijvingen ({int(latest['Collegejaar'].iloc[0])})</div><div class="value">{total_pred:.0f} / {total_act:.0f}</div></div>
+  <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
+  <div class="kpi-card good"><div class="label">Best presterend</div><div class="value">{best}<br><span style="font-size:16px">{prog_mapes[best]:.1%}</span></div></div>
+  <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
+</div>"""
+
+    def _build_individual_kpi_cards(self) -> str:
+        """Six KPI cards tailored to the individual (SARIMA) model."""
+        hist = self._hist_data()
+        if hist.empty:
+            return ""
+        mape_col = "MAPE_SARIMA_individual"
+        mae_col = "MAE_SARIMA_individual"
+        if mape_col not in hist.columns:
+            return ""
+
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
+        prog_mapes = hist.groupby("Croho groepeernaam")[mape_col].mean().dropna()
+        if prog_mapes.empty:
+            return ""
+
+        avg_mape = float(prog_mapes.mean())
+        median_mape = float(prog_mapes.median())
+        below_10 = int((prog_mapes <= 0.10).sum())
+        total = len(prog_mapes)
+        best = prog_mapes.idxmin()
+        worst = prog_mapes.idxmax()
+
+        avg_mae = ""
+        mae_cls = "good"
+        if mae_col in hist.columns:
+            prog_maes = hist.groupby("Croho groepeernaam")[mae_col].mean().dropna()
+            if not prog_maes.empty:
+                m = float(prog_maes.mean())
+                avg_mae = f"{m:.1f}"
+                mae_cls = "good" if m <= 5 else ("warn" if m <= 15 else "bad")
+
+        avg_cls = "good" if avg_mape <= 0.10 else ("warn" if avg_mape <= 0.25 else "bad")
+        med_cls = "good" if median_mape <= 0.10 else ("warn" if median_mape <= 0.25 else "bad")
+        ratio = below_10 / total if total else 0
+        below_cls = "good" if ratio >= 0.70 else ("warn" if ratio >= 0.40 else "bad")
+
+        return f"""<div class="kpi-row">
+  <div class="kpi-card {avg_cls}"><div class="label">Gem. MAPE (out-of-sample)</div><div class="value">{avg_mape:.1%}</div></div>
+  <div class="kpi-card {med_cls}"><div class="label">Mediaan MAPE</div><div class="value">{median_mape:.1%}</div></div>
+  <div class="kpi-card {mae_cls}"><div class="label">Gem. MAE (studenten)</div><div class="value">{avg_mae if avg_mae else "–"}</div></div>
   <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
   <div class="kpi-card good"><div class="label">Best presterend</div><div class="value">{best}<br><span style="font-size:16px">{prog_mapes[best]:.1%}</span></div></div>
   <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
@@ -925,6 +974,271 @@ class DashboardBuilder:
         self._add_predict_week_line(fig)
         return fig
 
+    def _model_performance_summary(
+        self, mape_cols: list[str], mae_cols: list[str] | None = None,
+    ) -> go.Figure | None:
+        """Summary table with overall metrics, per-herkomst, per-size, and bias."""
+        hist = self._hist_data()
+        valid_mape = [c for c in mape_cols if c in hist.columns] if not hist.empty else []
+        if hist.empty or not valid_mape:
+            ha = self._hist_accuracy()
+            if ha is not None and not ha.empty:
+                return self._model_performance_summary_from_hist(ha)
+            return self._model_performance_summary_from_studentcount()
+
+        if mae_cols is None:
+            mae_cols = [c.replace("MAPE_", "MAE_") for c in valid_mape]
+        valid_mae = [c for c in mae_cols if c in hist.columns]
+
+        models = [c.replace("MAPE_", "") for c in valid_mape]
+
+        rows_section: list[list[str]] = []
+        row_fills: list[str] = []
+
+        def _add_header(label: str) -> None:
+            rows_section.append([f"<b>{label}</b>"] + [""] * len(models))
+            row_fills.append("#e8edf2")
+
+        def _add_row(label: str, values: list[str], fill: str = "white") -> None:
+            rows_section.append([label] + values)
+            row_fills.append(fill)
+
+        # ── Overall ──────────────────────────────────────────────
+        _add_header("Overzicht")
+        for stat_label, agg_fn in [("Gem. MAPE", "mean"), ("Mediaan MAPE", "median")]:
+            vals = []
+            for mc in valid_mape:
+                s = hist[mc].dropna()
+                v = float(getattr(s, agg_fn)()) if not s.empty else np.nan
+                vals.append(f"{v:.1%}" if pd.notna(v) else "–")
+            _add_row(stat_label, vals)
+
+        if valid_mae:
+            vals = []
+            for mc in valid_mae:
+                s = hist[mc].dropna()
+                v = float(s.mean()) if not s.empty else np.nan
+                vals.append(f"{v:.1f}" if pd.notna(v) else "–")
+            _add_row("Gem. MAE (studenten)", vals)
+
+        # Fraction below 10%
+        vals = []
+        for mc in valid_mape:
+            s = hist[mc].dropna()
+            if not s.empty:
+                prog_mape = hist.groupby("Croho groepeernaam")[mc].mean().dropna()
+                below = int((prog_mape <= 0.10).sum())
+                vals.append(f"{below} / {len(prog_mape)}")
+            else:
+                vals.append("–")
+        _add_row("Opleidingen < 10% fout", vals)
+
+        # ── Per herkomst ─────────────────────────────────────────
+        if "Herkomst" in hist.columns:
+            _add_header("Per herkomst")
+            for herkomst in ["NL", "EER", "Niet-EER"]:
+                sub = hist[hist["Herkomst"] == herkomst]
+                if sub.empty:
+                    continue
+                vals = []
+                for mc in valid_mape:
+                    s = sub[mc].dropna()
+                    v = float(s.mean()) if not s.empty else np.nan
+                    vals.append(f"{v:.1%}" if pd.notna(v) else "–")
+                _add_row(herkomst, vals)
+
+        # ── Per programmagrootte ─────────────────────────────────
+        if "Aantal_studenten" in hist.columns:
+            _add_header("Per programmagrootte")
+            for label, lo, hi in [("Klein (< 20)", 0, 20), ("Groot (≥ 20)", 20, 1e9)]:
+                sub = hist[
+                    (hist["Aantal_studenten"] >= lo) & (hist["Aantal_studenten"] < hi)
+                ]
+                if sub.empty:
+                    continue
+                vals = []
+                for mc in valid_mape:
+                    s = sub[mc].dropna()
+                    v = float(s.mean()) if not s.empty else np.nan
+                    vals.append(f"{v:.1%}" if pd.notna(v) else "–")
+                _add_row(label, vals)
+
+        # ── Bias ─────────────────────────────────────────────────
+        if "Aantal_studenten" in hist.columns:
+            _add_header("Bias (voorspelling − werkelijk)")
+            for model, mc in zip(models, valid_mape):
+                pred_col = model
+                if pred_col not in hist.columns:
+                    continue
+                sub = hist[hist[pred_col].notna() & hist["Aantal_studenten"].notna()].copy()
+                if sub.empty:
+                    continue
+                residual = sub[pred_col] - sub["Aantal_studenten"]
+                mean_bias = float(residual.mean())
+                over_pct = float((residual > 0).mean())
+                vals_row = [f"{mean_bias:+.1f} studenten ({over_pct:.0%} overschatting)"]
+                vals_row += [""] * (len(models) - 1)
+                _add_row(_display(model), vals_row)
+
+        # ── Naïef baseline ───────────────────────────────────────
+        if self.data_studentcount is not None and "Aantal_studenten" in hist.columns:
+            _add_header("Vergelijking met naïef model (vorig jaar = voorspelling)")
+            prog_years = hist.groupby(["Croho groepeernaam", "Collegejaar"]).first().reset_index()
+            sc = self.data_studentcount
+            baseline_errors: dict[str, list[float]] = {m: [] for m in models}
+            naive_errors: list[float] = []
+            for _, row in prog_years.iterrows():
+                prog, yr = row["Croho groepeernaam"], row["Collegejaar"]
+                actual = sc[
+                    (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == yr)
+                ]["Aantal_studenten"].sum()
+                prev_actual = sc[
+                    (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == yr - 1)
+                ]["Aantal_studenten"].sum()
+                if actual > 0 and prev_actual > 0:
+                    naive_errors.append(abs(actual - prev_actual) / actual)
+                if actual > 0:
+                    for model, mc in zip(models, valid_mape):
+                        v = row.get(mc)
+                        if pd.notna(v):
+                            baseline_errors[model].append(float(v))
+
+            if naive_errors:
+                naive_mape = float(np.mean(naive_errors))
+                vals = []
+                for model in models:
+                    if baseline_errors[model]:
+                        model_mape = float(np.mean(baseline_errors[model]))
+                        diff = model_mape - naive_mape
+                        vals.append(f"{model_mape:.1%} vs {naive_mape:.1%} ({diff:+.1%})")
+                    else:
+                        vals.append("–")
+                _add_row("Model vs naïef (MAPE)", vals)
+
+        # ── Build Plotly table ───────────────────────────────────
+        header_labels = [""] + [_display(m) for m in models]
+        cells_by_col = list(zip(*rows_section)) if rows_section else [[] for _ in header_labels]
+
+        fig = go.Figure(go.Table(
+            header=dict(
+                values=[f"<b>{h}</b>" for h in header_labels],
+                fill_color="#2c3e50", font=dict(color="white", size=13),
+                align="left", height=32,
+            ),
+            cells=dict(
+                values=list(cells_by_col),
+                fill_color=[row_fills] * len(header_labels),
+                align="left", font=dict(size=12), height=28,
+            ),
+        ))
+        fig.update_layout(height=max(350, 50 + 28 * len(rows_section)), margin=dict(l=10, r=10, t=30, b=10))
+        return fig
+
+    def _model_performance_summary_from_hist(self, ha: pd.DataFrame) -> go.Figure:
+        """Fallback summary when no MAPE columns exist — uses historical conversion accuracy."""
+        prog_mapes = ha.groupby("Croho groepeernaam")["mape"].mean()
+        overall_mape = float(prog_mapes.mean())
+        median_mape = float(prog_mapes.median())
+        below_10 = int((prog_mapes <= 0.10).sum())
+        total = len(prog_mapes)
+
+        rows = [
+            ["<b>Overzicht (conversie-ratio)</b>", ""],
+            ["Gem. afwijking", f"{overall_mape:.1%}"],
+            ["Mediaan afwijking", f"{median_mape:.1%}"],
+            ["Opleidingen < 10% fout", f"{below_10} / {total}"],
+        ]
+
+        # Bias from conversion
+        ha_copy = ha.copy()
+        ha_copy["residual"] = ha_copy["predicted"] - ha_copy["actual"]
+        mean_bias = float(ha_copy["residual"].mean())
+        over_pct = float((ha_copy["residual"] > 0).mean())
+        rows.append(["<b>Bias</b>", ""])
+        rows.append(["Gem. afwijking", f"{mean_bias:+.1f} studenten ({over_pct:.0%} overschatting)"])
+
+        fills = ["#e8edf2", "white", "white", "white", "#e8edf2", "white"]
+        cells = list(zip(*rows))
+
+        fig = go.Figure(go.Table(
+            header=dict(
+                values=["<b></b>", "<b>Conversie-ratio</b>"],
+                fill_color="#2c3e50", font=dict(color="white", size=13),
+                align="left", height=32,
+            ),
+            cells=dict(
+                values=list(cells),
+                fill_color=[fills] * 2,
+                align="left", font=dict(size=12), height=28,
+            ),
+        ))
+        fig.update_layout(height=300, margin=dict(l=10, r=10, t=30, b=10))
+        return fig
+
+    def _model_performance_summary_from_studentcount(self) -> go.Figure | None:
+        """Fallback summary using year-over-year student counts as naive baseline."""
+        sc = self.data_studentcount
+        if sc is None or sc.empty:
+            return None
+
+        years = sorted(sc["Collegejaar"].unique())
+        if len(years) < 2:
+            return None
+
+        rows_data: list[list[str]] = []
+        fills: list[str] = []
+
+        rows_data.append(["<b>Naïef baselinemodel (vorig jaar = voorspelling)</b>", ""])
+        fills.append("#e8edf2")
+
+        naive_errors = []
+        for yr in years[1:]:
+            for prog in sc["Croho groepeernaam"].unique():
+                actual = sc[(sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == yr)]["Aantal_studenten"].sum()
+                prev = sc[(sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == yr - 1)]["Aantal_studenten"].sum()
+                if actual > 0 and prev > 0:
+                    naive_errors.append(abs(actual - prev) / actual)
+
+        if not naive_errors:
+            return None
+
+        naive_mape = float(np.mean(naive_errors))
+        naive_median = float(np.median(naive_errors))
+        below_10 = sum(1 for e in naive_errors if e <= 0.10)
+
+        rows_data.append(["Gem. MAPE (naïef)", f"{naive_mape:.1%}"])
+        fills.append("white")
+        rows_data.append(["Mediaan MAPE (naïef)", f"{naive_median:.1%}"])
+        fills.append("white")
+        rows_data.append(["Meetpunten < 10% fout", f"{below_10} / {len(naive_errors)}"])
+        fills.append("white")
+
+        rows_data.append(["<b>Jaarlijkse schommeling</b>", ""])
+        fills.append("#e8edf2")
+        prog_volatility = sc.groupby("Croho groepeernaam")["Aantal_studenten"].std() / sc.groupby("Croho groepeernaam")["Aantal_studenten"].mean()
+        prog_volatility = prog_volatility.dropna().sort_values()
+        if not prog_volatility.empty:
+            rows_data.append(["Meest stabiel", f"{prog_volatility.index[0]} ({prog_volatility.iloc[0]:.1%} CV)"])
+            fills.append("white")
+            rows_data.append(["Meest volatiel", f"{prog_volatility.index[-1]} ({prog_volatility.iloc[-1]:.1%} CV)"])
+            fills.append("white")
+
+        cells = list(zip(*rows_data))
+        fig = go.Figure(go.Table(
+            header=dict(
+                values=["<b></b>", "<b>Historische stabiliteit</b>"],
+                fill_color="#2c3e50", font=dict(color="white", size=13),
+                align="left", height=32,
+            ),
+            cells=dict(
+                values=list(cells),
+                fill_color=[fills] * 2,
+                align="left", font=dict(size=12), height=28,
+            ),
+        ))
+        fig.update_layout(height=max(300, 50 + 28 * len(rows_data)), margin=dict(l=10, r=10, t=30, b=10))
+        return fig
+
     def _predicted_vs_actual_scatter(self, pred_col: str) -> go.Figure | None:
         """Scatter: X = predicted, Y = actual. Points coloured by error %."""
         hist = self._hist_data()
@@ -1295,28 +1609,785 @@ class DashboardBuilder:
         self._add_predict_week_line(fig)
         return fig
 
+    def _individual_pipeline_chart(self) -> go.Figure | None:
+        """Two-stage ML pipeline: XGBoost aggregated curve + SARIMA extrapolation per programme."""
+        if self.data_xgboost_curve is None or self.predict_week is None:
+            return None
+        pred_col = "SARIMA_individual"
+        if pred_col not in self.data.columns:
+            return None
+
+        xgb = self.data_xgboost_curve.copy()
+        programmes = sorted(xgb["Croho groepeernaam"].unique())
+        if not programmes:
+            return None
+
+        # SARIMA forecast rows for prediction year (weeks after predict_week)
+        sarima = self.data[
+            (self.data["Collegejaar"] == self.prediction_year)
+            & (self.data["Voorspelde vooraanmelders"].notna())
+            & (self.data["Voorspelde vooraanmelders"] > 0)
+        ].copy() if "Voorspelde vooraanmelders" in self.data.columns else pd.DataFrame()
+
+        # Actual enrolment from data_studentcount (previous years for context)
+        sc = self.data_studentcount
+        prev_year = self.prediction_year - 1
+
+        fig = go.Figure()
+        prog_traces: dict[str, list[int]] = {}
+
+        for prog in programmes:
+            prog_traces[prog] = []
+
+            # ── XGBoost cumulative curve (week 39 → predict_week) ──
+            xgb_prog = xgb[xgb["Croho groepeernaam"] == prog].copy()
+            if not xgb_prog.empty:
+                xgb_agg = (
+                    xgb_prog.groupby("Weeknummer")["XGBoost_cumulative"]
+                    .sum().reset_index()
+                    .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                )
+                idx = len(fig.data)
+                fig.add_trace(go.Scatter(
+                    x=xgb_agg["Weeknummer"].astype(str),
+                    y=xgb_agg["XGBoost_cumulative"],
+                    mode="lines+markers", name="XGBoost (geaggregeerd)",
+                    line=dict(color="#1f77b4", width=3),
+                    marker=dict(size=5),
+                    hovertemplate="XGBoost<br>Week %{x}<br>Cumulatief: %{y:.0f}<extra></extra>",
+                    visible=False,
+                ))
+                prog_traces[prog].append(idx)
+
+                # Connection point: last XGBoost value feeds into SARIMA
+                xgb_last_week = str(int(xgb_agg["Weeknummer"].iloc[-1]))
+                xgb_last_val = xgb_agg["XGBoost_cumulative"].iloc[-1]
+            else:
+                xgb_last_week = None
+                xgb_last_val = None
+
+            # ── SARIMA extrapolation (predict_week → week 38) ──
+            if not sarima.empty:
+                sar_prog = sarima[sarima["Croho groepeernaam"] == prog].copy()
+                if not sar_prog.empty:
+                    sar_agg = (
+                        sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
+                        .sum().reset_index()
+                        .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                    )
+                    # Prepend XGBoost endpoint for visual continuity
+                    if xgb_last_week is not None and xgb_last_val is not None:
+                        bridge = pd.DataFrame({
+                            "Weeknummer": [int(xgb_last_week)],
+                            "Voorspelde vooraanmelders": [xgb_last_val],
+                        })
+                        sar_agg = pd.concat([bridge, sar_agg], ignore_index=True)
+
+                    idx = len(fig.data)
+                    fig.add_trace(go.Scatter(
+                        x=sar_agg["Weeknummer"].astype(str),
+                        y=sar_agg["Voorspelde vooraanmelders"],
+                        mode="lines+markers", name="SARIMA (extrapolatie)",
+                        line=dict(color="#ff7f0e", width=3, dash="dash"),
+                        marker=dict(size=5, symbol="diamond"),
+                        hovertemplate="SARIMA<br>Week %{x}<br>Cumulatief: %{y:.0f}<extra></extra>",
+                        visible=False,
+                    ))
+                    prog_traces[prog].append(idx)
+
+            # ── Actual enrolment previous year (reference) ──
+            if sc is not None:
+                real = sc[
+                    (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == prev_year)
+                ]["Aantal_studenten"].sum()
+                if real > 0:
+                    idx = len(fig.data)
+                    fig.add_trace(go.Scatter(
+                        x=[ACADEMIC_WEEKS[0], ACADEMIC_WEEKS[-1]],
+                        y=[real, real],
+                        mode="lines", name=f"Realisatie {prev_year}",
+                        line=dict(color="#333333", dash="dot", width=1.5),
+                        hovertemplate=f"Realisatie {prev_year}: {real:.0f}<extra></extra>",
+                        visible=False,
+                    ))
+                    prog_traces[prog].append(idx)
+
+        total_traces = len(fig.data)
+        if total_traces == 0:
+            return None
+
+        buttons = []
+        for prog in programmes:
+            vis = [False] * total_traces
+            for t_idx in prog_traces.get(prog, []):
+                vis[t_idx] = True
+            buttons.append(dict(label=prog, method="update", args=[{"visible": vis}]))
+
+        # Activate first programme
+        if programmes and prog_traces.get(programmes[0]):
+            for t_idx in prog_traces[programmes[0]]:
+                fig.data[t_idx].visible = True
+
+        fig.update_layout(
+            title=f"ML-pipeline: XGBoost + SARIMA ({self.prediction_year})",
+            xaxis_title="Weeknummer (academisch jaar)",
+            yaxis_title="Cumulatief voorspeld aantal studenten",
+            height=550, hovermode="x unified",
+            updatemenus=[dict(
+                active=0, buttons=buttons,
+                x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
+            )],
+        )
+        self._add_predict_week_line(fig)
+        return fig
+
+    def _individual_prediction_vs_actual(self) -> go.Figure | None:
+        """Per-programme dropdown: SARIMA trajectory per year converging to actual enrolment."""
+        hist = self._hist_data()
+        pred_col = "SARIMA_individual"
+        if hist.empty or pred_col not in hist.columns:
+            return None
+        if "Aantal_studenten" not in hist.columns or hist["Aantal_studenten"].dropna().empty:
+            return None
+
+        programmes = sorted(hist["Croho groepeernaam"].unique())
+        years = sorted(hist["Collegejaar"].unique())
+        fig = go.Figure()
+        prog_traces: dict[str, list[int]] = {}
+
+        for prog in programmes:
+            prog_traces[prog] = []
+            sub = hist[hist["Croho groepeernaam"] == prog]
+
+            for j, yr in enumerate(years):
+                yr_sub = sub[sub["Collegejaar"] == yr]
+                if yr_sub.empty:
+                    continue
+                week_agg = (
+                    yr_sub.groupby("Weeknummer")
+                    .agg(predicted=(pred_col, "sum"), actual=("Aantal_studenten", "first"))
+                    .reset_index()
+                    .sort_values("Weeknummer", key=_sort_weeks_series)
+                )
+                if week_agg.empty:
+                    continue
+
+                colour = PASTEL_YEAR_COLOURS[j % len(PASTEL_YEAR_COLOURS)]
+
+                # Prediction trajectory
+                idx = len(fig.data)
+                fig.add_trace(go.Scatter(
+                    x=week_agg["Weeknummer"].astype(str), y=week_agg["predicted"],
+                    mode="lines+markers", name=f"{int(yr)} voorspelling",
+                    line=dict(color=colour, width=2),
+                    marker=dict(size=4),
+                    hovertemplate=f"{int(yr)}<br>Week %{{x}}<br>Voorspeld: %{{y:.0f}}<extra></extra>",
+                    visible=False,
+                ))
+                prog_traces[prog].append(idx)
+
+                # Actual enrolment horizontal line
+                actual_val = week_agg["actual"].iloc[0]
+                if pd.notna(actual_val) and actual_val > 0:
+                    idx = len(fig.data)
+                    fig.add_trace(go.Scatter(
+                        x=[week_agg["Weeknummer"].astype(str).iloc[0],
+                           week_agg["Weeknummer"].astype(str).iloc[-1]],
+                        y=[actual_val, actual_val],
+                        mode="lines", name=f"{int(yr)} realisatie",
+                        line=dict(color=colour, dash="dash", width=1.5),
+                        hovertemplate=f"{int(yr)} realisatie: {actual_val:.0f}<extra></extra>",
+                        visible=False,
+                    ))
+                    prog_traces[prog].append(idx)
+
+        total_traces = len(fig.data)
+        if total_traces == 0:
+            return None
+
+        buttons = []
+        for prog in programmes:
+            vis = [False] * total_traces
+            for t_idx in prog_traces.get(prog, []):
+                vis[t_idx] = True
+            buttons.append(dict(label=prog, method="update", args=[{"visible": vis}]))
+
+        # Activate first programme
+        if programmes and prog_traces.get(programmes[0]):
+            for t_idx in prog_traces[programmes[0]]:
+                fig.data[t_idx].visible = True
+
+        fig.update_layout(
+            title="Voorspelling vs Realisatie per opleiding (individueel)",
+            xaxis_title="Weeknummer", yaxis_title="Voorspeld aantal studenten",
+            height=550, hovermode="x unified",
+            updatemenus=[dict(
+                active=0, buttons=buttons,
+                x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
+            )],
+        )
+        self._add_predict_week_line(fig)
+        return fig
+
+    def _individual_accuracy_table(self) -> go.Figure | None:
+        """Table: opleiding × predicted × actual × delta × MAPE, with year dropdown."""
+        hist = self._hist_data()
+        pred_col = "SARIMA_individual"
+        if hist.empty or pred_col not in hist.columns:
+            return None
+        if "Aantal_studenten" not in hist.columns:
+            return None
+
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
+        agg = (
+            hist.groupby(["Collegejaar", "Croho groepeernaam"])
+            .agg(predicted=(pred_col, "sum"), actual=("Aantal_studenten", "first"))
+            .reset_index()
+        )
+        agg = agg[agg["actual"] > 0].copy()
+        if agg.empty:
+            return None
+
+        agg["delta"] = agg["predicted"] - agg["actual"]
+        agg["mape"] = abs(agg["delta"]) / agg["actual"]
+
+        years = sorted(agg["Collegejaar"].unique())
+        fig = go.Figure()
+        buttons = []
+
+        for idx, yr in enumerate(years):
+            yr_data = agg[agg["Collegejaar"] == yr].sort_values("mape")
+            colors = [
+                "#d4edda" if m <= 0.10 else "#fff3cd" if m <= 0.25 else "#f8d7da"
+                for m in yr_data["mape"]
+            ]
+            visible = idx == len(years) - 1
+
+            fig.add_trace(go.Table(
+                header=dict(
+                    values=["Opleiding", "Voorspeld", "Werkelijk", "Verschil", "MAPE"],
+                    fill_color="#1f77b4", font=dict(color="white", size=13),
+                    align="left",
+                ),
+                cells=dict(
+                    values=[
+                        yr_data["Croho groepeernaam"].tolist(),
+                        [f"{v:.0f}" for v in yr_data["predicted"]],
+                        [f"{v:.0f}" for v in yr_data["actual"]],
+                        [f"{v:+.0f}" for v in yr_data["delta"]],
+                        [f"{v:.1%}" for v in yr_data["mape"]],
+                    ],
+                    fill_color=[colors] * 5,
+                    align="left", font=dict(size=12),
+                ),
+                visible=visible,
+            ))
+
+            vis = [False] * len(years)
+            vis[idx] = True
+            buttons.append(dict(
+                label=str(int(yr)), method="update",
+                args=[{"visible": vis}, {"title": f"Voorspelling vs Realisatie — {int(yr)}"}],
+            ))
+
+        default_yr = years[-1]
+        n_progs = agg["Croho groepeernaam"].nunique()
+        fig.update_layout(
+            title=f"Voorspelling vs Realisatie — {int(default_yr)}",
+            height=max(300, n_progs * 35 + 120),
+            updatemenus=[dict(
+                active=len(years) - 1, buttons=buttons,
+                x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
+            )],
+        )
+        return fig
+
+    def _individual_bias_scatter(self) -> go.Figure | None:
+        """Scatter: X = programme size, Y = signed residual. Reveals systematic bias."""
+        hist = self._hist_data()
+        pred_col = "SARIMA_individual"
+        if hist.empty or pred_col not in hist.columns:
+            return None
+        if "Aantal_studenten" not in hist.columns:
+            return None
+
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
+        agg = (
+            hist.groupby(["Collegejaar", "Croho groepeernaam"])
+            .agg(predicted=(pred_col, "sum"), actual=("Aantal_studenten", "first"))
+            .reset_index()
+        )
+        agg = agg[(agg["actual"] > 0) & agg["predicted"].notna()].copy()
+        if agg.empty:
+            return None
+        agg["residual"] = agg["predicted"] - agg["actual"]
+
+        fig = go.Figure()
+        years = sorted(agg["Collegejaar"].unique())
+        for j, yr in enumerate(years):
+            yr_data = agg[agg["Collegejaar"] == yr]
+            fig.add_trace(go.Scatter(
+                x=yr_data["actual"], y=yr_data["residual"],
+                mode="markers", name=str(int(yr)),
+                marker=dict(
+                    color=PASTEL_YEAR_COLOURS[j % len(PASTEL_YEAR_COLOURS)],
+                    size=10, line=dict(width=1, color="#333"),
+                ),
+                text=yr_data.apply(
+                    lambda r: (
+                        f"{r['Croho groepeernaam']}<br>Jaar: {int(r['Collegejaar'])}"
+                        f"<br>Voorspeld: {r['predicted']:.0f}<br>Werkelijk: {r['actual']:.0f}"
+                        f"<br>Verschil: {r['residual']:+.0f}"
+                    ), axis=1,
+                ),
+                hoverinfo="text",
+            ))
+
+        fig.add_hline(y=0, line_dash="dash", line_color="grey")
+
+        # Linear trend line
+        valid = agg.dropna(subset=["actual", "residual"])
+        if len(valid) >= 2:
+            coeffs = np.polyfit(valid["actual"], valid["residual"], 1)
+            x_range = np.array([valid["actual"].min(), valid["actual"].max()])
+            fig.add_trace(go.Scatter(
+                x=x_range, y=np.polyval(coeffs, x_range),
+                mode="lines", name="Trendlijn",
+                line=dict(color="rgba(0,0,0,0.4)", dash="dot", width=2),
+                showlegend=True,
+            ))
+
+        fig.update_layout(
+            title="Bias-analyse: over- en onderschatting",
+            xaxis_title="Werkelijke inschrijvingen",
+            yaxis_title="Voorspeld \u2212 Werkelijk",
+            height=500,
+        )
+        return fig
+
+    def _individual_error_by_herkomst(self) -> go.Figure | None:
+        """Bar chart: mean MAPE per herkomst group with error bars."""
+        hist = self._hist_data()
+        mape_col = "MAPE_SARIMA_individual"
+        if hist.empty or mape_col not in hist.columns:
+            return None
+        if "Herkomst" not in hist.columns:
+            return None
+
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
+        grouped = hist.groupby("Herkomst")[mape_col].agg(["mean", "std", "count"]).reset_index()
+        grouped = grouped.dropna(subset=["mean"])
+        if grouped.empty:
+            return None
+
+        herkomst_order = ["NL", "EER", "Niet-EER"]
+        grouped["_sort"] = grouped["Herkomst"].map(
+            {h: i for i, h in enumerate(herkomst_order)}
+        )
+        grouped = grouped.sort_values("_sort").drop(columns="_sort")
+
+        colors = [HERKOMST_COLOURS.get(h, "#999") for h in grouped["Herkomst"]]
+
+        fig = go.Figure()
+        fig.add_trace(go.Bar(
+            x=grouped["Herkomst"], y=grouped["mean"],
+            marker_color=colors,
+            error_y=dict(
+                type="data",
+                array=grouped["std"].fillna(0).tolist(),
+                visible=True,
+            ),
+            text=[
+                f"{m:.1%} (n={int(c)})" for m, c in zip(grouped["mean"], grouped["count"])
+            ],
+            textposition="outside",
+            hovertemplate="%{x}<br>Gem. MAPE: %{y:.1%}<extra></extra>",
+        ))
+
+        fig.update_layout(
+            title="Voorspelfout per herkomstgroep",
+            xaxis_title="Herkomst", yaxis_title="Gemiddelde MAPE",
+            yaxis=dict(tickformat=".0%"),
+            height=400,
+            showlegend=False,
+        )
+        return fig
+
+    def _individual_cockpit(self) -> go.Figure | None:
+        """Summary table: prognosis per programme, compared to last year's actual."""
+        pred_col = "SARIMA_individual"
+        if pred_col not in self.data.columns:
+            return None
+        pred = self.data[
+            (self.data["Collegejaar"] == self.prediction_year)
+            & (self.data["Weeknummer"] == self.predict_week)
+        ] if self.predict_week is not None else self.data[
+            self.data["Collegejaar"] == self.prediction_year
+        ]
+        if pred.empty or pred[pred_col].dropna().empty:
+            return None
+
+        programmes = sorted(pred["Croho groepeernaam"].unique())
+        prev_year = self.prediction_year - 1
+        sc = self.data_studentcount
+
+        opl, prognose_vals, real_vals, delta_vals = [], [], [], []
+        delta_colors = []
+
+        for prog in programmes:
+            opl.append(prog)
+            prog_pred = pred[pred["Croho groepeernaam"] == prog][pred_col].sum()
+            prognose_vals.append(f"{prog_pred:.0f}")
+
+            real = 0
+            if sc is not None:
+                real = sc[
+                    (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == prev_year)
+                ]["Aantal_studenten"].sum()
+            real_vals.append(f"{real:.0f}" if real > 0 else "\u2013")
+
+            if real > 0:
+                delta = (prog_pred - real) / real
+                delta_vals.append(f"{delta:+.1%}")
+                ad = abs(delta)
+                delta_colors.append("#2ca02c" if ad <= 0.05 else ("#f0ad4e" if ad <= 0.15 else "#d62728"))
+            else:
+                delta_vals.append("\u2013")
+                delta_colors.append("#666666")
+
+        # Totaalrij
+        total_prog = sum(float(v) for v in prognose_vals)
+        total_real = sum(float(v) for v in real_vals if v != "\u2013")
+        if total_real > 0:
+            total_d = (total_prog - total_real) / total_real
+            total_d_str = f"{total_d:+.1%}"
+            atd = abs(total_d)
+            total_d_color = "#2ca02c" if atd <= 0.05 else ("#f0ad4e" if atd <= 0.15 else "#d62728")
+        else:
+            total_d_str = "\u2013"
+            total_d_color = "#666666"
+
+        opl.append("Totaal")
+        prognose_vals.append(f"{total_prog:.0f}")
+        real_vals.append(f"{total_real:.0f}" if total_real > 0 else "\u2013")
+        delta_vals.append(total_d_str)
+        delta_colors.append(total_d_color)
+
+        def _tint(hex_color: str) -> str:
+            r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+            return f"rgba({r},{g},{b},0.15)"
+
+        n = len(opl)
+        row_bg = ["white"] * (n - 1) + ["#e8e8e8"]
+        bold = [11] * (n - 1) + [13]
+
+        fig = go.Figure(go.Table(
+            header=dict(
+                values=["Opleiding", f"Prognose {self.prediction_year}",
+                        f"Realisatie {prev_year}", "\u0394%"],
+                fill_color="#1f77b4", font=dict(color="white", size=12), align="left",
+            ),
+            cells=dict(
+                values=[opl, prognose_vals, real_vals, delta_vals],
+                fill_color=[
+                    row_bg, row_bg, row_bg,
+                    [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(delta_colors)],
+                ],
+                font=dict(size=bold), align="left",
+            ),
+        ))
+        fig.update_layout(
+            title=f"Verwacht aantal studenten per opleiding ({self.prediction_year})",
+            height=max(300, n * 32 + 120),
+        )
+        return fig
+
+    def _individual_growth_bars(self) -> go.Figure | None:
+        """Horizontal bar chart: predicted enrolment vs previous year per programme."""
+        pred_col = "SARIMA_individual"
+        if pred_col not in self.data.columns or self.data_studentcount is None:
+            return None
+        pred = self.data[
+            (self.data["Collegejaar"] == self.prediction_year)
+            & (self.data["Weeknummer"] == self.predict_week)
+        ] if self.predict_week is not None else self.data[
+            self.data["Collegejaar"] == self.prediction_year
+        ]
+        if pred.empty or pred[pred_col].dropna().empty:
+            return None
+
+        prev_year = self.prediction_year - 1
+        sc = self.data_studentcount
+        programmes = sorted(pred["Croho groepeernaam"].unique())
+
+        rows = []
+        for prog in programmes:
+            prognose = pred[pred["Croho groepeernaam"] == prog][pred_col].sum()
+            prev = sc[
+                (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == prev_year)
+            ]["Aantal_studenten"].sum()
+            if prev > 0:
+                pct = (prognose - prev) / prev
+                rows.append({"prog": prog, "pct": pct, "delta": prognose - prev})
+
+        if not rows:
+            return None
+
+        rows.sort(key=lambda r: r["pct"])
+        progs = [r["prog"] for r in rows]
+        pcts = [r["pct"] for r in rows]
+        deltas = [r["delta"] for r in rows]
+        colors = ["#2ca02c" if p >= 0 else "#d62728" for p in pcts]
+        labels = [f"{d:+.0f}" for d in deltas]
+
+        fig = go.Figure(go.Bar(
+            y=progs, x=pcts, orientation="h",
+            marker_color=colors,
+            text=labels, textposition="outside",
+            hovertemplate="%{y}<br>%{x:.1%} (%{text})<extra></extra>",
+        ))
+        fig.add_vline(x=0, line_color="#333", line_width=1)
+        fig.update_layout(
+            title=f"Verwachte groei/krimp t.o.v. {prev_year}",
+            xaxis=dict(title="Verandering", tickformat="+.0%"),
+            height=max(350, len(progs) * 30 + 150),
+            margin=dict(l=200),
+        )
+        return fig
+
+    def _individual_enrollment_history(self) -> go.Figure | None:
+        """Grouped bar chart: actual enrolment per programme per year from data_studentcount."""
+        if self.data_studentcount is None:
+            return None
+        sc = self.data_studentcount
+        programmes = sorted(self.data["Croho groepeernaam"].unique())
+        sc = sc[sc["Croho groepeernaam"].isin(programmes)]
+        if sc.empty:
+            return None
+
+        # Aggregate per programme per year
+        agg = sc.groupby(["Collegejaar", "Croho groepeernaam"])["Aantal_studenten"].sum().reset_index()
+        years = sorted(agg["Collegejaar"].unique())
+        if not years:
+            return None
+
+        fig = go.Figure()
+        for j, yr in enumerate(years):
+            yr_data = agg[agg["Collegejaar"] == yr].set_index("Croho groepeernaam").reindex(programmes)
+            vals = yr_data["Aantal_studenten"].fillna(0).tolist()
+            fig.add_trace(go.Bar(
+                x=programmes, y=vals, name=str(int(yr)),
+                marker_color=PASTEL_YEAR_COLOURS[j % len(PASTEL_YEAR_COLOURS)],
+                text=[f"{v:.0f}" for v in vals], textposition="outside",
+                hovertemplate="%{x}<br>" + str(int(yr)) + ": %{y:.0f}<extra></extra>",
+            ))
+
+        fig.update_layout(
+            title="Historische instroom per opleiding",
+            xaxis_title="Opleiding", yaxis_title="Inschrijvingen",
+            barmode="group",
+            height=max(400, len(programmes) * 30 + 200),
+            xaxis=dict(tickangle=-45),
+        )
+        return fig
+
+    def _individual_herkomst_prediction(self) -> go.Figure | None:
+        """Stacked bar: predicted enrolment split by herkomst per programme."""
+        pred_col = "SARIMA_individual"
+        if pred_col not in self.data.columns:
+            return None
+        pred = self.data[
+            (self.data["Collegejaar"] == self.prediction_year)
+            & (self.data["Weeknummer"] == self.predict_week)
+        ] if self.predict_week is not None else self.data[
+            self.data["Collegejaar"] == self.prediction_year
+        ]
+        if pred.empty or pred[pred_col].dropna().empty:
+            return None
+
+        programmes = sorted(pred["Croho groepeernaam"].unique())
+
+        fig = go.Figure()
+        for herkomst in ("NL", "EER", "Niet-EER"):
+            colour = HERKOMST_COLOURS.get(herkomst, "#999")
+            vals = []
+            for prog in programmes:
+                v = pred[
+                    (pred["Croho groepeernaam"] == prog) & (pred["Herkomst"] == herkomst)
+                ][pred_col].sum()
+                vals.append(v if pd.notna(v) else 0)
+            fig.add_trace(go.Bar(
+                x=programmes, y=vals,
+                name=herkomst, marker_color=colour,
+                hovertemplate="%{x}<br>" + herkomst + ": %{y:.0f}<extra></extra>",
+            ))
+
+        fig.update_layout(
+            title=f"Verwachte instroom per herkomst ({self.prediction_year})",
+            xaxis_title="Opleiding", yaxis_title="Voorspelde inschrijvingen",
+            barmode="stack",
+            height=max(400, len(programmes) * 30 + 200),
+            xaxis=dict(tickangle=-45),
+        )
+        return fig
+
+    def _individual_kpi_cards_current(self) -> str:
+        """KPI cards based on current prediction vs last year (always available)."""
+        pred_col = "SARIMA_individual"
+        if pred_col not in self.data.columns or self.data_studentcount is None:
+            return ""
+        pred = self.data[
+            (self.data["Collegejaar"] == self.prediction_year)
+            & (self.data["Weeknummer"] == self.predict_week)
+        ] if self.predict_week is not None else self.data[
+            self.data["Collegejaar"] == self.prediction_year
+        ]
+        if pred.empty or pred[pred_col].dropna().empty:
+            return ""
+
+        programmes = sorted(pred["Croho groepeernaam"].unique())
+        prev_year = self.prediction_year - 1
+        sc = self.data_studentcount
+
+        total_prognose = sum(
+            pred[pred["Croho groepeernaam"] == p][pred_col].sum() for p in programmes
+        )
+        total_prev = sum(
+            sc[(sc["Croho groepeernaam"] == p) & (sc["Collegejaar"] == prev_year)]["Aantal_studenten"].sum()
+            for p in programmes
+        )
+
+        # YoY change
+        if total_prev > 0:
+            yoy = (total_prognose - total_prev) / total_prev
+            yoy_cls = "good" if yoy >= 0 else ("warn" if yoy >= -0.05 else "bad")
+            yoy_val = f"{yoy:+.1%}"
+        else:
+            yoy_cls = "warn"
+            yoy_val = "\u2013"
+
+        # Biggest grower and biggest decliner
+        changes = []
+        for p in programmes:
+            prog_pred = pred[pred["Croho groepeernaam"] == p][pred_col].sum()
+            prog_prev = sc[
+                (sc["Croho groepeernaam"] == p) & (sc["Collegejaar"] == prev_year)
+            ]["Aantal_studenten"].sum()
+            if prog_prev > 0:
+                changes.append((p, (prog_pred - prog_prev) / prog_prev))
+        if changes:
+            changes.sort(key=lambda x: x[1])
+            grower = changes[-1]
+            decliner = changes[0]
+        else:
+            grower = ("\u2013", 0)
+            decliner = ("\u2013", 0)
+
+        return f"""<div class="kpi-row">
+  <div class="kpi-card good"><div class="label">Totaal verwacht {self.prediction_year}</div><div class="value">{total_prognose:.0f}</div></div>
+  <div class="kpi-card {yoy_cls}"><div class="label">Verandering t.o.v. {prev_year}</div><div class="value">{yoy_val}</div><div class="label">{total_prognose:.0f} vs {total_prev:.0f}</div></div>
+  <div class="kpi-card good"><div class="label">Meeste groei</div><div class="value">{grower[0]}<br><span style="font-size:16px">{grower[1]:+.1%}</span></div></div>
+  <div class="kpi-card {"warn" if decliner[1] < -0.05 else "good"}"><div class="label">Meeste krimp</div><div class="value">{decliner[0]}<br><span style="font-size:16px">{decliner[1]:+.1%}</span></div></div>
+</div>"""
+
     def _save_individual(self) -> None:
         pred_col = "SARIMA_individual"
         mape_cols = [c for c in self.data.columns if c.startswith("MAPE_") and "individual" in c]
         charts: list[tuple[str, go.Figure, str]] = []
 
+        # ── Overzicht (altijd beschikbaar) ─────────────────────────
+        mae_cols = [c.replace("MAPE_", "MAE_") for c in mape_cols]
+        fig = self._model_performance_summary(mape_cols, mae_cols)
+        if fig:
+            charts.append(("Samenvatting modelprestaties", fig,
+                "Overzichtstabel met de belangrijkste evaluatiemetrieken: overall MAPE en MAE, "
+                "uitsplitsing naar herkomst en programmagrootte, bias-analyse, "
+                "en vergelijking met een naïef baselinemodel (vorig jaar = voorspelling)."))
+
+        fig = self._individual_pipeline_chart()
+        if fig:
+            charts.append(("ML-pipeline: XGBoost + SARIMA", fig,
+                "De twee stappen van het individuele model. "
+                "Blauw: XGBoost classificeert per aanmelder en aggregeert tot een cumulatieve curve (t/m voorspelweek). "
+                "Oranje: SARIMA extrapoleert de trend naar week 38. "
+                "Stippellijn: realisatie vorig jaar als referentie."))
+
+        fig = self._individual_cockpit()
+        if fig:
+            charts.append(("Verwacht aantal studenten per opleiding", fig,
+                "Overzichtstabel: prognose per opleiding op basis van het individuele model, "
+                "vergeleken met de realisatie van vorig jaar. Percentage toont de verwachte verandering."))
+
+        fig = self._individual_growth_bars()
+        if fig:
+            charts.append(("Groei en krimp per opleiding", fig,
+                "Verwachte verandering per opleiding ten opzichte van vorig jaar. "
+                "Groen = groei, rood = krimp. Het getal toont het absolute verschil in studenten."))
+
+        fig = self._individual_herkomst_prediction()
+        if fig:
+            charts.append(("Verwachte instroom per herkomst", fig,
+                "Verdeling van de voorspelde instroom naar herkomst (NL, EER, niet-EER) per opleiding. "
+                "Verschuivingen t.o.v. vorig jaar kunnen wijzen op veranderende wervingspatronen."))
+
+        fig = self._individual_enrollment_history()
+        if fig:
+            charts.append(("Historische instroom", fig,
+                "Werkelijke inschrijvingen per opleiding over de afgelopen jaren. "
+                "Biedt context voor de huidige prognose: stijgt of daalt de instroom structureel?"))
+
+        fig = self._prediction_stability()
+        if fig:
+            charts.append(("Voorspelstabiliteit", fig,
+                "Week-op-week verandering in de voorspelling per opleiding. "
+                "Grote sprongen (rode balken) betekenen dat het model zijn schatting fors bijstelt."))
+
+        # ── Nauwkeurigheidsanalyse (bij meerdere voorspeljaren) ────
+        fig = self._individual_prediction_vs_actual()
+        if fig:
+            charts.append(("Voorspelling vs Realisatie per opleiding", fig,
+                "SARIMA-voorspelling per week (lijn) versus werkelijke inschrijvingen (stippellijn) per collegejaar. "
+                "Selecteer een opleiding met de dropdown. Convergeert de lijn naar de stippellijn, dan is het model nauwkeurig."))
+
+        fig = self._individual_accuracy_table()
+        if fig:
+            charts.append(("Voorspelling vs Realisatie (tabel)", fig,
+                "Voorspeld aantal studenten naast de werkelijke inschrijvingen per opleiding. "
+                "Rijkleur: groen &lt; 10% fout, geel 10-25%, rood &gt; 25%. Gebruik de dropdown om per jaar te vergelijken."))
+
+        fig = self._predicted_vs_actual_scatter(pred_col)
+        if fig:
+            charts.append(("Voorspeld vs Realisatie (scatter)", fig,
+                "Elke bol is een opleiding in een bepaald jaar. Bolgrootte toont het werkelijke aantal studenten. "
+                "Hoe dichter bij de diagonaal, hoe beter de voorspelling."))
+
+        charts.extend(self._model_accuracy_heatmaps(mape_cols))
+
+        fig = self._error_bar_per_year(pred_col)
+        if fig:
+            charts.append(("Voorspelfout per opleiding", fig,
+                "MAPE per opleiding per collegejaar. Groen &lt; 10%, geel 10-25%, rood &gt; 25%. "
+                "Gebruik de dropdown om jaren te vergelijken en structurele uitschieters te identificeren."))
+
+        fig = self._individual_bias_scatter()
+        if fig:
+            charts.append(("Bias-analyse", fig,
+                "Verschil tussen voorspelling en werkelijkheid uitgezet tegen het werkelijke aantal studenten. "
+                "Punten boven de nullijn = overschatting, eronder = onderschatting. "
+                "De trendlijn toont of de bias toeneemt bij grotere opleidingen."))
+
+        # ── Foutpatronen (bij meerdere voorspeljaren) ──────────────
         fig = self._error_progression(mape_cols, " (individueel)")
         if fig:
             charts.append(("MAPE per week", fig,
                 "Gemiddelde voorspelfout (MAPE) per week over alle opleidingen. "
                 "Dalende lijn = model wordt nauwkeuriger naarmate het jaar vordert."))
-
-        fig = self._prediction_vs_actual()
-        if fig:
-            charts.append(("Voorspelling vs Realisatie", fig,
-                "Vergelijking van de voorspelde aanmeldingen (lijn) met de werkelijke aantallen (markers) per opleiding. "
-                "Gebruik de dropdown om tussen opleidingen te wisselen."))
-
-        fig = self._predicted_vs_actual_scatter(pred_col)
-        if fig:
-            charts.append(("Voorspeld vs Realisatie", fig,
-                "Elke bol is een opleiding in een bepaald jaar. Bolgrootte toont het werkelijke aantal studenten. "
-                "Hoe dichter bij de diagonaal, hoe beter de voorspelling."))
 
         fig = self._error_heatmap(mape_cols)
         if fig:
@@ -1330,13 +2401,16 @@ class DashboardBuilder:
                 "Animatie van de fout-heatmap per collegejaar. "
                 "Gebruik de afspeelknop om te zien hoe de fout zich jaar-op-jaar ontwikkelt."))
 
-        fig = self._prediction_stability()
+        fig = self._individual_error_by_herkomst()
         if fig:
-            charts.append(("Voorspelstabiliteit", fig,
-                "Week-op-week verandering in de voorspelling per opleiding. "
-                "Grote sprongen (rode balken) betekenen dat het model zijn schatting fors bijstelt."))
+            charts.append(("Foutanalyse per herkomst", fig,
+                "Gemiddelde voorspelfout per herkomstgroep (NL, EER, niet-EER). "
+                "Foutbalken tonen de spreiding. Grote verschillen wijzen op ongelijke modelnauwkeurigheid per groep."))
 
-        kpi = self._build_kpi_cards(mape_cols)
+        # KPI: prefer accuracy-based cards, fallback to current-prediction cards
+        kpi = self._build_individual_kpi_cards()
+        if not kpi:
+            kpi = self._individual_kpi_cards_current()
         self._save_page("individual", charts, "Individueel", kpi)
 
     # ════════════════════════════════════════════════════════════════
@@ -1655,6 +2729,14 @@ class DashboardBuilder:
         charts: list[tuple[str, go.Figure, str]] = []
 
         # ── Overzicht ───────────────────────────────────────────────
+        mae_cols = [c.replace("MAPE_", "MAE_") for c in mape_cols]
+        fig = self._model_performance_summary(mape_cols, mae_cols)
+        if fig:
+            charts.append(("Samenvatting modelprestaties", fig,
+                "Overzichtstabel met de belangrijkste evaluatiemetrieken: overall MAPE en MAE, "
+                "uitsplitsing naar herkomst en programmagrootte, bias-analyse, "
+                "en vergelijking met een naïef baselinemodel (vorig jaar = voorspelling)."))
+
         fig = self._yearly_trend()
         if fig:
             charts.append(("Verloop per opleiding — alle jaren", fig,
