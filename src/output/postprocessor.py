@@ -378,7 +378,7 @@ class PostProcessor:
         valid_rows = ~self.data["Croho groepeernaam"].isin(self.numerus_fixus_list)
 
         for pred in predictions:
-            predicted = self.data[pred].apply(convert_nan_to_zero)
+            predicted = self.data[pred]
             self.data[f"MAE_{pred}"] = abs(self.data["Aantal_studenten"] - predicted).where(
                 valid_rows
             )

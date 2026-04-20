@@ -174,6 +174,13 @@ def _save_results(strategy, cfg):
                 data_cumulative = getattr(
                     getattr(strategy, "cumulative", None), "data_cumulative", None,
                 )
+            # Collect XGBoost curve from individual strategy (if available)
+            xgboost_curve = getattr(strategy, "xgboost_curve", None)
+            if xgboost_curve is None:
+                xgboost_curve = getattr(
+                    getattr(strategy, "individual", None), "xgboost_curve", None,
+                )
+
             dashboard = DashboardBuilder(
                 data=strategy.postprocessor.data,
                 data_option=cfg.data_option,
@@ -184,6 +191,7 @@ def _save_results(strategy, cfg):
                 predict_week=cfg.weeks[-1] if cfg.weeks else None,
                 data_cumulative=data_cumulative,
                 data_studentcount=strategy.postprocessor.data_studentcount,
+                data_xgboost_curve=xgboost_curve,
             )
             dashboard.build_and_save()
         else:
