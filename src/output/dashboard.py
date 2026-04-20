@@ -2817,52 +2817,61 @@ class DashboardBuilder:
     # ════════════════════════════════════════════════════════════════
 
     def _cockpit_with_confidence(self) -> go.Figure | None:
-        """Summary table with prognosis, realisation, delta, confidence, source models."""
-        best_col = self._best_prediction_col()
-        if best_col is None:
-            return None
+        """Summary table with per-model prognoses side-by-side, realisation, and confidence."""
         pred = self.data[self.data["Collegejaar"] == self.prediction_year]
         if pred.empty:
+            return None
+
+        model_cols = [
+            c for c in (
+                "SARIMA_individual", "SARIMA_cumulative", "Prognose_ratio",
+                "Weighted_ensemble_prediction", "Average_ensemble_prediction",
+                "Ensemble_prediction",
+            )
+            if c in pred.columns and pred[c].notna().any()
+        ]
+        if not model_cols:
             return None
 
         programmes = sorted(pred["Croho groepeernaam"].unique())
         prev_year = self.prediction_year - 1
         hist = self._hist_data()
-        all_mape_cols = [c for c in hist.columns if c.startswith("MAPE_")]
+        all_mape_cols = [c for c in hist.columns if c.startswith("MAPE_")] if not hist.empty else []
 
-        rows: dict[str, list] = {
-            "opleiding": [], "prognose": [], "realisatie": [],
-            "delta": [], "confidence": [], "bronmodellen": [],
-        }
-        delta_colors: list[str] = []
+        rows_opl: list[str] = []
+        rows_real: list[str] = []
+        rows_models: dict[str, list[str]] = {c: [] for c in model_cols}
+        rows_spread: list[str] = []
+        rows_conf: list[str] = []
         conf_colors: list[str] = []
 
         for prog in programmes:
-            rows["opleiding"].append(prog)
+            rows_opl.append(prog)
+            prog_pred = pred[pred["Croho groepeernaam"] == prog]
 
-            prognose = pred[pred["Croho groepeernaam"] == prog][best_col].sum()
-            rows["prognose"].append(f"{prognose:.0f}")
-
-            # Previous year realisation
             realisatie = 0
             if self.data_studentcount is not None:
                 sc = self.data_studentcount
                 realisatie = sc[
                     (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == prev_year)
                 ]["Aantal_studenten"].sum()
-            rows["realisatie"].append(f"{realisatie:.0f}" if realisatie > 0 else "–")
+            rows_real.append(f"{realisatie:.0f}" if realisatie > 0 else "–")
 
-            # Delta %
-            if realisatie > 0:
-                delta = (prognose - realisatie) / realisatie
-                rows["delta"].append(f"{delta:+.1%}")
-                abs_delta = abs(delta)
-                delta_colors.append("#2ca02c" if abs_delta <= 0.05 else ("#f0ad4e" if abs_delta <= 0.15 else "#d62728"))
+            model_values = {}
+            for mc in model_cols:
+                val = prog_pred[mc].sum()
+                if pd.notna(val) and val > 0:
+                    model_values[mc] = val
+                    rows_models[mc].append(f"{val:.0f}")
+                else:
+                    rows_models[mc].append("–")
+
+            if len(model_values) >= 2:
+                spread = max(model_values.values()) - min(model_values.values())
+                rows_spread.append(f"±{spread:.0f}")
             else:
-                rows["delta"].append("–")
-                delta_colors.append("#666666")
+                rows_spread.append("–")
 
-            # Confidence (historical MAPE or fallback)
             avg_mape = None
             if not hist.empty and all_mape_cols:
                 ph = hist[hist["Croho groepeernaam"] == prog]
@@ -2890,82 +2899,81 @@ class DashboardBuilder:
 
             if avg_mape is not None:
                 if avg_mape <= 0.10:
-                    rows["confidence"].append("Hoog")
+                    rows_conf.append("Hoog")
                     conf_colors.append("#2ca02c")
                 elif avg_mape <= 0.25:
-                    rows["confidence"].append("Midden")
+                    rows_conf.append("Midden")
                     conf_colors.append("#f0ad4e")
                 else:
-                    rows["confidence"].append("Laag")
+                    rows_conf.append("Laag")
                     conf_colors.append("#d62728")
             else:
-                rows["confidence"].append("–")
+                rows_conf.append("–")
                 conf_colors.append("#666666")
 
-            # Source models
-            model_cols = [
-                c for c in (
-                    "SARIMA_individual", "SARIMA_cumulative", "Prognose_ratio",
-                    "Ensemble_prediction", "Weighted_ensemble_prediction",
-                    "Average_ensemble_prediction",
-                )
-                if c in pred.columns
-                and pred[pred["Croho groepeernaam"] == prog][c].notna().any()
-            ]
-            rows["bronmodellen"].append(", ".join(_display(c) for c in model_cols) if model_cols else "–")
-
         # ── Totaalrij ───────────────────────────────────────────────
-        total_prog = sum(float(v) for v in rows["prognose"])
-        total_real = sum(float(v) for v in rows["realisatie"] if v != "–")
-        if total_real > 0:
-            total_delta = (total_prog - total_real) / total_real
-            total_delta_str = f"{total_delta:+.1%}"
-            abs_td = abs(total_delta)
-            total_delta_color = "#2ca02c" if abs_td <= 0.05 else ("#f0ad4e" if abs_td <= 0.15 else "#d62728")
-        else:
-            total_delta_str = "–"
-            total_delta_color = "#666666"
+        rows_opl.append("<b>Totaal</b>")
+        total_real = sum(float(v) for v in rows_real if v != "–")
+        rows_real.append(f"<b>{total_real:.0f}</b>" if total_real > 0 else "–")
 
-        rows["opleiding"].append("Totaal")
-        rows["prognose"].append(f"{total_prog:.0f}")
-        rows["realisatie"].append(f"{total_real:.0f}" if total_real > 0 else "–")
-        rows["delta"].append(total_delta_str)
-        rows["confidence"].append("")
-        rows["bronmodellen"].append("")
-        delta_colors.append(total_delta_color)
+        model_totals: dict[str, float] = {}
+        for mc in model_cols:
+            total = sum(float(v) for v in rows_models[mc] if v != "–")
+            model_totals[mc] = total
+            rows_models[mc].append(f"<b>{total:.0f}</b>")
+
+        if len(model_totals) >= 2:
+            spread = max(model_totals.values()) - min(model_totals.values())
+            rows_spread.append(f"<b>±{spread:.0f}</b>")
+        else:
+            rows_spread.append("–")
+        rows_conf.append("")
         conf_colors.append("#666666")
 
+        # ── Build table ─────────────────────────────────────────────
         def _tint(hex_color: str) -> str:
             r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
             return f"rgba({r},{g},{b},0.15)"
 
-        n = len(rows["opleiding"])
-        # Bold styling for total row
+        n = len(rows_opl)
         row_bg = ["white"] * (n - 1) + ["#e8e8e8"]
-        bold = [11] * (n - 1) + [13]
+
+        header_vals = ["Opleiding"]
+        cell_vals: list[list] = [rows_opl]
+        fill_cols: list[list] = [row_bg]
+
+        for mc in model_cols:
+            color = MODEL_COLOURS.get(mc, "#666")
+            header_vals.append(f"<span style='color:{color}'>●</span> {_display(mc)}")
+            cell_vals.append(rows_models[mc])
+            fill_cols.append(row_bg)
+
+        if len(model_cols) >= 2:
+            header_vals.append("Spreiding")
+            cell_vals.append(rows_spread)
+            fill_cols.append(row_bg)
+
+        header_vals.append(f"Realisatie {prev_year}")
+        cell_vals.append(rows_real)
+        fill_cols.append(row_bg)
+
+        header_vals.append("Betrouwbaarheid")
+        cell_vals.append(rows_conf)
+        fill_cols.append([_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)])
 
         fig = go.Figure(go.Table(
             header=dict(
-                values=["Opleiding", f"Prognose {self.prediction_year}",
-                        f"Realisatie {prev_year}", "Δ%", "Betrouwbaarheid", "Bronmodellen"],
+                values=[f"<b>{h}</b>" for h in header_vals],
                 fill_color="#1f77b4", font=dict(color="white", size=12), align="left",
             ),
             cells=dict(
-                values=[
-                    rows["opleiding"], rows["prognose"], rows["realisatie"],
-                    rows["delta"], rows["confidence"], rows["bronmodellen"],
-                ],
-                fill_color=[
-                    row_bg, row_bg, row_bg,
-                    [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(delta_colors)],
-                    [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)],
-                    row_bg,
-                ],
-                font=dict(size=bold), align="left",
+                values=cell_vals,
+                fill_color=fill_cols,
+                font=dict(size=[11] * (n - 1) + [13]), align="left",
             ),
         ))
         fig.update_layout(
-            title=f"Verwacht aantal studenten per opleiding ({self.prediction_year})",
+            title=f"Modelvergelijking per opleiding ({self.prediction_year})",
             height=max(400, n * 30 + 150),
         )
         return fig
