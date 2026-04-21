@@ -4,6 +4,7 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
 from src.utils.weeks import get_weeks_list
+from src.models.importance import extract_grouped_importance
 
 DEFAULT_STATUS_MAP = {
     "Ingeschreven": 1,
@@ -82,7 +83,7 @@ def predict_applicant(data, predict_year, predict_week, max_year, data_cumulativ
     y_test = test.pop("Inschrijfstatus")
 
     if len(X_test) == 0:
-        return np.nan
+        return np.nan, None
 
     numeric_cols = ["Collegejaar", "Sleutel_count", "is_numerus_fixus"]
 
@@ -131,6 +132,7 @@ def predict_applicant(data, predict_year, predict_week, max_year, data_cumulativ
     X_test = preprocessor.transform(X_test)
 
     model.fit(X_train, y_train)
+    importance = extract_grouped_importance(model, preprocessor, numeric_cols, categorical_cols)
 
     voorspellingen = model.predict_proba(X_test)[:, 1]
 
@@ -146,7 +148,7 @@ def predict_applicant(data, predict_year, predict_week, max_year, data_cumulativ
 
         predicties[i] = pred
 
-    return predicties
+    return predicties, importance
 
 
 def _create_ratio(data):

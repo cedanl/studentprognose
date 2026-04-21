@@ -76,6 +76,8 @@ class DashboardBuilder:
         data_cumulative: pd.DataFrame | None,
         data_studentcount: pd.DataFrame | None,
         data_xgboost_curve: pd.DataFrame | None = None,
+        xgb_classifier_importance: dict[str, float] | None = None,
+        xgb_regressor_importance: dict[str, float] | None = None,
     ):
         self.data = data.copy()
         self.data["Weeknummer"] = self.data["Weeknummer"].astype(int)
@@ -91,6 +93,8 @@ class DashboardBuilder:
         self.data_cumulative = data_cumulative
         self.data_studentcount = data_studentcount
         self.data_xgboost_curve = data_xgboost_curve
+        self.xgb_classifier_importance = xgb_classifier_importance
+        self.xgb_regressor_importance = xgb_regressor_importance
 
         self.prediction_year = int(self.data["Collegejaar"].max())
 
@@ -497,29 +501,26 @@ class DashboardBuilder:
             programmes = sorted(pivot.index)
             pivot = pivot.reindex(index=programmes)
 
-            hover = np.empty(pivot.shape, dtype=object)
-            for i, prog in enumerate(programmes):
-                for j, year_col in enumerate(pivot.columns):
-                    val = pivot.iloc[i, j]
-                    hover[i, j] = f"MAPE: {val:.1%}" if pd.notna(val) else ""
-
-            flat = pivot.values[~np.isnan(pivot.values)].flatten()
-            zmax = max(float(np.percentile(flat, 90)), 0.15) if len(flat) > 0 else 0.5
+            annotations = np.where(
+                np.isnan(pivot.values), "",
+                np.vectorize(lambda v: f"{v:.0%}")(pivot.values),
+            )
 
             fig = go.Figure(go.Heatmap(
                 z=pivot.values,
                 x=pivot.columns.tolist(),
                 y=pivot.index.tolist(),
-                colorscale=[[0, "#2ca02c"], [0.4, "#f0ad4e"], [0.75, "#e74c3c"], [1.0, "#8b0000"]],
-                zmin=0, zmax=zmax,
+                colorscale=[[0, "#2ca02c"], [0.15, "#8fce8f"], [0.3, "#f0ad4e"], [0.6, "#e74c3c"], [1.0, "#8b0000"]],
+                zmin=0, zmax=0.5,
                 colorbar=dict(title="MAPE", tickformat=".0%"),
-                text=hover, hoverinfo="text+x+y",
+                text=annotations, texttemplate="%{text}", textfont=dict(size=11),
+                hovertemplate="Opleiding: %{y}<br>Jaar: %{x}<br>MAPE: %{z:.1%}<extra></extra>",
             ))
             display = _display(model_name)
             fig.update_layout(
                 title=f"Modelnauwkeurigheid {display} per opleiding × jaar (MAPE)",
                 xaxis_title="Collegejaar", yaxis_title="Opleiding",
-                height=max(400, len(programmes) * 25 + 150),
+                height=max(400, len(programmes) * 30 + 150),
             )
             results.append((
                 f"Modelnauwkeurigheid {display}", fig,
@@ -1331,16 +1332,23 @@ class DashboardBuilder:
         if recent_n is not None:
             title += f" — laatste {recent_n} jaar"
 
+        annotations = np.where(
+            np.isnan(pivot.values), "",
+            np.vectorize(lambda v: f"{v:.0%}")(pivot.values),
+        )
+
         fig = go.Figure(go.Heatmap(
             z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
-            colorscale=[[0, "green"], [0.15, "yellow"], [0.5, "red"], [1.0, "darkred"]],
-            zmin=0, zmax=1.0,
+            colorscale=[[0, "#2ca02c"], [0.15, "#8fce8f"], [0.3, "#f0ad4e"], [0.6, "#e74c3c"], [1.0, "#8b0000"]],
+            zmin=0, zmax=0.5,
             colorbar=dict(title="MAPE", tickformat=".0%"),
+            text=annotations, texttemplate="%{text}", textfont=dict(size=11),
+            hovertemplate="Opleiding: %{y}<br>Jaar: %{x}<br>MAPE: %{z:.1%}<extra></extra>",
         ))
         fig.update_layout(
             title=title,
             xaxis_title="Collegejaar", yaxis_title="Opleiding",
-            height=max(400, len(pivot) * 25 + 150),
+            height=max(400, len(pivot) * 30 + 150),
         )
         return fig
 
@@ -1438,26 +1446,23 @@ class DashboardBuilder:
         programmes = sorted(pivot.index)
         pivot = pivot.reindex(index=programmes)
 
-        flat_mapes = pivot.values[~np.isnan(pivot.values)].flatten()
-        zmax = max(float(np.percentile(flat_mapes, 90)), 0.15) if len(flat_mapes) > 0 else 0.5
-
-        hover = np.empty(pivot.shape, dtype=object)
-        for i, prog in enumerate(programmes):
-            for j, yr_col in enumerate(pivot.columns):
-                val = pivot.iloc[i, j]
-                hover[i, j] = f"MAPE: {val:.1%}" if pd.notna(val) else ""
+        annotations = np.where(
+            np.isnan(pivot.values), "",
+            np.vectorize(lambda v: f"{v:.0%}")(pivot.values),
+        )
 
         fig = go.Figure(go.Heatmap(
             z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
-            colorscale=[[0, "#2ca02c"], [0.4, "#f0ad4e"], [0.75, "#e74c3c"], [1.0, "#8b0000"]],
-            zmin=0, zmax=zmax,
+            colorscale=[[0, "#2ca02c"], [0.15, "#8fce8f"], [0.3, "#f0ad4e"], [0.6, "#e74c3c"], [1.0, "#8b0000"]],
+            zmin=0, zmax=0.5,
             colorbar=dict(title="MAPE", tickformat=".0%"),
-            text=hover, hoverinfo="text+x+y",
+            text=annotations, texttemplate="%{text}", textfont=dict(size=11),
+            hovertemplate="Opleiding: %{y}<br>Jaar: %{x}<br>MAPE: %{z:.1%}<extra></extra>",
         ))
         fig.update_layout(
             title=f"Fout-heatmap per jaar ({_display(pred_col)})",
             xaxis_title="Collegejaar", yaxis_title="Opleiding",
-            height=max(400, len(programmes) * 25 + 150),
+            height=max(400, len(programmes) * 30 + 150),
         )
         return fig
 
@@ -2468,6 +2473,16 @@ class DashboardBuilder:
                 "Week-op-week verandering in de voorspelling per opleiding. "
                 "Grote sprongen (rode balken) betekenen dat het model zijn schatting fors bijstelt."))
 
+        fig = self._feature_importance_chart(
+            self.xgb_classifier_importance,
+            "Feature importance — XGBoost classifier",
+        )
+        if fig:
+            charts.append(("XGBoost Feature Importance", fig,
+                "De belangrijkste kenmerken die het XGBoost-model gebruikt om te voorspellen "
+                "of een vooraanmelder zich daadwerkelijk inschrijft. "
+                "Categorische variabelen zijn teruggegroepeerd naar de originele kolomnaam."))
+
         # ── Nauwkeurigheidsanalyse (bij meerdere voorspeljaren) ────
         fig = self._individual_prediction_vs_actual()
         if fig:
@@ -2866,6 +2881,16 @@ class DashboardBuilder:
                 "Groene ster: XGBoost-conversie van alle vooraanmelders naar voorspeld aantal studenten. "
                 "Stippellijn: realisatie vorig jaar als referentie."))
 
+        fig = self._feature_importance_chart(
+            self.xgb_regressor_importance,
+            "Feature importance — XGBoost regressor",
+        )
+        if fig:
+            charts.append(("XGBoost Feature Importance", fig,
+                "De belangrijkste kenmerken die het XGBoost-regressiemodel gebruikt om het aantal "
+                "studenten te voorspellen op basis van vooraanmeldersaantallen. "
+                "Categorische variabelen zijn teruggegroepeerd naar de originele kolomnaam."))
+
         fig = self._yearly_trend()
         if fig:
             charts.append(("Verloop per opleiding — alle jaren", fig,
@@ -3068,7 +3093,7 @@ class DashboardBuilder:
 
         for mc in model_cols:
             color = MODEL_COLOURS.get(mc, "#666")
-            header_vals.append(f"<span style='color:{color}'>●</span> {_display(mc)}")
+            header_vals.append(_display(mc))
             cell_vals.append(rows_models[mc])
             fill_cols.append(row_bg)
 
@@ -3297,6 +3322,30 @@ class DashboardBuilder:
             xaxis_title="Aantal studenten",
             barmode="group",
             height=max(300, len(progs) * 70 + 150),
+        )
+        return fig
+
+    def _feature_importance_chart(
+        self, importance: dict[str, float] | None, title: str, top_n: int = 15,
+    ) -> go.Figure | None:
+        if not importance:
+            return None
+
+        sorted_feats = sorted(importance.items(), key=lambda x: x[1], reverse=True)[:top_n]
+        sorted_feats.reverse()
+        features = [f[0] for f in sorted_feats]
+        values = [f[1] for f in sorted_feats]
+
+        fig = go.Figure(go.Bar(
+            y=features, x=values, orientation="h",
+            marker_color="#1f77b4",
+            hovertemplate="%{y}<br>Importance: %{x:.4f}<extra></extra>",
+        ))
+        fig.update_layout(
+            title=title,
+            xaxis=dict(title="Feature Importance"),
+            height=max(350, len(features) * 25 + 150),
+            margin=dict(l=250),
         )
         return fig
 

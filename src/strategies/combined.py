@@ -62,7 +62,7 @@ class CombinedStrategy(PredictionStrategy):
 
         from src.models.xgboost_classifier import predict_applicant
         print("Predicting preapplicants...")
-        predicties = predict_applicant(
+        predicties, self.individual.xgboost_importance = predict_applicant(
             self.individual.data_individual, self.predict_year, self.predict_week,
             self.individual.max_year,
             self.cumulative.data_cumulative,

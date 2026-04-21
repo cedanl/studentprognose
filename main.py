@@ -181,6 +181,16 @@ def _save_results(strategy, cfg):
                     getattr(strategy, "individual", None), "xgboost_curve", None,
                 )
 
+            # Collect XGBoost feature importance (classifier = individual, regressor = cumulative)
+            xgb_classifier_importance = getattr(
+                getattr(strategy, "individual", None), "xgboost_importance", None,
+            )
+            xgb_regressor_importance = getattr(
+                getattr(strategy, "cumulative", None), "xgboost_importance", None,
+            )
+            if xgb_regressor_importance is None and not hasattr(strategy, "individual"):
+                xgb_regressor_importance = getattr(strategy, "xgboost_importance", None)
+
             dashboard = DashboardBuilder(
                 data=strategy.postprocessor.data,
                 data_option=cfg.data_option,
@@ -192,6 +202,8 @@ def _save_results(strategy, cfg):
                 data_cumulative=data_cumulative,
                 data_studentcount=strategy.postprocessor.data_studentcount,
                 data_xgboost_curve=xgboost_curve,
+                xgb_classifier_importance=xgb_classifier_importance,
+                xgb_regressor_importance=xgb_regressor_importance,
             )
             dashboard.build_and_save()
         else:

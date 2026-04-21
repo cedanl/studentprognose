@@ -4,6 +4,7 @@ from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
 from src.utils.weeks import get_weeks_list
+from src.models.importance import extract_grouped_importance
 
 
 def predict_with_xgboost(train, test, data_studentcount):
@@ -27,12 +28,12 @@ def predict_with_xgboost(train, test, data_studentcount):
             on=["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"],
         )
     else:
-        return np.nan
+        return np.nan, None
 
     train.drop_duplicates(inplace=True, ignore_index=True)
 
     if train.empty:
-        return np.full(len(test), np.nan)
+        return np.full(len(test), np.nan), None
 
     X_train = train.drop(["Aantal_studenten"], axis=1)
     y_train = train.pop("Aantal_studenten")
@@ -56,10 +57,11 @@ def predict_with_xgboost(train, test, data_studentcount):
     model = XGBRegressor(learning_rate=0.25)
 
     model.fit(X_train, y_train)
+    importance = extract_grouped_importance(model, preprocessor, numeric_cols, categorical_cols)
 
     predictions = model.predict(test)
 
     for i in range(len(predictions)):
         predictions[i] = int(round(predictions[i], 0))
 
-    return predictions
+    return predictions, importance

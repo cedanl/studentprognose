@@ -22,6 +22,7 @@ class IndividualStrategy(PredictionStrategy):
 
         self.data_individual = data_individual
         self.xgboost_curve = None
+        self.xgboost_importance = None
 
     def preprocess(self):
         data = self.data_individual
@@ -131,7 +132,7 @@ class IndividualStrategy(PredictionStrategy):
         self.set_year_week(predict_year, predict_week, self.data_individual)
 
         print("Predicting preapplicants...")
-        predicties = predict_applicant(
+        predicties, self.xgboost_importance = predict_applicant(
             self.data_individual, self.predict_year, self.predict_week,
             self.max_year, configuration=self.configuration
         )
