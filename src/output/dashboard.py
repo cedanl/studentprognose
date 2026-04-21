@@ -105,8 +105,8 @@ class DashboardBuilder:
     # ── Data helpers ─────────────────────────────────────────────────
 
     def _hist_data(self) -> pd.DataFrame:
-        """Return only rows with Collegejaar < prediction_year (actuals only)."""
-        return self.data[self.data["Collegejaar"] < self.prediction_year]
+        """Return all rows including prediction_year (for backtesting with actuals)."""
+        return self.data
 
     def _get_actual_trend(self, programme: str) -> pd.DataFrame | None:
         """Weighted pre-applicants for *prediction_year*, summed over Herkomst, up to predict_week."""
@@ -146,7 +146,7 @@ class DashboardBuilder:
             return None
         dc = self.data_cumulative
         sc = self.data_studentcount
-        hist_years = sorted(y for y in dc["Collegejaar"].unique() if y < self.prediction_year)
+        hist_years = sorted(dc["Collegejaar"].unique())
         # Keep only the last 5 years for relevance
         hist_years = hist_years[-5:]
         if not hist_years:
@@ -1306,7 +1306,7 @@ class DashboardBuilder:
     def _error_heatmap(
         self, mape_cols: list[str], recent_n: int | None = None,
     ) -> go.Figure | None:
-        """Heatmap: programmes (y) x weeks (x), mean MAPE as colour.
+        """Heatmap: programmes (y) x collegejaar (x), mean MAPE as colour.
 
         When *recent_n* is set, only the last N collegejaren are included.
         """
@@ -1322,12 +1322,10 @@ class DashboardBuilder:
         tmp = hist.copy()
         tmp["_avg_mape"] = tmp[valid_cols].mean(axis=1).clip(upper=2.0)
         pivot = tmp.pivot_table(
-            index="Croho groepeernaam", columns="Weeknummer",
+            index="Croho groepeernaam", columns="Collegejaar",
             values="_avg_mape", aggfunc="mean",
         )
-        pivot.columns = pivot.columns.astype(str)
-        ordered = [w for w in ACADEMIC_WEEKS if w in pivot.columns]
-        pivot = pivot.reindex(columns=ordered)
+        pivot.columns = [str(int(c)) for c in pivot.columns]
 
         title = "Fout-heatmap (gemiddelde MAPE)"
         if recent_n is not None:
@@ -1341,10 +1339,9 @@ class DashboardBuilder:
         ))
         fig.update_layout(
             title=title,
-            xaxis_title="Weeknummer", yaxis_title="Opleiding",
+            xaxis_title="Collegejaar", yaxis_title="Opleiding",
             height=max(400, len(pivot) * 25 + 150),
         )
-        self._add_predict_week_line(fig)
         return fig
 
     def _error_bar_per_year(self, pred_col: str) -> go.Figure | None:
@@ -1610,6 +1607,167 @@ class DashboardBuilder:
             title="Voorspelstabiliteit (week-over-week verandering)",
             xaxis_title="Weeknummer", yaxis_title="Verandering in voorspelling", height=450,
             updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
+        )
+        self._add_predict_week_line(fig)
+        return fig
+
+    def _cumulative_pipeline_chart(self) -> go.Figure | None:
+        """Two-stage pipeline for cumulative model: SARIMA forecasts pre-applicants, XGBoost converts to students."""
+        if self.data_cumulative is None or self.predict_week is None:
+            return None
+        if "SARIMA_cumulative" not in self.data.columns:
+            return None
+
+        dc = self.data_cumulative
+        pred_year_data = dc[dc["Collegejaar"] == self.prediction_year]
+        if pred_year_data.empty:
+            return None
+
+        programmes = sorted(pred_year_data["Croho groepeernaam"].unique())
+        prev_year = self.prediction_year - 1
+        sc = self.data_studentcount
+        pw_key = _week_sort_key(self.predict_week)
+
+        sarima_rows = self.data[
+            (self.data["Collegejaar"] == self.prediction_year)
+            & (self.data["Voorspelde vooraanmelders"].notna())
+            & (self.data["Voorspelde vooraanmelders"] > 0)
+        ].copy() if "Voorspelde vooraanmelders" in self.data.columns else pd.DataFrame()
+
+        fig = go.Figure()
+        prog_traces: dict[str, list[int]] = {}
+
+        for prog in programmes:
+            prog_traces[prog] = []
+
+            # ── Known pre-applicants (week 39 → predict_week) ──
+            known = pred_year_data[
+                (pred_year_data["Croho groepeernaam"] == prog)
+            ].copy()
+            if not known.empty:
+                known_agg = (
+                    known.groupby("Weeknummer")["Gewogen vooraanmelders"]
+                    .sum().reset_index()
+                )
+                known_agg = known_agg[known_agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
+                known_agg = known_agg.sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+
+                if not known_agg.empty:
+                    idx = len(fig.data)
+                    fig.add_trace(go.Scatter(
+                        x=known_agg["Weeknummer"].astype(str),
+                        y=known_agg["Gewogen vooraanmelders"],
+                        mode="lines+markers",
+                        name="Vooraanmelders (bekend)",
+                        line=dict(color="#1f77b4", width=3),
+                        marker=dict(size=5),
+                        hovertemplate="Bekend<br>Week %{x}<br>Vooraanmelders: %{y:.0f}<extra></extra>",
+                        visible=False,
+                    ))
+                    prog_traces[prog].append(idx)
+                    last_known_week = str(int(known_agg["Weeknummer"].iloc[-1]))
+                    last_known_val = known_agg["Gewogen vooraanmelders"].iloc[-1]
+                else:
+                    last_known_week = None
+                    last_known_val = None
+            else:
+                last_known_week = None
+                last_known_val = None
+
+            # ── SARIMA forecast (predict_week → week 38) ──
+            if not sarima_rows.empty:
+                sar_prog = sarima_rows[sarima_rows["Croho groepeernaam"] == prog].copy()
+                if not sar_prog.empty:
+                    sar_agg = (
+                        sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
+                        .sum().reset_index()
+                        .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                    )
+                    if last_known_week is not None and last_known_val is not None:
+                        bridge = pd.DataFrame({
+                            "Weeknummer": [int(last_known_week)],
+                            "Voorspelde vooraanmelders": [last_known_val],
+                        })
+                        sar_agg = pd.concat([bridge, sar_agg], ignore_index=True)
+
+                    idx = len(fig.data)
+                    fig.add_trace(go.Scatter(
+                        x=sar_agg["Weeknummer"].astype(str),
+                        y=sar_agg["Voorspelde vooraanmelders"],
+                        mode="lines+markers",
+                        name="SARIMA (voorspelde vooraanmelders)",
+                        line=dict(color="#ff7f0e", width=3, dash="dash"),
+                        marker=dict(size=5, symbol="diamond"),
+                        hovertemplate="SARIMA<br>Week %{x}<br>Vooraanmelders: %{y:.0f}<extra></extra>",
+                        visible=False,
+                    ))
+                    prog_traces[prog].append(idx)
+
+            # ── XGBoost endpoint (conversion to students) ──
+            xgb_pred = self.data[
+                (self.data["Croho groepeernaam"] == prog)
+                & (self.data["Collegejaar"] == self.prediction_year)
+                & (self.data["SARIMA_cumulative"].notna())
+            ]
+            if not xgb_pred.empty:
+                xgb_val = xgb_pred["SARIMA_cumulative"].sum()
+                if xgb_val > 0:
+                    idx = len(fig.data)
+                    fig.add_trace(go.Scatter(
+                        x=["38"], y=[xgb_val],
+                        mode="markers+text",
+                        name="XGBoost (voorspelde studenten)",
+                        marker=dict(symbol="star", size=16, color="#2ca02c", line=dict(width=1, color="black")),
+                        text=[f"{xgb_val:.0f}"],
+                        textposition="middle right",
+                        textfont=dict(size=11, color="#2ca02c"),
+                        hovertemplate=f"XGBoost<br>Voorspelde studenten: {xgb_val:.0f}<extra></extra>",
+                        visible=False,
+                    ))
+                    prog_traces[prog].append(idx)
+
+            # ── Previous year realisation (reference) ──
+            if sc is not None:
+                real = sc[
+                    (sc["Croho groepeernaam"] == prog) & (sc["Collegejaar"] == prev_year)
+                ]["Aantal_studenten"].sum()
+                if real > 0:
+                    idx = len(fig.data)
+                    fig.add_trace(go.Scatter(
+                        x=[ACADEMIC_WEEKS[0], ACADEMIC_WEEKS[-1]],
+                        y=[real, real],
+                        mode="lines",
+                        name=f"Realisatie {prev_year}",
+                        line=dict(color="#333333", dash="dot", width=1.5),
+                        hovertemplate=f"Realisatie {prev_year}: {real:.0f}<extra></extra>",
+                        visible=False,
+                    ))
+                    prog_traces[prog].append(idx)
+
+        total_traces = len(fig.data)
+        if total_traces == 0:
+            return None
+
+        buttons = []
+        for prog in programmes:
+            vis = [False] * total_traces
+            for t_idx in prog_traces.get(prog, []):
+                vis[t_idx] = True
+            buttons.append(dict(label=prog, method="update", args=[{"visible": vis}]))
+
+        if programmes and prog_traces.get(programmes[0]):
+            for t_idx in prog_traces[programmes[0]]:
+                fig.data[t_idx].visible = True
+
+        fig.update_layout(
+            title=f"ML-pipeline: SARIMA → XGBoost ({self.prediction_year})",
+            xaxis_title="Weeknummer (academisch jaar)",
+            yaxis_title="Gewogen vooraanmelders / Voorspelde studenten",
+            height=550, hovermode="x unified",
+            updatemenus=[dict(
+                active=0, buttons=buttons,
+                x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
+            )],
         )
         self._add_predict_week_line(fig)
         return fig
@@ -2741,6 +2899,15 @@ class DashboardBuilder:
                 "Overzichtstabel met de belangrijkste evaluatiemetrieken: overall MAPE en MAE, "
                 "uitsplitsing naar herkomst en programmagrootte, bias-analyse, "
                 "en vergelijking met een naïef baselinemodel (vorig jaar = voorspelling)."))
+
+        fig = self._cumulative_pipeline_chart()
+        if fig:
+            charts.append(("ML-pipeline: SARIMA → XGBoost", fig,
+                "De twee stappen van het cumulatieve model. "
+                "Blauw: bekende gewogen vooraanmelders (t/m voorspelweek). "
+                "Oranje stippellijn: SARIMA-prognose van vooraanmelders (voorspelweek → week 38). "
+                "Groene ster: XGBoost-conversie van alle vooraanmelders naar voorspeld aantal studenten. "
+                "Stippellijn: realisatie vorig jaar als referentie."))
 
         fig = self._yearly_trend()
         if fig:
