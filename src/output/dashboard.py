@@ -2973,6 +2973,8 @@ class DashboardBuilder:
         pred = self.data[self.data["Collegejaar"] == self.prediction_year]
         if pred.empty:
             return None
+        if self.predict_week is not None:
+            pred = pred[pred["Weeknummer"] == self.predict_week]
 
         model_cols = [
             c for c in (
@@ -3095,7 +3097,6 @@ class DashboardBuilder:
         fill_cols: list[list] = [row_bg]
 
         for mc in model_cols:
-            color = MODEL_COLOURS.get(mc, "#666")
             header_vals.append(_display(mc))
             cell_vals.append(rows_models[mc])
             fill_cols.append(row_bg)
