@@ -105,8 +105,8 @@ class DashboardBuilder:
     # ── Data helpers ─────────────────────────────────────────────────
 
     def _hist_data(self) -> pd.DataFrame:
-        """Return all rows including prediction_year (for backtesting with actuals)."""
-        return self.data
+        """Return only rows with Collegejaar < prediction_year (actuals only)."""
+        return self.data[self.data["Collegejaar"] < self.prediction_year]
 
     def _get_actual_trend(self, programme: str) -> pd.DataFrame | None:
         """Weighted pre-applicants for *prediction_year*, summed over Herkomst, up to predict_week."""
@@ -146,7 +146,7 @@ class DashboardBuilder:
             return None
         dc = self.data_cumulative
         sc = self.data_studentcount
-        hist_years = sorted(dc["Collegejaar"].unique())
+        hist_years = sorted(y for y in dc["Collegejaar"].unique() if y < self.prediction_year)
         # Keep only the last 5 years for relevance
         hist_years = hist_years[-5:]
         if not hist_years:
