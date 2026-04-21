@@ -63,7 +63,7 @@ class CombinedStrategy(PredictionStrategy):
 
         from studentprognose.models.xgboost_classifier import predict_applicant
         print("Predicting preapplicants...")
-        predicties = predict_applicant(
+        predicties, self.individual.xgboost_importance = predict_applicant(
             self.individual.data_individual, self.predict_year, self.predict_week,
             self.individual.max_year,
             self.cumulative.data_cumulative,
@@ -134,7 +134,11 @@ class CombinedStrategy(PredictionStrategy):
             for _, row in chunk.iterrows()
         )
 
-        data_to_predict["SARIMA_individual"] = [x[0] for x in self.predicted_data]
+        # Extract endpoint (week-38 prediction) from each individual forecast array
+        data_to_predict["SARIMA_individual"] = [
+            x[0][-1] if len(x[0]) > 0 else np.nan
+            for x in self.predicted_data
+        ]
         data_to_predict["Voorspelde vooraanmelders"] = np.nan
 
         if self.predict_week != 38:
@@ -145,6 +149,9 @@ class CombinedStrategy(PredictionStrategy):
         data_to_predict = self.cumulative._predict_students_with_preapplicants(
             full_data, [x[1] for x in self.predicted_data], data_to_predict
         )
+
+        # Store XGBoost curve for pipeline visualization
+        self.individual._extract_xgboost_curve(predict_year, predict_week)
 
         return data_to_predict
 

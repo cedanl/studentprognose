@@ -88,7 +88,7 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
     Predicts nr of students with SARIMA per programme/origin/week for individual data.
 
     Returns:
-        float: predicted value, or np.nan on error.
+        list: predictions for each future week, or empty list on error.
     """
     from studentprognose.data.transforms import transform_data
 
@@ -145,9 +145,9 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
         if predict_week == FINAL_ACADEMIC_WEEK:
             ts_data = data.loc[:, get_all_weeks_valid(data.columns)].values.flatten()
             try:
-                return ts_data[-1]
+                return [ts_data[-1]]
             except IndexError:
-                return np.nan
+                return []
 
         if int(predict_week) > FINAL_ACADEMIC_WEEK:
             pred_len = FINAL_ACADEMIC_WEEK + WEEKS_PER_YEAR - int(predict_week)
@@ -168,7 +168,7 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             exogenous_train_1 = None
 
         if ts_data.size == 0:
-            return np.nan
+            return []
 
         try:
             if programme.startswith("B") and predict_week in SARIMA_BACHELOR_DEADLINE_WEEKS:
@@ -183,15 +183,15 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             else:
                 pred = model.forecast(steps=pred_len)
 
-            return pred[-1]
+            return pred
         except (LA.LinAlgError, IndexError, ValueError) as error:
             print(f"Individual error on: {programme}, {herkomst}")
             print(error)
-            return np.nan
+            return []
     except KeyError as error:
         print(f"Individual key error on: {programme}, {herkomst}")
         print(error)
-        return np.nan
+        return []
 
 
 def _get_transformed_data(data, min_training_year: int = 2016):

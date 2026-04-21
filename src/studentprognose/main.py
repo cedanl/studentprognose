@@ -6,6 +6,7 @@ from studentprognose.config import load_configuration
 from studentprognose.data.loader import load_data
 from studentprognose.utils.ci_subset import apply_ci_test_subset
 from studentprognose.output.postprocessor import PostProcessor
+from studentprognose.output.dashboard import DashboardBuilder
 from studentprognose.strategies import create_strategy
 from studentprognose.utils.weeks import DataOption, StudentYearPrediction, HIGHER_YEARS_COLUMNS
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
@@ -175,5 +176,41 @@ def _save_results(strategy, cfg):
         if strategy.postprocessor.data is not None:
             print("Saving output...")
             strategy.postprocessor.save_output(cfg.student_year_prediction)
+
+            data_cumulative = getattr(strategy, "data_cumulative", None)
+            if data_cumulative is None:
+                data_cumulative = getattr(
+                    getattr(strategy, "cumulative", None), "data_cumulative", None,
+                )
+            xgboost_curve = getattr(strategy, "xgboost_curve", None)
+            if xgboost_curve is None:
+                xgboost_curve = getattr(
+                    getattr(strategy, "individual", None), "xgboost_curve", None,
+                )
+
+            xgb_classifier_importance = getattr(
+                getattr(strategy, "individual", None), "xgboost_importance", None,
+            )
+            xgb_regressor_importance = getattr(
+                getattr(strategy, "cumulative", None), "xgboost_importance", None,
+            )
+            if xgb_regressor_importance is None and not hasattr(strategy, "individual"):
+                xgb_regressor_importance = getattr(strategy, "xgboost_importance", None)
+
+            dashboard = DashboardBuilder(
+                data=strategy.postprocessor.data,
+                data_option=cfg.data_option,
+                numerus_fixus_list=strategy.postprocessor.numerus_fixus_list,
+                student_year_prediction=cfg.student_year_prediction,
+                ci_test_n=cfg.ci_test_n,
+                cwd=os.getcwd(),
+                predict_week=cfg.weeks[-1] if cfg.weeks else None,
+                data_cumulative=data_cumulative,
+                data_studentcount=strategy.postprocessor.data_studentcount,
+                data_xgboost_curve=xgboost_curve,
+                xgb_classifier_importance=xgb_classifier_importance,
+                xgb_regressor_importance=xgb_regressor_importance,
+            )
+            dashboard.build_and_save()
         else:
             print("No data to save. Saving output skipped.")

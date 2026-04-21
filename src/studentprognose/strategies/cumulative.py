@@ -23,6 +23,8 @@ class CumulativeStrategy(PredictionStrategy):
         self.data_cumulative = data_cumulative
         self.data_studentcount = data_studentcount
         self.skip_years = 0
+        self.xgboost_importance = None
+        self._importance_dicts: list[dict] = []
 
     def preprocess(self):
         data = self.data_cumulative
@@ -208,6 +210,15 @@ class CumulativeStrategy(PredictionStrategy):
                 & (~data_to_predict["Croho groepeernaam"].isin(self.numerus_fixus_list)),
             )
 
+        if self._importance_dicts:
+            all_keys = set()
+            for d in self._importance_dicts:
+                all_keys.update(d.keys())
+            self.xgboost_importance = {
+                k: sum(d.get(k, 0.0) for d in self._importance_dicts) / len(self._importance_dicts)
+                for k in all_keys
+            }
+
         return data_to_predict
 
     def _predict_with_xgboost_extra_year(self, train, test, data_to_predict, replace_mask):
@@ -232,7 +243,9 @@ class CumulativeStrategy(PredictionStrategy):
                     )
                     return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
-                ahead_predictions = predict_with_xgboost(train2, test2_merged, self.data_studentcount)
+                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount)
+                if imp is not None:
+                    self._importance_dicts.append(imp)
                 test2["Collegejaar"] = test2["Collegejaar"] + self.skip_years
 
                 mask = (
@@ -259,7 +272,9 @@ class CumulativeStrategy(PredictionStrategy):
                         f"available (try increasing --ci test N)."
                     )
                     return data_to_predict
-                predictions = predict_with_xgboost(train, test_merged, self.data_studentcount)
+                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount)
+                if imp is not None:
+                    self._importance_dicts.append(imp)
 
                 mask = (
                     data_to_predict[columns_to_match]

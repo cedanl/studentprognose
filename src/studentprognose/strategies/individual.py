@@ -20,6 +20,8 @@ class IndividualStrategy(PredictionStrategy):
                          data_studentcount, cwd, data_option, ci_test_n)
 
         self.data_individual = data_individual
+        self.xgboost_curve = None
+        self.xgboost_importance = None
 
     def preprocess(self):
         data = self.data_individual
@@ -129,7 +131,7 @@ class IndividualStrategy(PredictionStrategy):
         self.set_year_week(predict_year, predict_week, self.data_individual)
 
         print("Predicting preapplicants...")
-        predicties = predict_applicant(
+        predicties, self.xgboost_importance = predict_applicant(
             self.data_individual, self.predict_year, self.predict_week,
             self.max_year, configuration=self.configuration
         )
@@ -167,11 +169,54 @@ class IndividualStrategy(PredictionStrategy):
             for _, row in chunk.iterrows()
         )
 
-        data_to_predict["SARIMA_individual"] = predicted_data
+        # Extract endpoint (week-38 prediction) from each forecast array
+        endpoints = [p[-1] if len(p) > 0 else np.nan for p in predicted_data]
+        data_to_predict["SARIMA_individual"] = endpoints
         data_to_predict["SARIMA_cumulative"] = np.nan
         data_to_predict["Voorspelde vooraanmelders"] = np.nan
 
+        # Expand full SARIMA trajectories into Voorspelde vooraanmelders rows
+        pred_len = (38 + 52 - int(predict_week)) if int(predict_week) > 38 else (38 - int(predict_week))
+        data_to_predict = self.postprocessor.add_predicted_preregistrations(
+            data_to_predict, [list(x[:pred_len]) if len(x) > 0 else [] for x in predicted_data]
+        )
+
+        # Store XGBoost aggregated curve (prediction year, wide format → long)
+        self._extract_xgboost_curve(predict_year, predict_week)
+
         return data_to_predict
+
+    def _extract_xgboost_curve(self, predict_year, predict_week):
+        """Extract the XGBoost-aggregated cumulative curve for the prediction year.
+
+        After transform_data(), data_individual is wide: group cols + week columns.
+        We melt the prediction year rows back to long format and store as self.xgboost_curve.
+        """
+        from studentprognose.utils.weeks import get_all_weeks_valid
+        di = self.data_individual
+        pred_rows = di[di["Collegejaar"] == predict_year]
+        if pred_rows.empty:
+            self.xgboost_curve = None
+            return
+
+        group_cols = ["Collegejaar", "Faculteit", "Herkomst", "Examentype", "Croho groepeernaam"]
+        week_cols = get_all_weeks_valid(pred_rows.columns)
+        if not week_cols:
+            self.xgboost_curve = None
+            return
+
+        melted = pred_rows[group_cols + week_cols].melt(
+            id_vars=group_cols, var_name="Weeknummer", value_name="XGBoost_cumulative",
+        )
+        melted["Weeknummer"] = melted["Weeknummer"].astype(int)
+        # Keep only weeks up to predict_week (the known XGBoost portion)
+        # Inline week sort key to avoid circular import with dashboard module
+        def _week_key(w):
+            return w - 39 if w >= 39 else w + 13
+        pw_key = _week_key(int(predict_week))
+        melted = melted[melted["Weeknummer"].apply(lambda w: _week_key(w) <= pw_key)]
+        melted = melted[melted["XGBoost_cumulative"] > 0]
+        self.xgboost_curve = melted
 
     def _predict_sarima(self, row, data_exog=None, already_printed=False):
         return predict_with_sarima_individual(
