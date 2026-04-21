@@ -1421,87 +1421,44 @@ class DashboardBuilder:
         return fig
 
     def _error_heatmap_animated(self, pred_col: str) -> go.Figure | None:
-        """Animated heatmap: one frame per collegejaar with play/pause + slider.
-
-        Used for SARIMA_individual which has meaningful week-by-week predictions.
-        """
+        """Heatmap: programmes (y) × collegejaar (x), coloured by MAPE for a single model."""
         hist = self._hist_data()
         if hist.empty or pred_col not in hist.columns:
             return None
         tmp = hist.copy()
 
-        if self.predict_week is not None:
-            pw_key = _week_sort_key(self.predict_week)
-            tmp = tmp[tmp["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) >= pw_key)]
-
         actual = tmp["Aantal_studenten"].replace(0, np.nan)
         tmp["_mape"] = (abs(tmp[pred_col].fillna(0) - tmp["Aantal_studenten"]) / actual).clip(upper=2.0)
 
-        flat_mapes = tmp["_mape"].dropna()
+        pivot = tmp.pivot_table(
+            index="Croho groepeernaam", columns="Collegejaar",
+            values="_mape", aggfunc="mean",
+        )
+        pivot.columns = [str(int(c)) for c in pivot.columns]
+        programmes = sorted(pivot.index)
+        pivot = pivot.reindex(index=programmes)
+
+        flat_mapes = pivot.values[~np.isnan(pivot.values)].flatten()
         zmax = max(float(np.percentile(flat_mapes, 90)), 0.15) if len(flat_mapes) > 0 else 0.5
 
-        years = sorted(tmp["Collegejaar"].unique())
-        programmes = sorted(tmp["Croho groepeernaam"].unique())
-        if self.predict_week is not None:
-            visible_weeks = [w for w in ACADEMIC_WEEKS if _week_sort_key(int(w)) >= pw_key]
-        else:
-            visible_weeks = ACADEMIC_WEEKS
+        hover = np.empty(pivot.shape, dtype=object)
+        for i, prog in enumerate(programmes):
+            for j, yr_col in enumerate(pivot.columns):
+                val = pivot.iloc[i, j]
+                hover[i, j] = f"MAPE: {val:.1%}" if pd.notna(val) else ""
 
-        frames = []
-        for yr in years:
-            sub = tmp[tmp["Collegejaar"] == yr]
-            pivot = sub.pivot_table(
-                index="Croho groepeernaam", columns="Weeknummer",
-                values="_mape", aggfunc="mean",
-            )
-            pivot.columns = pivot.columns.astype(str)
-            ordered = [w for w in visible_weeks if w in pivot.columns]
-            pivot = pivot.reindex(index=programmes, columns=ordered)
-
-            hover_text = pivot.map(
-                lambda v: f"MAPE: {v:.1%}" if pd.notna(v) else ""
-            ).values
-
-            frames.append(go.Frame(
-                data=[go.Heatmap(
-                    z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
-                    colorscale=[[0, "#2ca02c"], [0.4, "#f0ad4e"], [0.75, "#e74c3c"], [1.0, "#8b0000"]],
-                    zmin=0, zmax=zmax,
-                    colorbar=dict(title="MAPE", tickformat=".0%"),
-                    text=hover_text, hoverinfo="text+x+y",
-                )],
-                name=str(int(yr)),
-            ))
-
-        if not frames:
-            return None
-
-        fig = go.Figure(data=frames[0].data, frames=frames)
-        sliders = [dict(
-            active=0,
-            steps=[dict(
-                method="animate",
-                args=[[str(int(yr))], dict(frame=dict(duration=0, redraw=True), mode="immediate")],
-                label=str(int(yr)),
-            ) for yr in years],
-            currentvalue=dict(prefix="Collegejaar: "),
-        )]
+        fig = go.Figure(go.Heatmap(
+            z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
+            colorscale=[[0, "#2ca02c"], [0.4, "#f0ad4e"], [0.75, "#e74c3c"], [1.0, "#8b0000"]],
+            zmin=0, zmax=zmax,
+            colorbar=dict(title="MAPE", tickformat=".0%"),
+            text=hover, hoverinfo="text+x+y",
+        ))
         fig.update_layout(
             title=f"Fout-heatmap per jaar ({_display(pred_col)})",
-            xaxis_title="Weeknummer", yaxis_title="Opleiding",
-            height=max(450, len(programmes) * 25 + 200),
-            updatemenus=[dict(
-                type="buttons", showactive=False, y=1.15, x=0.5, xanchor="center",
-                buttons=[
-                    dict(label="Play", method="animate",
-                         args=[None, dict(frame=dict(duration=2000, redraw=True), fromcurrent=True)]),
-                    dict(label="Pause", method="animate",
-                         args=[[None], dict(frame=dict(duration=0, redraw=False), mode="immediate")]),
-                ],
-            )],
-            sliders=sliders,
+            xaxis_title="Collegejaar", yaxis_title="Opleiding",
+            height=max(400, len(programmes) * 25 + 150),
         )
-        self._add_predict_week_line(fig)
         return fig
 
     # ════════════════════════════════════════════════════════════════
@@ -2555,14 +2512,14 @@ class DashboardBuilder:
         fig = self._error_heatmap(mape_cols)
         if fig:
             charts.append(("Fout-heatmap", fig,
-                "Voorspelfout per opleiding (rij) en week (kolom). "
+                "Voorspelfout per opleiding (rij) en collegejaar (kolom). "
                 "Rode cellen verdienen aandacht: daar wijkt het model structureel af."))
 
         fig = self._error_heatmap_animated(pred_col)
         if fig:
             charts.append(("Fout-heatmap per jaar", fig,
-                "Animatie van de fout-heatmap per collegejaar. "
-                "Gebruik de afspeelknop om te zien hoe de fout zich jaar-op-jaar ontwikkelt."))
+                "Voorspelfout per opleiding (rij) en collegejaar (kolom) voor dit model. "
+                "Rode cellen wijzen op grotere afwijkingen."))
 
         fig = self._individual_error_by_herkomst()
         if fig:
@@ -3343,6 +3300,19 @@ class DashboardBuilder:
         )
         return fig
 
+    def _pipeline_banner(self) -> str:
+        labels = {
+            DataOption.INDIVIDUAL: ("Individueel", "#1f77b4"),
+            DataOption.CUMULATIVE: ("Cumulatief", "#ff7f0e"),
+            DataOption.BOTH_DATASETS: ("Beide (ensemble)", "#2ca02c"),
+        }
+        label, color = labels.get(self.data_option, ("Onbekend", "#999"))
+        return (
+            f'<div style="background:{color};color:#fff;padding:14px 24px;'
+            f'border-radius:8px;margin-bottom:20px;font-size:18px;font-weight:700">'
+            f'Pipeline: {label}</div>'
+        )
+
     def _final_kpi_cards(self) -> str:
         """KPI cards for the final dashboard: totals, year-on-year change, NF overshoot."""
         best_col = self._best_prediction_col()
@@ -3485,7 +3455,7 @@ class DashboardBuilder:
                 "Vergelijking van het huidige verloop met vorig jaar per opleiding. "
                 "Ligt de huidige lijn hoger, dan groeit de instroom; lager wijst op daling."))
 
-        kpi = self._final_kpi_cards()
+        kpi = self._pipeline_banner() + self._final_kpi_cards()
         self._save_page("final", charts, "Eindoverzicht", kpi)
 
     # ════════════════════════════════════════════════════════════════
