@@ -965,6 +965,9 @@ class DashboardBuilder:
 
             weekly[col] = weekly[col].clip(upper=2.0)
             weekly = weekly.sort_values("Weeknummer", key=_sort_weeks_series)
+            weekly = weekly.dropna(subset=[col])
+            if len(weekly) < 3:
+                continue
             fig.add_trace(go.Scatter(
                 x=weekly["Weeknummer"].astype(str), y=weekly[col],
                 mode="lines+markers", name=_display(model),
