@@ -5,7 +5,7 @@ import sys
 import datetime
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
-from src.config import load_configuration
+from studentprognose.config import load_configuration
 
 CONFIGURATION = load_configuration("configuration/configuration.json")
 

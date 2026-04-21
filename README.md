@@ -10,6 +10,7 @@
     <a href="https://github.com/cedanl"><img src="https://img.shields.io/badge/Onderhouden_door-CEDA-blue" alt="CEDA"></a>
     <img src="https://badgen.net/github/contributors/cedanl/studentprognose" alt="Contributors">
     <img src="https://img.shields.io/github/license/cedanl/studentprognose" alt="GitHub License">
+    <a href="https://pypi.org/project/studentprognose/"><img src="https://img.shields.io/pypi/v/studentprognose" alt="PyPI"></a>
     <br>
     <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
     <img src="https://badgen.net/github/last-commit/cedanl/studentprognose" alt="GitHub Last Commit">
@@ -23,6 +24,15 @@
 ---
 
 ## 📦 Aan de slag
+
+**Via pip** (aanbevolen voor gebruik):
+
+```bash
+pip install studentprognose
+studentprognose -w 6 -y 2024
+```
+
+**Via de broncode** (aanbevolen voor ontwikkeling / demodata):
 
 ```bash
 # 1. Installeer uv (zie https://docs.astral.sh/uv/getting-started/installation/)
@@ -38,6 +48,9 @@ uv run main.py
 
 > [!NOTE]
 > Demodata is meegeleverd in `data/input`, zodat je direct kunt starten. Controleer welke jaren en weken beschikbaar zijn — zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data.
+
+> [!TIP]
+> Na `pip install studentprognose` is het commando `studentprognose` beschikbaar en kun je alle `uv run main.py` voorbeelden vervangen door `studentprognose`.
 
 ---
 
@@ -88,6 +101,52 @@ Er zijn twee datasets beschikbaar: **individual** (per student) en **cumulative*
 uv run main.py -d individual
 uv run main.py -D cumulative
 uv run main.py -dataset both
+```
+
+### Datakwaliteitscontrole
+
+Bij elke run wordt de ruwe inputdata automatisch gevalideerd **voordat de ETL start**. Zo weet je zeker dat je nooit 20 minuten wacht voor een prognose op basis van corrupte data.
+
+Er zijn drie soorten bevindingen:
+
+| Type | Voorbeeld | Wat er gebeurt |
+|---|---|---|
+| **Fout** | Ontbrekend bestand, ontbrekende kolom | Pipeline stopt direct |
+| **Probleem** | Negatieve waarden, onbekende herkomstcode | Prompt: doorgaan of stoppen? |
+| **Waarschuwing** | Klein percentage ontbrekende waarden, weekgaten | Gelogd, pipeline loopt door |
+
+```
+Validatie gevonden problemen die prognoses kunnen beïnvloeden:
+  [PROBLEEM] telbestandY2025W10.csv: meercode_V = 0 voor 1 opleiding(en): B Opleiding X
+
+Als je doorgaat, kunnen sommige opleidingen worden overgeslagen of
+onbetrouwbare prognoses opleveren.
+
+Wil je doorgaan met de pipeline? [j/N]
+```
+
+Gebruik `--yes` om de prompt te omzeilen in geautomatiseerde runs (bijv. CI/CD):
+
+```bash
+studentprognose -w 6 -y 2025 --yes
+```
+
+> [!NOTE]
+> Met `--noetl` worden ETL én validatie overgeslagen. Gebruik dit alleen als de ruwe data al eerder succesvol verwerkt en gevalideerd is.
+
+#### Validatie-instellingen aanpassen
+
+De standaardwaarden (jaarbereiken, NaN-drempels, toegestane categorische waarden) staan in de broncode. Je kunt ze overschrijven door een `"validation"`-blok toe te voegen aan je `configuration.json`. Vermeld alleen de waarden die afwijken:
+
+```json
+{
+    "validation": {
+        "nan_error_threshold": 0.20,
+        "telbestand": {
+            "herkomst_allowed": ["N", "E", "R", "ONBEKEND"]
+        }
+    }
+}
 ```
 
 ### Configuratie
@@ -158,10 +217,11 @@ uv run main.py -y 2025 -w 5 -d c
 | Stap | Fase | Bestand |
 |------|------|---------|
 | 1 | CLI parsing | `cli.py` |
-| 2 | ETL (skip met `--noetl`) | `etl` |
-| 3 | Configuratie laden | `config.py` |
-| 4 | Data laden | `loader` → `preprocessing/add_zero_weeks` |
-| 5 | CI subset (indien `--ci`) | `utils/ci_subset` |
+| 2 | Validatie ruwe data (skip met `--noetl`) | `data/validation` |
+| 3 | ETL (skip met `--noetl`) | `data/etl` |
+| 4 | Configuratie laden | `config.py` |
+| 5 | Data laden | `loader` → `preprocessing/add_zero_weeks` |
+| 6 | CI subset (indien `--ci`) | `utils/ci_subset` |
 
 **Modus-specifieke stappen:**
 
