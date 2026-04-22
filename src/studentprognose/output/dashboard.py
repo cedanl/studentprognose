@@ -3510,12 +3510,6 @@ class DashboardBuilder:
                 "Voorspeld aantal studenten voor numerus-fixusopleidingen afgezet tegen de capaciteitsgrens. "
                 "Balk voorbij de rode lijn = verwachte overschrijding, mogelijk wachtlijst."))
 
-        fig = self._prognose_vs_vorig_jaar()
-        if fig:
-            charts.append(("Prognose vs Vorig Jaar", fig,
-                "Vergelijking van het huidige verloop met vorig jaar per opleiding. "
-                "Ligt de huidige lijn hoger, dan groeit de instroom; lager wijst op daling."))
-
         kpi = self._pipeline_banner() + self._final_kpi_cards()
         self._save_page("final", charts, "Eindoverzicht", kpi)
 
