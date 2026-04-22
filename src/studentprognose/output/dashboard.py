@@ -2958,22 +2958,16 @@ class DashboardBuilder:
     # ════════════════════════════════════════════════════════════════
 
     def _cockpit_with_confidence(self) -> go.Figure | None:
-        """Summary table with per-model prognoses side-by-side, realisation, and confidence."""
+        """Summary table: one prognosis number per programme for policymakers."""
+        best_col = self._best_prediction_col()
+        if best_col is None:
+            return None
+
         pred = self.data[self.data["Collegejaar"] == self.prediction_year]
         if pred.empty:
             return None
         if self.predict_week is not None:
             pred = pred[pred["Weeknummer"] == self.predict_week]
-
-        model_cols = [
-            c for c in (
-                "SARIMA_individual", "SARIMA_cumulative", "Prognose_ratio",
-                "Weighted_ensemble_prediction",
-            )
-            if c in pred.columns and pred[c].notna().any()
-        ]
-        if not model_cols:
-            return None
 
         programmes = sorted(pred["Croho groepeernaam"].unique())
         prev_year = self.prediction_year - 1
@@ -2981,15 +2975,18 @@ class DashboardBuilder:
         all_mape_cols = [c for c in hist.columns if c.startswith("MAPE_")] if not hist.empty else []
 
         rows_opl: list[str] = []
+        rows_prog: list[str] = []
         rows_real: list[str] = []
-        rows_models: dict[str, list[str]] = {c: [] for c in model_cols}
-        rows_spread: list[str] = []
+        rows_diff: list[str] = []
         rows_conf: list[str] = []
         conf_colors: list[str] = []
 
         for prog in programmes:
             rows_opl.append(prog)
             prog_pred = pred[pred["Croho groepeernaam"] == prog]
+
+            prognose = prog_pred[best_col].sum()
+            rows_prog.append(f"{prognose:.0f}" if pd.notna(prognose) and prognose > 0 else "–")
 
             realisatie = 0
             if self.data_studentcount is not None:
@@ -2999,20 +2996,12 @@ class DashboardBuilder:
                 ]["Aantal_studenten"].sum()
             rows_real.append(f"{realisatie:.0f}" if realisatie > 0 else "–")
 
-            model_values = {}
-            for mc in model_cols:
-                val = prog_pred[mc].sum()
-                if pd.notna(val) and val > 0:
-                    model_values[mc] = val
-                    rows_models[mc].append(f"{val:.0f}")
-                else:
-                    rows_models[mc].append("–")
-
-            if len(model_values) >= 2:
-                spread = max(model_values.values()) - min(model_values.values())
-                rows_spread.append(f"±{spread:.0f}")
+            if prognose > 0 and realisatie > 0:
+                delta = prognose - realisatie
+                pct = delta / realisatie
+                rows_diff.append(f"{delta:+.0f} ({pct:+.0%})")
             else:
-                rows_spread.append("–")
+                rows_diff.append("–")
 
             avg_mape = None
             if not hist.empty and all_mape_cols:
@@ -3055,20 +3044,16 @@ class DashboardBuilder:
 
         # ── Totaalrij ───────────────────────────────────────────────
         rows_opl.append("<b>Totaal</b>")
+        total_prog = sum(float(v) for v in rows_prog if v != "–")
+        rows_prog.append(f"<b>{total_prog:.0f}</b>")
         total_real = sum(float(v) for v in rows_real if v != "–")
         rows_real.append(f"<b>{total_real:.0f}</b>" if total_real > 0 else "–")
-
-        model_totals: dict[str, float] = {}
-        for mc in model_cols:
-            total = sum(float(v) for v in rows_models[mc] if v != "–")
-            model_totals[mc] = total
-            rows_models[mc].append(f"<b>{total:.0f}</b>")
-
-        if len(model_totals) >= 2:
-            spread = max(model_totals.values()) - min(model_totals.values())
-            rows_spread.append(f"<b>±{spread:.0f}</b>")
+        if total_prog > 0 and total_real > 0:
+            delta = total_prog - total_real
+            pct = delta / total_real
+            rows_diff.append(f"<b>{delta:+.0f} ({pct:+.0%})</b>")
         else:
-            rows_spread.append("–")
+            rows_diff.append("–")
         rows_conf.append("")
         conf_colors.append("#666666")
 
@@ -3080,27 +3065,10 @@ class DashboardBuilder:
         n = len(rows_opl)
         row_bg = ["white"] * (n - 1) + ["#e8e8e8"]
 
-        header_vals = ["Opleiding"]
-        cell_vals: list[list] = [rows_opl]
-        fill_cols: list[list] = [row_bg]
-
-        for mc in model_cols:
-            header_vals.append(_display(mc))
-            cell_vals.append(rows_models[mc])
-            fill_cols.append(row_bg)
-
-        if len(model_cols) >= 2:
-            header_vals.append("Spreiding")
-            cell_vals.append(rows_spread)
-            fill_cols.append(row_bg)
-
-        header_vals.append(f"Realisatie {prev_year}")
-        cell_vals.append(rows_real)
-        fill_cols.append(row_bg)
-
-        header_vals.append("Betrouwbaarheid")
-        cell_vals.append(rows_conf)
-        fill_cols.append([_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)])
+        header_vals = ["Opleiding", f"Prognose {self.prediction_year}", f"Realisatie {prev_year}", "Verschil", "Betrouwbaarheid"]
+        cell_vals = [rows_opl, rows_prog, rows_real, rows_diff, rows_conf]
+        fill_cols = [row_bg, row_bg, row_bg, row_bg,
+                     [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)]]
 
         fig = go.Figure(go.Table(
             header=dict(
@@ -3110,11 +3078,12 @@ class DashboardBuilder:
             cells=dict(
                 values=cell_vals,
                 fill_color=fill_cols,
-                font=dict(size=[11] * (n - 1) + [13]), align=["left"] + ["center"] * (len(header_vals) - 1),
+                font=dict(size=[11] * (n - 1) + [13]),
+                align=["left"] + ["center"] * (len(header_vals) - 1),
             ),
         ))
         fig.update_layout(
-            title=f"Modelvergelijking per opleiding ({self.prediction_year})",
+            title=f"Verwacht aantal studenten per opleiding ({self.prediction_year})",
             height=_chart_height(n),
         )
         return fig
