@@ -203,7 +203,14 @@ def _tune_xgboost(strategy, cfg, configuration, n_iter):
         )
 
         if not data_cum.empty:
+            target_cols = ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"]
+            target_df = (
+                data_cum[target_cols + ["Aantal_studenten"]]
+                .drop_duplicates(subset=target_cols)
+            )
+
             data_wide = transform_data(data_cum, "ts")
+            data_wide = data_wide.merge(target_df, on=target_cols, how="left")
             data_wide = data_wide.dropna(subset=["Aantal_studenten"])
 
             numeric_cols = ["Collegejaar"] + [str(x) for x in get_weeks_list(38)]
