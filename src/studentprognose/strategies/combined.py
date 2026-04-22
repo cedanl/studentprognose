@@ -8,29 +8,61 @@ from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy
 from studentprognose.utils.weeks import get_weeks_list
 from studentprognose.data.transforms import transform_data
-from studentprognose.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
+from studentprognose.models.sarima import (
+    predict_with_sarima_individual,
+    predict_with_sarima_cumulative,
+    _get_transformed_data,
+)
 
 
 class CombinedStrategy(PredictionStrategy):
-    def __init__(self, data_individual, data_cumulative,
-                 data_studentcount, configuration,
-                 data_latest, ensemble_weights, cwd, data_option, ci_test_n,
-                 years):
-        super().__init__(configuration, data_latest, ensemble_weights,
-                         data_studentcount, cwd, data_option, ci_test_n)
+    def __init__(
+        self,
+        data_individual,
+        data_cumulative,
+        data_studentcount,
+        configuration,
+        data_latest,
+        ensemble_weights,
+        cwd,
+        data_option,
+        ci_test_n,
+        years,
+    ):
+        super().__init__(
+            configuration,
+            data_latest,
+            ensemble_weights,
+            data_studentcount,
+            cwd,
+            data_option,
+            ci_test_n,
+        )
 
         self.individual = IndividualStrategy(
-            data_individual, configuration,
-            data_latest, ensemble_weights, data_studentcount,
-            cwd, data_option, ci_test_n,
+            data_individual,
+            configuration,
+            data_latest,
+            ensemble_weights,
+            data_studentcount,
+            cwd,
+            data_option,
+            ci_test_n,
         )
         self.cumulative = CumulativeStrategy(
-            data_cumulative, data_studentcount, configuration,
-            data_latest, ensemble_weights, cwd, data_option, ci_test_n,
+            data_cumulative,
+            data_studentcount,
+            configuration,
+            data_latest,
+            ensemble_weights,
+            cwd,
+            data_option,
+            ci_test_n,
         )
 
         if not all(
-            year in self.individual.data_individual["Collegejaar"].unique() for year in years
+            year in self.individual.data_individual["Collegejaar"].unique()
+            for year in years
         ):
             raise ValueError(
                 f"Selected years {years} not found in individual dataset. Proceeding with cumulative dataset."
@@ -45,46 +77,75 @@ class CombinedStrategy(PredictionStrategy):
         return self.cumulative.preprocess()
 
     def predict_nr_of_students(self, predict_year, predict_week, skip_years=0):
-        self.individual.data_individual = self.individual.data_individual_backup.copy(deep=True)
-        self.cumulative.data_cumulative = self.cumulative.data_cumulative_backup.copy(deep=True)
+        self.individual.data_individual = self.individual.data_individual_backup.copy(
+            deep=True
+        )
+        self.cumulative.data_cumulative = self.cumulative.data_cumulative_backup.copy(
+            deep=True
+        )
 
         self.set_year_week(predict_year, predict_week, self.cumulative.data_cumulative)
-        self.individual.set_year_week(predict_year, predict_week, self.individual.data_individual)
-        self.cumulative.set_year_week(predict_year, predict_week, self.cumulative.data_cumulative)
+        self.individual.set_year_week(
+            predict_year, predict_week, self.individual.data_individual
+        )
+        self.cumulative.set_year_week(
+            predict_year, predict_week, self.cumulative.data_cumulative
+        )
 
         self.individual.data_individual = self.individual.data_individual.merge(
             self.cumulative.data_cumulative,
             on=[
-                "Croho groepeernaam", "Collegejaar", "Faculteit",
-                "Examentype", "Weeknummer", "Herkomst",
+                "Croho groepeernaam",
+                "Collegejaar",
+                "Faculteit",
+                "Examentype",
+                "Weeknummer",
+                "Herkomst",
             ],
             how="left",
         )
 
         from studentprognose.models.xgboost_classifier import predict_applicant
+
         print("Predicting preapplicants...")
-        predicties, self.individual.xgboost_importance = predict_applicant(
-            self.individual.data_individual, self.predict_year, self.predict_week,
+        (
+            predicties,
+            self.individual.xgboost_importance,
+            self.individual.xgboost_training_log,
+        ) = predict_applicant(
+            self.individual.data_individual,
+            self.predict_year,
+            self.predict_week,
             self.individual.max_year,
             self.cumulative.data_cumulative,
             configuration=self.configuration,
         )
         self.individual.data_individual.loc[
             (self.individual.data_individual["Collegejaar"] == self.predict_year)
-            & (self.individual.data_individual["Weeknummer"].isin(get_weeks_list(self.predict_week))),
+            & (
+                self.individual.data_individual["Weeknummer"].isin(
+                    get_weeks_list(self.predict_week)
+                )
+            ),
             "Inschrijvingen_predictie",
         ] = predicties
 
         self.individual._transform_data_individual()
 
         temp_data_individual = self.individual.data_individual.copy(deep=True)
-        temp_data_individual["Weeknummer"] = self.individual.data_individual["Weeknummer"].astype(int)
+        temp_data_individual["Weeknummer"] = self.individual.data_individual[
+            "Weeknummer"
+        ].astype(int)
 
         self.data_exog = temp_data_individual.merge(
             self.cumulative.data_cumulative,
             on=[
-                "Croho groepeernaam", "Collegejaar", "Examentype",
-                "Faculteit", "Weeknummer", "Herkomst",
+                "Croho groepeernaam",
+                "Collegejaar",
+                "Examentype",
+                "Faculteit",
+                "Weeknummer",
+                "Herkomst",
             ],
             how="left",
         )
@@ -95,7 +156,9 @@ class CombinedStrategy(PredictionStrategy):
 
         self.cumulative._prepare_data()
 
-        full_data = _get_transformed_data(self.cumulative.data_cumulative.copy(deep=True), self.min_training_year)
+        full_data = _get_transformed_data(
+            self.cumulative.data_cumulative.copy(deep=True), self.min_training_year
+        )
         full_data["39"] = 0
 
         self.skip_years = skip_years
@@ -103,7 +166,11 @@ class CombinedStrategy(PredictionStrategy):
         data_to_predict = self.cumulative.data_cumulative[
             (self.cumulative.data_cumulative["Collegejaar"] == self.predict_year)
             & (self.cumulative.data_cumulative["Weeknummer"] == self.predict_week)
-            & (~self.cumulative.data_cumulative["Croho groepeernaam"].isin(self.exclude_from_combined))
+            & (
+                ~self.cumulative.data_cumulative["Croho groepeernaam"].isin(
+                    self.exclude_from_combined
+                )
+            )
         ]
         if self.programme_filtering != []:
             data_to_predict = data_to_predict[
@@ -124,7 +191,8 @@ class CombinedStrategy(PredictionStrategy):
         nr_CPU_cores = os.cpu_count()
         chunk_size = math.ceil(len(data_to_predict) / nr_CPU_cores)
         chunks = [
-            data_to_predict[i : i + chunk_size] for i in range(0, len(data_to_predict), chunk_size)
+            data_to_predict[i : i + chunk_size]
+            for i in range(0, len(data_to_predict), chunk_size)
         ]
 
         print("Start parallel predicting...")
@@ -136,8 +204,7 @@ class CombinedStrategy(PredictionStrategy):
 
         # Extract endpoint (week-38 prediction) from each individual forecast array
         data_to_predict["SARIMA_individual"] = [
-            x[0][-1] if len(x[0]) > 0 else np.nan
-            for x in self.predicted_data
+            x[0][-1] if len(x[0]) > 0 else np.nan for x in self.predicted_data
         ]
         data_to_predict["Voorspelde vooraanmelders"] = np.nan
 
@@ -161,15 +228,26 @@ class CombinedStrategy(PredictionStrategy):
         )
 
         sarima_individual = predict_with_sarima_individual(
-            self.individual.data_individual, row, self.predict_year, self.predict_week,
-            self.individual.max_year, self.numerus_fixus_list, self.data_exog, already_printed=True,
+            self.individual.data_individual,
+            row,
+            self.predict_year,
+            self.predict_week,
+            self.individual.max_year,
+            self.numerus_fixus_list,
+            self.data_exog,
+            already_printed=True,
         )
         if self.predict_week == 38:
             return sarima_individual, []
         else:
             predicted_preregistration = predict_with_sarima_cumulative(
-                self.cumulative.data_cumulative, row, self.predict_year, self.predict_week,
-                self.cumulative.pred_len, self.cumulative.skip_years, already_printed=True,
+                self.cumulative.data_cumulative,
+                row,
+                self.predict_year,
+                self.predict_week,
+                self.cumulative.pred_len,
+                self.cumulative.skip_years,
+                already_printed=True,
                 min_training_year=self.min_training_year,
             )
 

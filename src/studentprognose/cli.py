@@ -19,6 +19,7 @@ class PipelineConfig:
     ci_test_n: int | None = None
     noetl: bool = False
     yes: bool = False
+    tune: bool = False
 
 
 def _expand_slices(tokens):
@@ -74,20 +75,58 @@ def parse_args(argv):
 
     parser.add_argument("-w", "-W", "-week", nargs="*", default=None, dest="weeks")
     parser.add_argument("-y", "-Y", "-year", nargs="*", default=None, dest="years")
-    parser.add_argument("-d", "-D", "-dataset", choices=list(DATASET_MAP.keys()), default=None, dest="dataset")
-    parser.add_argument("-c", "-C", "-configuration", default="configuration/configuration.json", dest="configuration")
-    parser.add_argument("-f", "-F", "-filtering", nargs="*", default=None, dest="filtering")
-    parser.add_argument("-sy", "-SY", "-studentyear", choices=list(STUDENT_YEAR_MAP.keys()), default=None, dest="studentyear")
-    parser.add_argument("-sk", "-SK", "-skipyears", type=int, default=0, dest="skipyears")
+    parser.add_argument(
+        "-d",
+        "-D",
+        "-dataset",
+        choices=list(DATASET_MAP.keys()),
+        default=None,
+        dest="dataset",
+    )
+    parser.add_argument(
+        "-c",
+        "-C",
+        "-configuration",
+        default="configuration/configuration.json",
+        dest="configuration",
+    )
+    parser.add_argument(
+        "-f", "-F", "-filtering", nargs="*", default=None, dest="filtering"
+    )
+    parser.add_argument(
+        "-sy",
+        "-SY",
+        "-studentyear",
+        choices=list(STUDENT_YEAR_MAP.keys()),
+        default=None,
+        dest="studentyear",
+    )
+    parser.add_argument(
+        "-sk", "-SK", "-skipyears", type=int, default=0, dest="skipyears"
+    )
     parser.add_argument("--ci", nargs=2, metavar=("test", "N"), default=None)
-    parser.add_argument("--noetl", action="store_true", help="Sla ETL én validatie over (gebruik dit alleen als de ruwe data al eerder verwerkt en gevalideerd is)")
-    parser.add_argument("--yes", action="store_true", help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)")
+    parser.add_argument(
+        "--noetl",
+        action="store_true",
+        help="Sla ETL én validatie over (gebruik dit alleen als de ruwe data al eerder verwerkt en gevalideerd is)",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)",
+    )
+    parser.add_argument(
+        "--tune",
+        action="store_true",
+        help="Draai hyperparameter tuning voor alle modellen (resultaten gecacht in data/output/tuning_cache.json)",
+    )
 
     args = parser.parse_args(argv[1:])
 
     cfg = PipelineConfig()
     cfg.noetl = args.noetl
     cfg.yes = args.yes
+    cfg.tune = args.tune
 
     # Configuration path
     if args.configuration and os.path.exists(args.configuration):
@@ -113,11 +152,15 @@ def parse_args(argv):
     # CI test
     if args.ci is not None:
         if args.ci[0] != "test":
-            raise SystemExit(f"Invalid --ci argument: '{args.ci[0]}'. Usage: --ci test <N>")
+            raise SystemExit(
+                f"Invalid --ci argument: '{args.ci[0]}'. Usage: --ci test <N>"
+            )
         try:
             cfg.ci_test_n = int(args.ci[1])
         except ValueError:
-            raise SystemExit(f"Invalid --ci argument: '{args.ci[1]}'. Usage: --ci test <N>")
+            raise SystemExit(
+                f"Invalid --ci argument: '{args.ci[1]}'. Usage: --ci test <N>"
+            )
 
     # Weeks
     if args.weeks is not None and len(args.weeks) > 0:

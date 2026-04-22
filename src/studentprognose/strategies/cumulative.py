@@ -6,19 +6,39 @@ import math
 
 import warnings
 from statsmodels.tools.sm_exceptions import ConvergenceWarning
+
 warnings.simplefilter("ignore", ConvergenceWarning)
 
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import increment_week
-from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
+from studentprognose.models.sarima import (
+    predict_with_sarima_cumulative,
+    _get_transformed_data,
+)
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
 
 
 class CumulativeStrategy(PredictionStrategy):
-    def __init__(self, data_cumulative, data_studentcount, configuration,
-                 data_latest, ensemble_weights, cwd, data_option, ci_test_n):
-        super().__init__(configuration, data_latest, ensemble_weights,
-                         data_studentcount, cwd, data_option, ci_test_n)
+    def __init__(
+        self,
+        data_cumulative,
+        data_studentcount,
+        configuration,
+        data_latest,
+        ensemble_weights,
+        cwd,
+        data_option,
+        ci_test_n,
+    ):
+        super().__init__(
+            configuration,
+            data_latest,
+            ensemble_weights,
+            data_studentcount,
+            cwd,
+            data_option,
+            ci_test_n,
+        )
 
         self.data_cumulative = data_cumulative
         self.data_studentcount = data_studentcount
@@ -45,19 +65,33 @@ class CumulativeStrategy(PredictionStrategy):
         data = data[data["Hogerejaars"] == "Nee"]
 
         data = (
-            data.groupby([
-                "Collegejaar", "Croho groepeernaam", "Faculteit",
-                "Examentype", "Herkomst", "Weeknummer",
-            ])
+            data.groupby(
+                [
+                    "Collegejaar",
+                    "Croho groepeernaam",
+                    "Faculteit",
+                    "Examentype",
+                    "Herkomst",
+                    "Weeknummer",
+                ]
+            )
             .sum(numeric_only=False)
             .reset_index()
         )
-        data = data[[
-            "Weeknummer", "Collegejaar", "Faculteit", "Examentype",
-            "Herkomst", "Croho groepeernaam", "Gewogen vooraanmelders",
-            "Ongewogen vooraanmelders", "Aantal aanmelders met 1 aanmelding",
-            "Inschrijvingen",
-        ]]
+        data = data[
+            [
+                "Weeknummer",
+                "Collegejaar",
+                "Faculteit",
+                "Examentype",
+                "Herkomst",
+                "Croho groepeernaam",
+                "Gewogen vooraanmelders",
+                "Ongewogen vooraanmelders",
+                "Aantal aanmelders met 1 aanmelding",
+                "Inschrijvingen",
+            ]
+        ]
 
         self.data_cumulative = data.sort_values(
             by=["Croho groepeernaam", "Herkomst", "Collegejaar", "Weeknummer"]
@@ -83,7 +117,9 @@ class CumulativeStrategy(PredictionStrategy):
             {"Weeknummer": "int32", "Collegejaar": "int32"}
         )
 
-        full_data = _get_transformed_data(self.data_cumulative.copy(deep=True), self.min_training_year)
+        full_data = _get_transformed_data(
+            self.data_cumulative.copy(deep=True), self.min_training_year
+        )
         full_data["39"] = 0
 
         self.skip_years = skip_years
@@ -111,7 +147,8 @@ class CumulativeStrategy(PredictionStrategy):
         nr_CPU_cores = os.cpu_count()
         chunk_size = math.ceil(len(data_to_predict) / nr_CPU_cores)
         chunks = [
-            data_to_predict[i : i + chunk_size] for i in range(0, len(data_to_predict), chunk_size)
+            data_to_predict[i : i + chunk_size]
+            for i in range(0, len(data_to_predict), chunk_size)
         ]
 
         print("Start parallel predicting...")
@@ -142,7 +179,8 @@ class CumulativeStrategy(PredictionStrategy):
                 how="left",
             )
         self.data_cumulative["ts"] = (
-            self.data_cumulative["Gewogen vooraanmelders"] + self.data_cumulative["Inschrijvingen"]
+            self.data_cumulative["Gewogen vooraanmelders"]
+            + self.data_cumulative["Inschrijvingen"]
         )
         self.data_cumulative = self.data_cumulative.drop_duplicates()
 
@@ -153,8 +191,14 @@ class CumulativeStrategy(PredictionStrategy):
 
     def _predict_sarima(self, row, already_printed=False):
         return predict_with_sarima_cumulative(
-            self.data_cumulative, row, self.predict_year, self.predict_week,
-            self.pred_len, self.skip_years, already_printed, self.min_training_year
+            self.data_cumulative,
+            row,
+            self.predict_year,
+            self.predict_week,
+            self.pred_len,
+            self.skip_years,
+            already_printed,
+            self.min_training_year,
         )
 
     def _predict_students_with_preapplicants(self, data, predictions, data_to_predict):
@@ -180,7 +224,8 @@ class CumulativeStrategy(PredictionStrategy):
 
             if programme in self.numerus_fixus_list:
                 train = data[
-                    (data["Croho groepeernaam"] == programme) & (data["Examentype"] == examentype)
+                    (data["Croho groepeernaam"] == programme)
+                    & (data["Examentype"] == examentype)
                 ]
                 test = data[
                     (data["Croho groepeernaam"] == programme)
@@ -188,7 +233,9 @@ class CumulativeStrategy(PredictionStrategy):
                     & (data["Examentype"] == examentype)
                 ]
                 data_to_predict = self._predict_with_xgboost_extra_year(
-                    train, test, data_to_predict,
+                    train,
+                    test,
+                    data_to_predict,
                     (data_to_predict["Croho groepeernaam"] == programme)
                     & (data_to_predict["Herkomst"] == herkomst)
                     & (data_to_predict["Examentype"] == examentype),
@@ -205,9 +252,13 @@ class CumulativeStrategy(PredictionStrategy):
                 & (~data["Croho groepeernaam"].isin(self.numerus_fixus_list))
             ]
             data_to_predict = self._predict_with_xgboost_extra_year(
-                train, test, data_to_predict,
+                train,
+                test,
+                data_to_predict,
                 (data_to_predict["Examentype"] == examtype)
-                & (~data_to_predict["Croho groepeernaam"].isin(self.numerus_fixus_list)),
+                & (
+                    ~data_to_predict["Croho groepeernaam"].isin(self.numerus_fixus_list)
+                ),
             )
 
         if self._importance_dicts:
@@ -215,19 +266,28 @@ class CumulativeStrategy(PredictionStrategy):
             for d in self._importance_dicts:
                 all_keys.update(d.keys())
             self.xgboost_importance = {
-                k: sum(d.get(k, 0.0) for d in self._importance_dicts) / len(self._importance_dicts)
+                k: sum(d.get(k, 0.0) for d in self._importance_dicts)
+                / len(self._importance_dicts)
                 for k in all_keys
             }
 
         return data_to_predict
 
-    def _predict_with_xgboost_extra_year(self, train, test, data_to_predict, replace_mask):
+    def _predict_with_xgboost_extra_year(
+        self, train, test, data_to_predict, replace_mask
+    ):
         columns_to_match = [
-            "Collegejaar", "Faculteit", "Examentype", "Herkomst", "Croho groepeernaam",
+            "Collegejaar",
+            "Faculteit",
+            "Examentype",
+            "Herkomst",
+            "Croho groepeernaam",
         ]
 
         if self.skip_years > 0:
-            train2 = train[(train["Collegejaar"] < self.predict_year - (self.skip_years * 2))]
+            train2 = train[
+                (train["Collegejaar"] < self.predict_year - (self.skip_years * 2))
+            ]
             train2["Collegejaar"] = train2["Collegejaar"] + self.skip_years
             test2 = test[(test["Collegejaar"] == self.predict_year - self.skip_years)]
             test2["Collegejaar"] = test2["Collegejaar"] + self.skip_years
@@ -243,7 +303,9 @@ class CumulativeStrategy(PredictionStrategy):
                     )
                     return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
-                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount)
+                ahead_predictions, imp, _ = predict_with_xgboost(
+                    train2, test2_merged, self.data_studentcount, self.configuration
+                )
                 if imp is not None:
                     self._importance_dicts.append(imp)
                 test2["Collegejaar"] = test2["Collegejaar"] + self.skip_years
@@ -254,9 +316,13 @@ class CumulativeStrategy(PredictionStrategy):
                     .isin(test2_merged[columns_to_match].apply(tuple, axis=1))
                 )
                 full_mask = (
-                    replace_mask & (data_to_predict["Weeknummer"] == self.predict_week) & mask
+                    replace_mask
+                    & (data_to_predict["Weeknummer"] == self.predict_week)
+                    & mask
                 )
-                data_to_predict.loc[full_mask, "Skip_prediction"] = ahead_predictions[: full_mask.sum()]
+                data_to_predict.loc[full_mask, "Skip_prediction"] = ahead_predictions[
+                    : full_mask.sum()
+                ]
         else:
             train = train[(train["Collegejaar"] < self.predict_year)]
             test = test[(test["Collegejaar"] == self.predict_year)]
@@ -272,7 +338,9 @@ class CumulativeStrategy(PredictionStrategy):
                         f"available (try increasing --ci test N)."
                     )
                     return data_to_predict
-                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount)
+                predictions, imp, _ = predict_with_xgboost(
+                    train, test_merged, self.data_studentcount, self.configuration
+                )
                 if imp is not None:
                     self._importance_dicts.append(imp)
 
@@ -282,8 +350,12 @@ class CumulativeStrategy(PredictionStrategy):
                     .isin(test_merged[columns_to_match].apply(tuple, axis=1))
                 )
                 full_mask = (
-                    replace_mask & (data_to_predict["Weeknummer"] == self.predict_week) & mask
+                    replace_mask
+                    & (data_to_predict["Weeknummer"] == self.predict_week)
+                    & mask
                 )
-                data_to_predict.loc[full_mask, "SARIMA_cumulative"] = predictions[: full_mask.sum()]
+                data_to_predict.loc[full_mask, "SARIMA_cumulative"] = predictions[
+                    : full_mask.sum()
+                ]
 
         return data_to_predict

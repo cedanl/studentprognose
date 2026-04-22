@@ -47,6 +47,50 @@ Standaard: `2016`
 
 Het vroegste collegejaar dat als trainingsdata wordt meegenomen. Data van vóór dit jaar wordt genegeerd. Verlaag dit alleen als je betrouwbare historische data hebt die verder teruggaat.
 
+### `hyperparameters`
+
+Optionele sectie waarmee je de hyperparameters van de ML-modellen kunt instellen. Als deze sectie ontbreekt, gebruikt de pipeline sensibele standaardwaarden.
+
+#### `tuning_n_iter`
+
+Standaard: `50`
+
+Het aantal willekeurige parametercombinaties dat `--tune` uitprobeert per XGBoost-model. De volledige zoekruimte bevat 2.187 combinaties; met randomized search worden er `tuning_n_iter` uit gesampled. Zet op `null` voor een exhaustieve grid search (aanzienlijk langzamer).
+
+#### `xgboost_classifier`
+
+| Parameter | Standaard | Omschrijving |
+|-----------|-----------|-------------|
+| `n_estimators` | `500` | Maximum aantal bomen (plafond; early stopping bepaalt het werkelijke aantal) |
+| `learning_rate` | `0.05` | Leertempo per boom |
+| `max_depth` | `6` | Maximale diepte per boom |
+| `subsample` | `0.8` | Fractie van trainingsdata per boom |
+| `colsample_bytree` | `0.8` | Fractie van features per boom |
+| `min_child_weight` | `5` | Minimale som van instantiegewichten in een blad |
+| `reg_alpha` | `0.1` | L1-regularisatie |
+| `reg_lambda` | `1.0` | L2-regularisatie |
+| `scale_pos_weight` | `null` | Klasseverhouding. `null` = automatisch berekend uit trainingsdata |
+| `early_stopping_rounds` | `50` | Stop training als de validatiefout 50 rondes niet verbetert |
+
+#### `xgboost_regressor`
+
+Dezelfde parameters als de classifier (zonder `scale_pos_weight`), met identieke standaardwaarden.
+
+#### `sarima`
+
+| Parameter | Standaard | Omschrijving |
+|-----------|-----------|-------------|
+| `auto_order_selection` | `true` | Gebruik AIC grid search voor orderselectie per tijdreeks |
+| `max_p`, `max_d`, `max_q` | `2`, `1`, `2` | Maximale ARIMA-orde voor grid search |
+| `max_P`, `max_D`, `max_Q` | `1`, `1`, `1` | Maximale seizoensorde voor grid search |
+| `seasonal_period` | `52` | Seizoenslengte in weken |
+| `selection_criterion` | `aic` | Selectiecriterium (`aic` of `bic`) |
+
+Zet `auto_order_selection` op `false` om de bestaande hardcoded SARIMA-orders te gebruiken in plaats van AIC-selectie.
+
+!!! note "Tuning cache overschrijft configuratie"
+    Als je `--tune` hebt gedraaid, worden de geoptimaliseerde parameters opgeslagen in `data/output/tuning_cache.json`. Deze cache heeft prioriteit boven de waarden in `configuration.json`. Verwijder het cachebestand om terug te vallen op de configuratiewaarden.
+
 ## `numerus_fixus`
 
 Een object met opleidingsnamen als sleutels en het maximale inschrijvingsaantal als waarde:

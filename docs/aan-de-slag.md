@@ -50,9 +50,18 @@ uv run studentprognose -d c
 
 # ETL overslaan (data al eerder verwerkt)
 uv run studentprognose --noetl
+
+# Hyperparameter tuning draaien (resultaten gecacht)
+uv run studentprognose --tune -w 12 -y 2025 -d b --noetl
 ```
 
 De output verschijnt in `data/output/`.
+
+### Hyperparameter tuning
+
+Met `--tune` draait de pipeline een grid search over XGBoost-hyperparameters en SARIMA-ordes vóór de reguliere voorspelling. De gevonden parameters worden opgeslagen in `data/output/tuning_cache.json` en automatisch hergebruikt bij volgende runs (ook zonder `--tune`).
+
+Tuning duurt 5–60 minuten afhankelijk van de hoeveelheid data. Je hoeft het niet bij elke run te doen — typisch eenmaal per studiejaar of na significante datawijzigingen. Zie [Configuratie](configuratie.md#hyperparameters) voor de configureerbare grid-search-parameters.
 
 ## CLI-referentie
 
@@ -67,6 +76,7 @@ De output verschijnt in `data/output/`.
 | `-sk` | getal | `0` | Skip N jaren (backtesting) |
 | `--noetl` | — | uit | Sla ETL én validatie over |
 | `--yes` | — | uit | Sla validatieprompts over (voor CI/CD) |
+| `--tune` | — | uit | Draai hyperparameter tuning vóór de voorspelling |
 | `--ci test N` | getal | — | Testmodus: beperkt tot N opleidingen |
 
 Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.

@@ -14,15 +14,23 @@ Aanmelddata heeft een sterk seizoenspatroon (jaarlijkse cyclus, wekelijkse granu
 
 $$SARIMA(p, d, q)(P, D, Q)_{52}$$
 
-De seizoenslengte is altijd **52 weken**. De overige parameters zijn **vaste waarden** — er wordt geen automatische parameter-selectie toegepast. De keuze hangt af van het spoor en het moment in het jaar:
+De seizoenslengte is altijd **52 weken**. De implementatie gebruikt `statsmodels.tsa.statespace.SARIMAX`. Zie `src/studentprognose/models/sarima.py` voor de `SARIMAForecaster`-klasse.
+
+### Orderselectie
+
+Met `--tune` wordt per tijdreeks (opleiding × herkomst × examentype) een **AIC grid search** uitgevoerd over een beperkte parameterruimte. Het model met de laagste AIC wordt gekozen als optimale configuratie. De gevonden ordes worden gecacht in `data/output/tuning_cache.json`.
+
+De gridgrenzen zijn configureerbaar via `configuration.json` onder `model_config.hyperparameters.sarima` (standaard: p ≤ 2, d ≤ 1, q ≤ 2, P ≤ 1, D ≤ 1, Q ≤ 1 = 144 combinaties per tijdreeks).
+
+### Fallback-ordes
+
+Als er geen gecachte ordes beschikbaar zijn (geen `--tune` gedraaid), valt het model terug op vaste waarden:
 
 | Situatie | Order `(p,d,q)` | Seizoensorder `(P,D,Q)` |
 |----------|----------------|------------------------|
 | Cumulatief spoor | `(1, 0, 1)` | `(1, 1, 1)` |
 | Individueel — Bachelor, weken 17–21 | `(1, 0, 1)` | `(1, 1, 1)` |
 | Individueel — overige gevallen | `(1, 1, 1)` | `(1, 1, 0)` |
-
-De implementatie gebruikt `statsmodels.tsa.statespace.SARIMAX`. Zie `src/studentprognose/models/sarima.py` voor de `SARIMAForecaster`-klasse.
 
 ## Exogene variabelen (individueel spoor)
 

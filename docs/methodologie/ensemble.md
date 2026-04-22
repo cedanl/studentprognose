@@ -58,3 +58,7 @@ De gewichten gelden voor specifieke weekperiodes en examentypes:
 Week 38 (einddeadline) gebruikt altijd 100% het individuele SARIMA-model en is niet configureerbaar.
 
 Pas de gewichten aan op basis van validatieresultaten voor jouw instelling. Zie [Configuratie](../configuratie.md) voor de volledige optiedocumentatie.
+
+## Getuned modellen in het ensemble
+
+Wanneer `--tune` is gebruikt, trainen de onderliggende modellen (XGBoost classifier, regressor en SARIMA) met geoptimaliseerde hyperparameters. Dit verbetert de kwaliteit van de individuele modelvoorspellingen die het ensemble combineert. De ensemble-gewichten zelf worden niet gewijzigd door tuning — deze worden nog steeds bepaald via `ensemble_weights.xlsx` of de configureerbare weekgewichten.

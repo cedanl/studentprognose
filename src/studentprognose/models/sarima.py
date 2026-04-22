@@ -5,10 +5,15 @@ import statsmodels.api as sm
 from studentprognose.models.base import BaseForecaster
 from studentprognose.utils.weeks import get_all_weeks_valid
 from studentprognose.utils.constants import (
-    FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR,
-    SARIMA_ORDER, SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
+    FINAL_ACADEMIC_WEEK,
+    WEEKS_PER_YEAR,
+    SARIMA_ORDER,
+    SARIMA_ORDER_INDIVIDUAL,
+    SARIMA_SEASONAL_ORDER,
+    SARIMA_SEASONAL_ORDER_ALT,
     SARIMA_BACHELOR_DEADLINE_WEEKS,
 )
+from studentprognose.tuning.cache import load_sarima_order
 
 
 class SARIMAForecaster(BaseForecaster):
@@ -39,9 +44,39 @@ def create_time_series(data, pred_len):
     return np.array(ts_data)
 
 
-def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_week, pred_len, skip_years=0, already_printed=False, min_training_year: int = 2016) -> list:
-    """
-    Predicts pre-registrations with SARIMA per programme/origin/week for cumulative data.
+def _resolve_sarima_orders(
+    programme,
+    herkomst,
+    examentype,
+    strategy_type,
+    predict_week=None,
+    numerus_fixus_list=None,
+):
+    """Resolve SARIMA orders: check cache first, then fall back to hardcoded constants."""
+    cached = load_sarima_order(programme, herkomst, examentype, strategy_type)
+    if cached is not None:
+        return tuple(cached["order"]), tuple(cached["seasonal_order"])
+
+    if strategy_type == "individual":
+        if programme.startswith("B") and predict_week in SARIMA_BACHELOR_DEADLINE_WEEKS:
+            return SARIMA_ORDER, SARIMA_SEASONAL_ORDER
+        else:
+            return SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER_ALT
+    else:
+        return SARIMA_ORDER, SARIMA_SEASONAL_ORDER
+
+
+def predict_with_sarima_cumulative(
+    data_cumulative,
+    row,
+    predict_year,
+    predict_week,
+    pred_len,
+    skip_years=0,
+    already_printed=False,
+    min_training_year: int = 2016,
+) -> list:
+    """Predicts pre-registrations with SARIMA per programme/origin/week for cumulative data.
 
     Returns:
         list: predictions for each future week, or empty list on error.
@@ -72,7 +107,13 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
     ts_data = create_time_series(data, pred_len)
 
     try:
-        model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
+        order, seasonal_order = _resolve_sarima_orders(
+            programme,
+            herkomst,
+            examentype,
+            "cumulative",
+        )
+        model = SARIMAForecaster(order=order, seasonal_order=seasonal_order)
         model.fit(ts_data)
         pred = model.forecast(steps=pred_len)
         return pred
@@ -83,9 +124,17 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
         return []
 
 
-def predict_with_sarima_individual(data_individual, row, predict_year, predict_week, max_year, numerus_fixus_list, data_exog=None, already_printed=False) -> float:
-    """
-    Predicts nr of students with SARIMA per programme/origin/week for individual data.
+def predict_with_sarima_individual(
+    data_individual,
+    row,
+    predict_year,
+    predict_week,
+    max_year,
+    numerus_fixus_list,
+    data_exog=None,
+    already_printed=False,
+) -> float:
+    """Predicts nr of students with SARIMA per programme/origin/week for individual data.
 
     Returns:
         list: predictions for each future week, or empty list on error.
@@ -134,7 +183,9 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
 
     if data_exog is not None:
         data_exog["Deadline"] = data_exog.apply(
-            lambda x: deadline_week(x["Weeknummer"], x["Croho groepeernaam"], x["Examentype"]),
+            lambda x: deadline_week(
+                x["Weeknummer"], x["Croho groepeernaam"], x["Examentype"]
+            ),
             axis=1,
         )
 
@@ -171,10 +222,15 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             return []
 
         try:
-            if programme.startswith("B") and predict_week in SARIMA_BACHELOR_DEADLINE_WEEKS:
-                model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
-            else:
-                model = SARIMAForecaster(order=SARIMA_ORDER_INDIVIDUAL, seasonal_order=SARIMA_SEASONAL_ORDER_ALT)
+            order, seasonal_order = _resolve_sarima_orders(
+                programme,
+                herkomst,
+                examentype,
+                "individual",
+                predict_week=predict_week,
+                numerus_fixus_list=numerus_fixus_list,
+            )
+            model = SARIMAForecaster(order=order, seasonal_order=seasonal_order)
 
             model.fit(ts_data, exog=exogenous_train_1)
 
@@ -195,13 +251,7 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
 
 
 def _get_transformed_data(data, min_training_year: int = 2016):
-    """Helper to transform cumulative data for SARIMA.
-
-    Args:
-        data: Cumulative pre-application data.
-        min_training_year: Earliest academic year included in training. Should be
-            read from ``model_config.min_training_year`` in the caller's configuration.
-    """
+    """Helper to transform cumulative data for SARIMA."""
     from studentprognose.data.transforms import transform_data
 
     data = data.drop_duplicates()

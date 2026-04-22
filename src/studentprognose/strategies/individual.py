@@ -6,18 +6,40 @@ import os
 import math
 
 from studentprognose.strategies.base import PredictionStrategy
-from studentprognose.utils.weeks import get_weeks_list, get_all_weeks_valid, decrement_week
+from studentprognose.utils.weeks import (
+    get_weeks_list,
+    get_all_weeks_valid,
+    decrement_week,
+)
 from studentprognose.data.transforms import transform_data
-from studentprognose.models.xgboost_classifier import predict_applicant, DEFAULT_STATUS_MAP
+from studentprognose.models.xgboost_classifier import (
+    predict_applicant,
+    DEFAULT_STATUS_MAP,
+)
 from studentprognose.models.sarima import predict_with_sarima_individual
 
 
 class IndividualStrategy(PredictionStrategy):
-    def __init__(self, data_individual, configuration,
-                 data_latest, ensemble_weights, data_studentcount,
-                 cwd, data_option, ci_test_n):
-        super().__init__(configuration, data_latest, ensemble_weights,
-                         data_studentcount, cwd, data_option, ci_test_n)
+    def __init__(
+        self,
+        data_individual,
+        configuration,
+        data_latest,
+        ensemble_weights,
+        data_studentcount,
+        cwd,
+        data_option,
+        ci_test_n,
+    ):
+        super().__init__(
+            configuration,
+            data_latest,
+            ensemble_weights,
+            data_studentcount,
+            cwd,
+            data_option,
+            ci_test_n,
+        )
 
         self.data_individual = data_individual
         self.xgboost_curve = None
@@ -50,9 +72,9 @@ class IndividualStrategy(PredictionStrategy):
             except AttributeError:
                 return np.nan
 
-        data["Datum intrekking vooraanmelding"] = data["Datum intrekking vooraanmelding"].apply(
-            to_weeknummer
-        )
+        data["Datum intrekking vooraanmelding"] = data[
+            "Datum intrekking vooraanmelding"
+        ].apply(to_weeknummer)
         data["Weeknummer"] = data["Datum Verzoek Inschr"].apply(to_weeknummer)
 
         def get_herkomst(nat, eer):
@@ -63,7 +85,9 @@ class IndividualStrategy(PredictionStrategy):
             else:
                 return "Niet-EER"
 
-        data["Herkomst"] = data.apply(lambda x: get_herkomst(x["Nationaliteit"], x["EER"]), axis=1)
+        data["Herkomst"] = data.apply(
+            lambda x: get_herkomst(x["Nationaliteit"], x["EER"]), axis=1
+        )
 
         data = data[
             data["Ingangsdatum"].str.contains("01-09-")
@@ -74,14 +98,18 @@ class IndividualStrategy(PredictionStrategy):
             data["Croho groepeernaam"].isin(self.numerus_fixus_list)
         ).astype(int)
 
-        data["Examentype"] = data["Examentype"].replace("Propedeuse Bachelor", "Bachelor")
+        data["Examentype"] = data["Examentype"].replace(
+            "Propedeuse Bachelor", "Bachelor"
+        )
 
         data = data[data["Inschrijfstatus"].notna()]
         data = data[data["Examentype"].isin(["Bachelor", "Master", "Pre-master"])]
 
         nationaliteit_counts = data["Nationaliteit"].value_counts()
         values_to_change = nationaliteit_counts[nationaliteit_counts < 100].index
-        data["Nationaliteit"] = data["Nationaliteit"].replace(values_to_change, "Overig")
+        data["Nationaliteit"] = data["Nationaliteit"].replace(
+            values_to_change, "Overig"
+        )
 
         def get_new_column(row):
             if (
@@ -97,7 +125,11 @@ class IndividualStrategy(PredictionStrategy):
         data = data.drop(["Sleutel"], axis=1)
 
         # Ensure numeric types for flag columns (raw data may contain strings like "Nee"/"Ja")
-        for col in ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"]:
+        for col in [
+            "Is eerstejaars croho opleiding",
+            "Is hogerejaars",
+            "BBC ontvangen",
+        ]:
             data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0).astype(int)
 
         data.loc[
@@ -131,19 +163,30 @@ class IndividualStrategy(PredictionStrategy):
         self.set_year_week(predict_year, predict_week, self.data_individual)
 
         print("Predicting preapplicants...")
-        predicties, self.xgboost_importance = predict_applicant(
-            self.data_individual, self.predict_year, self.predict_week,
-            self.max_year, configuration=self.configuration
+        predicties, self.xgboost_importance, self.xgboost_training_log = (
+            predict_applicant(
+                self.data_individual,
+                self.predict_year,
+                self.predict_week,
+                self.max_year,
+                configuration=self.configuration,
+            )
         )
 
         self.data_individual.loc[
             (self.data_individual["Collegejaar"] == self.predict_year)
-            & (self.data_individual["Weeknummer"].isin(get_weeks_list(self.predict_week))),
+            & (
+                self.data_individual["Weeknummer"].isin(
+                    get_weeks_list(self.predict_week)
+                )
+            ),
             "Inschrijvingen_predictie",
         ] = predicties
 
         self._transform_data_individual()
-        self.data_individual = transform_data(self.data_individual, "Cumulative_sum_within_year")
+        self.data_individual = transform_data(
+            self.data_individual, "Cumulative_sum_within_year"
+        )
 
         data_to_predict = self.get_data_to_predict(
             self.data_individual,
@@ -159,7 +202,8 @@ class IndividualStrategy(PredictionStrategy):
         chunk_size = math.ceil(len(data_to_predict) / nr_CPU_cores)
 
         chunks = [
-            data_to_predict[i : i + chunk_size] for i in range(0, len(data_to_predict), chunk_size)
+            data_to_predict[i : i + chunk_size]
+            for i in range(0, len(data_to_predict), chunk_size)
         ]
 
         print("Start parallel predicting...")
@@ -176,9 +220,14 @@ class IndividualStrategy(PredictionStrategy):
         data_to_predict["Voorspelde vooraanmelders"] = np.nan
 
         # Expand full SARIMA trajectories into Voorspelde vooraanmelders rows
-        pred_len = (38 + 52 - int(predict_week)) if int(predict_week) > 38 else (38 - int(predict_week))
+        pred_len = (
+            (38 + 52 - int(predict_week))
+            if int(predict_week) > 38
+            else (38 - int(predict_week))
+        )
         data_to_predict = self.postprocessor.add_predicted_preregistrations(
-            data_to_predict, [list(x[:pred_len]) if len(x) > 0 else [] for x in predicted_data]
+            data_to_predict,
+            [list(x[:pred_len]) if len(x) > 0 else [] for x in predicted_data],
         )
 
         # Store XGBoost aggregated curve (prediction year, wide format → long)
@@ -193,26 +242,37 @@ class IndividualStrategy(PredictionStrategy):
         We melt the prediction year rows back to long format and store as self.xgboost_curve.
         """
         from studentprognose.utils.weeks import get_all_weeks_valid
+
         di = self.data_individual
         pred_rows = di[di["Collegejaar"] == predict_year]
         if pred_rows.empty:
             self.xgboost_curve = None
             return
 
-        group_cols = ["Collegejaar", "Faculteit", "Herkomst", "Examentype", "Croho groepeernaam"]
+        group_cols = [
+            "Collegejaar",
+            "Faculteit",
+            "Herkomst",
+            "Examentype",
+            "Croho groepeernaam",
+        ]
         week_cols = get_all_weeks_valid(pred_rows.columns)
         if not week_cols:
             self.xgboost_curve = None
             return
 
         melted = pred_rows[group_cols + week_cols].melt(
-            id_vars=group_cols, var_name="Weeknummer", value_name="XGBoost_cumulative",
+            id_vars=group_cols,
+            var_name="Weeknummer",
+            value_name="XGBoost_cumulative",
         )
         melted["Weeknummer"] = melted["Weeknummer"].astype(int)
+
         # Keep only weeks up to predict_week (the known XGBoost portion)
         # Inline week sort key to avoid circular import with dashboard module
         def _week_key(w):
             return w - 39 if w >= 39 else w + 13
+
         pw_key = _week_key(int(predict_week))
         melted = melted[melted["Weeknummer"].apply(lambda w: _week_key(w) <= pw_key)]
         melted = melted[melted["XGBoost_cumulative"] > 0]
@@ -220,8 +280,14 @@ class IndividualStrategy(PredictionStrategy):
 
     def _predict_sarima(self, row, data_exog=None, already_printed=False):
         return predict_with_sarima_individual(
-            self.data_individual, row, self.predict_year, self.predict_week,
-            self.max_year, self.numerus_fixus_list, data_exog, already_printed
+            self.data_individual,
+            row,
+            self.predict_year,
+            self.predict_week,
+            self.max_year,
+            self.numerus_fixus_list,
+            data_exog,
+            already_printed,
         )
 
     def _transform_data_individual(self):
@@ -241,13 +307,17 @@ class IndividualStrategy(PredictionStrategy):
 
         target_year_weeknummers = []
         if int(self.predict_week) > 38:
-            target_year_weeknummers = [str(i) for i in range(39, int(self.predict_week) + 1)]
+            target_year_weeknummers = [
+                str(i) for i in range(39, int(self.predict_week) + 1)
+            ]
         elif int(self.predict_week) < 39:
             target_year_weeknummers = [str(i) for i in range(39, 53)] + [
                 str(i) for i in range(1, int(self.predict_week) + 1)
             ]
 
-        data = data[group_cols + ["Inschrijvingen_predictie", "Inschrijfstatus", "Weeknummer"]]
+        data = data[
+            group_cols + ["Inschrijvingen_predictie", "Inschrijfstatus", "Weeknummer"]
+        ]
         data["Weeknummer"] = data["Weeknummer"].astype(str)
 
         status_map = self.configuration.get("model_config", {}).get(
@@ -255,7 +325,11 @@ class IndividualStrategy(PredictionStrategy):
         )
         data["Inschrijfstatus"] = data["Inschrijfstatus"].map(status_map)
 
-        data = data.groupby(group_cols + ["Weeknummer"]).sum(numeric_only=False).reset_index()
+        data = (
+            data.groupby(group_cols + ["Weeknummer"])
+            .sum(numeric_only=False)
+            .reset_index()
+        )
 
         def _transform_inner(input_data, target_col, weeknummers):
             data2 = input_data.reset_index().drop(["index", target_col], axis=1)
@@ -291,8 +365,12 @@ class IndividualStrategy(PredictionStrategy):
                 ignore_index=False, id_vars=group_cols, value_vars=weeknummers
             )
 
-            input_data = input_data.rename(columns={"variable": "Weeknummer", "value": target_col})
-            input_data = input_data.merge(data2, on=group_cols + ["Weeknummer"], how="left")
+            input_data = input_data.rename(
+                columns={"variable": "Weeknummer", "value": target_col}
+            )
+            input_data = input_data.merge(
+                data2, on=group_cols + ["Weeknummer"], how="left"
+            )
             input_data = input_data.fillna(0)
 
             input_data["Cumulative_sum_within_year"] = input_data.groupby(group_cols)[

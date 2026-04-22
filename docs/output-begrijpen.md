@@ -10,6 +10,7 @@ De pipeline schrijft de resultaten naar `data/output/`. Er zijn twee typen uitvo
 | `output_first-years_{modus}.xlsx` | Eindresultaat | Eerstejaars voorspellingen per opleiding/herkomst/week |
 | `output_higher-years_{modus}.xlsx` | Eindresultaat | Hogerjaars voorspellingen |
 | `output_volume_{modus}.xlsx` | Eindresultaat | Totaal studentvolume-voorspellingen |
+| `tuning_cache.json` | Cache | Geoptimaliseerde hyperparameters (na `--tune`). Wordt automatisch hergebruikt. |
 
 `{modus}` is `cumulatief`, `individueel` of `beide`, afhankelijk van de gebruikte `-d` vlag.
 
