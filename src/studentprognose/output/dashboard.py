@@ -1363,6 +1363,72 @@ class DashboardBuilder:
                       line=dict(dash="dash", color="black", width=2))
         return fig
 
+    def _relative_error_scatter(self, pred_col: str) -> go.Figure | None:
+        """Scatter: X = actual enrolment (programme size), Y = MAPE, size = absolute error."""
+        hist = self._hist_data()
+        if hist.empty or pred_col not in hist.columns:
+            return None
+
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
+        agg = (
+            hist.groupby(["Collegejaar", "Croho groepeernaam"])
+            .agg(predicted=(pred_col, "sum"), actual=("Aantal_studenten", "sum"))
+            .reset_index()
+        )
+        agg = agg.dropna(subset=["predicted", "actual"])
+        agg = agg[agg["actual"] > 0]
+        if agg.empty:
+            return None
+
+        agg["mape"] = (abs(agg["predicted"] - agg["actual"]) / agg["actual"] * 100)
+        agg["abs_error"] = abs(agg["predicted"] - agg["actual"])
+
+        sizeref = 2.0 * max(agg["abs_error"].max(), 1) / (35.0**2)
+
+        fig = go.Figure()
+        years = sorted(agg["Collegejaar"].unique())
+        for yr, colour in zip(years, PASTEL_YEAR_COLOURS[:len(years)]):
+            yr_data = agg[agg["Collegejaar"] == yr]
+            fig.add_trace(go.Scatter(
+                x=yr_data["actual"], y=yr_data["mape"], mode="markers",
+                name=str(int(yr)),
+                marker=dict(
+                    color=colour,
+                    size=yr_data["abs_error"],
+                    sizemode="area",
+                    sizeref=sizeref,
+                    sizemin=4,
+                    line=dict(width=1, color="#333"),
+                ),
+                text=yr_data.apply(
+                    lambda r: (
+                        f"{r['Croho groepeernaam']}<br>Jaar: {int(r['Collegejaar'])}"
+                        f"<br>Werkelijk: {r['actual']:.0f}<br>Voorspeld: {r['predicted']:.0f}"
+                        f"<br>MAPE: {r['mape']:.1f}%<br>Absoluut verschil: {r['abs_error']:.0f}"
+                    ), axis=1,
+                ),
+                hoverinfo="text",
+            ))
+
+        max_mape = min(agg["mape"].max() * 1.1, 100)
+        for threshold, color, label in [(10, "green", "10%"), (25, "orange", "25%")]:
+            if threshold < max_mape:
+                fig.add_hline(
+                    y=threshold, line_dash="dash", line_color=color, line_width=1.5,
+                    annotation_text=label, annotation_position="top right",
+                )
+
+        fig.update_layout(
+            title=f"Relatieve fout per opleidingsgrootte ({_display(pred_col)})",
+            xaxis_title="Werkelijke inschrijvingen (opleidingsgrootte)",
+            yaxis_title="MAPE (%)",
+            yaxis=dict(range=[0, max_mape]),
+            height=_chart_height(len(agg), per_item=15, min_h=450),
+        )
+        return fig
+
     def _error_heatmap(
         self, mape_cols: list[str], recent_n: int | None = None,
     ) -> go.Figure | None:
@@ -2514,6 +2580,12 @@ class DashboardBuilder:
                 "Elke bol is een opleiding in een bepaald jaar. Bolgrootte toont het werkelijke aantal studenten. "
                 "Hoe dichter bij de diagonaal, hoe beter de voorspelling."))
 
+        fig = self._relative_error_scatter(pred_col)
+        if fig:
+            charts.append(("Relatieve fout per opleidingsgrootte", fig,
+                "MAPE (%) uitgezet tegen opleidingsgrootte. Bolgrootte toont het absolute verschil. "
+                "Kleine opleidingen linksboven worden relatief slecht voorspeld."))
+
         charts.extend(self._model_accuracy_heatmaps(mape_cols))
 
         fig = self._error_bar_per_year(pred_col)
@@ -2918,6 +2990,11 @@ class DashboardBuilder:
                 charts.append((f"Voorspeld vs Realisatie ({_display(pc)})", fig,
                     "Elke bol is een opleiding in een bepaald jaar. Bolgrootte toont het werkelijke aantal studenten. "
                     "Kleuren onderscheiden collegejaren."))
+            fig = self._relative_error_scatter(pc)
+            if fig:
+                charts.append((f"Relatieve fout per opleidingsgrootte ({_display(pc)})", fig,
+                    "MAPE (%) uitgezet tegen opleidingsgrootte. Bolgrootte toont het absolute verschil. "
+                    "Kleine opleidingen linksboven worden relatief slecht voorspeld."))
 
         # ── Diagnostiek ─────────────────────────────────────────────
         fig = self._error_progression(mape_cols, " (cumulatief)")
