@@ -2529,13 +2529,6 @@ class DashboardBuilder:
                 "Punten boven de nullijn = overschatting, eronder = onderschatting. "
                 "De trendlijn toont of de bias toeneemt bij grotere opleidingen."))
 
-        # ── Foutpatronen (bij meerdere voorspeljaren) ──────────────
-        fig = self._error_progression(mape_cols, " (individueel)")
-        if fig:
-            charts.append(("MAPE per week", fig,
-                "Gemiddelde voorspelfout (MAPE) per week over alle opleidingen. "
-                "Dalende lijn = model wordt nauwkeuriger naarmate het jaar vordert."))
-
         fig = self._individual_error_by_herkomst()
         if fig:
             charts.append(("Foutanalyse per herkomst", fig,
