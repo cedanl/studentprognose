@@ -10,6 +10,7 @@ from studentprognose.utils.weeks import get_weeks_list, get_all_weeks_valid, dec
 from studentprognose.data.transforms import transform_data
 from studentprognose.models.xgboost_classifier import predict_applicant, DEFAULT_STATUS_MAP
 from studentprognose.models.sarima import predict_with_sarima_individual
+from studentprognose.data.preprocessing.excluded_data_points import apply_excluded_data_points
 
 
 class IndividualStrategy(PredictionStrategy):
@@ -129,6 +130,10 @@ class IndividualStrategy(PredictionStrategy):
     def predict_nr_of_students(self, predict_year, predict_week, skip_years=0):
         self.data_individual = self.data_individual_backup.copy(deep=True)
         self.set_year_week(predict_year, predict_week, self.data_individual)
+        if self.excluded_data_points:
+            self.data_individual = apply_excluded_data_points(
+                self.data_individual, self.excluded_data_points, self.predict_year
+            )
 
         print("Predicting preapplicants...")
         predicties, self.xgboost_importance = predict_applicant(

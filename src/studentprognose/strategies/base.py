@@ -14,6 +14,7 @@ class PredictionStrategy(ABC):
         self.configuration = configuration
         self.numerus_fixus_list = configuration["numerus_fixus"]
         self.min_training_year = configuration.get("model_config", {}).get("min_training_year", 2016)
+        self.excluded_data_points = configuration.get("excluded_data_points", [])
 
         self.postprocessor = PostProcessor(
             configuration, data_latest, ensemble_weights,

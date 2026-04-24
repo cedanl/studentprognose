@@ -28,6 +28,7 @@
     "numerus_fixus": {
         "B Opleiding": 0
     },
+    "excluded_data_points": [],
     "ensemble_override_cumulative": [
         "B Geneeskunde",
         "B Biomedische Wetenschappen",

@@ -62,6 +62,47 @@ Een object met opleidingsnamen als sleutels en het maximale inschrijvingsaantal 
 
 Als de gesommeerde voorspelling over herkomstgroepen het maximum overschrijdt, wordt het overschot afgetrokken van de NL-herkomstgroep. Opleidingen die hier niet staan worden niet gecapped.
 
+## `excluded_data_points` — anomaliejaren uitsluiten van trainingsdata
+
+Optionele lijst van filterregels voor het verwijderen van bekende problematische datapunten uit de **trainingsdata**. De tool past de regels toe vóór elk model wordt getraind. Het voorspeljaar (`predict_year`) wordt **altijd** beschermd en nooit uitgesloten, ongeacht de regels.
+
+Gebruik dit alleen voor aantoonbare datakwaliteitsproblemen: foutieve Studielink-snapshots, deadlineverschuivingen die een historische reeks onvergelijkbaar maken, of structureel afwijkende populaties. Uitsluiten om een betere modelfit te forceren is misbruik — documenteer altijd de reden.
+
+```json
+{
+    "excluded_data_points": [
+        {
+            "year": 2024,
+            "herkomst": "Niet-EER",
+            "examentype": ["Bachelor", "Pre-master"]
+        },
+        {
+            "year_before": 2024,
+            "examentype": "Pre-master",
+            "opleiding": "B Notarieel Recht"
+        }
+    ]
+}
+```
+
+### Filtersleutels per regel
+
+Alle sleutels binnen één regel worden gecombineerd met **AND**. Meerdere regels worden gecombineerd met **OR**.
+
+| Sleutel | Type | Omschrijving |
+|---------|------|-------------|
+| `year` | `int` | Sluit exact dit collegejaar uit |
+| `year_before` | `int` | Sluit alle jaren vóór (exclusief) deze waarde uit |
+| `year_after` | `int` | Sluit alle jaren na (exclusief) deze waarde uit |
+| `herkomst` | `str` of `list[str]` | Filter op herkomst (`"NL"`, `"EER"`, `"Niet-EER"`) |
+| `examentype` | `str` of `list[str]` | Filter op examentype (`"Bachelor"`, `"Master"`, `"Pre-master"`) |
+| `opleiding` | `str` of `list[str]` | Filter op `Croho groepeernaam` |
+
+Een lege lijst (`[]`) schakelt uitsluiting volledig uit — dit is de standaard.
+
+!!! warning "Gebruik dit bewust"
+    Elk uitgesloten datapunt verkleint de trainingsset. Bij kleine opleidingen kan dat de modelkwaliteit ernstig verslechteren. Beperk uitsluiting tot jaren waarvan je kunt aantonen dat de data structureel fout of onvergelijkbaar is.
+
 ## `ensemble_override_cumulative` — ensemble-uitzondering per opleiding
 
 Een lijst van opleidingsnamen (op `Croho groepeernaam`) waarvoor de ensemble-logica altijd het SARIMA-cumulatief model gebruikt, ongeacht weeknummer of examentype.
