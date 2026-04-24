@@ -54,3 +54,14 @@ def _validate_excluded_data_points(rules, file_path):
                     f"'excluded_data_points[{i}].{int_key}' moet een geheel getal zijn."
                 )
                 sys.exit(1)
+
+        if "year_before" in rule and "year_after" in rule:
+            if rule["year_before"] <= rule["year_after"]:
+                print(
+                    f"Configuratiefout in {file_path}: "
+                    f"'excluded_data_points[{i}]' heeft een onmogelijk jaarbereik: "
+                    f"year_before ({rule['year_before']}) moet groter zijn dan "
+                    f"year_after ({rule['year_after']}). "
+                    f"De combinatie sluit nooit rijen uit."
+                )
+                sys.exit(1)

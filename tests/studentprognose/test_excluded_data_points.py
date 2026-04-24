@@ -1,6 +1,7 @@
 """Tests for excluded_data_points filter and configuration validation."""
 
 import json
+import warnings
 
 import pandas as pd
 import pytest
@@ -75,9 +76,12 @@ class TestApplyExcludedDataPoints:
     def test_keys_within_rule_are_anded(self):
         df = _df([2020, 2021], herkomsten=["NL", "EER"])
         rules = [{"year": 2020, "herkomst": "EER"}]
-        result = apply_excluded_data_points(df, rules, predict_year=2024)
-        # 2020+EER doesn't exist, so nothing removed
+        # 2020+EER doesn't exist → nothing removed, but zero-match warning expected
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = apply_excluded_data_points(df, rules, predict_year=2024)
         assert len(result) == 2
+        assert len(w) == 1  # zero-match warning
 
     def test_combined_and_and_or(self):
         df = _df([2020, 2020, 2021], herkomsten=["NL", "EER", "NL"])
@@ -103,6 +107,18 @@ class TestApplyExcludedDataPoints:
                 df, [{"herkomst": "NL"}], predict_year=2024,
                 herkomst_col="OnbekendeKolom",
             )
+
+    def test_zero_match_rule_warns(self):
+        df = _df([2020, 2021], herkomsten=["NL", "EER"])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            result = apply_excluded_data_points(
+                df, [{"herkomst": "Niet-EER"}], predict_year=2024
+            )
+        assert len(result) == 2  # nothing removed
+        assert len(w) == 1
+        assert issubclass(w[0].category, UserWarning)
+        assert "matcht geen enkele rij" in str(w[0].message)
 
     def test_opleiding_filter(self):
         df = pd.DataFrame({
@@ -151,6 +167,23 @@ class TestValidateExcludedDataPoints:
     def test_non_int_year_before_exits(self):
         with pytest.raises(SystemExit):
             _validate_excluded_data_points([{"year_before": 2020.5}], "cfg.json")
+
+    def test_contradictory_year_range_exits(self):
+        with pytest.raises(SystemExit):
+            _validate_excluded_data_points(
+                [{"year_before": 2020, "year_after": 2022}], "cfg.json"
+            )
+
+    def test_equal_year_before_after_exits(self):
+        with pytest.raises(SystemExit):
+            _validate_excluded_data_points(
+                [{"year_before": 2021, "year_after": 2021}], "cfg.json"
+            )
+
+    def test_valid_year_before_after_passes(self):
+        _validate_excluded_data_points(
+            [{"year_before": 2023, "year_after": 2020}], "cfg.json"
+        )  # matches years 2021 and 2022 — no exception
 
 
 # ---------------------------------------------------------------------------

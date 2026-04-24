@@ -1,3 +1,5 @@
+import warnings
+
 import pandas as pd
 
 
@@ -54,7 +56,7 @@ def apply_excluded_data_points(
     # onafhankelijke gebeurtenissen apart beschreven kunnen worden.
     exclude_mask = pd.Series(False, index=df.index)
 
-    for rule in rules:
+    for i, rule in enumerate(rules):
         mask = pd.Series(True, index=df.index)
 
         if "year" in rule:
@@ -73,6 +75,15 @@ def apply_excluded_data_points(
         if "opleiding" in rule:
             values = rule["opleiding"] if isinstance(rule["opleiding"], list) else [rule["opleiding"]]
             mask &= df[programme_col].isin(values)
+
+        if not mask.any():
+            warnings.warn(
+                f"excluded_data_points: regel {i} ({rule}) matcht geen enkele rij in de "
+                f"trainingsdata. Controleer of de waarden exact overeenkomen met de data "
+                f"(hoofdlettergevoelig).",
+                UserWarning,
+                stacklevel=2,
+            )
 
         exclude_mask |= mask
 

@@ -79,7 +79,7 @@ Gebruik dit alleen voor aantoonbare datakwaliteitsproblemen: foutieve Studielink
         {
             "year_before": 2024,
             "examentype": "Pre-master",
-            "opleiding": "B Notarieel Recht"
+            "opleiding": "B Voorbeeldopleiding"
         }
     ]
 }
