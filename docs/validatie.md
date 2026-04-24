@@ -55,6 +55,9 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 
 Vóór elke modelrun voert de pipeline drie aanvullende checks uit op de **cumulatieve vooraanmelddata**. Ze draaien per `(jaar, week)`-combinatie, na ETL maar vóór de modellen.
 
+!!! note "Alleen actief als cumulatieve data beschikbaar is"
+    De pre-prediction checks worden overgeslagen als de pipeline zonder cumulatieve data draait (individueel-enkel modus, `-d i`). In dat geval is er geen `Gewogen vooraanmelders`-kolom om te valideren.
+
 | Check | Type | Wat wordt gecheckt |
 |-------|------|-------------------|
 | Decimaalintegriteit | Hard stop | `Gewogen vooraanmelders` bevat strings met komma's of niet-numerieke waarden |
