@@ -37,6 +37,10 @@ def run_pre_prediction_checks(
         & (data_cumulative["Weeknummer"] == predict_week)
     ]
 
+    # Decimal and empty checks are unconditional hard stops: corrupted or missing
+    # data means the model cannot run at all — there is no safe value to fall back on.
+    # Historical realism is a domain judgment (e.g. COVID years legitimately differ)
+    # so --yes can demote it to a warning.
     _check_decimal_integrity(current, predict_year, predict_week)
     _check_empty_data(current, predict_year, predict_week)
     _check_historical_realism(current, last_year, numerus_fixus_list, predict_year, predict_week, yes)
@@ -112,6 +116,9 @@ def _check_historical_realism(
         programme = row["Croho groepeernaam"]
         examentype = row["Examentype"]
 
+        # NF-programma's hebben een bewust plafond; schommelingen zijn beleidsmatig,
+        # niet een signaal van datakwaliteitsproblemen. Vals-positieve hard stops
+        # vermijden.
         if programme in numerus_fixus_list and examentype == "Bachelor":
             continue
 
@@ -120,6 +127,10 @@ def _check_historical_realism(
         abs_diff = abs(val_curr - val_last)
         label = f"{row['Herkomst']} | {programme} | {examentype}"
 
+        # max() floor voorkomt vals-positieven bij kleine opleidingen: een programma
+        # met 10 studenten vorig jaar en 18 dit jaar (80% relatief, 8 absoluut) mag
+        # geen hard stop triggeren. De absolute vloer beschermt kleine programma's
+        # tegen relatieve drempels die op die schaal niet zinvol zijn.
         hard_threshold = max(25.0, 0.70 * val_last)
         if abs_diff > hard_threshold:
             msg = (

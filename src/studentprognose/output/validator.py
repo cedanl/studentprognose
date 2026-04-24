@@ -141,6 +141,10 @@ def _check_numerus_fixus_caps(
     if "Examentype" not in predictions.columns:
         return
 
+    # Pre-master studenten vallen buiten het NF-instroomplafond: ze zijn al
+    # ingeschreven in een overgangstraject en tellen niet mee als nieuwe
+    # eerstejaars. Inclusie zou NF-programma's structureel boven plafond doen
+    # lijken terwijl de instroom feitelijk correct is.
     non_premaster = predictions[predictions["Examentype"] != "Pre-master"]
     totals = (
         non_premaster.groupby("Croho groepeernaam")["Ensemble_prediction"]
