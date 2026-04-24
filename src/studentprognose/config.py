@@ -7,7 +7,8 @@ _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype
 def load_configuration(file_path):
     with open(file_path) as f:
         cfg = json.load(f)
-    _validate_excluded_data_points(cfg.get("excluded_data_points", []), file_path)
+    if "excluded_data_points" in cfg:
+        _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     return cfg
 
 
