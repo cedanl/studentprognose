@@ -25,8 +25,22 @@ Elke rij in de output beschrijft een combinatie van **opleiding × herkomst × e
 | `SARIMA_individual` | `-d i` of `-d b` | SARIMA-voorspelling op basis van individuele aanmelddata |
 | `Prognose_ratio` | `-d c` of `-d b` | Ratio-modelvoorspelling (3-jaars historisch gemiddelde) |
 | `Ensemble_prediction` | `-d b` | Gewogen combinatie van bovenstaande modellen |
+| `Baseline` | `-d c` of `-d b` | Naïeve referentie: `vorig_jaar_inschrijvingen / vorig_jaar_aanmeldingen × huidige_aanmeldingen`. Identiek aan `Prognose_ratio`, maar expliciet benoemd voor gebruik als planningsreferentie. |
 
 Als `-d b` is gebruikt maar individuele data ontbreekt, zijn `SARIMA_individual` en `Ensemble_prediction` leeg — zie [bekende valkuil](aan-de-slag.md#bekende-valkuil-stille-modus-downgrade).
+
+### Actuele aanmeldcijfers in de output
+
+De output bevat naast voorspellingen ook de actuele Studielink-cijfers voor het voorspelmoment:
+
+| Kolom | Omschrijving |
+|-------|-------------|
+| `Gewogen vooraanmelders` | Gewogen aanmeldingen op predict_week (actueel) |
+| `Ongewogen vooraanmelders` | Ongewogen aanmeldingen op predict_week |
+| `Aantal aanmelders met 1 aanmelding` | Aanmelders die exclusief voor deze opleiding kozen |
+| `Inschrijvingen` | Reeds ingeschreven studenten op predict_week |
+
+Deze kolommen worden direct uit de cumulatieve Studielink-snapshot gevuld voor de rijen die overeenkomen met het voorspeljaar en de voorspelweek. Zo staan de voorspelling en de actuele stand altijd op dezelfde rij.
 
 ### Foutmaatkolommen
 

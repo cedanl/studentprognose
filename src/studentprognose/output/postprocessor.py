@@ -200,6 +200,57 @@ class PostProcessor:
             self.numerus_fixus_list, predict_year
         )
 
+    def add_applicant_data(self, data_cumulative: "pd.DataFrame", predict_year: int, predict_week: int) -> None:
+        """Overwrite applicant columns in self.data with actuals from the cumulative snapshot.
+
+        Only rows matching predict_year/predict_week are updated. Rows without a
+        match in data_cumulative are left unchanged.
+        """
+        if self.data is None or data_cumulative is None:
+            return
+
+        key_cols = ["Weeknummer", "Examentype", "Croho groepeernaam", "Herkomst", "Collegejaar"]
+        update_cols = [
+            "Gewogen vooraanmelders",
+            "Ongewogen vooraanmelders",
+            "Aantal aanmelders met 1 aanmelding",
+            "Inschrijvingen",
+        ]
+
+        snapshot = data_cumulative[
+            (data_cumulative["Collegejaar"] == predict_year)
+            & (data_cumulative["Weeknummer"] == predict_week)
+        ]
+        if snapshot.empty:
+            return
+
+        snapshot = (
+            snapshot
+            .sort_values(key_cols)
+            .drop_duplicates(subset=key_cols, keep="last")
+            .set_index(key_cols)[update_cols]
+        )
+
+        mask = (
+            (self.data["Collegejaar"] == predict_year)
+            & (self.data["Weeknummer"] == predict_week)
+        )
+        if not mask.any():
+            return
+
+        subset = self.data.loc[mask, key_cols + update_cols].copy()
+        updated = subset.join(
+            snapshot.rename(columns={c: f"_new_{c}" for c in update_cols}),
+            on=key_cols,
+        )
+        for col in update_cols:
+            new_col = f"_new_{col}"
+            if new_col in updated.columns:
+                has_value = updated[new_col].notna()
+                subset.loc[has_value, col] = updated.loc[has_value, new_col]
+
+        self.data.loc[mask, update_cols] = subset[update_cols].values
+
     def postprocess(self, predict_year, predict_week):
         if self.data_latest is not None:
             self.data = replace_latest_data(
@@ -208,6 +259,9 @@ class PostProcessor:
 
         if self.data_option == DataOption.BOTH_DATASETS:
             self._create_ensemble_columns(predict_year, predict_week)
+
+        if "Prognose_ratio" in self.data.columns:
+            self.data["Baseline"] = self.data["Prognose_ratio"]
 
         self._create_error_columns()
 
