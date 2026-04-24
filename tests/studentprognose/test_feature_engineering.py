@@ -47,6 +47,7 @@ def _make_wide(rows: list[dict]) -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 class TestLaggedFeatures:
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_lag2_correct_week(self):
         long = _make_long([
             {"Weeknummer": 8, "Gewogen vooraanmelders": 50.0},
@@ -58,6 +59,7 @@ class TestLaggedFeatures:
 
         assert result.loc[0, "Gewogen_t-2"] == pytest.approx(50.0)
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_lag5_correct_week(self):
         long = _make_long([
             {"Weeknummer": 5, "Gewogen vooraanmelders": 30.0},
@@ -98,6 +100,7 @@ class TestLaggedFeatures:
         assert result.loc[0, "Gewogen_t-5"] == pytest.approx(0.0)
         assert any("week-1 fallback" in str(w.message) for w in caught)
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_predict_week_1_clamps_ref_to_week1(self):
         """predict_week=1 → max(1-2,1)=1 → lag uses week 1."""
         long = _make_long([
@@ -116,6 +119,7 @@ class TestLaggedFeatures:
 # ---------------------------------------------------------------------------
 
 class TestAcceleration:
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_acceleration_formula(self):
         """Gewogen_acceleration = (curr - t-2) - (t-2 - t-5)."""
         # curr=70, t-2=50, t-5=30 → (70-50) - (50-30) = 20 - 20 = 0
@@ -130,6 +134,7 @@ class TestAcceleration:
 
         assert result.loc[0, "Gewogen_acceleration"] == pytest.approx(0.0)
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_acceleration_positive_when_accelerating(self):
         """Larger gap in second interval → positive acceleration."""
         # curr=100, t-2=40, t-5=30 → (100-40) - (40-30) = 60 - 10 = 50
@@ -144,6 +149,7 @@ class TestAcceleration:
 
         assert result.loc[0, "Gewogen_acceleration"] == pytest.approx(50.0)
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_acceleration_negative_when_decelerating(self):
         """Smaller gap vs first interval → negative acceleration."""
         # curr=35, t-2=30, t-5=10 → (35-30) - (30-10) = 5 - 20 = -15
@@ -158,12 +164,27 @@ class TestAcceleration:
 
         assert result.loc[0, "Gewogen_acceleration"] == pytest.approx(-15.0)
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
+    def test_acceleration_finite_when_current_week_missing(self):
+        """Missing predict_week in long → _gewogen_curr treated as 0, not NaN."""
+        long = _make_long([
+            {"Weeknummer": 5, "Gewogen vooraanmelders": 10.0},
+            {"Weeknummer": 8, "Gewogen vooraanmelders": 20.0},
+            # week 10 (predict_week) is absent
+        ])
+        wide = _make_wide([{}])
+
+        result = _add_engineered_features(wide, long, predict_week=10)
+
+        assert np.isfinite(result.loc[0, "Gewogen_acceleration"])
+
 
 # ---------------------------------------------------------------------------
 # Exclusivity ratio
 # ---------------------------------------------------------------------------
 
 class TestExclusivityRatio:
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_ratio_computed_correctly(self):
         long = _make_long([
             {
@@ -180,6 +201,7 @@ class TestExclusivityRatio:
         # 50 / (200 + 1e-8) ≈ 0.25
         assert result.loc[0, "exclusivity_ratio"] == pytest.approx(50.0 / (200.0 + 1e-8))
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_ratio_zero_unweighted_does_not_divide_by_zero(self):
         long = _make_long([
             {
@@ -195,6 +217,7 @@ class TestExclusivityRatio:
 
         assert np.isfinite(result.loc[0, "exclusivity_ratio"])
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_ratio_missing_week_fills_zero(self):
         """No predict_week rows in long → ratio = 0 / (0 + EPS) ≈ 0."""
         long = _make_long([
@@ -212,6 +235,7 @@ class TestExclusivityRatio:
 # ---------------------------------------------------------------------------
 
 class TestOutputColumns:
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_all_four_features_present(self):
         long = _make_long([
             {"Weeknummer": 5, "Gewogen vooraanmelders": 10.0},
@@ -227,6 +251,7 @@ class TestOutputColumns:
         for col in ["Gewogen_t-2", "Gewogen_t-5", "Gewogen_acceleration", "exclusivity_ratio"]:
             assert col in result.columns, f"missing column: {col}"
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_no_intermediate_columns_leaked(self):
         """Helper columns like _gewogen_curr must not appear in the output."""
         long = _make_long([{"Weeknummer": 10, "Gewogen vooraanmelders": 30.0}])
@@ -237,6 +262,7 @@ class TestOutputColumns:
         for col in result.columns:
             assert not col.startswith("_"), f"leaked helper column: {col}"
 
+    @pytest.mark.filterwarnings("ignore::UserWarning")
     def test_multiple_groups_independent(self):
         """Each group gets its own lag values, not cross-contaminated."""
         long = _make_long([

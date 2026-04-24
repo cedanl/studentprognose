@@ -74,7 +74,7 @@ def _add_engineered_features(
     )
     full_data = full_data.merge(current_gewogen, on=_GROUP_COLS, how="left")
     full_data["Gewogen_acceleration"] = (
-        (full_data["_gewogen_curr"] - full_data["Gewogen_t-2"])
+        (full_data["_gewogen_curr"].fillna(0) - full_data["Gewogen_t-2"])
         - (full_data["Gewogen_t-2"] - full_data["Gewogen_t-5"])
     )
     full_data = full_data.drop(columns=["_gewogen_curr"])
