@@ -25,6 +25,7 @@ def run_pre_prediction_checks(
     predict_year: int,
     predict_week: int,
     numerus_fixus_list: dict,
+    yes: bool = False,
 ) -> None:
     """Run all pre-prediction checks. Hard stops exit the process."""
     current = data_cumulative[
@@ -38,7 +39,7 @@ def run_pre_prediction_checks(
 
     _check_decimal_integrity(current, predict_year, predict_week)
     _check_empty_data(current, predict_year, predict_week)
-    _check_historical_realism(current, last_year, numerus_fixus_list, predict_year, predict_week)
+    _check_historical_realism(current, last_year, numerus_fixus_list, predict_year, predict_week, yes)
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +90,7 @@ def _check_historical_realism(
     numerus_fixus_list: dict,
     predict_year: int,
     predict_week: int,
+    yes: bool = False,
 ) -> None:
     if last_year.empty:
         return
@@ -116,18 +118,20 @@ def _check_historical_realism(
         val_curr = row["Gewogen vooraanmelders_curr"]
         val_last = row["Gewogen vooraanmelders_last"]
         abs_diff = abs(val_curr - val_last)
-        rel_diff = abs_diff / val_last if val_last else (1.0 if abs_diff > 0 else 0.0)
         label = f"{row['Herkomst']} | {programme} | {examentype}"
 
         hard_threshold = max(25.0, 0.70 * val_last)
         if abs_diff > hard_threshold:
-            print(
-                f"\n[HARD STOP] Historisch realisme jaar {predict_year} week {predict_week}: "
+            msg = (
+                f"Historisch realisme jaar {predict_year} week {predict_week}: "
                 f"extreme afwijking voor {label}. "
                 f"Huidig: {val_curr:.0f}, vorig jaar: {val_last:.0f}, "
-                f"verschil: {abs_diff:.0f} (drempel: {hard_threshold:.0f}). "
-                f"Gebruik --yes om door te gaan ondanks deze waarschuwing."
+                f"verschil: {abs_diff:.0f} (drempel: {hard_threshold:.0f})."
             )
+            if yes:
+                warnings.warn(f"[--yes] {msg}", UserWarning, stacklevel=2)
+                continue
+            print(f"\n[HARD STOP] {msg} Gebruik --yes om door te gaan.")
             sys.exit(1)
 
         warn_threshold = max(15.0, 0.30 * val_last)

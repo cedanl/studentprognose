@@ -161,7 +161,7 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
     if cfg.student_year_prediction in (StudentYearPrediction.FIRST_YEARS, StudentYearPrediction.VOLUME):
         if data_cumulative is not None and cfg.ci_test_n is None:
             run_pre_prediction_checks(
-                data_cumulative, year, week, strategy.numerus_fixus_list
+                data_cumulative, year, week, strategy.numerus_fixus_list, yes=cfg.yes,
             )
 
         print(f"Predicting first-years: {year}-{week}...")

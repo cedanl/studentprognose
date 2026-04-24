@@ -16,6 +16,8 @@ import warnings
 
 import pandas as pd
 
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
+
 
 def run_post_prediction_checks(
     data: pd.DataFrame,
@@ -63,12 +65,14 @@ def _check_trend_realism(
             & (data_cumulative["Weeknummer"] == predict_week)
         ]
 
-    # Week-over-week: compare against predictions from last week in same run
+    # Week-over-week: compare against predictions from last week in same run.
+    # Exclude week 1 (no prior week) and FINAL_ACADEMIC_WEEK+1 (prior week is
+    # end of previous cycle, not previous prediction in this run).
     last_week_data = data[
         (data["Collegejaar"] == predict_year)
         & (data["Weeknummer"] == predict_week - 1)
         & data["Ensemble_prediction"].notna()
-    ] if predict_week > 1 else pd.DataFrame()
+    ] if predict_week > 1 and predict_week != FINAL_ACADEMIC_WEEK + 1 else pd.DataFrame()
 
     curr_preds = predictions.groupby(group_cols)["Ensemble_prediction"].sum().reset_index()
 
