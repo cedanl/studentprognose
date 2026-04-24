@@ -203,6 +203,14 @@ class PostProcessor:
     def add_applicant_data(self, data_cumulative: "pd.DataFrame", predict_year: int, predict_week: int) -> None:
         """Overwrite applicant columns in self.data with actuals from the cumulative snapshot.
 
+        prepare_data_for_output_prelim merges the full cumulative dataset (alle jaren
+        en weken) al in self.data, waardoor de aanmeldkolommen voor predict_year/week
+        in de meeste gevallen al correct zijn. Deze methode is een expliciete hersynced
+        na predict_with_ratio: die stap kan in afgeleide strategieën self.data muteren
+        op manieren die de merge-waarden overschrijven. De aanroep hier garandeert dat
+        de aanmeldcijfers altijd de actuele snapshot-waarden zijn, ongeacht wat er
+        tussen prepare_data_for_output_prelim en postprocess() is aangepast.
+
         Only rows matching predict_year/predict_week are updated. Rows without a
         match in data_cumulative are left unchanged.
         """
