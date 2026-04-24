@@ -29,6 +29,10 @@ def apply_excluded_data_points(
     if not rules:
         return df
 
+    # Elke regel beschrijft één uitsluitingsgebeurtenis (bv. COVID-jaar voor
+    # specifieke opleiding). Sleutels binnen één regel worden ge-AND-ed om exact
+    # die combinatie te treffen; meerdere regels worden ge-OR-ed zodat
+    # onafhankelijke gebeurtenissen apart beschreven kunnen worden.
     exclude_mask = pd.Series(False, index=df.index)
 
     for rule in rules:
@@ -53,7 +57,9 @@ def apply_excluded_data_points(
 
         exclude_mask |= mask
 
-    # Never exclude the prediction year — it contains the data to predict on.
+    # Een brede regel als year_before:2025 met predict_year=2024 zou anders de
+    # rijen verwijderen waarop het model juist moet voorspellen. Dit is een
+    # vangnet tegen regels die per ongeluk te ruim geformuleerd zijn.
     exclude_mask &= df[year_col] != predict_year
 
     return df[~exclude_mask].reset_index(drop=True)

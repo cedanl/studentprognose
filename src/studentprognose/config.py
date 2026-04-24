@@ -7,6 +7,9 @@ _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype
 def load_configuration(file_path):
     with open(file_path) as f:
         cfg = json.load(f)
+    # load_configuration wordt ook aangeroepen voor filtering.json, dat deze
+    # sleutel nooit mag bevatten. Een .get() met lege lijst-default zou dat
+    # stil doorlaten; de expliciete presence-check maakt de contractbreuk zichtbaar.
     if "excluded_data_points" in cfg:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     return cfg
