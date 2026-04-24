@@ -150,3 +150,23 @@ class TestAddApplicantData:
 
         for col in UPDATE_COLS:
             assert pp.data.loc[0, col] == 42.0, f"{col} not updated"
+
+    def test_non_contiguous_index_updates_correct_row(self):
+        """reset_index(drop=True) in add_applicant_data must realign idx with merge position."""
+        pp = _make_postprocessor()
+        # Simulate index [5, 6] — as if rows 0-4 were dropped earlier
+        data = pd.concat([
+            _make_data_row(year=2024, week=10, programme="B Opleiding", gewogen=0.0),
+            _make_data_row(year=2024, week=10, programme="B Andere", gewogen=0.0),
+        ])
+        data.index = [5, 6]
+        pp.data = data
+        snapshot = pd.concat([
+            _make_snapshot(year=2024, week=10, programme="B Opleiding", gewogen=11.0),
+            _make_snapshot(year=2024, week=10, programme="B Andere", gewogen=22.0),
+        ])
+
+        pp.add_applicant_data(snapshot, predict_year=2024, predict_week=10)
+
+        assert pp.data.loc[5, "Gewogen vooraanmelders"] == 11.0
+        assert pp.data.loc[6, "Gewogen vooraanmelders"] == 22.0
