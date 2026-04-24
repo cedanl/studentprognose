@@ -224,6 +224,9 @@ class PostProcessor:
         if snapshot.empty:
             return
 
+        # keep="last": telbestanden zijn cumulatief en kunnen bij herverwerking
+        # meerdere keren dezelfde week bevatten. De laatste verschijning is
+        # altijd de meest recente en wint.
         snapshot = (
             snapshot
             .sort_values(key_cols)
@@ -239,6 +242,10 @@ class PostProcessor:
             return
 
         idx = self.data.index[mask]
+        # reset_index zodat merged positie 0,1,2... exact overeenkomt met
+        # idx[0],idx[1],idx[2]... — self.data kan na eerder filteren een
+        # niet-aaneengesloten index hebben waardoor idx[has_value] anders
+        # naar de verkeerde rijen zou wijzen.
         merged = (
             self.data.loc[idx, key_cols]
             .reset_index(drop=True)
