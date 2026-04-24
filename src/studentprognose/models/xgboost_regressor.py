@@ -45,6 +45,15 @@ def predict_with_xgboost(
         + [str(x) for x in get_weeks_list(38)]
         + (extra_numeric_cols or [])
     )
+
+    if extra_numeric_cols:
+        missing = [c for c in extra_numeric_cols if c not in X_train.columns]
+        if missing:
+            raise ValueError(
+                f"predict_with_xgboost: kolommen in extra_numeric_cols ontbreken in de "
+                f"trainingsdata: {missing}. Controleer of _add_engineered_features is "
+                f"aangeroepen vóór predict_with_xgboost."
+            )
     categorical_cols = ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
 
     numeric_transformer = "passthrough"

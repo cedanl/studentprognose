@@ -282,3 +282,42 @@ class TestOutputColumns:
         row_b = result[result["Croho groepeernaam"] == "B Opleiding B"].iloc[0]
         assert row_a["Gewogen_t-2"] == pytest.approx(10.0)
         assert row_b["Gewogen_t-2"] == pytest.approx(80.0)
+
+
+# ---------------------------------------------------------------------------
+# Column-presence guard in predict_with_xgboost
+# ---------------------------------------------------------------------------
+
+class TestXGBoostColumnGuard:
+    def test_raises_when_extra_cols_missing_from_train(self):
+        """predict_with_xgboost must raise ValueError when extra_numeric_cols are absent."""
+        import pandas as pd
+        import numpy as np
+        from studentprognose.models.xgboost_regressor import predict_with_xgboost
+
+        # Minimal train DataFrame without the engineered feature columns.
+        # Aantal_studenten is NOT in train — it comes from data_studentcount via merge.
+        train = pd.DataFrame({
+            "Collegejaar": [2023],
+            "Faculteit": ["FacA"],
+            "Herkomst": ["NL"],
+            "Examentype": ["Bachelor"],
+            "Croho groepeernaam": ["B Opleiding"],
+            **{str(w): [float(w)] for w in range(1, 39)},
+        })
+        test = train.copy()
+
+        # Minimal data_studentcount so the merge path is taken
+        data_studentcount = pd.DataFrame({
+            "Croho groepeernaam": ["B Opleiding"],
+            "Collegejaar": [2023],
+            "Herkomst": ["NL"],
+            "Examentype": ["Bachelor"],
+            "Aantal_studenten": [100],
+        })
+
+        with pytest.raises(ValueError, match="extra_numeric_cols ontbreken"):
+            predict_with_xgboost(
+                train, test, data_studentcount,
+                extra_numeric_cols=["Gewogen_t-2", "Gewogen_t-5"],
+            )
