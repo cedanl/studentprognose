@@ -7,7 +7,9 @@ from studentprognose.utils.weeks import get_weeks_list
 from studentprognose.models.importance import extract_grouped_importance
 
 
-def predict_with_xgboost(train, test, data_studentcount) -> np.ndarray | float:
+def predict_with_xgboost(
+    train, test, data_studentcount, extra_numeric_cols: list[str] | None = None
+) -> np.ndarray | float:
     """
     Train an XGBoost regressor to predict student counts from cumulative pre-application data.
 
@@ -41,7 +43,7 @@ def predict_with_xgboost(train, test, data_studentcount) -> np.ndarray | float:
     numeric_cols = (
         ["Collegejaar"]
         + [str(x) for x in get_weeks_list(38)]
-        + ["Gewogen_t-2", "Gewogen_t-5", "Gewogen_acceleration", "exclusivity_ratio"]
+        + (extra_numeric_cols or [])
     )
     categorical_cols = ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
 

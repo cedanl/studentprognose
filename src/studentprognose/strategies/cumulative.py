@@ -12,9 +12,14 @@ from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import increment_week
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
+from studentprognose.data.transforms import TRANSFORM_GROUP_COLS
 
 _EPS = 1e-8
-_GROUP_COLS = ["Collegejaar", "Faculteit", "Herkomst", "Examentype", "Croho groepeernaam"]
+_LAGS = [2, 5]
+ENGINEERED_FEATURE_COLS = (
+    [f"Gewogen_t-{lag}" for lag in _LAGS]
+    + ["Gewogen_acceleration", "exclusivity_ratio"]
+)
 
 
 def _add_engineered_features(
@@ -22,39 +27,42 @@ def _add_engineered_features(
     data_cumulative: pd.DataFrame,
     predict_week: int,
 ) -> pd.DataFrame:
-    """Add Gewogen_t-2, Gewogen_t-5, Gewogen_acceleration, exclusivity_ratio to wide-format data.
+    """Add lagged features, Gewogen_acceleration en exclusivity_ratio to wide-format data.
 
-    Computes lags relative to predict_week from the long-format source data and merges
-    them into the pivoted XGBoost feature matrix. Missing reference weeks fall back to
-    week 1; if week 1 is also absent the value is filled with 0.
+    Computes lags (defined by _LAGS) relative to predict_week from the long-format source
+    data and merges them into the pivoted XGBoost feature matrix. Missing reference weeks
+    fall back to week 1; if week 1 is also absent the value is filled with 0.
+
+    The columns added are exactly those listed in ENGINEERED_FEATURE_COLS.
     """
     src = data_cumulative
+    grp = TRANSFORM_GROUP_COLS
 
-    for lag in [2, 5]:
+    for lag in _LAGS:
         ref_week = max(predict_week - lag, 1)
         col_name = f"Gewogen_t-{lag}"
 
         ref_values = (
             src[src["Weeknummer"] == ref_week]
-            .groupby(_GROUP_COLS)["Gewogen vooraanmelders"]
+            .groupby(grp)["Gewogen vooraanmelders"]
             .mean()
             .rename(col_name)
             .reset_index()
         )
-        full_data = full_data.merge(ref_values, on=_GROUP_COLS, how="left")
+        full_data = full_data.merge(ref_values, on=grp, how="left")
 
         missing_mask = full_data[col_name].isna()
         if missing_mask.any():
             fallback = (
                 src[src["Weeknummer"] == 1]
-                .groupby(_GROUP_COLS)["Gewogen vooraanmelders"]
+                .groupby(grp)["Gewogen vooraanmelders"]
                 .mean()
                 .rename("_fallback")
                 .reset_index()
             )
             fill_series = (
-                full_data.loc[missing_mask, _GROUP_COLS]
-                .merge(fallback, on=_GROUP_COLS, how="left")["_fallback"]
+                full_data.loc[missing_mask, grp]
+                .merge(fallback, on=grp, how="left")["_fallback"]
             )
             n_zero = fill_series.isna().sum()
             if n_zero:
@@ -65,14 +73,17 @@ def _add_engineered_features(
                 )
             full_data.loc[missing_mask, col_name] = fill_series.fillna(0).values
 
+    # Compute acceleration and exclusivity ratio from a single predict_week slice.
+    curr_src = src[src["Weeknummer"] == predict_week]
+
     current_gewogen = (
-        src[src["Weeknummer"] == predict_week]
-        .groupby(_GROUP_COLS)["Gewogen vooraanmelders"]
+        curr_src
+        .groupby(grp)["Gewogen vooraanmelders"]
         .mean()
         .rename("_gewogen_curr")
         .reset_index()
     )
-    full_data = full_data.merge(current_gewogen, on=_GROUP_COLS, how="left")
+    full_data = full_data.merge(current_gewogen, on=grp, how="left")
     full_data["Gewogen_acceleration"] = (
         (full_data["_gewogen_curr"].fillna(0) - full_data["Gewogen_t-2"])
         - (full_data["Gewogen_t-2"] - full_data["Gewogen_t-5"])
@@ -80,12 +91,12 @@ def _add_engineered_features(
     full_data = full_data.drop(columns=["_gewogen_curr"])
 
     excl_src = (
-        src[src["Weeknummer"] == predict_week]
-        .groupby(_GROUP_COLS)[["Aantal aanmelders met 1 aanmelding", "Ongewogen vooraanmelders"]]
+        curr_src
+        .groupby(grp)[["Aantal aanmelders met 1 aanmelding", "Ongewogen vooraanmelders"]]
         .sum()
         .reset_index()
     )
-    full_data = full_data.merge(excl_src, on=_GROUP_COLS, how="left")
+    full_data = full_data.merge(excl_src, on=grp, how="left")
     full_data["exclusivity_ratio"] = (
         full_data["Aantal aanmelders met 1 aanmelding"].fillna(0)
         / (full_data["Ongewogen vooraanmelders"].fillna(0) + _EPS)
@@ -327,7 +338,7 @@ class CumulativeStrategy(PredictionStrategy):
                     )
                     return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
-                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount)
+                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS)
                 if imp is not None:
                     self._importance_dicts.append(imp)
                 test2["Collegejaar"] = test2["Collegejaar"] + self.skip_years
@@ -356,7 +367,7 @@ class CumulativeStrategy(PredictionStrategy):
                         f"available (try increasing --ci test N)."
                     )
                     return data_to_predict
-                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount)
+                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS)
                 if imp is not None:
                     self._importance_dicts.append(imp)
 

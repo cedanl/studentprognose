@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from studentprognose.strategies.cumulative import _add_engineered_features, _GROUP_COLS
+from studentprognose.strategies.cumulative import _add_engineered_features
 
 
 # ---------------------------------------------------------------------------
