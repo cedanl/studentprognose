@@ -91,6 +91,13 @@ def _check_trend_realism(
                 continue
             abs_diff = abs(pred - act_ly)
             rel_diff = abs_diff / act_ly
+            # Ensemble_prediction is de voorspelde eindinstroom; act_ly is de
+            # gewogen vooraanmelding vorig jaar op dezelfde week — geen directe
+            # appels-met-appels vergelijking. De check werkt als signaal omdat
+            # de conversieverhouding historisch stabiel is: extreme YoY-afwijking
+            # wijst op een modelfout of uitzonderlijk jaar, niet op een normaal
+            # seizoenspatroon. AND-logica (beide drempels) filtert ruis bij
+            # kleine programma's zonder de absolute vloer van de pre-check.
             if rel_diff > 0.50 and abs_diff > 20:
                 label = f"{row['Herkomst']} | {row['Croho groepeernaam']} | {row['Examentype']}"
                 warnings.warn(

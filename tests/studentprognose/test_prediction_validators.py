@@ -142,6 +142,14 @@ class TestCheckHistoricalRealism:
         last = pd.DataFrame()
         _check_historical_realism(curr, last, {}, 2024, 10)  # no exception
 
+    def test_zero_last_year_does_not_hard_stop(self):
+        # Nieuw programma: vorig jaar 0 studenten, dit jaar 30 — geen datakwaliteitsfout.
+        curr, last = self._make_pair(30, 0)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _check_historical_realism(curr, last, {}, 2024, 10)
+        assert not w
+
     def test_yes_flag_propagates_through_run_pre_prediction_checks(self):
         data = pd.concat([
             _make_cumulative(2024, 10, gewogen=5),

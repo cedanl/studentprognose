@@ -127,6 +127,11 @@ def _check_historical_realism(
         abs_diff = abs(val_curr - val_last)
         label = f"{row['Herkomst']} | {programme} | {examentype}"
 
+        # Nieuw programma of jaar zonder historische data: geen basis voor vergelijking,
+        # niet per definitie een datakwaliteitsprobleem.
+        if val_last <= 0:
+            continue
+
         # max() floor voorkomt vals-positieven bij kleine opleidingen: een programma
         # met 10 studenten vorig jaar en 18 dit jaar (80% relatief, 8 absoluut) mag
         # geen hard stop triggeren. De absolute vloer beschermt kleine programma's
