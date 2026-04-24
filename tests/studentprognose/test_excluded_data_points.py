@@ -88,6 +88,22 @@ class TestApplyExcludedDataPoints:
         # The NL-2020 row is kept
         assert any((result["Collegejaar"] == 2020) & (result["Herkomst"] == "NL"))
 
+    def test_missing_column_raises_valueerror(self):
+        df = _df([2020, 2021])  # heeft geen "Faculteit" kolom
+        with pytest.raises(ValueError, match="bestaan"):
+            apply_excluded_data_points(
+                df, [{"examentype": "Bachelor"}], predict_year=2024,
+                examentype_col="Faculteit",
+            )
+
+    def test_missing_herkomst_col_raises(self):
+        df = _df([2020, 2021])
+        with pytest.raises(ValueError, match="bestaan"):
+            apply_excluded_data_points(
+                df, [{"herkomst": "NL"}], predict_year=2024,
+                herkomst_col="OnbekendeKolom",
+            )
+
     def test_opleiding_filter(self):
         df = pd.DataFrame({
             "Collegejaar": [2020, 2021],

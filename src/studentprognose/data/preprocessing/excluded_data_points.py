@@ -29,6 +29,25 @@ def apply_excluded_data_points(
     if not rules:
         return df
 
+    # Vroeg valideren welke kolommen de regels vereisen. Dit geeft een duidelijke
+    # foutmelding in plaats van een KeyError diep in de loop, en voorkomt stille
+    # partial-matching als een configuratiefout een kolomnaam verkeerd spelt.
+    _required = set()
+    for rule in rules:
+        if "herkomst" in rule:
+            _required.add(herkomst_col)
+        if "examentype" in rule:
+            _required.add(examentype_col)
+        if "opleiding" in rule:
+            _required.add(programme_col)
+    _missing = _required - set(df.columns)
+    if _missing:
+        raise ValueError(
+            f"excluded_data_points: regel verwijst naar kolom(men) die niet in het "
+            f"dataframe bestaan: {sorted(_missing)}. "
+            f"Beschikbare kolommen: {sorted(df.columns)}."
+        )
+
     # Elke regel beschrijft één uitsluitingsgebeurtenis (bv. COVID-jaar voor
     # specifieke opleiding). Sleutels binnen één regel worden ge-AND-ed om exact
     # die combinatie te treffen; meerdere regels worden ge-OR-ed zodat
