@@ -51,6 +51,58 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 | Collegejaar bereik | Soft error | Zelfde bereikcontrole als telbestanden |
 | Ontbrekende waarden | Waarschuwing / Soft error | Per verplichte kolom |
 
+## Pre-prediction checks
+
+Vóór elke modelrun voert de pipeline drie aanvullende checks uit op de **cumulatieve vooraanmelddata**. Ze draaien per `(jaar, week)`-combinatie, na ETL maar vóór de modellen.
+
+| Check | Type | Wat wordt gecheckt |
+|-------|------|-------------------|
+| Decimaalintegriteit | Hard stop | `Gewogen vooraanmelders` bevat strings met komma's of niet-numerieke waarden |
+| Lege dataset | Hard stop | Geen rijen aanwezig voor het gevraagde jaar+week |
+| Historisch realisme | Hard stop / waarschuwing | Afwijking t.o.v. dezelfde week vorig jaar per opleiding/herkomst/examentype |
+
+### Historisch realisme — drempelwaarden
+
+Vergelijking per `(Croho groepeernaam, Herkomst, Examentype)`:
+
+| Situatie | Gedrag |
+|----------|--------|
+| Afwijking > `max(25, 70% van vorig jaar)` | Hard stop — pipeline stopt |
+| Afwijking > `max(15, 30% van vorig jaar)` | Waarschuwing — pipeline loopt door |
+
+De absolute vloer (`max(…)`) voorkomt vals-positieven bij kleine opleidingen: een programma met 10 studenten vorig jaar en 18 dit jaar (80% relatief, 8 absoluut) triggert geen hard stop omdat de absolute drempel (25) niet gehaald wordt.
+
+Numerus-fixus-opleidingen (examentype Bachelor) worden overgeslagen — hun aanmeldpatroon is beleidsmatig bepaald en niet vergelijkbaar met het historische patroon.
+
+Als er geen vorig-jaar-data beschikbaar is (nieuwe opleiding), wordt de check stilzwijgend overgeslagen.
+
+### Hard stop omzeilen met `--yes`
+
+De decimaalcheck en lege-dataset-check zijn nooit te omzeilen: corrupte of afwezige data heeft geen veilige fallback. De historisch-realismecheck wél — gebruik `--yes` om een extreme afwijking te accepteren en door te gaan:
+
+```bash
+uv run studentprognose --yes -y 2024 -w 10
+```
+
+Met `--yes` verschijnt een waarschuwing in de console maar stopt de pipeline niet. Gebruik dit bewust: een extreme afwijking kan duiden op een Studielink-probleem dat je niet wilt meenemen in de modeltraining.
+
+## Post-prediction checks
+
+Nadat het ensemble zijn voorspellingen heeft opgeleverd, voert de pipeline twee informatieve checks uit. Ze stoppen de pipeline **nooit** — ze printen alleen waarschuwingen in de console.
+
+| Check | Wat wordt gecheckt |
+|-------|-------------------|
+| Trend-realisme YoY | `Ensemble_prediction` wijkt > 50% én > 20 absoluut af van `Gewogen vooraanmelders` dezelfde week vorig jaar |
+| Trend-realisme WoW | `Ensemble_prediction` wijkt > 30% én > 15 absoluut af van de voorspelling van de vorige week |
+| NF-cap overschrijding | Gesommeerde `Ensemble_prediction` per numerus-fixus-opleiding overschrijdt het geconfigureerde plafond |
+
+Pre-master-rijen worden uitgesloten van de NF-cap-check: ze tellen niet mee als nieuwe eerstejaars.
+
+De week-op-week-check slaat de eerste week van elke run over (geen vorige week beschikbaar) en week 39 (eerste week van het nieuwe aanmeldseizoen — de vorige week, 38, is het einde van het vorige seizoen en geen zinvolle referentie).
+
+!!! note "Alleen beschikbaar in combinatiemodus"
+    De post-prediction checks zijn alleen actief als de pipeline wordt gestart met `-d both` of `-d b`. In cumulatief-enkel (`-d c`) of individueel-enkel (`-d i`) modus bestaat de `Ensemble_prediction`-kolom niet en worden de checks stilzwijgend overgeslagen.
+
 ## Drempels aanpassen
 
 De standaarddrempels voor NaN-percentages en jaarbereiken zijn instelbaar via `configuration.json`. Zie [Configuratie — validation](configuratie.md#validation--validatiedrempels-overschrijven).
