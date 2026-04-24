@@ -13,6 +13,89 @@ from studentprognose.utils.weeks import increment_week
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
 
+_EPS = 1e-8
+_GROUP_COLS = ["Collegejaar", "Faculteit", "Herkomst", "Examentype", "Croho groepeernaam"]
+
+
+def _add_engineered_features(
+    full_data: pd.DataFrame,
+    data_cumulative: pd.DataFrame,
+    predict_week: int,
+) -> pd.DataFrame:
+    """Add Gewogen_t-2, Gewogen_t-5, Gewogen_acceleration, exclusivity_ratio to wide-format data.
+
+    Computes lags relative to predict_week from the long-format source data and merges
+    them into the pivoted XGBoost feature matrix. Missing reference weeks fall back to
+    week 1; if week 1 is also absent the value is filled with 0.
+    """
+    src = data_cumulative
+
+    for lag in [2, 5]:
+        ref_week = max(predict_week - lag, 1)
+        col_name = f"Gewogen_t-{lag}"
+
+        ref_values = (
+            src[src["Weeknummer"] == ref_week]
+            .groupby(_GROUP_COLS)["Gewogen vooraanmelders"]
+            .mean()
+            .rename(col_name)
+            .reset_index()
+        )
+        full_data = full_data.merge(ref_values, on=_GROUP_COLS, how="left")
+
+        missing_mask = full_data[col_name].isna()
+        if missing_mask.any():
+            fallback = (
+                src[src["Weeknummer"] == 1]
+                .groupby(_GROUP_COLS)["Gewogen vooraanmelders"]
+                .mean()
+                .rename("_fallback")
+                .reset_index()
+            )
+            fill_series = (
+                full_data.loc[missing_mask, _GROUP_COLS]
+                .merge(fallback, on=_GROUP_COLS, how="left")["_fallback"]
+            )
+            n_zero = fill_series.isna().sum()
+            if n_zero:
+                warnings.warn(
+                    f"{n_zero} rijen missen week-1 fallback voor lag={lag}. Gevuld met 0.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            full_data.loc[missing_mask, col_name] = fill_series.fillna(0).values
+
+    current_gewogen = (
+        src[src["Weeknummer"] == predict_week]
+        .groupby(_GROUP_COLS)["Gewogen vooraanmelders"]
+        .mean()
+        .rename("_gewogen_curr")
+        .reset_index()
+    )
+    full_data = full_data.merge(current_gewogen, on=_GROUP_COLS, how="left")
+    full_data["Gewogen_acceleration"] = (
+        (full_data["_gewogen_curr"] - full_data["Gewogen_t-2"])
+        - (full_data["Gewogen_t-2"] - full_data["Gewogen_t-5"])
+    )
+    full_data = full_data.drop(columns=["_gewogen_curr"])
+
+    excl_src = (
+        src[src["Weeknummer"] == predict_week]
+        .groupby(_GROUP_COLS)[["Aantal aanmelders met 1 aanmelding", "Ongewogen vooraanmelders"]]
+        .sum()
+        .reset_index()
+    )
+    full_data = full_data.merge(excl_src, on=_GROUP_COLS, how="left")
+    full_data["exclusivity_ratio"] = (
+        full_data["Aantal aanmelders met 1 aanmelding"].fillna(0)
+        / (full_data["Ongewogen vooraanmelders"].fillna(0) + _EPS)
+    )
+    full_data = full_data.drop(
+        columns=["Aantal aanmelders met 1 aanmelding", "Ongewogen vooraanmelders"]
+    )
+
+    return full_data
+
 
 class CumulativeStrategy(PredictionStrategy):
     def __init__(self, data_cumulative, data_studentcount, configuration,
@@ -85,6 +168,7 @@ class CumulativeStrategy(PredictionStrategy):
 
         full_data = _get_transformed_data(self.data_cumulative.copy(deep=True), self.min_training_year)
         full_data["39"] = 0
+        full_data = _add_engineered_features(full_data, self.data_cumulative, int(self.predict_week))
 
         self.skip_years = skip_years
 

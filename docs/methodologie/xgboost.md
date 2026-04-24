@@ -40,7 +40,12 @@ De regressor voorspelt het **totaal aantal inschrijvingen** per opleiding/herkom
 | Type | Features |
 |------|----------|
 | Numeriek | Collegejaar, weekkolommen (week 1 t/m 38 als afzonderlijke kolommen) |
+| Afgeleid — lagged | `Gewogen_t-2`, `Gewogen_t-5`: gewogen vooraanmelders 2 en 5 weken vóór de voorspelweek |
+| Afgeleid — dynamiek | `Gewogen_acceleration`: tweede afgeleide van de aanmeldstroom — `(huidig − t-2) − (t-2 − t-5)`. Positief = instroom versnelt, negatief = instroom vlakt af. |
+| Afgeleid — commitment | `exclusivity_ratio`: aandeel aanmelders dat exclusief voor deze opleiding kiest — `Aantal aanmelders met 1 aanmelding / (Ongewogen vooraanmelders + ε)`. Hogere waarde = grotere commitment. |
 | Categorisch | Examentype, Faculteit, Croho groepeernaam, Herkomst |
+
+De lagged en afgeleide features worden per (opleiding × herkomst × examentype × jaar) berekend ten opzichte van de voorspelweek. Ontbreekt een referentieweek dan wordt als fallback week 1 gebruikt; is ook die afwezig dan wordt 0 ingevuld.
 
 ### Waarom XGBoost hier?
 

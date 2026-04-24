@@ -38,7 +38,11 @@ def predict_with_xgboost(train, test, data_studentcount) -> np.ndarray | float:
     X_train = train.drop(["Aantal_studenten"], axis=1)
     y_train = train.pop("Aantal_studenten")
 
-    numeric_cols = ["Collegejaar"] + [str(x) for x in get_weeks_list(38)]
+    numeric_cols = (
+        ["Collegejaar"]
+        + [str(x) for x in get_weeks_list(38)]
+        + ["Gewogen_t-2", "Gewogen_t-5", "Gewogen_acceleration", "exclusivity_ratio"]
+    )
     categorical_cols = ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
 
     numeric_transformer = "passthrough"
