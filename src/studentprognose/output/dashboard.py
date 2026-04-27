@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from studentprognose.utils.weeks import DataOption, StudentYearPrediction
+from studentprognose.utils.weeks import DataOption, StudentYearPrediction, week_sort_key
 
 
 # ── Colour palette ──────────────────────────────────────────────────
@@ -38,23 +38,26 @@ MAPE_WARN = 0.25
 DELTA_GOOD = 0.05
 DELTA_WARN = 0.15
 
+STATUS_COLOURS = {"good": "#2ca02c", "warn": "#f0ad4e", "bad": "#d62728"}
+STATUS_FILLS = {"good": "#d4edda", "warn": "#fff3cd", "bad": "#f8d7da"}
+
 PLOTLY_CONFIG = {"responsive": True, "displayModeBar": False}
 
 
 def _mape_color(val: float) -> str:
     if val <= MAPE_GOOD:
-        return "#2ca02c"
+        return STATUS_COLOURS["good"]
     if val <= MAPE_WARN:
-        return "#f0ad4e"
-    return "#d62728"
+        return STATUS_COLOURS["warn"]
+    return STATUS_COLOURS["bad"]
 
 
 def _mape_row_fill(val: float) -> str:
     if val <= MAPE_GOOD:
-        return "#d4edda"
+        return STATUS_FILLS["good"]
     if val <= MAPE_WARN:
-        return "#fff3cd"
-    return "#f8d7da"
+        return STATUS_FILLS["warn"]
+    return STATUS_FILLS["bad"]
 
 
 def _chart_height(n: int, per_item: int = 30, base: int = 200, min_h: int = 350) -> int:
@@ -79,14 +82,9 @@ HERKOMST_COLOURS = {"NL": "#4472C4", "EER": "#ED7D31", "Niet-EER": "#A5A5A5"}
 ACADEMIC_WEEKS = [str(w) for w in list(range(39, 53)) + list(range(1, 39))]
 
 
-def _week_sort_key(w: int) -> int:
-    """Sort key so the academic year runs 39 → 52, 1 → 38."""
-    return w - 39 if w >= 39 else w + 13
-
-
 def _sort_weeks_series(s: pd.Series) -> pd.Series:
     """Pandas key function for sorting a Weeknummer series."""
-    return s.apply(lambda w: _week_sort_key(int(w)))
+    return s.apply(lambda w: week_sort_key(int(w)))
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -154,8 +152,8 @@ class DashboardBuilder:
             return None
         agg = sub.groupby("Weeknummer")["Gewogen vooraanmelders"].sum().reset_index()
         if self.predict_week is not None:
-            pw_key = _week_sort_key(self.predict_week)
-            agg = agg[agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
+            pw_key = week_sort_key(self.predict_week)
+            agg = agg[agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
         return agg.sort_values("Weeknummer", key=_sort_weeks_series)
 
     def _best_prediction_col(self) -> str | None:
@@ -1676,7 +1674,7 @@ class DashboardBuilder:
         programmes = sorted(pred_year_data["Croho groepeernaam"].unique())
         prev_year = self.prediction_year - 1
         sc = self.data_studentcount
-        pw_key = _week_sort_key(self.predict_week)
+        pw_key = week_sort_key(self.predict_week)
 
         sarima_rows = self.data[
             (self.data["Collegejaar"] == self.prediction_year)
@@ -1699,8 +1697,8 @@ class DashboardBuilder:
                     known.groupby("Weeknummer")["Gewogen vooraanmelders"]
                     .sum().reset_index()
                 )
-                known_agg = known_agg[known_agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
-                known_agg = known_agg.sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                known_agg = known_agg[known_agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
+                known_agg = known_agg.sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
 
                 if not known_agg.empty:
                     idx = len(fig.data)
@@ -1731,7 +1729,7 @@ class DashboardBuilder:
                     sar_agg = (
                         sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
                         .sum().reset_index()
-                        .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                        .sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
                     )
                     if last_known_week is not None and last_known_val is not None:
                         bridge = pd.DataFrame({
@@ -1858,7 +1856,7 @@ class DashboardBuilder:
                 xgb_agg = (
                     xgb_prog.groupby("Weeknummer")["XGBoost_cumulative"]
                     .sum().reset_index()
-                    .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                    .sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
                 )
                 idx = len(fig.data)
                 fig.add_trace(go.Scatter(
@@ -1886,7 +1884,7 @@ class DashboardBuilder:
                     sar_agg = (
                         sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
                         .sum().reset_index()
-                        .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                        .sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
                     )
                     # Prepend XGBoost endpoint for visual continuity
                     if xgb_last_week is not None and xgb_last_val is not None:
@@ -2659,9 +2657,9 @@ class DashboardBuilder:
             )
 
             if self.predict_week is not None:
-                pw_key = _week_sort_key(self.predict_week)
-                before_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
-                after_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) > pw_key)]
+                pw_key = week_sort_key(self.predict_week)
+                before_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
+                after_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) > pw_key)]
 
                 # Thick line: known at prediction time
                 idx = len(fig.data)
@@ -2706,9 +2704,9 @@ class DashboardBuilder:
                 )
                 # Only weeks after predict_week
                 if self.predict_week is not None:
-                    pw_key = _week_sort_key(self.predict_week)
+                    pw_key = week_sort_key(self.predict_week)
                     sarima_sub = sarima_sub[
-                        sarima_sub["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) > pw_key)
+                        sarima_sub["Weeknummer"].apply(lambda w: week_sort_key(int(w)) > pw_key)
                     ]
                 sarima_sub = sarima_sub.sort_values("Weeknummer", key=_sort_weeks_series)
 
@@ -3256,8 +3254,8 @@ class DashboardBuilder:
         # Current year: latest available week per programme × herkomst
         cur = dc[dc["Collegejaar"] == self.prediction_year]
         if self.predict_week is not None:
-            pw_key = _week_sort_key(self.predict_week)
-            cur = cur[cur["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
+            pw_key = week_sort_key(self.predict_week)
+            cur = cur[cur["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
         # Take the value at the maximum week per group
         cur_max = (
             cur.sort_values("Weeknummer", key=_sort_weeks_series)
@@ -3334,11 +3332,11 @@ class DashboardBuilder:
             current = 0
             if self.data_cumulative is not None and self.predict_week is not None:
                 dc = self.data_cumulative
-                pw_key = _week_sort_key(self.predict_week)
+                pw_key = week_sort_key(self.predict_week)
                 mask = (
                     (dc["Croho groepeernaam"] == prog)
                     & (dc["Collegejaar"] == self.prediction_year)
-                    & (dc["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key))
+                    & (dc["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key))
                 )
                 sub_dc = dc.loc[mask]
                 if not sub_dc.empty:
