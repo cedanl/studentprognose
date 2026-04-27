@@ -177,26 +177,10 @@ def _save_results(strategy, cfg):
             print("Saving output...")
             strategy.postprocessor.save_output(cfg.student_year_prediction)
 
-            data_cumulative = getattr(strategy, "data_cumulative", None)
-            if data_cumulative is None:
-                data_cumulative = getattr(
-                    getattr(strategy, "cumulative", None), "data_cumulative", None,
-                )
-            xgboost_curve = getattr(strategy, "xgboost_curve", None)
-            if xgboost_curve is None:
-                xgboost_curve = getattr(
-                    getattr(strategy, "individual", None), "xgboost_curve", None,
-                )
+            if len(cfg.weeks) > 1:
+                print(f"Let op: het dashboard toont alleen de prognose voor week {cfg.weeks[-1]} (laatste week in de reeks).")
 
-            xgb_classifier_importance = getattr(
-                getattr(strategy, "individual", None), "xgboost_importance", None,
-            )
-            xgb_regressor_importance = getattr(
-                getattr(strategy, "cumulative", None), "xgboost_importance", None,
-            )
-            if xgb_regressor_importance is None and not hasattr(strategy, "individual"):
-                xgb_regressor_importance = getattr(strategy, "xgboost_importance", None)
-
+            dd = strategy.get_dashboard_data()
             dashboard = DashboardBuilder(
                 data=strategy.postprocessor.data,
                 data_option=cfg.data_option,
@@ -205,11 +189,11 @@ def _save_results(strategy, cfg):
                 ci_test_n=cfg.ci_test_n,
                 cwd=os.getcwd(),
                 predict_week=cfg.weeks[-1] if cfg.weeks else None,
-                data_cumulative=data_cumulative,
+                data_cumulative=dd["data_cumulative"],
                 data_studentcount=strategy.postprocessor.data_studentcount,
-                data_xgboost_curve=xgboost_curve,
-                xgb_classifier_importance=xgb_classifier_importance,
-                xgb_regressor_importance=xgb_regressor_importance,
+                data_xgboost_curve=dd["xgboost_curve"],
+                xgb_classifier_importance=dd["xgb_classifier_importance"],
+                xgb_regressor_importance=dd["xgb_regressor_importance"],
             )
             dashboard.build_and_save()
         else:

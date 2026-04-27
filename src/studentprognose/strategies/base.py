@@ -45,6 +45,14 @@ class PredictionStrategy(ABC):
         self.herkomst_filtering = herkomst_filtering
         self.examentype_filtering = examentype_filtering
 
+    def get_dashboard_data(self) -> dict:
+        return {
+            "data_cumulative": None,
+            "xgboost_curve": None,
+            "xgb_classifier_importance": None,
+            "xgb_regressor_importance": None,
+        }
+
     def get_data_to_predict(
         self, data, programme_filtering=None, herkomst_filtering=None, examentype_filtering=None
     ):
