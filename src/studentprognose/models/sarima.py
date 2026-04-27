@@ -5,7 +5,7 @@ import statsmodels.api as sm
 from studentprognose.models.base import BaseForecaster
 from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len
 from studentprognose.utils.constants import (
-    FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR,
+    FINAL_ACADEMIC_WEEK,
     SARIMA_ORDER, SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
     SARIMA_BACHELOR_DEADLINE_WEEKS,
 )
