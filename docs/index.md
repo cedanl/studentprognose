@@ -26,3 +26,7 @@ Het model kent drie verwerkingssporen, afhankelijk van de beschikbare data:
 | Beide | `-d b` | Beide bronnen (standaard) | Volledig ensemble |
 
 Zie [Methodologie](methodologie/index.md) voor een diepgaande uitleg per model.
+
+## In de praktijk
+
+Dit model is oorspronkelijk ontwikkeld door **Radboud Universiteit** en vervolgens samen met CEDA open source gemaakt zodat andere Nederlandse onderwijsinstellingen er ook van kunnen profiteren. Radboud is daarmee de grondlegger van dit project. VOX Nijmegen schreef hierover: [*De universiteit heeft nu haar eigen glazen bol*](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten).

@@ -17,7 +17,9 @@ MODEL_COLOURS = {
     "SARIMA_individual": "#1f77b4",
     "SARIMA_cumulative": "#ff7f0e",
     "Prognose_ratio": "#2ca02c",
+    "Ensemble_prediction": "#d62728",
     "Weighted_ensemble_prediction": "#9467bd",
+    "Average_ensemble_prediction": "#8c564b",
     "Aantal_studenten": "#333333",
 }
 
@@ -160,6 +162,8 @@ class DashboardBuilder:
         """Pick the best available prediction column by priority."""
         for col in (
             "Weighted_ensemble_prediction",
+            "Average_ensemble_prediction",
+            "Ensemble_prediction",
             "SARIMA_cumulative",
             "SARIMA_individual",
         ):

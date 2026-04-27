@@ -21,6 +21,9 @@
 
 </div>
 
+> [!NOTE]
+> Dit model is oorspronkelijk ontwikkeld door **Radboud Universiteit** en vervolgens samen met CEDA open source gemaakt zodat andere instellingen er ook van kunnen profiteren. Lees meer in het [VOX-artikel](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten).
+
 ---
 
 ## 📦 Aan de slag
