@@ -9,7 +9,7 @@ from statsmodels.tools.sm_exceptions import ConvergenceWarning
 warnings.simplefilter("ignore", ConvergenceWarning)
 
 from studentprognose.strategies.base import PredictionStrategy
-from studentprognose.utils.weeks import increment_week
+from studentprognose.utils.weeks import increment_week, compute_pred_len
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
 
@@ -25,6 +25,14 @@ class CumulativeStrategy(PredictionStrategy):
         self.skip_years = 0
         self.xgboost_importance = None
         self._importance_dicts: list[dict] = []
+
+    def get_dashboard_data(self) -> dict:
+        return {
+            "data_cumulative": self.data_cumulative,
+            "xgboost_curve": None,
+            "xgb_classifier_importance": None,
+            "xgb_regressor_importance": self.xgboost_importance,
+        }
 
     def preprocess(self):
         data = self.data_cumulative
@@ -146,10 +154,7 @@ class CumulativeStrategy(PredictionStrategy):
         )
         self.data_cumulative = self.data_cumulative.drop_duplicates()
 
-        if int(self.predict_week) > 38:
-            self.pred_len = 38 + 52 - int(self.predict_week)
-        else:
-            self.pred_len = 38 - int(self.predict_week)
+        self.pred_len = compute_pred_len(int(self.predict_week))
 
     def _predict_sarima(self, row, already_printed=False):
         return predict_with_sarima_cumulative(

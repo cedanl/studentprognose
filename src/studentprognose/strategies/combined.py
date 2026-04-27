@@ -38,6 +38,14 @@ class CombinedStrategy(PredictionStrategy):
         self.years = years
         self.exclude_from_combined = configuration.get("exclude_from_combined", [])
 
+    def get_dashboard_data(self) -> dict:
+        return {
+            "data_cumulative": self.cumulative.data_cumulative,
+            "xgboost_curve": self.individual.xgboost_curve,
+            "xgb_classifier_importance": self.individual.xgboost_importance,
+            "xgb_regressor_importance": self.cumulative.xgboost_importance,
+        }
+
     def preprocess(self):
         print("Preprocessing individual data...")
         self.individual.preprocess()
@@ -63,12 +71,13 @@ class CombinedStrategy(PredictionStrategy):
 
         from studentprognose.models.xgboost_classifier import predict_applicant
         print("Predicting preapplicants...")
-        predicties, self.individual.xgboost_importance = predict_applicant(
+        predicties, importance = predict_applicant(
             self.individual.data_individual, self.predict_year, self.predict_week,
             self.individual.max_year,
             self.cumulative.data_cumulative,
             configuration=self.configuration,
         )
+        self.individual.set_xgboost_importance(importance)
         self.individual.data_individual.loc[
             (self.individual.data_individual["Collegejaar"] == self.predict_year)
             & (self.individual.data_individual["Weeknummer"].isin(get_weeks_list(self.predict_week))),
@@ -89,9 +98,9 @@ class CombinedStrategy(PredictionStrategy):
             how="left",
         )
 
-        self.individual.data_individual = transform_data(
+        self.individual.set_data_individual(transform_data(
             self.individual.data_individual, "Cumulative_sum_within_year"
-        )
+        ))
 
         self.cumulative._prepare_data()
 
@@ -141,13 +150,15 @@ class CombinedStrategy(PredictionStrategy):
         ]
         data_to_predict["Voorspelde vooraanmelders"] = np.nan
 
+        cumulative_predictions = [x[1] for x in self.predicted_data]
+
         if self.predict_week != 38:
             data_to_predict = self.postprocessor.add_predicted_preregistrations(
-                data_to_predict, [x[1] for x in self.predicted_data]
+                data_to_predict, cumulative_predictions
             )
 
         data_to_predict = self.cumulative._predict_students_with_preapplicants(
-            full_data, [x[1] for x in self.predicted_data], data_to_predict
+            full_data, cumulative_predictions, data_to_predict
         )
 
         # Store XGBoost curve for pipeline visualization
