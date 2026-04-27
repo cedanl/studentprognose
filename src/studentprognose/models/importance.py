@@ -1,4 +1,6 @@
-def extract_grouped_importance(model, preprocessor, numeric_cols, categorical_cols):
+def extract_grouped_importance(
+    model, preprocessor, numeric_cols: list[str], categorical_cols: list[str],
+) -> dict[str, float]:
     """Extract feature importances, grouping OneHotEncoded features back to original columns."""
     importances = model.feature_importances_
     feature_names = preprocessor.get_feature_names_out()

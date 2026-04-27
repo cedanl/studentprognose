@@ -78,3 +78,20 @@ De individuele modelkolommen naast `Ensemble_prediction` zijn bewust in de outpu
 - De baseline (ratio-model) te vergelijken met de complexere modellen — als het ensemble niet beter is dan de ratio, is er reden om kritischer te kijken
 
 Zie [Ensemble](methodologie/ensemble.md) voor uitleg over hoe de gewichten tot stand komen.
+
+## Foutmaten en numerus-fixusopleidingen
+
+MAE en MAPE worden berekend **exclusief numerus-fixusopleidingen**. Voor deze opleidingen worden de foutkolommen op `NaN` gezet. De reden: bij numerus-fixusopleidingen wordt het voorspelde aantal afgekapt op de capaciteitslimiet, waardoor de modelfouten niet vergelijkbaar zijn met reguliere opleidingen.
+
+## Interactief dashboard
+
+Naast de Excel-bestanden genereert de pipeline interactieve HTML-dashboards onder `data/output/visualisaties/`. Per modus (`-d i`, `-d c`, `-d b`) wordt een apart dashboard aangemaakt met daarin:
+
+- **Individueel dashboard**: XGBoost-voorspellingen per opleiding, SARIMA-trajecten, feature importance (classifier).
+- **Cumulatief dashboard**: SARIMA-voorspellingen op cumulatieve teldata, XGBoost-regressorresultaten, feature importance (regressor).
+- **Eindoverzicht**: ensemble-voorspellingen per opleiding, foutmaten, vergelijking met vorige jaren.
+
+De dashboards zijn zelfstandige HTML-bestanden (geen server nodig) en kunnen in elke browser geopend worden.
+
+!!! note "Dashboard toont alleen de laatste week"
+    Bij een multi-week run (bijv. `-w 10:20`) toont het dashboard alleen de prognose van de **laatste week** in de reeks. De Excel-output bevat wel alle weken.

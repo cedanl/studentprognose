@@ -99,6 +99,17 @@ def convert_nan_to_zero(number):
         return number
 
 
+def week_sort_key(w: int) -> int:
+    """Sort key so the academic year runs 39 → 52, 1 → 38."""
+    return w - 39 if w >= 39 else w + 13
+
+
+def compute_pred_len(predict_week: int) -> int:
+    if predict_week > FINAL_ACADEMIC_WEEK:
+        return FINAL_ACADEMIC_WEEK + WEEKS_PER_YEAR - predict_week
+    return FINAL_ACADEMIC_WEEK - predict_week
+
+
 def get_all_weeks_valid(columns):
     col_set = set(columns)
     return [w for w in get_all_weeks_ordered() if w in col_set]

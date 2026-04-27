@@ -53,6 +53,12 @@ De relatie tussen het cumulatieve vooraanmeldpatroon en het uiteindelijke inschr
 
 ---
 
+## Feature importance
+
+Na het trainen van elk XGBoost-model wordt de **feature importance** geëxtraheerd en gegroepeerd per oorspronkelijke feature. One-hot geëncodeerde categorieën worden teruggegroepeerd naar hun oorspronkelijke kolom (bijv. alle `Herkomst_NL`, `Herkomst_EER`, … worden samengevoegd tot `Herkomst`). Weeknummers worden weergegeven als `Week 1`, `Week 2`, etc.
+
+De gegroepeerde importances worden getoond in het interactieve dashboard (zie [Output begrijpen](../output-begrijpen.md#interactief-dashboard)).
+
 ## Implementatie
 
-Zie `src/studentprognose/models/xgboost_classifier.py` en `src/studentprognose/models/xgboost_regressor.py`.
+Zie `src/studentprognose/models/xgboost_classifier.py`, `src/studentprognose/models/xgboost_regressor.py` en `src/studentprognose/models/importance.py`.
