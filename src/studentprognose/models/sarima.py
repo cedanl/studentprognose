@@ -3,7 +3,7 @@ from numpy import linalg as LA
 import statsmodels.api as sm
 
 from studentprognose.models.base import BaseForecaster
-from studentprognose.utils.weeks import get_all_weeks_valid
+from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len
 from studentprognose.utils.constants import (
     FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR,
     SARIMA_ORDER, SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
@@ -83,7 +83,7 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
         return []
 
 
-def predict_with_sarima_individual(data_individual, row, predict_year, predict_week, max_year, numerus_fixus_list, data_exog=None, already_printed=False) -> float:
+def predict_with_sarima_individual(data_individual, row, predict_year, predict_week, max_year, numerus_fixus_list, data_exog=None, already_printed=False) -> list:
     """
     Predicts nr of students with SARIMA per programme/origin/week for individual data.
 
@@ -149,10 +149,7 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             except IndexError:
                 return []
 
-        if int(predict_week) > FINAL_ACADEMIC_WEEK:
-            pred_len = FINAL_ACADEMIC_WEEK + WEEKS_PER_YEAR - int(predict_week)
-        else:
-            pred_len = FINAL_ACADEMIC_WEEK - int(predict_week)
+        pred_len = compute_pred_len(int(predict_week))
 
         def create_exogenous(data, pred_len):
             exg_data = data.loc[:, get_all_weeks_valid(data.columns)].values.flatten()

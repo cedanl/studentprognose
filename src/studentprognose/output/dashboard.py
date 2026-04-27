@@ -9,7 +9,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from studentprognose.utils.weeks import DataOption, StudentYearPrediction
+from studentprognose.utils.weeks import DataOption, StudentYearPrediction, week_sort_key
 
 
 # ── Colour palette ──────────────────────────────────────────────────
@@ -27,7 +27,43 @@ DISPLAY_NAMES = {
     "SARIMA_cumulative": "XGBoost (cumulatief)",
     "SARIMA_individual": "SARIMA (individueel)",
     "Prognose_ratio": "Prognose ratio",
+    "Weighted_ensemble_prediction": "Ensemble",
+    "Aantal_studenten": "Werkelijk",
 }
+
+ACTUAL_TREND_COLOUR = "#00bcd4"
+CONVERSION_COLOURS = {"predicted": "#4682b4", "actual": "#708090"}
+CAPACITY_LINE_COLOUR = "#d62728"
+
+MAPE_GOOD = 0.10
+MAPE_WARN = 0.25
+DELTA_GOOD = 0.05
+DELTA_WARN = 0.15
+
+STATUS_COLOURS = {"good": "#2ca02c", "warn": "#f0ad4e", "bad": "#d62728"}
+STATUS_FILLS = {"good": "#d4edda", "warn": "#fff3cd", "bad": "#f8d7da"}
+
+PLOTLY_CONFIG = {"responsive": True, "displayModeBar": False}
+
+
+def _mape_color(val: float) -> str:
+    if val <= MAPE_GOOD:
+        return STATUS_COLOURS["good"]
+    if val <= MAPE_WARN:
+        return STATUS_COLOURS["warn"]
+    return STATUS_COLOURS["bad"]
+
+
+def _mape_row_fill(val: float) -> str:
+    if val <= MAPE_GOOD:
+        return STATUS_FILLS["good"]
+    if val <= MAPE_WARN:
+        return STATUS_FILLS["warn"]
+    return STATUS_FILLS["bad"]
+
+
+def _chart_height(n: int, per_item: int = 30, base: int = 200, min_h: int = 350) -> int:
+    return max(min_h, n * per_item + base)
 
 
 def _display(col: str) -> str:
@@ -48,14 +84,9 @@ HERKOMST_COLOURS = {"NL": "#4472C4", "EER": "#ED7D31", "Niet-EER": "#A5A5A5"}
 ACADEMIC_WEEKS = [str(w) for w in list(range(39, 53)) + list(range(1, 39))]
 
 
-def _week_sort_key(w: int) -> int:
-    """Sort key so the academic year runs 39 → 52, 1 → 38."""
-    return w - 39 if w >= 39 else w + 13
-
-
 def _sort_weeks_series(s: pd.Series) -> pd.Series:
     """Pandas key function for sorting a Weeknummer series."""
-    return s.apply(lambda w: _week_sort_key(int(w)))
+    return s.apply(lambda w: week_sort_key(int(w)))
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -123,8 +154,8 @@ class DashboardBuilder:
             return None
         agg = sub.groupby("Weeknummer")["Gewogen vooraanmelders"].sum().reset_index()
         if self.predict_week is not None:
-            pw_key = _week_sort_key(self.predict_week)
-            agg = agg[agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
+            pw_key = week_sort_key(self.predict_week)
+            agg = agg[agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
         return agg.sort_values("Weeknummer", key=_sort_weeks_series)
 
     def _best_prediction_col(self) -> str | None:
@@ -190,9 +221,10 @@ class DashboardBuilder:
         pw_idx = ACADEMIC_WEEKS.index(pw_str)
         fig.add_vline(x=pw_idx, line_dash="dash", line_color="red", line_width=1.5)
         fig.add_annotation(
-            x=pw_idx, y=1.06, yref="paper",
+            x=pw_idx, y=1.02, yref="paper", yanchor="bottom",
             text=f"Voorspelweek {self.predict_week}",
             showarrow=False, font=dict(color="red", size=11),
+            bgcolor="rgba(255,255,255,0.8)", borderpad=3,
         )
 
     @staticmethod
@@ -223,7 +255,7 @@ class DashboardBuilder:
         for i, entry in enumerate(charts):
             title, fig = entry[0], entry[1]
             desc = entry[2] if len(entry) > 2 else ""
-            html = fig.to_html(full_html=False, include_plotlyjs=(i == 0))
+            html = fig.to_html(full_html=False, include_plotlyjs=(i == 0), config=PLOTLY_CONFIG)
             desc_html = f'<p class="chart-desc">{desc}</p>' if desc else ""
             chart_blocks.append(
                 f'<details class="chart-section" open>'
@@ -238,6 +270,7 @@ class DashboardBuilder:
 <html lang="nl">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Studentprognose Dashboard &ndash; {active_label}</title>
 <style>
   *{{margin:0;padding:0;box-sizing:border-box}}
@@ -248,7 +281,7 @@ class DashboardBuilder:
   .nav-link:hover{{background:#d0d0d0}}
   .nav-active{{background:#1f77b4!important;color:#fff!important}}
   .kpi-row{{display:flex;gap:16px;margin-bottom:24px;flex-wrap:wrap}}
-  .kpi-card{{flex:1;min-width:180px;padding:16px 20px;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}}
+  .kpi-card{{flex:1;min-width:160px;padding:16px 20px;border-radius:8px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.08)}}
   .kpi-card .label{{font-size:13px;color:#666;margin-bottom:4px}}
   .kpi-card .value{{font-size:26px;font-weight:700}}
   .kpi-card.good{{border-left:4px solid #2ca02c}}
@@ -261,6 +294,18 @@ class DashboardBuilder:
   .chart-toggle::before{{content:"▾ ";font-size:14px;color:#999}}
   .chart-section:not([open]) .chart-toggle::before{{content:"▸ "}}
   .chart-desc{{font-size:13px;color:#666;margin-bottom:12px;line-height:1.4}}
+  @media(max-width:768px){{
+    .page-wrap{{padding:12px 8px}}
+    .kpi-row{{flex-direction:column}}
+    .kpi-card{{min-width:auto;margin-bottom:8px}}
+    .chart-section{{padding:12px}}
+    .nav-bar{{flex-wrap:wrap}}
+    .nav-link{{padding:6px 12px;font-size:13px}}
+  }}
+  @media(max-width:480px){{
+    .chart-toggle h2{{font-size:14px}}
+    .kpi-card .value{{font-size:18px}}
+  }}
 </style>
 </head>
 <body>
@@ -302,21 +347,21 @@ class DashboardBuilder:
 
         names, mapes = zip(*prog_mapes)
         avg_mape = float(np.mean(mapes))
-        below_10 = sum(1 for m in mapes if m <= 0.10)
+        below_10 = sum(1 for m in mapes if m <= MAPE_GOOD)
         total = len(mapes)
 
         best_idx = int(np.argmin(mapes))
         worst_idx = int(np.argmax(mapes))
 
-        avg_cls = "good" if avg_mape <= 0.10 else ("warn" if avg_mape <= 0.25 else "bad")
+        avg_cls = "good" if avg_mape <= MAPE_GOOD else ("warn" if avg_mape <= MAPE_WARN else "bad")
         ratio = below_10 / total if total else 0
         below_cls = "good" if ratio >= 0.70 else ("warn" if ratio >= 0.40 else "bad")
 
         return f"""<div class="kpi-row">
-  <div class="kpi-card {avg_cls}"><div class="label">Gem. model-MAPE (out-of-sample)</div><div class="value">{avg_mape:.1%}</div></div>
-  <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% model-fout</div><div class="value">{below_10} van {total}</div></div>
-  <div class="kpi-card good"><div class="label">Best presterend</div><div class="value">{names[best_idx]}<br><span style="font-size:16px">{mapes[best_idx]:.1%}</span></div></div>
-  <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{names[worst_idx]}<br><span style="font-size:16px">{mapes[worst_idx]:.1%}</span></div></div>
+  <div class="kpi-card {avg_cls}" role="status" aria-label="Gemiddelde MAPE: {avg_mape:.1%}"><div class="label">Gem. model-MAPE (out-of-sample)</div><div class="value">{avg_mape:.1%}</div></div>
+  <div class="kpi-card {below_cls}" role="status" aria-label="Opleidingen onder 10% fout: {below_10} van {total}"><div class="label">Opleidingen &lt; 10% model-fout</div><div class="value">{below_10} van {total}</div></div>
+  <div class="kpi-card good" role="status" aria-label="Best presterend: {names[best_idx]}"><div class="label">Best presterend</div><div class="value">{names[best_idx]}<br><span style="font-size:16px">{mapes[best_idx]:.1%}</span></div></div>
+  <div class="kpi-card bad" role="status" aria-label="Meest afwijkend: {names[worst_idx]}"><div class="label">Meest afwijkend</div><div class="value">{names[worst_idx]}<br><span style="font-size:16px">{mapes[worst_idx]:.1%}</span></div></div>
 </div>"""
 
     def _build_kpi_cards_from_hist_accuracy(self) -> str:
@@ -326,28 +371,27 @@ class DashboardBuilder:
             return ""
         prog_mapes = ha.groupby("Croho groepeernaam")["mape"].mean()
         avg_mape = float(prog_mapes.mean())
-        below_10 = int((prog_mapes <= 0.10).sum())
+        below_10 = int((prog_mapes <= MAPE_GOOD).sum())
         total = len(prog_mapes)
         best = prog_mapes.idxmin()
         worst = prog_mapes.idxmax()
 
-        avg_cls = "good" if avg_mape <= 0.10 else ("warn" if avg_mape <= 0.25 else "bad")
+        avg_cls = "good" if avg_mape <= MAPE_GOOD else ("warn" if avg_mape <= MAPE_WARN else "bad")
         ratio = below_10 / total if total else 0
         below_cls = "good" if ratio >= 0.70 else ("warn" if ratio >= 0.40 else "bad")
 
-        # Sanity check: totaal voorspeld vs totaal actueel (meest recente jaar)
         latest = ha[ha["Collegejaar"] == ha["Collegejaar"].max()]
         total_pred = latest["predicted"].sum()
         total_act = latest["actual"].sum()
         sanity_pct = abs(total_pred - total_act) / total_act if total_act > 0 else 0
-        sanity_cls = "good" if sanity_pct <= 0.05 else ("warn" if sanity_pct <= 0.15 else "bad")
+        sanity_cls = "good" if sanity_pct <= DELTA_GOOD else ("warn" if sanity_pct <= DELTA_WARN else "bad")
 
         return f"""<div class="kpi-row">
-  <div class="kpi-card {avg_cls}"><div class="label">Gem. conversieafwijking</div><div class="value">{avg_mape:.1%}</div></div>
-  <div class="kpi-card {sanity_cls}"><div class="label">Vooraanmelders vs inschrijvingen ({int(latest['Collegejaar'].iloc[0])})</div><div class="value">{total_pred:.0f} / {total_act:.0f}</div></div>
-  <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
-  <div class="kpi-card good"><div class="label">Best presterend</div><div class="value">{best}<br><span style="font-size:16px">{prog_mapes[best]:.1%}</span></div></div>
-  <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
+  <div class="kpi-card {avg_cls}" role="status" aria-label="Gemiddelde conversieafwijking: {avg_mape:.1%}"><div class="label">Gem. conversieafwijking</div><div class="value">{avg_mape:.1%}</div></div>
+  <div class="kpi-card {sanity_cls}" role="status" aria-label="Vooraanmelders vs inschrijvingen: {total_pred:.0f} / {total_act:.0f}"><div class="label">Vooraanmelders vs inschrijvingen ({int(latest['Collegejaar'].iloc[0])})</div><div class="value">{total_pred:.0f} / {total_act:.0f}</div></div>
+  <div class="kpi-card {below_cls}" role="status" aria-label="Opleidingen onder 10% fout: {below_10} van {total}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
+  <div class="kpi-card good" role="status" aria-label="Best presterend: {best}"><div class="label">Best presterend</div><div class="value">{best}<br><span style="font-size:16px">{prog_mapes[best]:.1%}</span></div></div>
+  <div class="kpi-card bad" role="status" aria-label="Meest afwijkend: {worst}"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
 </div>"""
 
     def _build_individual_kpi_cards(self) -> str:
@@ -369,7 +413,7 @@ class DashboardBuilder:
 
         avg_mape = float(prog_mapes.mean())
         median_mape = float(prog_mapes.median())
-        below_10 = int((prog_mapes <= 0.10).sum())
+        below_10 = int((prog_mapes <= MAPE_GOOD).sum())
         total = len(prog_mapes)
         best = prog_mapes.idxmin()
         worst = prog_mapes.idxmax()
@@ -383,18 +427,20 @@ class DashboardBuilder:
                 avg_mae = f"{m:.1f}"
                 mae_cls = "good" if m <= 5 else ("warn" if m <= 15 else "bad")
 
-        avg_cls = "good" if avg_mape <= 0.10 else ("warn" if avg_mape <= 0.25 else "bad")
-        med_cls = "good" if median_mape <= 0.10 else ("warn" if median_mape <= 0.25 else "bad")
+        avg_cls = "good" if avg_mape <= MAPE_GOOD else ("warn" if avg_mape <= MAPE_WARN else "bad")
+        med_cls = "good" if median_mape <= MAPE_GOOD else ("warn" if median_mape <= MAPE_WARN else "bad")
         ratio = below_10 / total if total else 0
         below_cls = "good" if ratio >= 0.70 else ("warn" if ratio >= 0.40 else "bad")
 
+        mae_display = f"{avg_mae} studenten" if avg_mae else "–"
+
         return f"""<div class="kpi-row">
-  <div class="kpi-card {avg_cls}"><div class="label">Gem. MAPE (out-of-sample)</div><div class="value">{avg_mape:.1%}</div></div>
-  <div class="kpi-card {med_cls}"><div class="label">Mediaan MAPE</div><div class="value">{median_mape:.1%}</div></div>
-  <div class="kpi-card {mae_cls}"><div class="label">Gem. MAE (studenten)</div><div class="value">{avg_mae if avg_mae else "–"}</div></div>
-  <div class="kpi-card {below_cls}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
-  <div class="kpi-card good"><div class="label">Best presterend</div><div class="value">{best}<br><span style="font-size:16px">{prog_mapes[best]:.1%}</span></div></div>
-  <div class="kpi-card bad"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
+  <div class="kpi-card {avg_cls}" role="status" aria-label="Gemiddelde MAPE: {avg_mape:.1%}"><div class="label">Gem. MAPE (out-of-sample)</div><div class="value">{avg_mape:.1%}</div></div>
+  <div class="kpi-card {med_cls}" role="status" aria-label="Mediaan MAPE: {median_mape:.1%}"><div class="label">Mediaan MAPE</div><div class="value">{median_mape:.1%}</div></div>
+  <div class="kpi-card {mae_cls}" role="status" aria-label="Gemiddelde MAE: {mae_display}"><div class="label">Gem. MAE</div><div class="value">{mae_display}</div></div>
+  <div class="kpi-card {below_cls}" role="status" aria-label="Opleidingen onder 10% fout: {below_10} van {total}"><div class="label">Opleidingen &lt; 10% fout</div><div class="value">{below_10} van {total}</div></div>
+  <div class="kpi-card good" role="status" aria-label="Best presterend: {best}"><div class="label">Best presterend</div><div class="value">{best}<br><span style="font-size:16px">{prog_mapes[best]:.1%}</span></div></div>
+  <div class="kpi-card bad" role="status" aria-label="Meest afwijkend: {worst}"><div class="label">Meest afwijkend</div><div class="value">{worst}<br><span style="font-size:16px">{prog_mapes[worst]:.1%}</span></div></div>
 </div>"""
 
     def _conversion_bar_chart(self) -> go.Figure | None:
@@ -425,13 +471,13 @@ class DashboardBuilder:
 
             fig.add_trace(go.Bar(
                 x=programmes, y=preds, name="Vooraanmelders (wk 38)",
-                marker_color="steelblue", visible=visible,
+                marker_color=CONVERSION_COLOURS["predicted"], visible=visible,
                 text=[f"{v:.0f}" for v in preds], textposition="outside",
                 hovertemplate="%{x}<br>Vooraanmelders: %{y:.0f}<extra></extra>",
             ))
             fig.add_trace(go.Bar(
                 x=programmes, y=actuals, name="Inschrijvingen",
-                marker_color="slategrey", visible=visible,
+                marker_color=CONVERSION_COLOURS["actual"], visible=visible,
                 text=conv_pct, textposition="outside",
                 hovertemplate="%{x}<br>Inschrijvingen: %{y:.0f}<br>Conversie: %{text}<extra></extra>",
             ))
@@ -450,7 +496,8 @@ class DashboardBuilder:
             title=f"Vooraanmelders vs inschrijvingen — {int(default_yr)}",
             xaxis_title="Opleiding", yaxis_title="Aantal",
             barmode="group",
-            height=max(400, len(programmes) * 30 + 200),
+            height=_chart_height(len(programmes), base=200),
+            margin=dict(b=120),
             updatemenus=[dict(
                 active=len(years) - 1, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
@@ -520,7 +567,7 @@ class DashboardBuilder:
             fig.update_layout(
                 title=f"Modelnauwkeurigheid {display} per opleiding × jaar (MAPE)",
                 xaxis_title="Collegejaar", yaxis_title="Opleiding",
-                height=max(400, len(programmes) * 30 + 150),
+                height=_chart_height(len(programmes)),
             )
             results.append((
                 f"Modelnauwkeurigheid {display}", fig,
@@ -600,7 +647,7 @@ class DashboardBuilder:
         fig.update_layout(
             title=f"Modelvergelijking per opleiding (★ = best, gem. {year_str})",
             xaxis_title="Model", yaxis_title="Opleiding",
-            height=max(400, len(programmes) * 25 + 150),
+            height=_chart_height(len(programmes), per_item=25),
             annotations=annotations,
         )
         return fig
@@ -663,7 +710,7 @@ class DashboardBuilder:
                     showlegend=bool(i == 0),
                     name=f"Test (bekend t/m wk {pw})",
                     legendgroup="known",
-                    hovertemplate=f"Test {int(pred_yr)}: wk 39–{pw} (bekend)<extra></extra>",
+                    hovertemplate=f"Test {int(pred_yr)}: wk 39–{pw} (bekend, {known_frac:.0%} van jaar)<extra></extra>",
                 ))
 
                 # Test year — predicted portion (predict_week+1 to 38)
@@ -701,7 +748,7 @@ class DashboardBuilder:
             ),
             yaxis=dict(autorange="reversed"),
             barmode="stack",
-            height=max(250, len(pred_years) * 50 + 150),
+            height=_chart_height(len(pred_years), per_item=50, min_h=250),
             legend=dict(orientation="h", y=-0.15, x=0.5, xanchor="center"),
         )
         return fig
@@ -760,7 +807,7 @@ class DashboardBuilder:
             yr_data = yr_data.sort_values("_best_mape")
 
             colors = [
-                "#d4edda" if m <= 0.10 else "#fff3cd" if m <= 0.25 else "#f8d7da"
+                "#d4edda" if m <= MAPE_GOOD else "#fff3cd" if m <= MAPE_WARN else "#f8d7da"
                 for m in yr_data["_best_mape"]
             ]
 
@@ -784,12 +831,12 @@ class DashboardBuilder:
                 header=dict(
                     values=header_vals,
                     fill_color="#1f77b4", font=dict(color="white", size=13),
-                    align="left",
+                    align="center",
                 ),
                 cells=dict(
                     values=cell_vals,
                     fill_color=[colors] * n_cols,
-                    align="left", font=dict(size=12),
+                    align=["left"] + ["center"] * (n_cols - 1), font=dict(size=12),
                 ),
                 visible=visible,
             ))
@@ -805,7 +852,7 @@ class DashboardBuilder:
         n_progs = agg["Croho groepeernaam"].nunique()
         fig.update_layout(
             title=f"Voorspelling vs realisatie — {int(default_yr)}",
-            height=max(300, n_progs * 35 + 120),
+            height=_chart_height(n_progs, per_item=35, base=120, min_h=300),
             updatemenus=[dict(
                 active=len(years) - 1, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
@@ -832,15 +879,20 @@ class DashboardBuilder:
                 cmin=0, cmax=30,
                 colorbar=dict(title="Afwijking %"),
             ),
-            text=ha.apply(
-                lambda r: (
-                    f"{r['Croho groepeernaam']}<br>Jaar: {int(r['Collegejaar'])}"
-                    f"<br>Vooraanmelders wk38: {r['predicted']:.0f}"
-                    f"<br>Inschrijvingen: {r['actual']:.0f}"
-                    f"<br>Verschil: {r['residual']:+.0f}"
-                ), axis=1,
+            customdata=np.column_stack([
+                ha["Croho groepeernaam"],
+                ha["Collegejaar"].astype(int),
+                ha["actual"].values,
+                ha["residual"].values,
+            ]),
+            hovertemplate=(
+                "%{customdata[0]}<br>"
+                "Jaar: %{customdata[1]}<br>"
+                "Vooraanmelders wk38: %{x:.0f}<br>"
+                "Inschrijvingen: %{customdata[2]}<br>"
+                "Verschil: %{customdata[3]}"
+                "<extra></extra>"
             ),
-            hoverinfo="text",
         ))
         fig.add_hline(y=0, line_dash="dash", line_color="grey")
 
@@ -859,7 +911,8 @@ class DashboardBuilder:
             title="Conversiegap: vooraanmelders wk38 − inschrijvingen",
             xaxis_title="Gewogen vooraanmelders (wk 38)",
             yaxis_title="Verschil (vooraanmelders − inschrijvingen)",
-            height=450, showlegend=False,
+            height=_chart_height(len(ha), per_item=10, min_h=450), showlegend=False,
+            margin=dict(l=60, r=20, t=50, b=60),
         )
         return fig
 
@@ -922,7 +975,7 @@ class DashboardBuilder:
         fig.update_layout(
             title=f"Jaar-op-jaar verandering ({self.prediction_year} vs {prev_year})",
             xaxis_title="Weeknummer", yaxis_title="Opleiding",
-            height=max(400, len(programmes) * 25 + 150),
+            height=_chart_height(len(programmes), per_item=25),
         )
         self._add_predict_week_line(fig)
         return fig
@@ -978,9 +1031,12 @@ class DashboardBuilder:
         fig.update_layout(
             title=f"{title_prefix}MAPE per week{title_suffix}",
             xaxis_title="Weeknummer", yaxis_title="Gemiddelde MAPE",
-            yaxis=dict(tickformat=".0%"), hovermode="x unified", height=450,
+            yaxis=dict(tickformat=".0%"), hovermode="x unified",
+            height=_chart_height(5, min_h=400),
         )
         self._add_predict_week_line(fig)
+        fig.add_hline(y=MAPE_GOOD, line_dash="dot", line_color="#2ca02c", line_width=1,
+                      annotation_text="10% drempel", annotation_position="top left")
         return fig
 
     def _model_performance_summary(
@@ -1036,7 +1092,7 @@ class DashboardBuilder:
             s = hist[mc].dropna()
             if not s.empty:
                 prog_mape = hist.groupby("Croho groepeernaam")[mc].mean().dropna()
-                below = int((prog_mape <= 0.10).sum())
+                below = int((prog_mape <= MAPE_GOOD).sum())
                 vals.append(f"{below} / {len(prog_mape)}")
             else:
                 vals.append("–")
@@ -1132,12 +1188,12 @@ class DashboardBuilder:
             header=dict(
                 values=[f"<b>{h}</b>" for h in header_labels],
                 fill_color="#2c3e50", font=dict(color="white", size=13),
-                align="left", height=32,
+                align="center", height=32,
             ),
             cells=dict(
                 values=list(cells_by_col),
                 fill_color=[row_fills] * len(header_labels),
-                align="left", font=dict(size=12), height=28,
+                align=["left"] + ["center"] * len(models), font=dict(size=12), height=28,
             ),
         ))
         fig.update_layout(height=max(350, 50 + 28 * len(rows_section)), margin=dict(l=10, r=10, t=30, b=10))
@@ -1148,7 +1204,7 @@ class DashboardBuilder:
         prog_mapes = ha.groupby("Croho groepeernaam")["mape"].mean()
         overall_mape = float(prog_mapes.mean())
         median_mape = float(prog_mapes.median())
-        below_10 = int((prog_mapes <= 0.10).sum())
+        below_10 = int((prog_mapes <= MAPE_GOOD).sum())
         total = len(prog_mapes)
 
         rows = [
@@ -1173,12 +1229,12 @@ class DashboardBuilder:
             header=dict(
                 values=["<b></b>", "<b>Conversie-ratio</b>"],
                 fill_color="#2c3e50", font=dict(color="white", size=13),
-                align="left", height=32,
+                align="center", height=32,
             ),
             cells=dict(
                 values=list(cells),
                 fill_color=[fills] * 2,
-                align="left", font=dict(size=12), height=28,
+                align=["left", "center"], font=dict(size=12), height=28,
             ),
         ))
         fig.update_layout(height=300, margin=dict(l=10, r=10, t=30, b=10))
@@ -1213,7 +1269,7 @@ class DashboardBuilder:
 
         naive_mape = float(np.mean(naive_errors))
         naive_median = float(np.median(naive_errors))
-        below_10 = sum(1 for e in naive_errors if e <= 0.10)
+        below_10 = sum(1 for e in naive_errors if e <= MAPE_GOOD)
 
         rows_data.append(["Gem. MAPE (naïef)", f"{naive_mape:.1%}"])
         fills.append("white")
@@ -1237,12 +1293,12 @@ class DashboardBuilder:
             header=dict(
                 values=["<b></b>", "<b>Historische stabiliteit</b>"],
                 fill_color="#2c3e50", font=dict(color="white", size=13),
-                align="left", height=32,
+                align="center", height=32,
             ),
             cells=dict(
                 values=list(cells),
                 fill_color=[fills] * 2,
-                align="left", font=dict(size=12), height=28,
+                align=["left", "center"], font=dict(size=12), height=28,
             ),
         ))
         fig.update_layout(height=max(300, 50 + 28 * len(rows_data)), margin=dict(l=10, r=10, t=30, b=10))
@@ -1303,7 +1359,75 @@ class DashboardBuilder:
             xaxis_title="Voorspelde inschrijvingen", yaxis_title="Werkelijke inschrijvingen",
             xaxis=dict(range=[0, max_val]),
             yaxis=dict(range=[0, max_val], scaleanchor="x"),
-            height=550,
+            height=_chart_height(len(agg), per_item=15, min_h=450),
+        )
+        fig.add_shape(type="line", x0=0, y0=0, x1=max_val, y1=max_val,
+                      line=dict(dash="dash", color="black", width=2))
+        return fig
+
+    def _relative_error_scatter(self, pred_col: str) -> go.Figure | None:
+        """Scatter: X = actual enrolment (programme size), Y = MAPE, size = absolute error."""
+        hist = self._hist_data()
+        if hist.empty or pred_col not in hist.columns:
+            return None
+
+        if self.predict_week is not None:
+            hist = hist[hist["Weeknummer"] == self.predict_week]
+
+        agg = (
+            hist.groupby(["Collegejaar", "Croho groepeernaam"])
+            .agg(predicted=(pred_col, "sum"), actual=("Aantal_studenten", "sum"))
+            .reset_index()
+        )
+        agg = agg.dropna(subset=["predicted", "actual"])
+        agg = agg[agg["actual"] > 0]
+        if agg.empty:
+            return None
+
+        agg["mape"] = (abs(agg["predicted"] - agg["actual"]) / agg["actual"] * 100)
+        agg["abs_error"] = abs(agg["predicted"] - agg["actual"])
+
+        sizeref = 2.0 * max(agg["abs_error"].max(), 1) / (35.0**2)
+
+        fig = go.Figure()
+        years = sorted(agg["Collegejaar"].unique())
+        for yr, colour in zip(years, PASTEL_YEAR_COLOURS[:len(years)]):
+            yr_data = agg[agg["Collegejaar"] == yr]
+            fig.add_trace(go.Scatter(
+                x=yr_data["actual"], y=yr_data["mape"], mode="markers",
+                name=str(int(yr)),
+                marker=dict(
+                    color=colour,
+                    size=yr_data["abs_error"],
+                    sizemode="area",
+                    sizeref=sizeref,
+                    sizemin=4,
+                    line=dict(width=1, color="#333"),
+                ),
+                text=yr_data.apply(
+                    lambda r: (
+                        f"{r['Croho groepeernaam']}<br>Jaar: {int(r['Collegejaar'])}"
+                        f"<br>Werkelijk: {r['actual']:.0f}<br>Voorspeld: {r['predicted']:.0f}"
+                        f"<br>MAPE: {r['mape']:.1f}%<br>Absoluut verschil: {r['abs_error']:.0f}"
+                    ), axis=1,
+                ),
+                hoverinfo="text",
+            ))
+
+        max_mape = min(agg["mape"].max() * 1.1, 100)
+        for threshold, color, label in [(10, "green", "10%"), (25, "orange", "25%")]:
+            if threshold < max_mape:
+                fig.add_hline(
+                    y=threshold, line_dash="dash", line_color=color, line_width=1.5,
+                    annotation_text=label, annotation_position="top right",
+                )
+
+        fig.update_layout(
+            title=f"Relatieve fout per opleidingsgrootte ({_display(pred_col)})",
+            xaxis_title="Werkelijke inschrijvingen (opleidingsgrootte)",
+            yaxis_title="MAPE (%)",
+            yaxis=dict(range=[0, max_mape]),
+            height=_chart_height(len(agg), per_item=15, min_h=450),
         )
         return fig
 
@@ -1351,7 +1475,7 @@ class DashboardBuilder:
         fig.update_layout(
             title=title,
             xaxis_title="Collegejaar", yaxis_title="Opleiding",
-            height=max(400, len(pivot) * 30 + 150),
+            height=_chart_height(len(pivot)),
         )
         return fig
 
@@ -1393,10 +1517,7 @@ class DashboardBuilder:
             preds = yr_data["_pred"].fillna(0).tolist()
             acts = yr_data["_act"].fillna(0).tolist()
 
-            colors = [
-                "#2ca02c" if m <= 0.10 else "#f0ad4e" if m <= 0.25 else "#e74c3c"
-                for m in mapes
-            ]
+            colors = [_mape_color(m) for m in mapes]
 
             visible = idx == len(years) - 1
 
@@ -1422,51 +1543,14 @@ class DashboardBuilder:
             title=f"Voorspelfout per opleiding ({_display(pred_col)}) — {int(default_yr)}",
             xaxis_title="Opleiding", yaxis_title="MAPE",
             yaxis=dict(tickformat=".0%"),
-            height=max(400, len(programmes) * 30 + 200),
+            height=_chart_height(len(programmes), base=200),
             showlegend=False,
             updatemenus=[dict(
                 active=len(years) - 1, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
             )],
         )
-        return fig
-
-    def _error_heatmap_animated(self, pred_col: str) -> go.Figure | None:
-        """Heatmap: programmes (y) × collegejaar (x), coloured by MAPE for a single model."""
-        hist = self._hist_data()
-        if hist.empty or pred_col not in hist.columns:
-            return None
-        tmp = hist.copy()
-
-        actual = tmp["Aantal_studenten"].replace(0, np.nan)
-        tmp["_mape"] = (abs(tmp[pred_col].fillna(0) - tmp["Aantal_studenten"]) / actual).clip(upper=2.0)
-
-        pivot = tmp.pivot_table(
-            index="Croho groepeernaam", columns="Collegejaar",
-            values="_mape", aggfunc="mean",
-        )
-        pivot.columns = [str(int(c)) for c in pivot.columns]
-        programmes = sorted(pivot.index)
-        pivot = pivot.reindex(index=programmes)
-
-        annotations = np.where(
-            np.isnan(pivot.values), "",
-            np.vectorize(lambda v: f"{v:.0%}")(pivot.values),
-        )
-
-        fig = go.Figure(go.Heatmap(
-            z=pivot.values, x=pivot.columns.tolist(), y=pivot.index.tolist(),
-            colorscale=[[0, "#2ca02c"], [0.15, "#8fce8f"], [0.3, "#f0ad4e"], [0.6, "#e74c3c"], [1.0, "#8b0000"]],
-            zmin=0, zmax=0.5,
-            colorbar=dict(title="MAPE", tickformat=".0%"),
-            text=annotations, texttemplate="%{text}", textfont=dict(size=11),
-            hovertemplate="Opleiding: %{y}<br>Jaar: %{x}<br>MAPE: %{z:.1%}<extra></extra>",
-        ))
-        fig.update_layout(
-            title=f"Fout-heatmap per jaar ({_display(pred_col)})",
-            xaxis_title="Collegejaar", yaxis_title="Opleiding",
-            height=max(400, len(programmes) * 30 + 150),
-        )
+        fig.add_hline(y=MAPE_GOOD, line_dash="dot", line_color="#2ca02c", line_width=1)
         return fig
 
     # ════════════════════════════════════════════════════════════════
@@ -1503,7 +1587,7 @@ class DashboardBuilder:
                 fig.add_trace(go.Scatter(
                     x=actual["Weeknummer"].astype(str), y=actual["Gewogen vooraanmelders"],
                     mode="lines+markers", name="Actuele vooraanmeldingen",
-                    line=dict(color="cyan"), visible=visible,
+                    line=dict(color=ACTUAL_TREND_COLOUR), visible=visible,
                 ))
             else:
                 fig.add_trace(go.Scatter(x=[], y=[], visible=visible, name="Actuele vooraanmeldingen"))
@@ -1528,7 +1612,7 @@ class DashboardBuilder:
 
         fig.update_layout(
             title="Voorspelling vs Realisatie (individueel)",
-            xaxis_title="Weeknummer", yaxis_title="Aantal", height=500,
+            xaxis_title="Weeknummer", yaxis_title="Aantal", height=_chart_height(5, min_h=450),
             updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
         )
         self._add_predict_week_line(fig)
@@ -1562,6 +1646,8 @@ class DashboardBuilder:
             fig.add_trace(go.Bar(
                 x=wa["Weeknummer"].astype(str), y=wa["delta"],
                 marker_color=colours.tolist(), name=prog, visible=(i == 0),
+                customdata=wa["delta_pct"].values,
+                hovertemplate="Week %{x}<br>Verandering: %{y:+.0f} studenten<br>(%{customdata:.1f}% t.o.v. vorige week)<extra></extra>",
             ))
 
             vis = [False] * len(programmes)
@@ -1570,7 +1656,8 @@ class DashboardBuilder:
 
         fig.update_layout(
             title="Voorspelstabiliteit (week-over-week verandering)",
-            xaxis_title="Weeknummer", yaxis_title="Verandering in voorspelling", height=450,
+            xaxis_title="Weeknummer", yaxis_title="Verandering in voorspelling",
+            height=_chart_height(5, min_h=400),
             updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
         )
         self._add_predict_week_line(fig)
@@ -1591,7 +1678,7 @@ class DashboardBuilder:
         programmes = sorted(pred_year_data["Croho groepeernaam"].unique())
         prev_year = self.prediction_year - 1
         sc = self.data_studentcount
-        pw_key = _week_sort_key(self.predict_week)
+        pw_key = week_sort_key(self.predict_week)
 
         sarima_rows = self.data[
             (self.data["Collegejaar"] == self.prediction_year)
@@ -1614,8 +1701,8 @@ class DashboardBuilder:
                     known.groupby("Weeknummer")["Gewogen vooraanmelders"]
                     .sum().reset_index()
                 )
-                known_agg = known_agg[known_agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
-                known_agg = known_agg.sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                known_agg = known_agg[known_agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
+                known_agg = known_agg.sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
 
                 if not known_agg.empty:
                     idx = len(fig.data)
@@ -1646,7 +1733,7 @@ class DashboardBuilder:
                     sar_agg = (
                         sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
                         .sum().reset_index()
-                        .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                        .sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
                     )
                     if last_known_week is not None and last_known_val is not None:
                         bridge = pd.DataFrame({
@@ -1728,7 +1815,7 @@ class DashboardBuilder:
             title=f"ML-pipeline: SARIMA → XGBoost ({self.prediction_year})",
             xaxis_title="Weeknummer (academisch jaar)",
             yaxis_title="Gewogen vooraanmelders / Voorspelde studenten",
-            height=550, hovermode="x unified",
+            height=_chart_height(5, min_h=500), hovermode="x unified",
             updatemenus=[dict(
                 active=0, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
@@ -1773,7 +1860,7 @@ class DashboardBuilder:
                 xgb_agg = (
                     xgb_prog.groupby("Weeknummer")["XGBoost_cumulative"]
                     .sum().reset_index()
-                    .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                    .sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
                 )
                 idx = len(fig.data)
                 fig.add_trace(go.Scatter(
@@ -1801,7 +1888,7 @@ class DashboardBuilder:
                     sar_agg = (
                         sar_prog.groupby("Weeknummer")["Voorspelde vooraanmelders"]
                         .sum().reset_index()
-                        .sort_values("Weeknummer", key=lambda s: s.apply(_week_sort_key))
+                        .sort_values("Weeknummer", key=lambda s: s.apply(week_sort_key))
                     )
                     # Prepend XGBoost endpoint for visual continuity
                     if xgb_last_week is not None and xgb_last_val is not None:
@@ -1860,7 +1947,7 @@ class DashboardBuilder:
             title=f"ML-pipeline: XGBoost + SARIMA ({self.prediction_year})",
             xaxis_title="Weeknummer (academisch jaar)",
             yaxis_title="Cumulatief voorspeld aantal studenten",
-            height=550, hovermode="x unified",
+            height=_chart_height(5, min_h=500), hovermode="x unified",
             updatemenus=[dict(
                 active=0, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
@@ -1948,7 +2035,7 @@ class DashboardBuilder:
         fig.update_layout(
             title="Voorspelling vs Realisatie per opleiding (individueel)",
             xaxis_title="Weeknummer", yaxis_title="Voorspeld aantal studenten",
-            height=550, hovermode="x unified",
+            height=_chart_height(5, min_h=500), hovermode="x unified",
             updatemenus=[dict(
                 active=0, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
@@ -1987,17 +2074,14 @@ class DashboardBuilder:
 
         for idx, yr in enumerate(years):
             yr_data = agg[agg["Collegejaar"] == yr].sort_values("mape")
-            colors = [
-                "#d4edda" if m <= 0.10 else "#fff3cd" if m <= 0.25 else "#f8d7da"
-                for m in yr_data["mape"]
-            ]
+            colors = [_mape_row_fill(m) for m in yr_data["mape"]]
             visible = idx == len(years) - 1
 
             fig.add_trace(go.Table(
                 header=dict(
                     values=["Opleiding", "Voorspeld", "Werkelijk", "Verschil", "MAPE"],
                     fill_color="#1f77b4", font=dict(color="white", size=13),
-                    align="left",
+                    align="center",
                 ),
                 cells=dict(
                     values=[
@@ -2008,7 +2092,7 @@ class DashboardBuilder:
                         [f"{v:.1%}" for v in yr_data["mape"]],
                     ],
                     fill_color=[colors] * 5,
-                    align="left", font=dict(size=12),
+                    align=["left", "center", "center", "center", "center"], font=dict(size=12),
                 ),
                 visible=visible,
             ))
@@ -2024,7 +2108,7 @@ class DashboardBuilder:
         n_progs = agg["Croho groepeernaam"].nunique()
         fig.update_layout(
             title=f"Voorspelling vs Realisatie — {int(default_yr)}",
-            height=max(300, n_progs * 35 + 120),
+            height=_chart_height(n_progs, per_item=35, base=120, min_h=300),
             updatemenus=[dict(
                 active=len(years) - 1, buttons=buttons,
                 x=0, y=1.15, xanchor="left", yanchor="top", direction="down",
@@ -2065,14 +2149,18 @@ class DashboardBuilder:
                     color=PASTEL_YEAR_COLOURS[j % len(PASTEL_YEAR_COLOURS)],
                     size=10, line=dict(width=1, color="#333"),
                 ),
-                text=yr_data.apply(
-                    lambda r: (
-                        f"{r['Croho groepeernaam']}<br>Jaar: {int(r['Collegejaar'])}"
-                        f"<br>Voorspeld: {r['predicted']:.0f}<br>Werkelijk: {r['actual']:.0f}"
-                        f"<br>Verschil: {r['residual']:+.0f}"
-                    ), axis=1,
+                customdata=np.column_stack([
+                    yr_data["Croho groepeernaam"],
+                    yr_data["predicted"].values,
+                    yr_data["residual"].values,
+                ]),
+                hovertemplate=(
+                    "%{customdata[0]}<br>"
+                    "Voorspeld: %{customdata[1]}<br>"
+                    "Werkelijk: %{x:.0f}<br>"
+                    "Verschil: %{customdata[2]}"
+                    "<extra></extra>"
                 ),
-                hoverinfo="text",
             ))
 
         fig.add_hline(y=0, line_dash="dash", line_color="grey")
@@ -2093,7 +2181,7 @@ class DashboardBuilder:
             title="Bias-analyse: over- en onderschatting",
             xaxis_title="Werkelijke inschrijvingen",
             yaxis_title="Voorspeld \u2212 Werkelijk",
-            height=500,
+            height=_chart_height(len(agg), per_item=15, min_h=450),
         )
         return fig
 
@@ -2114,7 +2202,7 @@ class DashboardBuilder:
         if grouped.empty:
             return None
 
-        herkomst_order = ["NL", "EER", "Niet-EER"]
+        herkomst_order = list(HERKOMST_COLOURS)
         grouped["_sort"] = grouped["Herkomst"].map(
             {h: i for i, h in enumerate(herkomst_order)}
         )
@@ -2142,7 +2230,7 @@ class DashboardBuilder:
             title="Voorspelfout per herkomstgroep",
             xaxis_title="Herkomst", yaxis_title="Gemiddelde MAPE",
             yaxis=dict(tickformat=".0%"),
-            height=400,
+            height=_chart_height(3, min_h=380),
             showlegend=False,
         )
         return fig
@@ -2219,7 +2307,7 @@ class DashboardBuilder:
             header=dict(
                 values=["Opleiding", f"Prognose {self.prediction_year}",
                         f"Realisatie {prev_year}", "\u0394%"],
-                fill_color="#1f77b4", font=dict(color="white", size=12), align="left",
+                fill_color="#1f77b4", font=dict(color="white", size=12), align="center",
             ),
             cells=dict(
                 values=[opl, prognose_vals, real_vals, delta_vals],
@@ -2227,12 +2315,12 @@ class DashboardBuilder:
                     row_bg, row_bg, row_bg,
                     [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(delta_colors)],
                 ],
-                font=dict(size=bold), align="left",
+                font=dict(size=bold), align=["left", "center", "center", "center"],
             ),
         ))
         fig.update_layout(
             title=f"Verwacht aantal studenten per opleiding ({self.prediction_year})",
-            height=max(300, n * 32 + 120),
+            height=_chart_height(n, per_item=32, base=120, min_h=300),
         )
         return fig
 
@@ -2269,7 +2357,7 @@ class DashboardBuilder:
 
         rows.sort(key=lambda r: r["pct"])
         progs = [r["prog"] for r in rows]
-        pcts = [r["pct"] for r in rows]
+        pcts = [max(-2.0, min(2.0, r["pct"])) for r in rows]
         deltas = [r["delta"] for r in rows]
         colors = ["#2ca02c" if p >= 0 else "#d62728" for p in pcts]
         labels = [f"{d:+.0f}" for d in deltas]
@@ -2284,7 +2372,7 @@ class DashboardBuilder:
         fig.update_layout(
             title=f"Verwachte groei/krimp t.o.v. {prev_year}",
             xaxis=dict(title="Verandering", tickformat="+.0%"),
-            height=max(350, len(progs) * 30 + 150),
+            height=_chart_height(len(progs)),
             margin=dict(l=200),
         )
         return fig
@@ -2320,7 +2408,7 @@ class DashboardBuilder:
             title="Historische instroom per opleiding",
             xaxis_title="Opleiding", yaxis_title="Inschrijvingen",
             barmode="group",
-            height=max(400, len(programmes) * 30 + 200),
+            height=_chart_height(len(programmes), base=200),
             xaxis=dict(tickangle=-45),
         )
         return fig
@@ -2342,7 +2430,7 @@ class DashboardBuilder:
         programmes = sorted(pred["Croho groepeernaam"].unique())
 
         fig = go.Figure()
-        for herkomst in ("NL", "EER", "Niet-EER"):
+        for herkomst in HERKOMST_COLOURS:
             colour = HERKOMST_COLOURS.get(herkomst, "#999")
             vals = []
             for prog in programmes:
@@ -2360,7 +2448,7 @@ class DashboardBuilder:
             title=f"Verwachte instroom per herkomst ({self.prediction_year})",
             xaxis_title="Opleiding", yaxis_title="Voorspelde inschrijvingen",
             barmode="stack",
-            height=max(400, len(programmes) * 30 + 200),
+            height=_chart_height(len(programmes), base=200),
             xaxis=dict(tickangle=-45),
         )
         return fig
@@ -2417,11 +2505,12 @@ class DashboardBuilder:
             grower = ("\u2013", 0)
             decliner = ("\u2013", 0)
 
+        decl_cls = "warn" if decliner[1] < -DELTA_GOOD else "good"
         return f"""<div class="kpi-row">
-  <div class="kpi-card good"><div class="label">Totaal verwacht {self.prediction_year}</div><div class="value">{total_prognose:.0f}</div></div>
-  <div class="kpi-card {yoy_cls}"><div class="label">Verandering t.o.v. {prev_year}</div><div class="value">{yoy_val}</div><div class="label">{total_prognose:.0f} vs {total_prev:.0f}</div></div>
-  <div class="kpi-card good"><div class="label">Meeste groei</div><div class="value">{grower[0]}<br><span style="font-size:16px">{grower[1]:+.1%}</span></div></div>
-  <div class="kpi-card {"warn" if decliner[1] < -0.05 else "good"}"><div class="label">Meeste krimp</div><div class="value">{decliner[0]}<br><span style="font-size:16px">{decliner[1]:+.1%}</span></div></div>
+  <div class="kpi-card good" role="status" aria-label="Totaal verwacht: {total_prognose:.0f} studenten"><div class="label">Totaal verwacht {self.prediction_year}</div><div class="value">{total_prognose:.0f} studenten</div></div>
+  <div class="kpi-card {yoy_cls}" role="status" aria-label="Verandering: {yoy_val}"><div class="label">Verandering t.o.v. {prev_year}</div><div class="value">{yoy_val}</div><div class="label">{total_prognose:.0f} vs {total_prev:.0f}</div></div>
+  <div class="kpi-card good" role="status" aria-label="Meeste groei: {grower[0]}"><div class="label">Meeste groei</div><div class="value">{grower[0]}<br><span style="font-size:16px">{grower[1]:+.1%}</span></div></div>
+  <div class="kpi-card {decl_cls}" role="status" aria-label="Meeste krimp: {decliner[0]}"><div class="label">Meeste krimp</div><div class="value">{decliner[0]}<br><span style="font-size:16px">{decliner[1]:+.1%}</span></div></div>
 </div>"""
 
     def _save_individual(self) -> None:
@@ -2470,12 +2559,6 @@ class DashboardBuilder:
                 "Werkelijke inschrijvingen per opleiding over de afgelopen jaren. "
                 "Biedt context voor de huidige prognose: stijgt of daalt de instroom structureel?"))
 
-        fig = self._prediction_stability()
-        if fig:
-            charts.append(("Voorspelstabiliteit", fig,
-                "Week-op-week verandering in de voorspelling per opleiding. "
-                "Grote sprongen (rode balken) betekenen dat het model zijn schatting fors bijstelt."))
-
         fig = self._feature_importance_chart(
             self.xgb_classifier_importance,
             "Feature importance — XGBoost classifier",
@@ -2487,12 +2570,6 @@ class DashboardBuilder:
                 "Categorische variabelen zijn teruggegroepeerd naar de originele kolomnaam."))
 
         # ── Nauwkeurigheidsanalyse (bij meerdere voorspeljaren) ────
-        fig = self._individual_prediction_vs_actual()
-        if fig:
-            charts.append(("Voorspelling vs Realisatie per opleiding", fig,
-                "SARIMA-voorspelling per week (lijn) versus werkelijke inschrijvingen (stippellijn) per collegejaar. "
-                "Selecteer een opleiding met de dropdown. Convergeert de lijn naar de stippellijn, dan is het model nauwkeurig."))
-
         fig = self._individual_accuracy_table()
         if fig:
             charts.append(("Voorspelling vs Realisatie (tabel)", fig,
@@ -2504,6 +2581,12 @@ class DashboardBuilder:
             charts.append(("Voorspeld vs Realisatie (scatter)", fig,
                 "Elke bol is een opleiding in een bepaald jaar. Bolgrootte toont het werkelijke aantal studenten. "
                 "Hoe dichter bij de diagonaal, hoe beter de voorspelling."))
+
+        fig = self._relative_error_scatter(pred_col)
+        if fig:
+            charts.append(("Relatieve fout per opleidingsgrootte", fig,
+                "MAPE (%) uitgezet tegen opleidingsgrootte. Bolgrootte toont het absolute verschil. "
+                "Kleine opleidingen linksboven worden relatief slecht voorspeld."))
 
         charts.extend(self._model_accuracy_heatmaps(mape_cols))
 
@@ -2519,25 +2602,6 @@ class DashboardBuilder:
                 "Verschil tussen voorspelling en werkelijkheid uitgezet tegen het werkelijke aantal studenten. "
                 "Punten boven de nullijn = overschatting, eronder = onderschatting. "
                 "De trendlijn toont of de bias toeneemt bij grotere opleidingen."))
-
-        # ── Foutpatronen (bij meerdere voorspeljaren) ──────────────
-        fig = self._error_progression(mape_cols, " (individueel)")
-        if fig:
-            charts.append(("MAPE per week", fig,
-                "Gemiddelde voorspelfout (MAPE) per week over alle opleidingen. "
-                "Dalende lijn = model wordt nauwkeuriger naarmate het jaar vordert."))
-
-        fig = self._error_heatmap(mape_cols)
-        if fig:
-            charts.append(("Fout-heatmap", fig,
-                "Voorspelfout per opleiding (rij) en collegejaar (kolom). "
-                "Rode cellen verdienen aandacht: daar wijkt het model structureel af."))
-
-        fig = self._error_heatmap_animated(pred_col)
-        if fig:
-            charts.append(("Fout-heatmap per jaar", fig,
-                "Voorspelfout per opleiding (rij) en collegejaar (kolom) voor dit model. "
-                "Rode cellen wijzen op grotere afwijkingen."))
 
         fig = self._individual_error_by_herkomst()
         if fig:
@@ -2597,9 +2661,9 @@ class DashboardBuilder:
             )
 
             if self.predict_week is not None:
-                pw_key = _week_sort_key(self.predict_week)
-                before_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
-                after_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) > pw_key)]
+                pw_key = week_sort_key(self.predict_week)
+                before_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
+                after_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) > pw_key)]
 
                 # Thick line: known at prediction time
                 idx = len(fig.data)
@@ -2644,9 +2708,9 @@ class DashboardBuilder:
                 )
                 # Only weeks after predict_week
                 if self.predict_week is not None:
-                    pw_key = _week_sort_key(self.predict_week)
+                    pw_key = week_sort_key(self.predict_week)
                     sarima_sub = sarima_sub[
-                        sarima_sub["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) > pw_key)
+                        sarima_sub["Weeknummer"].apply(lambda w: week_sort_key(int(w)) > pw_key)
                     ]
                 sarima_sub = sarima_sub.sort_values("Weeknummer", key=_sort_weeks_series)
 
@@ -2795,7 +2859,7 @@ class DashboardBuilder:
 
         fig.update_layout(
             title="Verloop per opleiding — alle jaren",
-            xaxis_title="Weeknummer", yaxis_title="Gewogen vooraanmelders", height=600,
+            xaxis_title="Weeknummer", yaxis_title="Gewogen vooraanmelders", height=_chart_height(5, min_h=550),
             updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
         )
         self._add_predict_week_line(fig)
@@ -2809,8 +2873,7 @@ class DashboardBuilder:
         pred_cols = [
             c for c in (
                 "SARIMA_cumulative", "Prognose_ratio", "SARIMA_individual",
-                "Ensemble_prediction", "Weighted_ensemble_prediction",
-                "Average_ensemble_prediction",
+                "Weighted_ensemble_prediction",
             )
             if c in pred_data.columns and pred_data[c].notna().any()
         ]
@@ -2853,7 +2916,7 @@ class DashboardBuilder:
 
         fig.update_layout(
             title="Modelconsensus (spreiding tussen modellen)",
-            xaxis_title="Weeknummer", yaxis_title="Voorspeld aantal", height=450,
+            xaxis_title="Weeknummer", yaxis_title="Voorspeld aantal", height=_chart_height(5, min_h=420),
             updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
         )
         self._add_predict_week_line(fig)
@@ -2929,6 +2992,11 @@ class DashboardBuilder:
                 charts.append((f"Voorspeld vs Realisatie ({_display(pc)})", fig,
                     "Elke bol is een opleiding in een bepaald jaar. Bolgrootte toont het werkelijke aantal studenten. "
                     "Kleuren onderscheiden collegejaren."))
+            fig = self._relative_error_scatter(pc)
+            if fig:
+                charts.append((f"Relatieve fout per opleidingsgrootte ({_display(pc)})", fig,
+                    "MAPE (%) uitgezet tegen opleidingsgrootte. Bolgrootte toont het absolute verschil. "
+                    "Kleine opleidingen linksboven worden relatief slecht voorspeld."))
 
         # ── Diagnostiek ─────────────────────────────────────────────
         fig = self._error_progression(mape_cols, " (cumulatief)")
@@ -2969,23 +3037,16 @@ class DashboardBuilder:
     # ════════════════════════════════════════════════════════════════
 
     def _cockpit_with_confidence(self) -> go.Figure | None:
-        """Summary table with per-model prognoses side-by-side, realisation, and confidence."""
+        """Summary table: one prognosis number per programme for policymakers."""
+        best_col = self._best_prediction_col()
+        if best_col is None:
+            return None
+
         pred = self.data[self.data["Collegejaar"] == self.prediction_year]
         if pred.empty:
             return None
         if self.predict_week is not None:
             pred = pred[pred["Weeknummer"] == self.predict_week]
-
-        model_cols = [
-            c for c in (
-                "SARIMA_individual", "SARIMA_cumulative", "Prognose_ratio",
-                "Weighted_ensemble_prediction", "Average_ensemble_prediction",
-                "Ensemble_prediction",
-            )
-            if c in pred.columns and pred[c].notna().any()
-        ]
-        if not model_cols:
-            return None
 
         programmes = sorted(pred["Croho groepeernaam"].unique())
         prev_year = self.prediction_year - 1
@@ -2993,15 +3054,18 @@ class DashboardBuilder:
         all_mape_cols = [c for c in hist.columns if c.startswith("MAPE_")] if not hist.empty else []
 
         rows_opl: list[str] = []
+        rows_prog: list[str] = []
         rows_real: list[str] = []
-        rows_models: dict[str, list[str]] = {c: [] for c in model_cols}
-        rows_spread: list[str] = []
+        rows_diff: list[str] = []
         rows_conf: list[str] = []
         conf_colors: list[str] = []
 
         for prog in programmes:
             rows_opl.append(prog)
             prog_pred = pred[pred["Croho groepeernaam"] == prog]
+
+            prognose = prog_pred[best_col].sum()
+            rows_prog.append(f"{prognose:.0f}" if pd.notna(prognose) and prognose > 0 else "–")
 
             realisatie = 0
             if self.data_studentcount is not None:
@@ -3011,20 +3075,12 @@ class DashboardBuilder:
                 ]["Aantal_studenten"].sum()
             rows_real.append(f"{realisatie:.0f}" if realisatie > 0 else "–")
 
-            model_values = {}
-            for mc in model_cols:
-                val = prog_pred[mc].sum()
-                if pd.notna(val) and val > 0:
-                    model_values[mc] = val
-                    rows_models[mc].append(f"{val:.0f}")
-                else:
-                    rows_models[mc].append("–")
-
-            if len(model_values) >= 2:
-                spread = max(model_values.values()) - min(model_values.values())
-                rows_spread.append(f"±{spread:.0f}")
+            if prognose > 0 and realisatie > 0:
+                delta = prognose - realisatie
+                pct = delta / realisatie
+                rows_diff.append(f"{delta:+.0f} ({pct:+.0%})")
             else:
-                rows_spread.append("–")
+                rows_diff.append("–")
 
             avg_mape = None
             if not hist.empty and all_mape_cols:
@@ -3052,10 +3108,10 @@ class DashboardBuilder:
                     break
 
             if avg_mape is not None:
-                if avg_mape <= 0.10:
+                if avg_mape <= MAPE_GOOD:
                     rows_conf.append("Hoog")
                     conf_colors.append("#2ca02c")
-                elif avg_mape <= 0.25:
+                elif avg_mape <= MAPE_WARN:
                     rows_conf.append("Midden")
                     conf_colors.append("#f0ad4e")
                 else:
@@ -3067,20 +3123,16 @@ class DashboardBuilder:
 
         # ── Totaalrij ───────────────────────────────────────────────
         rows_opl.append("<b>Totaal</b>")
+        total_prog = sum(float(v) for v in rows_prog if v != "–")
+        rows_prog.append(f"<b>{total_prog:.0f}</b>")
         total_real = sum(float(v) for v in rows_real if v != "–")
         rows_real.append(f"<b>{total_real:.0f}</b>" if total_real > 0 else "–")
-
-        model_totals: dict[str, float] = {}
-        for mc in model_cols:
-            total = sum(float(v) for v in rows_models[mc] if v != "–")
-            model_totals[mc] = total
-            rows_models[mc].append(f"<b>{total:.0f}</b>")
-
-        if len(model_totals) >= 2:
-            spread = max(model_totals.values()) - min(model_totals.values())
-            rows_spread.append(f"<b>±{spread:.0f}</b>")
+        if total_prog > 0 and total_real > 0:
+            delta = total_prog - total_real
+            pct = delta / total_real
+            rows_diff.append(f"<b>{delta:+.0f} ({pct:+.0%})</b>")
         else:
-            rows_spread.append("–")
+            rows_diff.append("–")
         rows_conf.append("")
         conf_colors.append("#666666")
 
@@ -3092,42 +3144,26 @@ class DashboardBuilder:
         n = len(rows_opl)
         row_bg = ["white"] * (n - 1) + ["#e8e8e8"]
 
-        header_vals = ["Opleiding"]
-        cell_vals: list[list] = [rows_opl]
-        fill_cols: list[list] = [row_bg]
-
-        for mc in model_cols:
-            header_vals.append(_display(mc))
-            cell_vals.append(rows_models[mc])
-            fill_cols.append(row_bg)
-
-        if len(model_cols) >= 2:
-            header_vals.append("Spreiding")
-            cell_vals.append(rows_spread)
-            fill_cols.append(row_bg)
-
-        header_vals.append(f"Realisatie {prev_year}")
-        cell_vals.append(rows_real)
-        fill_cols.append(row_bg)
-
-        header_vals.append("Betrouwbaarheid")
-        cell_vals.append(rows_conf)
-        fill_cols.append([_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)])
+        header_vals = ["Opleiding", f"Prognose {self.prediction_year}", f"Realisatie {prev_year}", "Verschil", "Betrouwbaarheid"]
+        cell_vals = [rows_opl, rows_prog, rows_real, rows_diff, rows_conf]
+        fill_cols = [row_bg, row_bg, row_bg, row_bg,
+                     [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)]]
 
         fig = go.Figure(go.Table(
             header=dict(
                 values=[f"<b>{h}</b>" for h in header_vals],
-                fill_color="#1f77b4", font=dict(color="white", size=12), align="left",
+                fill_color="#1f77b4", font=dict(color="white", size=12), align="center",
             ),
             cells=dict(
                 values=cell_vals,
                 fill_color=fill_cols,
-                font=dict(size=[11] * (n - 1) + [13]), align="left",
+                font=dict(size=[11] * (n - 1) + [13]),
+                align=["left"] + ["center"] * (len(header_vals) - 1),
             ),
         ))
         fig.update_layout(
-            title=f"Modelvergelijking per opleiding ({self.prediction_year})",
-            height=max(400, n * 30 + 150),
+            title=f"Verwacht aantal studenten per opleiding ({self.prediction_year})",
+            height=_chart_height(n),
         )
         return fig
 
@@ -3152,23 +3188,32 @@ class DashboardBuilder:
                 fig.add_trace(go.Scatter(
                     x=actual["Weeknummer"].astype(str), y=actual["Gewogen vooraanmelders"],
                     mode="lines+markers", name=f"Actueel {self.prediction_year}",
-                    line=dict(color="cyan"), visible=visible,
+                    line=dict(color=ACTUAL_TREND_COLOUR), visible=visible,
+                    hovertemplate="Wk %{x}: %{y:.0f} vooraanmelders<extra>Actueel</extra>",
                 ))
             else:
                 fig.add_trace(go.Scatter(x=[], y=[], visible=visible, name=f"Actueel {self.prediction_year}"))
 
-            # Prognose (red)
+            # Prognose (red horizontal line at predict_week value)
             p = self.data[
                 (self.data["Croho groepeernaam"] == prog)
                 & (self.data["Collegejaar"] == self.prediction_year)
             ]
-            pa = p.groupby("Weeknummer")[best_col].sum().reset_index()
-            pa = pa.sort_values("Weeknummer", key=_sort_weeks_series)
-            fig.add_trace(go.Scatter(
-                x=pa["Weeknummer"].astype(str), y=pa[best_col],
-                mode="lines+markers", name=f"Prognose {self.prediction_year}",
-                line=dict(color="#d62728"), visible=visible,
-            ))
+            if self.predict_week is not None:
+                p_pw = p[p["Weeknummer"] == self.predict_week]
+            else:
+                p_pw = p
+            prognose_val = p_pw[best_col].sum() if not p_pw.empty else 0
+            if prognose_val > 0:
+                x_range = [ACADEMIC_WEEKS[0], ACADEMIC_WEEKS[-1]]
+                fig.add_trace(go.Scatter(
+                    x=x_range, y=[prognose_val, prognose_val],
+                    mode="lines", name=f"Prognose {self.prediction_year}",
+                    line=dict(color="#d62728", dash="dot", width=2), visible=visible,
+                    hovertemplate=f"Prognose: {prognose_val:.0f} studenten<extra></extra>",
+                ))
+            else:
+                fig.add_trace(go.Scatter(x=[], y=[], visible=visible, name=f"Prognose {self.prediction_year}"))
 
             # Previous year (black dashed)
             if self.data_cumulative is not None:
@@ -3184,6 +3229,7 @@ class DashboardBuilder:
                     x=prev["Weeknummer"].astype(str), y=prev["Gewogen vooraanmelders"],
                     mode="lines", name=f"Realisatie {prev_year}",
                     line=dict(color="black", dash="dash"), visible=visible,
+                    hovertemplate="Wk %{x}: %{y:.0f} vooraanmelders<extra>Vorig jaar</extra>",
                 ))
             else:
                 fig.add_trace(go.Scatter(x=[], y=[], visible=visible, name=f"Realisatie {prev_year}"))
@@ -3194,7 +3240,7 @@ class DashboardBuilder:
 
         fig.update_layout(
             title="Prognose vs Vorig Jaar",
-            xaxis_title="Weeknummer", yaxis_title="Aantal", height=500,
+            xaxis_title="Weeknummer", yaxis_title="Aantal", height=_chart_height(5, min_h=450),
             updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
         )
         self._add_predict_week_line(fig)
@@ -3212,8 +3258,8 @@ class DashboardBuilder:
         # Current year: latest available week per programme × herkomst
         cur = dc[dc["Collegejaar"] == self.prediction_year]
         if self.predict_week is not None:
-            pw_key = _week_sort_key(self.predict_week)
-            cur = cur[cur["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key)]
+            pw_key = week_sort_key(self.predict_week)
+            cur = cur[cur["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
         # Take the value at the maximum week per group
         cur_max = (
             cur.sort_values("Weeknummer", key=_sort_weeks_series)
@@ -3229,7 +3275,7 @@ class DashboardBuilder:
         )
 
         fig = go.Figure()
-        for herkomst in ("NL", "EER", "Niet-EER"):
+        for herkomst in HERKOMST_COLOURS:
             colour = HERKOMST_COLOURS.get(herkomst, "#999")
 
             vals = [
@@ -3243,6 +3289,7 @@ class DashboardBuilder:
                 x=programmes, y=vals,
                 name=f"{herkomst} ({self.prediction_year})",
                 marker_color=colour,
+                hovertemplate=f"{herkomst} ({self.prediction_year})<br>" + "%{x}<br>%{y:.0f} vooraanmelders<extra></extra>",
             ))
 
             vals_prev = [
@@ -3256,12 +3303,13 @@ class DashboardBuilder:
                 x=programmes, y=vals_prev,
                 name=f"{herkomst} ({prev_year})",
                 marker_color=colour, opacity=0.5,
+                hovertemplate=f"{herkomst} ({prev_year})<br>" + "%{x}<br>%{y:.0f} vooraanmelders<extra></extra>",
             ))
 
         fig.update_layout(
             title="Herkomstverdeling per opleiding",
             barmode="stack", xaxis_title="Opleiding",
-            yaxis_title="Gewogen vooraanmelders", height=500,
+            yaxis_title="Gewogen vooraanmelders", height=_chart_height(len(programmes), base=200),
             xaxis=dict(tickangle=-45),
         )
         return fig
@@ -3288,11 +3336,11 @@ class DashboardBuilder:
             current = 0
             if self.data_cumulative is not None and self.predict_week is not None:
                 dc = self.data_cumulative
-                pw_key = _week_sort_key(self.predict_week)
+                pw_key = week_sort_key(self.predict_week)
                 mask = (
                     (dc["Croho groepeernaam"] == prog)
                     & (dc["Collegejaar"] == self.prediction_year)
-                    & (dc["Weeknummer"].apply(lambda w: _week_sort_key(int(w)) <= pw_key))
+                    & (dc["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key))
                 )
                 sub_dc = dc.loc[mask]
                 if not sub_dc.empty:
@@ -3315,17 +3363,17 @@ class DashboardBuilder:
         for i, cap in enumerate(caps):
             fig.add_shape(
                 type="line", x0=cap, x1=cap, y0=i - 0.45, y1=i + 0.45,
-                line=dict(color="red", dash="dash", width=2),
+                line=dict(color=CAPACITY_LINE_COLOUR, dash="dash", width=2),
             )
             fig.add_annotation(
                 x=cap, y=i, text=f"Cap: {cap}", showarrow=False,
-                xanchor="left", xshift=5, font=dict(size=10, color="red"),
+                xanchor="left", xshift=5, font=dict(size=10, color=CAPACITY_LINE_COLOUR),
             )
         fig.update_layout(
             title="Numerus Fixus Voortgang",
             xaxis_title="Aantal studenten",
             barmode="group",
-            height=max(300, len(progs) * 70 + 150),
+            height=_chart_height(len(progs), per_item=70, min_h=300),
         )
         return fig
 
@@ -3339,16 +3387,22 @@ class DashboardBuilder:
         sorted_feats.reverse()
         features = [f[0] for f in sorted_feats]
         values = [f[1] for f in sorted_feats]
+        total = sum(values)
+        pcts = [v / total if total > 0 else 0 for v in values]
 
         fig = go.Figure(go.Bar(
             y=features, x=values, orientation="h",
-            marker_color="#1f77b4",
-            hovertemplate="%{y}<br>Importance: %{x:.4f}<extra></extra>",
+            marker=dict(
+                color=values,
+                colorscale=[[0, "#aec7e8"], [1, "#1f77b4"]],
+            ),
+            text=[f"{p:.1%}" for p in pcts], textposition="outside",
+            hovertemplate="%{y}<br>Importance: %{x:.4f} (%{text})<extra></extra>",
         ))
         fig.update_layout(
             title=title,
             xaxis=dict(title="Feature Importance"),
-            height=max(350, len(features) * 25 + 150),
+            height=_chart_height(len(features), per_item=25),
             margin=dict(l=250),
         )
         return fig
@@ -3360,10 +3414,12 @@ class DashboardBuilder:
             DataOption.BOTH_DATASETS: ("Beide (ensemble)", "#2ca02c"),
         }
         label, color = labels.get(self.data_option, ("Onbekend", "#999"))
+        pw_text = f" | Voorspelweek: {self.predict_week}" if self.predict_week else ""
+        n_prog = len(self.data["Croho groepeernaam"].unique())
         return (
             f'<div style="background:{color};color:#fff;padding:14px 24px;'
             f'border-radius:8px;margin-bottom:20px;font-size:18px;font-weight:700">'
-            f'Pipeline: {label}</div>'
+            f'Pipeline: {label} | Prognose: {self.prediction_year} | {n_prog} opleidingen{pw_text}</div>'
         )
 
     def _final_kpi_cards(self) -> str:
@@ -3414,12 +3470,12 @@ class DashboardBuilder:
         nf_cls = "good" if nf_over == 0 else ("warn" if nf_over <= 1 else "bad")
 
         cards = f"""<div class="kpi-row">
-  <div class="kpi-card good"><div class="label">Totaal verwachte eerstejaars {self.prediction_year}</div><div class="value">{total_prognose:.0f}</div></div>
-  <div class="kpi-card {yoy_cls}"><div class="label">Verandering t.o.v. {prev_year}</div><div class="value">{yoy_val}</div><div class="label">{yoy_sub}</div></div>"""
+  <div class="kpi-card good" role="status" aria-label="Totaal verwachte eerstejaars: {total_prognose:.0f} studenten"><div class="label">Totaal verwachte eerstejaars {self.prediction_year}</div><div class="value">{total_prognose:.0f} studenten</div></div>
+  <div class="kpi-card {yoy_cls}" role="status" aria-label="Verandering: {yoy_val}"><div class="label">Verandering t.o.v. {prev_year}</div><div class="value">{yoy_val}</div><div class="label">{yoy_sub}</div></div>"""
 
         if nf_total > 0:
             cards += f"""
-  <div class="kpi-card {nf_cls}"><div class="label">Numerus fixus boven capaciteit</div><div class="value">{nf_over} van {nf_total}</div></div>"""
+  <div class="kpi-card {nf_cls}" role="status" aria-label="Numerus fixus boven capaciteit: {nf_over} van {nf_total}"><div class="label">Numerus fixus boven capaciteit</div><div class="value">{nf_over} van {nf_total}</div></div>"""
 
         cards += "\n</div>"
         return cards
@@ -3455,7 +3511,7 @@ class DashboardBuilder:
 
         rows.sort(key=lambda r: r["pct"])
         progs = [r["prog"] for r in rows]
-        pcts = [r["pct"] for r in rows]
+        pcts = [max(-2.0, min(2.0, r["pct"])) for r in rows]
         deltas = [r["delta"] for r in rows]
         colors = ["#2ca02c" if p >= 0 else "#d62728" for p in pcts]
         labels = [f"{d:+.0f}" for d in deltas]
@@ -3470,7 +3526,7 @@ class DashboardBuilder:
         fig.update_layout(
             title=f"Verwachte groei/krimp t.o.v. {prev_year}",
             xaxis=dict(title="Verandering", tickformat="+.0%"),
-            height=max(350, len(progs) * 30 + 150),
+            height=_chart_height(len(progs)),
             margin=dict(l=200),
         )
         return fig
@@ -3501,12 +3557,6 @@ class DashboardBuilder:
             charts.append(("Numerus Fixus Voortgang", fig,
                 "Voorspeld aantal studenten voor numerus-fixusopleidingen afgezet tegen de capaciteitsgrens. "
                 "Balk voorbij de rode lijn = verwachte overschrijding, mogelijk wachtlijst."))
-
-        fig = self._prognose_vs_vorig_jaar()
-        if fig:
-            charts.append(("Prognose vs Vorig Jaar", fig,
-                "Vergelijking van het huidige verloop met vorig jaar per opleiding. "
-                "Ligt de huidige lijn hoger, dan groeit de instroom; lager wijst op daling."))
 
         kpi = self._pipeline_banner() + self._final_kpi_cards()
         self._save_page("final", charts, "Eindoverzicht", kpi)
