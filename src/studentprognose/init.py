@@ -55,24 +55,24 @@ def run_init():
     if not os.path.exists(config_path):
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(_FULL_CONFIG, f, indent=4, ensure_ascii=False)
-        print(f"  Aangemaakt: configuration/configuration.json")
+        print("  Aangemaakt: configuration/configuration.json")
     else:
-        print(f"  Overgeslagen: configuration/configuration.json (bestaat al)")
+        print("  Overgeslagen: configuration/configuration.json (bestaat al)")
 
     filtering_path = os.path.join(cwd, "configuration", "filtering", "base.json")
     if not os.path.exists(filtering_path):
         filtering = {"filtering": {"programme": [], "herkomst": [], "examentype": []}}
         with open(filtering_path, "w", encoding="utf-8") as f:
             json.dump(filtering, f, indent=4, ensure_ascii=False)
-        print(f"  Aangemaakt: configuration/filtering/base.json")
+        print("  Aangemaakt: configuration/filtering/base.json")
     else:
-        print(f"  Overgeslagen: configuration/filtering/base.json (bestaat al)")
+        print("  Overgeslagen: configuration/filtering/base.json (bestaat al)")
 
     readme_path = os.path.join(cwd, "data", "input_raw", "README.md")
     if not os.path.exists(readme_path):
         with open(readme_path, "w", encoding="utf-8") as f:
             f.write(_INPUT_RAW_README)
-        print(f"  Aangemaakt: data/input_raw/README.md")
+        print("  Aangemaakt: data/input_raw/README.md")
 
     print("""
 Volgende stappen:
