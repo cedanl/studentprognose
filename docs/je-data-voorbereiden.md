@@ -2,6 +2,8 @@
 
 De pipeline verwacht twee typen inputmappen: `data/input_raw/` voor de ruwe bronbestanden die de ETL verwerkt, en `data/input/` voor de verwerkte bestanden die het model direct inleest.
 
+`data/input/` wordt automatisch aangemaakt door de ETL als de map nog niet bestaat. `data/input_raw/telbestanden/` wordt aangemaakt door `studentprognose init`. Je hoeft deze mappen niet zelf te maken.
+
 Zie de [volledige dataflow](https://github.com/cedanl/studentprognose/blob/main/doc/PIPELINE.md) voor een visueel Mermaid-diagram.
 
 ## Ruwe bronbestanden (`data/input_raw/`)
