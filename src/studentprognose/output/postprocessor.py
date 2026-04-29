@@ -200,6 +200,71 @@ class PostProcessor:
             self.numerus_fixus_list, predict_year
         )
 
+    def add_applicant_data(self, data_cumulative: "pd.DataFrame", predict_year: int, predict_week: int) -> None:
+        """Overwrite applicant columns in self.data with actuals from the cumulative snapshot.
+
+        prepare_data_for_output_prelim merges the full cumulative dataset (alle jaren
+        en weken) al in self.data, waardoor de aanmeldkolommen voor predict_year/week
+        in de meeste gevallen al correct zijn. Deze methode is een expliciete hersynced
+        na predict_with_ratio: die stap kan in afgeleide strategieën self.data muteren
+        op manieren die de merge-waarden overschrijven. De aanroep hier garandeert dat
+        de aanmeldcijfers altijd de actuele snapshot-waarden zijn, ongeacht wat er
+        tussen prepare_data_for_output_prelim en postprocess() is aangepast.
+
+        Only rows matching predict_year/predict_week are updated. Rows without a
+        match in data_cumulative are left unchanged.
+        """
+        if self.data is None or data_cumulative is None:
+            return
+
+        key_cols = ["Weeknummer", "Examentype", "Croho groepeernaam", "Herkomst", "Collegejaar"]
+        update_cols = [
+            "Gewogen vooraanmelders",
+            "Ongewogen vooraanmelders",
+            "Aantal aanmelders met 1 aanmelding",
+            "Inschrijvingen",
+        ]
+
+        snapshot = data_cumulative[
+            (data_cumulative["Collegejaar"] == predict_year)
+            & (data_cumulative["Weeknummer"] == predict_week)
+        ]
+        if snapshot.empty:
+            return
+
+        # keep="last": telbestanden zijn cumulatief en kunnen bij herverwerking
+        # meerdere keren dezelfde week bevatten. De laatste verschijning is
+        # altijd de meest recente en wint.
+        snapshot = (
+            snapshot
+            .sort_values(key_cols)
+            .drop_duplicates(subset=key_cols, keep="last")
+            [key_cols + update_cols]
+        )
+
+        mask = (
+            (self.data["Collegejaar"] == predict_year)
+            & (self.data["Weeknummer"] == predict_week)
+        )
+        if not mask.any():
+            return
+
+        idx = self.data.index[mask]
+        # reset_index zodat merged positie 0,1,2... exact overeenkomt met
+        # idx[0],idx[1],idx[2]... — self.data kan na eerder filteren een
+        # niet-aaneengesloten index hebben waardoor idx[has_value] anders
+        # naar de verkeerde rijen zou wijzen.
+        merged = (
+            self.data.loc[idx, key_cols]
+            .reset_index(drop=True)
+            .merge(snapshot, on=key_cols, how="left")
+        )
+
+        for col in update_cols:
+            if col in merged.columns:
+                has_value = merged[col].notna().values
+                self.data.loc[idx[has_value], col] = merged.loc[has_value, col].values
+
     def postprocess(self, predict_year, predict_week):
         if self.data_latest is not None:
             self.data = replace_latest_data(
@@ -208,6 +273,9 @@ class PostProcessor:
 
         if self.data_option == DataOption.BOTH_DATASETS:
             self._create_ensemble_columns(predict_year, predict_week)
+
+        if "Prognose_ratio" in self.data.columns:
+            self.data["Baseline"] = self.data["Prognose_ratio"]
 
         self._create_error_columns()
 
