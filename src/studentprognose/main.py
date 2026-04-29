@@ -4,9 +4,11 @@ import sys
 from studentprognose.cli import parse_args
 from studentprognose.config import load_configuration
 from studentprognose.data.loader import load_data
+from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.utils.ci_subset import apply_ci_test_subset
 from studentprognose.output.postprocessor import PostProcessor
 from studentprognose.output.dashboard import DashboardBuilder
+from studentprognose.output.validator import run_post_prediction_checks
 from studentprognose.strategies import create_strategy
 from studentprognose.utils.weeks import DataOption, StudentYearPrediction, HIGHER_YEARS_COLUMNS
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
@@ -157,6 +159,11 @@ def _preprocess(strategy, student_year_prediction):
 
 def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
     if cfg.student_year_prediction in (StudentYearPrediction.FIRST_YEARS, StudentYearPrediction.VOLUME):
+        if data_cumulative is not None and cfg.ci_test_n is None:
+            run_pre_prediction_checks(
+                data_cumulative, year, week, strategy.numerus_fixus_list, yes=cfg.yes,
+            )
+
         print(f"Predicting first-years: {year}-{week}...")
         data = strategy.predict_nr_of_students(year, week, cfg.skip_years)
         if data is not None:
@@ -168,6 +175,15 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
                 strategy.postprocessor.add_applicant_data(data_cumulative, year, week)
             print("Postprocessing...")
             strategy.postprocessor.postprocess(year, week)
+
+            if cfg.ci_test_n is None:
+                run_post_prediction_checks(
+                    strategy.postprocessor.data,
+                    data_cumulative,
+                    year,
+                    week,
+                    strategy.numerus_fixus_list,
+                )
 
     strategy.postprocessor.ready_new_data()
 
