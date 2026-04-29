@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import linalg as LA
-import statsmodels.api as sm
+from statsforecast.models import ARIMA
 
 from studentprognose.models.base import BaseForecaster
 from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len
@@ -12,25 +12,31 @@ from studentprognose.utils.constants import (
 
 
 class SARIMAForecaster(BaseForecaster):
-    """Unified SARIMA forecaster used by both individual and cumulative strategies."""
+    """Unified SARIMA forecaster used by both individual and cumulative strategies.
+
+    Uses statsforecast ARIMA (CSS-ML estimation) as backend.
+    """
 
     def __init__(self, order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER):
         self.order = order
-        self.seasonal_order = seasonal_order
-        self._results = None
+        self.seasonal_order = seasonal_order[:3]
+        self.season_length = seasonal_order[3]
+        self._model = None
 
     def fit(self, ts_data, exog=None):
-        model = sm.tsa.statespace.SARIMAX(
-            ts_data,
+        self._model = ARIMA(
             order=self.order,
+            season_length=self.season_length,
             seasonal_order=self.seasonal_order,
-            exog=exog,
         )
-        self._results = model.fit(disp=0)
+        X = exog.reshape(-1, 1) if exog is not None else None
+        self._model.fit(y=ts_data.astype(np.float64), X=X)
         return self
 
     def forecast(self, steps, exog=None):
-        return self._results.forecast(steps=steps, exog=exog)
+        X = exog.reshape(-1, 1) if exog is not None else None
+        result = self._model.predict(h=steps, X=X)
+        return result["mean"]
 
 
 def create_time_series(data, pred_len):

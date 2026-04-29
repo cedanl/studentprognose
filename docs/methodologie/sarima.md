@@ -22,7 +22,9 @@ De seizoenslengte is altijd **52 weken**. De overige parameters zijn **vaste waa
 | Individueel — Bachelor, weken 17–21 | `(1, 0, 1)` | `(1, 1, 1)` |
 | Individueel — overige gevallen | `(1, 1, 1)` | `(1, 1, 0)` |
 
-De implementatie gebruikt `statsmodels.tsa.statespace.SARIMAX`. Zie `src/studentprognose/models/sarima.py` voor de `SARIMAForecaster`-klasse.
+De implementatie gebruikt `statsforecast.models.ARIMA` (Nixtla) als backend. Dit vervangt de eerdere `statsmodels.tsa.statespace.SARIMAX`-backend. De modelspecificatie is identiek; het verschil zit in de schattingsmethode: **CSS-ML** (conditional sum of squares, gevolgd door maximum likelihood) in plaats van MLE via een Kalman-filter. Dit levert een snelheidswinst van ~10–15× per reeks op bij gelijkwaardige nauwkeurigheid.
+
+Zie `src/studentprognose/models/sarima.py` voor de `SARIMAForecaster`-klasse.
 
 ## Exogene variabelen (individueel spoor)
 
@@ -33,6 +35,7 @@ In het individuele spoor kan een deadlineweek-variabele als exogene regresssor w
 1. **Herhaalbaar seizoenspatroon** — het model gaat ervan uit dat het patroon van dit jaar op het patroon van voorgaande jaren lijkt. Dit geldt niet bij structurele veranderingen (nieuwe opleiding, beleidsingreep, COVID).
 2. **Voldoende historische data** — trainingsdata start vanaf het jaar ingesteld via `min_training_year` in `configuration.json` (standaard 2016). Bij opleidingen met minder dan ~3 jaar data zijn de seizoensschattingen onbetrouwbaar.
 3. **Stationariteit** — het model past één seizoensdifferentiatie toe (`D=1`). Als de trend structureel niet-stationair is, kan de differentiatie onvoldoende zijn.
+4. **CSS-ML schattingsmethode** — de backend gebruikt conditional sum of squares als startpunt voor maximum likelihood. Dit is sneller dan exact MLE via het Kalman-filter, maar kan bij zeer korte reeksen of reeksen met ontbrekende waarden iets afwijkende parameterschattingen opleveren.
 
 ## Wanneer vertrouw je het niet?
 
