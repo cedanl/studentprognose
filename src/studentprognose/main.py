@@ -165,6 +165,7 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
             )
             if cfg.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS):
                 strategy.postprocessor.predict_with_ratio(data_cumulative, year)
+                strategy.postprocessor.add_applicant_data(data_cumulative, year, week)
             print("Postprocessing...")
             strategy.postprocessor.postprocess(year, week)
 

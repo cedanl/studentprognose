@@ -13,6 +13,7 @@ from studentprognose.utils.weeks import increment_week, compute_pred_len
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
 from studentprognose.data.transforms import TRANSFORM_GROUP_COLS
+from studentprognose.data.preprocessing.excluded_data_points import apply_excluded_data_points
 
 _EPS = 1e-8
 _LAGS = [2, 5]
@@ -180,6 +181,10 @@ class CumulativeStrategy(PredictionStrategy):
     def predict_nr_of_students(self, predict_year, predict_week, skip_years=0):
         self.data_cumulative = self.data_cumulative_backup.copy(deep=True)
         self.set_year_week(predict_year, predict_week, self.data_cumulative)
+        if self.excluded_data_points:
+            self.data_cumulative = apply_excluded_data_points(
+                self.data_cumulative, self.excluded_data_points, self.predict_year
+            )
         self._prepare_data()
         self.data_cumulative = self.data_cumulative.astype(
             {"Weeknummer": "int32", "Collegejaar": "int32"}

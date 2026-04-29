@@ -1,10 +1,6 @@
-from studentprognose.utils.weeks import convert_nan_to_zero, get_all_weeks_valid
+from studentprognose.utils.weeks import get_all_weeks_valid
 
 import pandas as pd
-import numpy as np
-from tqdm import tqdm
-
-tqdm.pandas()
 
 
 TRANSFORM_GROUP_COLS = [
