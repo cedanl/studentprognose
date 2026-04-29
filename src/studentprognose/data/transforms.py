@@ -3,15 +3,18 @@ from studentprognose.utils.weeks import get_all_weeks_valid
 import pandas as pd
 
 
+TRANSFORM_GROUP_COLS = [
+    "Collegejaar",
+    "Faculteit",
+    "Herkomst",
+    "Examentype",
+    "Croho groepeernaam",
+]
+
+
 def transform_data(data_input: pd.DataFrame, targ_col: str) -> pd.DataFrame:
     """Makes a certain pivot_wider where it transforms the data from long to wide."""
-    group_cols = [
-        "Collegejaar",
-        "Faculteit",
-        "Herkomst",
-        "Examentype",
-        "Croho groepeernaam",
-    ]
+    group_cols = TRANSFORM_GROUP_COLS
 
     data = data_input[group_cols + [targ_col, "Weeknummer"]]
 
