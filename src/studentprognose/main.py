@@ -2,7 +2,7 @@ import os
 import sys
 
 from studentprognose.cli import parse_args
-from studentprognose.config import load_configuration
+from studentprognose.config import load_configuration, load_filtering
 from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.utils.ci_subset import apply_ci_test_subset
@@ -33,7 +33,6 @@ def main(argv):
         run_etl(configuration)
 
     # Step 1: Load data
-    from studentprognose.config import load_filtering
     filtering = load_filtering(cfg.filtering_path)
 
     print("Loading data...")

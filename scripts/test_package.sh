@@ -4,8 +4,10 @@
 # Wat dit test:
 #   1. Wheel bouwen en installeren slaagt
 #   2. CLI is beschikbaar na installatie (--help)
-#   3. `init` maakt de juiste mapstructuur aan
-#   4. Een volledige run met demo-data geeft output
+#   3. `init` maakt de juiste mapstructuur aan (puur standalone)
+#   4. Integratiepijplijn met repo-demodata — controleert dat de volledige
+#      pipeline tot outputbestand loopt; data wordt gekopieerd vanuit de repo,
+#      NIET meegeleverd in het wheel.
 #
 # Gebruik: bash scripts/test_package.sh [--skip-build]
 
@@ -44,7 +46,7 @@ uv run studentprognose init > /dev/null
 echo "OK"
 
 echo ""
-echo "=== [4] Volledige run met demo-data ==="
+echo "=== [4] Integratiepijplijn met repo-demodata ==="
 cp -r "$REPO_ROOT/data/input_raw/telbestanden"           data/input_raw/
 cp    "$REPO_ROOT/data/input_raw/individuele_aanmelddata.csv" data/input_raw/
 cp    "$REPO_ROOT/data/input_raw/oktober_bestand.xlsx"   data/input_raw/

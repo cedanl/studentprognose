@@ -24,7 +24,8 @@ class PostProcessor:
         """Verify output files can be written (not locked by Excel)."""
         mode_suffix = data_option.filename_suffix
         ci_suffix = f"_ci_test_N{ci_test_n}" if ci_test_n is not None else ""
-        os.makedirs("data/output", exist_ok=True)
+        output_dir = os.path.join(os.getcwd(), "data", "output")
+        os.makedirs(output_dir, exist_ok=True)
         try:
             open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
             if ci_test_n is None:

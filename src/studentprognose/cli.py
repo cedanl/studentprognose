@@ -89,20 +89,15 @@ def parse_args(argv):
     cfg.noetl = args.noetl
     cfg.yes = args.yes
 
-    # Configuration path
+    # Configuration path — load_configuration handles missing files gracefully
     if args.configuration:
-        if os.path.exists(args.configuration):
-            cfg.configuration_path = args.configuration
-        elif args.configuration != "configuration/configuration.json":
-            print(f"Waarschuwing: configuratiebestand niet gevonden: {args.configuration!r} — package defaults worden gebruikt.")
+        cfg.configuration_path = args.configuration
 
     # Filtering path (supports multiple files via -f path1 -f path2 or -f path1 path2)
+    # load_filtering handles missing files gracefully (falls back to bundled base.json)
     if args.filtering is not None:
         for path in args.filtering:
-            if os.path.exists(path):
-                cfg.filtering_path = path
-            else:
-                print(f"Waarschuwing: filteringbestand niet gevonden: {path!r} — overgeslagen.")
+            cfg.filtering_path = path
 
     # Dataset
     if args.dataset is not None:
