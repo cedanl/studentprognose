@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const weeks = ['w10','w12','w14','w16','w18','w20','w22','w24','w26','w28','w30','w32','w34','w36','w38'];
+const pred = [320,315,310,308,305,302,300,298,297,296,295,295,295,295,295];
+const upper = pred.map((v, i) => v + 40 - i * 2.5);
+const lower = pred.map((v, i) => Math.max(v - 40 + i * 2.5, 250));
+const tUpper = { x: weeks, y: upper, mode: 'lines', line: { width: 0 }, showlegend: false };
+const tLower = { x: weeks, y: lower, mode: 'lines', line: { width: 0 }, fill: 'tonexty',
+  fillcolor: 'rgba(59,130,246,0.15)', name: '95% betrouwbaarheid' };
+const tPred = { x: weeks, y: pred, mode: 'lines+markers', name: 'Ensemble voorspelling',
+  line: { color: '#2563eb', width: 1.5 }, marker: { size: 3 } };
+const tActual = { x: ['w38'], y: [295], mode: 'markers', name: 'Werkelijk',
+  marker: { color: '#dc2626', size: 10, symbol: 'diamond' } };
+const layout = {
+  title: { text: 'Voorspelling met betrouwbaarheidsband (smaller bij meer data)', font: { size: 14 } },
+  xaxis: { title: 'Week van voorspelling' }, yaxis: { title: 'Voorspeld aantal', range: [240, 370] },
+  legend: { orientation: 'h', itemwidth: 40, tracegroupgap: 30, y: 1.12, x: 0.5, xanchor: 'center', font: { size: 10 } },
+  margin: { t: 55, b: 55, l: 50, r: 20 },
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)'
+};
+Plotly.newPlot('chart', [tUpper, tLower, tPred, tActual], layout, { responsive: true, displayModeBar: false });
+</script></body></html>

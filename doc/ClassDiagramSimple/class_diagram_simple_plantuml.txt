@@ -1,0 +1,36 @@
+@startuml
+
+skinparam classAttributeIconSize 0
+
+abstract class AvailableData
+
+class Individual
+
+class Cumulative
+
+class BothDatasets
+
+class Main
+
+class LoadData << (P,orchid) >>
+
+class DataTotal
+
+class HigherYears
+
+BothDatasets -down-> Individual
+BothDatasets -down-> Cumulative
+
+AvailableData <|-- BothDatasets
+AvailableData <|-- Individual
+AvailableData <|-- Cumulative
+
+AvailableData --> DataTotal
+
+Main ..> LoadData
+Main --> AvailableData
+Main ..> DataTotal
+
+Main --> HigherYears
+
+@enduml

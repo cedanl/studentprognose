@@ -1,0 +1,49 @@
+@startuml
+
+start
+
+#palegreen:Load configuration;
+
+#palegreen:Load data;
+
+#palegreen:Patch columnnames based on configuration;
+
+fork
+  #yellow:Preprocess individual data;
+fork again
+  #lightblue:Preprocess cumulative data;
+end fork
+
+#palegreen:Filter programme and origin based on configuration;
+
+repeat
+  repeat
+    #yellow:Predict preapplication;
+
+    fork
+      #yellow:SARIMA with individual dataset;
+    fork again
+      #lightblue:SARIMA with cumulative dataset for pre-applicants;
+    end fork
+
+    #deepskyblue:Predict nr of students with XGBoost based on pre-applicants;
+
+    #palegreen:Numerus fixus cap;
+
+    #lightblue:Predict with ratio;
+
+    #palegreen:Replace latest data with forecasted data;
+
+    #palegreen:Postprocessing;
+
+    #orchid:Predict nr of higher years students using XGBoost and ratio;
+
+  repeat while (Forecast another week) is (yes) not (no)
+
+repeat while (Forecast another year) is (yes) not (no)
+
+#palegreen:Save final output;
+
+stop
+
+@enduml

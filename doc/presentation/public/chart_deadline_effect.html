@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const weeks = Array.from({length: 30}, (_, i) => 'w' + (i + 1));
+const bachelor = [15,18,20,22,25,28,30,32,35,38,42,48,55,60,65,70,95,55,35,28,22,18,15,12,10,8,6,5,4,3];
+const master = [8,10,12,14,16,18,20,22,24,26,28,30,32,34,36,38,40,42,44,46,48,50,45,38,30,22,15,10,6,4];
+const t1 = { x: weeks, y: bachelor, name: 'Bachelor', mode: 'lines+markers',
+  line: { color: '#3b82f6', width: 1.5 }, marker: { size: 3 } };
+const t2 = { x: weeks, y: master, name: 'Master', mode: 'lines+markers',
+  line: { color: '#a855f7', width: 1.5 }, marker: { size: 3 } };
+const layout = {
+  title: { text: 'Deadline-effect: Bachelor piek bij week 17 (1 mei deadline)', font: { size: 14 } },
+  xaxis: { title: 'Week' }, yaxis: { title: 'Nieuwe aanmeldingen' },
+  legend: { orientation: 'h', itemwidth: 40, tracegroupgap: 30, y: 1.12, x: 0.5, xanchor: 'center', font: { size: 10 } },
+  margin: { t: 55, b: 55, l: 50, r: 20 },
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+  shapes: [{ type: 'line', x0: 'w17', x1: 'w17', y0: 0, y1: 1, yref: 'paper',
+    line: { color: '#dc2626', width: 1.5, dash: 'dash' } }],
+  annotations: [{ x: 'w17', y: 98, text: '<b>1 mei deadline</b>', showarrow: false,
+    font: { size: 11, color: '#dc2626' }, bgcolor: '#fef2f2', borderpad: 3 }]
+};
+Plotly.newPlot('chart', [t1, t2], layout, { responsive: true, displayModeBar: false });
+</script></body></html>

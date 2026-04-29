@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const programmes = ['Psychologie','Rechten','Informatica','Biologie','Bedrijfskunde','Scheikunde','Geschiedenis','Taalwetenschap','Pedagogiek','Sociologie','Filosofie','Kunstgeschiedenis'];
+const ratios = [0.68,0.72,0.58,0.64,0.71,0.55,0.62,0.48,0.66,0.60,0.45,0.42];
+const sizes = [420,285,210,165,310,95,95,120,180,110,55,40];
+const data = [{
+  x: programmes, y: ratios, mode: 'markers',
+  marker: { size: sizes.map(s => Math.sqrt(s) * 1.8), color: ratios,
+    colorscale: [[0,'#fbbf24'],[0.5,'#f59e0b'],[1,'#16a34a']],
+    showscale: true, colorbar: { title: 'Ratio', thickness: 15 },
+    line: { width: 1, color: '#fff' } },
+  text: programmes.map((p, i) => p + '<br>Ratio: ' + (ratios[i]*100).toFixed(0) + '%<br>Studenten: ' + sizes[i]),
+  hoverinfo: 'text'
+}];
+const layout = {
+  title: { text: 'Ratio vooraanmelding → inschrijving per opleiding', font: { size: 14 } },
+  xaxis: { tickangle: -35 }, yaxis: { title: 'Inschrijfratio', tickformat: '.0%' },
+  margin: { t: 45, b: 90, l: 55, r: 70 },
+  paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
+  annotations: [{ x: 'Kunstgeschiedenis', y: 0.42, text: 'Kleine opleiding,<br>lage ratio', showarrow: true, ax: 40, ay: -30, font: { size: 10 } }]
+};
+Plotly.newPlot('chart', data, layout, { responsive: true, displayModeBar: false });
+</script></body></html>

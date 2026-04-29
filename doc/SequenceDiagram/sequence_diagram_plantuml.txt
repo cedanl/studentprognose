@@ -1,0 +1,52 @@
+@startuml
+
+autonumber
+
+autonumber stop
+activate Main
+Main -> LoadData: load_configuration(filepath)
+activate LoadData
+Main <-- LoadData: configuration
+deactivate LoadData
+
+Main -> LoadData: load_data(configuration)
+activate LoadData
+Main <-- LoadData: data
+deactivate LoadData
+
+Main -> AvailableData: preprocess()
+
+Main -> DataTotal: initialize()
+
+Main -> AvailableData: set_filtering(programme_filtering, herkomst_filtering)
+
+loop for specified years and weeks
+  Main -> AvailableData: predict_nr_of_students(predict_year, predict_week, skip_years)
+  activate AvailableData
+  AvailableData -> DataTotal: prepare_data(data_to_predict, data_cumulative)
+  activate DataTotal
+  DataTotal -> DataTotal: numerus_fixus_cap()
+  AvailableData <-- DataTotal
+  deactivate DataTotal
+  Main <-- AvailableData
+  deactivate AvailableData
+
+  alt cumulative data present
+    Main -> DataTotal: predict_with_ratio(data_cumulative, year)
+  end
+
+  Main -> DataTotal: postprocess(postprocess_subset, year, week)
+
+  alt predict higher years or volume
+    Main -> HigherYears: predict_nr_of_students(data, data_latest, year, week)
+    activate HigherYears
+    HigherYears --> Main: data
+    deactivate HigherYears
+  end
+end
+
+Main -> DataTotal: save_output()
+
+deactivate Main
+
+@enduml

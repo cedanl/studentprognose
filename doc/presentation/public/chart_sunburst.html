@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html><head><script src="https://cdn.plot.ly/plotly-2.35.0.min.js"></script>
+<style>body{margin:0;background:transparent}#chart{width:100%;height:100vh}</style></head>
+<body><div id="chart"></div><script>
+const data = [{
+  type: 'sunburst',
+  labels: ['Totaal','Bachelor','Master','Pre-master',
+    'B-NL','B-EER','B-Niet-EER','M-NL','M-EER','M-Niet-EER','PM-NL','PM-EER','PM-Niet-EER'],
+  parents: ['','Totaal','Totaal','Totaal',
+    'Bachelor','Bachelor','Bachelor','Master','Master','Master','Pre-master','Pre-master','Pre-master'],
+  values: [0, 0, 0, 0, 1150, 380, 180, 520, 250, 150, 200, 80, 30],
+  branchvalues: 'total',
+  marker: { colors: ['','#60a5fa','#c084fc','#fbbf24',
+    '#3b82f6','#93c5fd','#bfdbfe','#a855f7','#c4b5fd','#ddd6fe','#f59e0b','#fcd34d','#fef3c7'] },
+  textinfo: 'label+value', textfont: { size: 11 },
+  insidetextorientation: 'radial'
+}];
+const layout = {
+  title: { text: 'Studentverdeling: examentype x herkomst (sunburst)', font: { size: 14 } },
+  margin: { t: 45, b: 10, l: 10, r: 10 },
+  paper_bgcolor: 'rgba(0,0,0,0)'
+};
+Plotly.newPlot('chart', data, layout, { responsive: true, displayModeBar: false });
+</script></body></html>

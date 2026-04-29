@@ -1,0 +1,97 @@
+@startuml
+
+skinparam classAttributeIconSize 0
+
+abstract class AvailableData {
+  numerus_fixus_list
+  +preprocess()
+  +predict_nr_of_students(predict_year, predict_week, skip_years)
+  #set_year_week(predict_year, predict_week, data)
+  #set_filtering(programme_filtering, herkomst_filtering)
+  #get_data_to_predict(data, programme_filtering, herkomst_filtering)
+}
+
+class Individual {
+  data_individual
+  data_distances
+  +preprocess()
+  +predict_nr_of_students(predict_year, predict_week, skip_years=0)
+  +predict_applicant(data, data_cumulative=None)
+  -create_ratio(data)
+  +transform_data_individual()
+  +predict_with_sarima(row, data_exog=None, already_printed=False)
+}
+
+class Cumulative {
+  data_cumulative
+  data_studentcount
+  +preprocess()
+  -cast_string_to_float(data, key)
+  +predict_nr_of_students(predict_year, predict_week, skip_years=0)
+  +get_transformed_data(data)
+  +prepare_data()
+  +predict_with_sarima(row, already_printed=False)
+  +predict_students_with_preapplicants(data, predictions, data_to_predict)
+  -predict_with_xgboost_extra_year(train, test, data_to_predict, replace_mask)
+  -predict_with_xgboost(train, test)
+}
+
+class BothDatasets {
+  +preprocess()
+  +predict_nr_of_students(predict_year, predict_week, skip_years=0)
+  +predict_with_sarima(row)
+}
+
+class Main {
+  -parse_arguments(arguments)
+  +run()
+}
+
+class LoadData << (P,orchid) >> {
+  +load_configuration(file_path)
+  +load_data(configuration)
+}
+
+class DataTotal {
+  data_latest
+  ensemble_weights
+  data_studentcount
+  numerus_fixus_list
+  +initialize()
+  +add_predicted_preregistrations(data, predicted_preregistrations)
+  -numerus_fixus_cap()
+  +prepare_data(data, data_cumulative=None)
+  +predict_with_ratio(data_cumulative, predict_year)
+  +postprocess(postprocess_subset, predict_year, predict_week)
+  -create_ensemble_columns()
+  -get_normal_ensemble(row)
+  -create_error_columns()
+  -mean_absolute_error(row, key)
+  -mean_absolute_percentage_error(row, key)
+  +ready_new_data()
+  +save_output(student_year_prediction)
+}
+
+class HigherYears {
+  data_student_numbers_first_years
+  data_student_numbers_higher_years
+  data_student_numbers_volume
+  predict_nr_of_students(first_year_data, all_data, predict_year, predict_week, skip_years)
+}
+
+BothDatasets -down-> Individual
+BothDatasets -down-> Cumulative
+
+AvailableData <|-- BothDatasets
+AvailableData <|-- Individual
+AvailableData <|-- Cumulative
+
+AvailableData --> DataTotal
+
+Main ..> LoadData
+Main --> AvailableData
+Main ..> DataTotal
+
+Main --> HigherYears
+
+@enduml
