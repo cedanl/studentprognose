@@ -1,29 +1,8 @@
 """studentprognose init — scaffold a new project directory."""
 
-import json
 import os
+from importlib.resources import files
 
-
-_FULL_CONFIG = {
-    "paths": {
-        "path_raw_telbestanden":          "data/input_raw/telbestanden",
-        "path_raw_individueel":           "data/input_raw/individuele_aanmelddata.csv",
-        "path_raw_october":               "data/input_raw/oktober_bestand.xlsx",
-        "path_cumulative":                "data/input/vooraanmeldingen_cumulatief.csv",
-        "path_individual":                "data/input/vooraanmeldingen_individueel.csv",
-        "path_latest_individual":         "data/input/totaal_individueel.xlsx",
-        "path_latest_cumulative":         "data/input/totaal_cumulatief.xlsx",
-        "path_cumulative_new":            "",
-        "path_ensemble_weights":          "data/input/ensemble_weights.xlsx",
-        "path_student_count_first-years": "data/input/student_count_first-years.xlsx",
-        "path_student_count_higher-years": "data/input/student_count_higher-years.xlsx",
-        "path_student_volume":            "data/input/student_volume.xlsx",
-        "path_ratios":                    "data/input/ratiobestand.xlsx",
-    },
-    "numerus_fixus": {},
-    "ensemble_override_cumulative": [],
-    "exclude_from_combined": [],
-}
 
 _INPUT_RAW_README = """\
 # data/input_raw
@@ -53,17 +32,18 @@ def run_init():
 
     config_path = os.path.join(cwd, "configuration", "configuration.json")
     if not os.path.exists(config_path):
+        content = files("studentprognose.configuration").joinpath("configuration.json").read_text(encoding="utf-8")
         with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(_FULL_CONFIG, f, indent=4, ensure_ascii=False)
+            f.write(content)
         print("  Aangemaakt: configuration/configuration.json")
     else:
         print("  Overgeslagen: configuration/configuration.json (bestaat al)")
 
     filtering_path = os.path.join(cwd, "configuration", "filtering", "base.json")
     if not os.path.exists(filtering_path):
-        filtering = {"filtering": {"programme": [], "herkomst": [], "examentype": []}}
+        content = files("studentprognose.configuration.filtering").joinpath("base.json").read_text(encoding="utf-8")
         with open(filtering_path, "w", encoding="utf-8") as f:
-            json.dump(filtering, f, indent=4, ensure_ascii=False)
+            f.write(content)
         print("  Aangemaakt: configuration/filtering/base.json")
     else:
         print("  Overgeslagen: configuration/filtering/base.json (bestaat al)")

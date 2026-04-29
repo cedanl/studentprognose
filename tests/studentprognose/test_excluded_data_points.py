@@ -192,13 +192,14 @@ class TestValidateExcludedDataPoints:
 
 class TestLoadConfigurationScoping:
     def test_filtering_json_without_key_loads_without_validation(self, tmp_path):
-        # No excluded_data_points key — validation must not fire (no sys.exit).
-        # Deep-merge with defaults means result != raw cfg; just verify the call succeeds.
+        # No excluded_data_points key in user file — defaults supply [] which is valid.
+        # Validation must not fire (no sys.exit). Deep-merge means result has defaults too.
         cfg = {"filtering": {"programme": [], "herkomst": [], "examentype": []}}
         f = tmp_path / "filtering.json"
         f.write_text(json.dumps(cfg))
         result = load_configuration(str(f))
-        assert "excluded_data_points" not in result
+        # defaults supply excluded_data_points=[] — valid, no crash
+        assert result.get("excluded_data_points") == []
 
     def test_configuration_with_valid_excluded_data_points_loads(self, tmp_path):
         cfg = {
