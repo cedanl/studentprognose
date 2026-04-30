@@ -59,7 +59,8 @@ def detect_last_available(data: pd.DataFrame) -> tuple[int, int | None]:
         return max_year, None
 
     year_data = data[data["Collegejaar"].astype(int) == max_year]
-    max_week = int(year_data["Weeknummer"].dropna().astype(int).max())
+    weeks = year_data["Weeknummer"].dropna().astype(int).tolist()
+    max_week = max(weeks, key=week_sort_key)
     return max_year, max_week
 
 

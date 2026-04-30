@@ -39,6 +39,25 @@ class TestDetectLastAvailable:
         assert jaar == 2022
         assert week == 18
 
+    def test_detect_last_available_split_academic_year(self):
+        """Weken 39-52 (herfst) komen vóór weken 1-20 (lente) in het academisch jaar.
+
+        Numeriek is week 52 hoger dan week 20, maar in het academisch jaar
+        is week 20 recenter. De functie moet week 20 teruggeven.
+        """
+        weeks_fall = list(range(39, 53))   # 39 t/m 52
+        weeks_spring = list(range(1, 21))  # 1 t/m 20
+        all_weeks = weeks_fall + weeks_spring
+        data = pd.DataFrame(
+            {
+                "Collegejaar": [2025] * len(all_weeks),
+                "Weeknummer": all_weeks,
+            }
+        )
+        jaar, week = detect_last_available(data)
+        assert jaar == 2025
+        assert week == 20  # niet 52
+
     def test_detect_last_available_no_weeknummer(self):
         """When Weeknummer column is absent, week should be None."""
         data = pd.DataFrame(
