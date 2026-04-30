@@ -22,6 +22,7 @@ class TestExpandSlices:
 class TestParseArgs:
     def test_defaults(self):
         import datetime
+
         cfg = parse_args(["prog"])
         assert cfg.weeks == [datetime.date.today().isocalendar()[1]]
         assert cfg.noetl is False
@@ -53,6 +54,7 @@ class TestParseArgs:
 
     def test_dataset_cumulative(self):
         from studentprognose.utils.weeks import DataOption
+
         cfg = parse_args(["prog", "-d", "c"])
         assert cfg.data_option == DataOption.CUMULATIVE
 
@@ -67,3 +69,11 @@ class TestParseArgs:
     def test_init_not_needed_for_flags(self):
         cfg = parse_args(["prog", "-w", "10"])
         assert cfg.command is None
+
+    def test_years_specified_flag(self):
+        cfg = parse_args(["prog", "-y", "2024"])
+        assert cfg.years_specified is True
+
+    def test_years_not_specified_flag(self):
+        cfg = parse_args(["prog"])
+        assert cfg.years_specified is False

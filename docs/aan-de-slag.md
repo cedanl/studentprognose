@@ -55,8 +55,17 @@ Zie [Je data voorbereiden](je-data-voorbereiden.md) voor kolomspecificaties per 
 
 ## Eerste run
 
+Als je `-w` en `-y` weglaat, kiest de pipeline automatisch de **laatste beschikbare week en het laatste jaar uit je inputdata**. Je ziet dan een melding zoals:
+
+```
+Geen week/jaar opgegeven — automatisch gekozen op basis van beschikbare data: jaar 2024, week 38.
+Geef -w en -y mee om een andere combinatie te gebruiken.
+```
+
+Dit voorkomt dat de tool faalt omdat de huidige systeemweek/-jaar nog niet in je trainingsdata zit.
+
 ```bash
-# Beide sporen + ensemble (standaard) — voorspelling voor de huidige week
+# Beide sporen + ensemble (standaard) — automatisch laatste beschikbare week/jaar
 uv run studentprognose
 
 # Specifieke week en jaar
@@ -89,8 +98,8 @@ studentprognose --help
 
 | Vlag | Waarden | Standaard | Beschrijving |
 |------|---------|-----------|-------------|
-| `-w` | weeknummer(s) | huidige week | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |
-| `-y` | jaar(en) | huidig jaar | Voorspeljaar(en), bijv. `-y 2025` of `-y 2024 2025` |
+| `-w` | weeknummer(s) | laatste week in data | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |
+| `-y` | jaar(en) | laatste jaar in data | Voorspeljaar(en), bijv. `-y 2025` of `-y 2024 2025` |
 | `-d` | `b` / `c` / `i` | `b` | Dataset: `both`, `cumulative`, `individual` |
 | `-sy` | `f` / `h` / `v` | `f` | Studentjaar: `first-years`, `higher-years`, `volume` |
 | `-c` | pad | `configuration/configuration.json` | Configuratiebestand |

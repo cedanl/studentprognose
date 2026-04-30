@@ -10,6 +10,7 @@ class PipelineConfig:
     weeks: list = field(default_factory=list)
     years: list = field(default_factory=list)
     weeks_specified: bool = False
+    years_specified: bool = False
     data_option: DataOption = DataOption.BOTH_DATASETS
     configuration_path: str = "configuration/configuration.json"
     filtering_path: str = "configuration/filtering/base.json"
@@ -80,14 +81,46 @@ def parse_args(argv):
     )
     parser.add_argument("-w", "-W", "-week", nargs="*", default=None, dest="weeks")
     parser.add_argument("-y", "-Y", "-year", nargs="*", default=None, dest="years")
-    parser.add_argument("-d", "-D", "-dataset", choices=list(DATASET_MAP.keys()), default=None, dest="dataset")
-    parser.add_argument("-c", "-C", "-configuration", default="configuration/configuration.json", dest="configuration")
-    parser.add_argument("-f", "-F", "-filtering", nargs="*", default=None, dest="filtering")
-    parser.add_argument("-sy", "-SY", "-studentyear", choices=list(STUDENT_YEAR_MAP.keys()), default=None, dest="studentyear")
-    parser.add_argument("-sk", "-SK", "-skipyears", type=int, default=0, dest="skipyears")
+    parser.add_argument(
+        "-d",
+        "-D",
+        "-dataset",
+        choices=list(DATASET_MAP.keys()),
+        default=None,
+        dest="dataset",
+    )
+    parser.add_argument(
+        "-c",
+        "-C",
+        "-configuration",
+        default="configuration/configuration.json",
+        dest="configuration",
+    )
+    parser.add_argument(
+        "-f", "-F", "-filtering", nargs="*", default=None, dest="filtering"
+    )
+    parser.add_argument(
+        "-sy",
+        "-SY",
+        "-studentyear",
+        choices=list(STUDENT_YEAR_MAP.keys()),
+        default=None,
+        dest="studentyear",
+    )
+    parser.add_argument(
+        "-sk", "-SK", "-skipyears", type=int, default=0, dest="skipyears"
+    )
     parser.add_argument("--ci", nargs=2, metavar=("test", "N"), default=None)
-    parser.add_argument("--noetl", action="store_true", help="Sla ETL én validatie over (gebruik dit alleen als de ruwe data al eerder verwerkt en gevalideerd is)")
-    parser.add_argument("--yes", action="store_true", help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)")
+    parser.add_argument(
+        "--noetl",
+        action="store_true",
+        help="Sla ETL én validatie over (gebruik dit alleen als de ruwe data al eerder verwerkt en gevalideerd is)",
+    )
+    parser.add_argument(
+        "--yes",
+        action="store_true",
+        help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)",
+    )
 
     args = parser.parse_args(argv[1:])
 
@@ -120,11 +153,15 @@ def parse_args(argv):
     # CI test
     if args.ci is not None:
         if args.ci[0] != "test":
-            raise SystemExit(f"Invalid --ci argument: '{args.ci[0]}'. Usage: --ci test <N>")
+            raise SystemExit(
+                f"Invalid --ci argument: '{args.ci[0]}'. Usage: --ci test <N>"
+            )
         try:
             cfg.ci_test_n = int(args.ci[1])
         except ValueError:
-            raise SystemExit(f"Invalid --ci argument: '{args.ci[1]}'. Usage: --ci test <N>")
+            raise SystemExit(
+                f"Invalid --ci argument: '{args.ci[1]}'. Usage: --ci test <N>"
+            )
 
     # Weeks
     if args.weeks is not None and len(args.weeks) > 0:
@@ -142,10 +179,12 @@ def parse_args(argv):
     # Years
     if args.years is not None and len(args.years) > 0:
         cfg.years = _expand_slices(args.years)
+        cfg.years_specified = True
     else:
         current_year = datetime.date.today().year
         if not cfg.weeks_specified and cfg.weeks[0] >= 40:
             current_year += 1
         cfg.years = [current_year]
+        cfg.years_specified = False
 
     return cfg
