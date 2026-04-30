@@ -73,6 +73,20 @@ De output verschijnt in `data/output/`.
 
 ## CLI-referentie
 
+Alle subcommando's en vlaggen zijn te bekijken via:
+
+```bash
+studentprognose --help
+```
+
+### Subcommando's
+
+| Commando | Beschrijving |
+|----------|-------------|
+| `init` | Maak een nieuwe projectmap aan met configuratie en mappenstructuur |
+
+### Vlaggen
+
 | Vlag | Waarden | Standaard | Beschrijving |
 |------|---------|-----------|-------------|
 | `-w` | weeknummer(s) | huidige week | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |

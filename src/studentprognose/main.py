@@ -15,12 +15,12 @@ from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
 
 
 def main(argv):
-    if len(argv) > 1 and argv[1] == "init":
+    cfg = parse_args(argv)
+
+    if cfg.command == "init":
         from studentprognose.init import run_init
         run_init()
         return
-
-    cfg = parse_args(argv)
 
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
     print("Loading configuration...")
