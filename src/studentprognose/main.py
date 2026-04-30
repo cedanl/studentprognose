@@ -189,11 +189,12 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output
     # Step 2: Initialize strategy (Individual / Cumulative / Combined)
     strategy = create_strategy(cfg, datasets, configuration, cwd)
 
-    PostProcessor.check_output_writable(
-        cfg.data_option,
-        cfg.student_year_prediction,
-        cfg.ci_test_n,
-    )
+    if save_output:
+        PostProcessor.check_output_writable(
+            cfg.data_option,
+            cfg.student_year_prediction,
+            cfg.ci_test_n,
+        )
 
     # Step 3: Preprocess (feature engineering)
     data_cumulative = _preprocess(strategy, cfg.student_year_prediction)
