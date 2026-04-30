@@ -5,8 +5,6 @@ import os
 import math
 
 import warnings
-from statsmodels.tools.sm_exceptions import ConvergenceWarning
-warnings.simplefilter("ignore", ConvergenceWarning)
 
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import increment_week, compute_pred_len
