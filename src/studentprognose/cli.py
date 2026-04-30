@@ -1,6 +1,5 @@
 import argparse
 import datetime
-import os
 from dataclasses import dataclass, field
 
 from studentprognose.utils.weeks import DataOption, StudentYearPrediction
@@ -19,6 +18,7 @@ class PipelineConfig:
     ci_test_n: int | None = None
     noetl: bool = False
     yes: bool = False
+    command: str | None = None
 
 
 def _expand_slices(tokens):
@@ -72,6 +72,12 @@ def parse_args(argv):
     """Parse CLI arguments and return a PipelineConfig."""
     parser = argparse.ArgumentParser(description="Student prognose pipeline")
 
+    parser.add_argument(
+        "command",
+        nargs="?",
+        choices=["init"],
+        help="init  Maak een nieuwe projectmap aan met configuratie en mappenstructuur",
+    )
     parser.add_argument("-w", "-W", "-week", nargs="*", default=None, dest="weeks")
     parser.add_argument("-y", "-Y", "-year", nargs="*", default=None, dest="years")
     parser.add_argument("-d", "-D", "-dataset", choices=list(DATASET_MAP.keys()), default=None, dest="dataset")
@@ -86,6 +92,7 @@ def parse_args(argv):
     args = parser.parse_args(argv[1:])
 
     cfg = PipelineConfig()
+    cfg.command = args.command
     cfg.noetl = args.noetl
     cfg.yes = args.yes
 

@@ -55,3 +55,15 @@ class TestParseArgs:
         from studentprognose.utils.weeks import DataOption
         cfg = parse_args(["prog", "-d", "c"])
         assert cfg.data_option == DataOption.CUMULATIVE
+
+    def test_init_command_in_parse_args(self):
+        cfg = parse_args(["prog", "init"])
+        assert cfg.command == "init"
+
+    def test_default_command_is_none(self):
+        cfg = parse_args(["prog"])
+        assert cfg.command is None
+
+    def test_init_not_needed_for_flags(self):
+        cfg = parse_args(["prog", "-w", "10"])
+        assert cfg.command is None
