@@ -122,7 +122,7 @@ from studentprognose import (
     load_configuration,            # laad configuration.json (of package defaults)
     load_filtering,                # laad filtering JSON (of package defaults)
     load_data,                     # laad data vanaf schijf als DataFrames
-    run_pipeline,                  # volledige CLI-pipeline (accepteert argv-lijst)
+    run_pipeline_cli,              # volledige CLI-pipeline (accepteert argv-lijst)
     run_pipeline_from_dataframes,  # pipeline met DataFrames in-memory
     PipelineConfig,                # configuratie-dataclass voor de pipeline
     DataOption,                    # enum: INDIVIDUAL / CUMULATIVE / BOTH_DATASETS
@@ -133,13 +133,13 @@ from studentprognose import (
 ### Minimaal werkend voorbeeld (bestandsgebaseerd)
 
 ```python
-from studentprognose import run_pipeline
+from studentprognose import run_pipeline_cli
 
 # Zelfde als de CLI — start de volledige pipeline inclusief ETL
-run_pipeline(["studentprognose", "-d", "c", "-y", "2025", "-w", "10"])
+run_pipeline_cli(["studentprognose", "-d", "c", "-y", "2025", "-w", "10"])
 
 # Of sla ETL over als de data al verwerkt is
-run_pipeline(["studentprognose", "--noetl", "-d", "c", "-y", "2025", "-w", "10"])
+run_pipeline_cli(["studentprognose", "--noetl", "-d", "c", "-y", "2025", "-w", "10"])
 ```
 
 ### Cloud-gebruik (data al in-memory)
@@ -163,6 +163,7 @@ result = run_pipeline_from_dataframes(
     week=10,
     data_cumulative=df_cum,
     dataset=DataOption.CUMULATIVE,
+    save_output=False,  # geen lokale uitvoerbestanden aanmaken
 )
 
 if result is not None:

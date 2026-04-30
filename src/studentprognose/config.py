@@ -22,14 +22,19 @@ def load_defaults() -> dict:
     return json.loads(data)
 
 
+def load_defaults_filtering() -> dict:
+    """Load the bundled default filtering config (no filters applied)."""
+    data = files("studentprognose.configuration.filtering").joinpath("base.json").read_text(encoding="utf-8")
+    return json.loads(data)
+
+
 def load_filtering(file_path: str) -> dict:
     """Load a filtering config. Falls back to bundled base.json if file_path doesn't exist."""
     try:
         with open(file_path, encoding="utf-8") as f:
             return json.load(f)
     except FileNotFoundError:
-        data = files("studentprognose.configuration.filtering").joinpath("base.json").read_text(encoding="utf-8")
-        return json.loads(data)
+        return load_defaults_filtering()
 
 
 def load_configuration(file_path: str) -> dict:

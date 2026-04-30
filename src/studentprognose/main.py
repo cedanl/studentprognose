@@ -5,7 +5,7 @@ from typing import Optional
 import pandas as pd
 
 from studentprognose.cli import PipelineConfig, parse_args
-from studentprognose.config import load_configuration, load_filtering
+from studentprognose.config import load_configuration, load_defaults_filtering, load_filtering
 from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.utils.ci_subset import apply_ci_test_subset
@@ -62,6 +62,21 @@ def cli():
     main(sys.argv)
 
 
+def run_pipeline_cli(argv):
+    """Wrapper rond main() voor gebruik als geïmporteerde functie.
+
+    Accepteert een argv-lijst zoals sys.argv, inclusief de programmanaam als
+    eerste element. Gebruik run_pipeline_from_dataframes() als je data al
+    in-memory hebt.
+
+    Example::
+
+        from studentprognose import run_pipeline_cli
+        run_pipeline_cli(["studentprognose", "--noetl", "-d", "c", "-y", "2025", "-w", "10"])
+    """
+    main(argv)
+
+
 def run_pipeline_from_dataframes(
     year: int,
     week: int,
@@ -76,6 +91,7 @@ def run_pipeline_from_dataframes(
     skip_years: int = 0,
     filtering: Optional[dict] = None,
     cwd: Optional[str] = None,
+    save_output: bool = True,
 ) -> Optional[pd.DataFrame]:
     """Run de voorspellingspipeline met data die al als DataFrames in-memory aanwezig is.
 
@@ -100,6 +116,9 @@ def run_pipeline_from_dataframes(
         filtering: Filteringdict (zelfde structuur als een filtering-JSON-bestand).
             Bij ``None`` wordt de gebundelde ``base.json`` gebruikt (geen filters).
         cwd: Werkmap voor uitvoerbestanden. Standaard ``os.getcwd()``.
+        save_output: Sla uitvoer op naar schijf. Standaard ``True``. Zet op ``False``
+            voor puur in-memory gebruik (bijv. bij cloud-pipelines die het resultaat
+            zelf opslaan).
 
     Returns:
         Het gepostprocessde voorspellings-DataFrame, of ``None`` als geen rijen
@@ -111,11 +130,14 @@ def run_pipeline_from_dataframes(
         from studentprognose import run_pipeline_from_dataframes, DataOption
 
         df_cum = pd.read_csv("vooraanmeldingen_cumulatief.csv", sep=";", skiprows=[1])
+
+        # Alleen het DataFrame teruggeven, niets naar schijf schrijven
         result = run_pipeline_from_dataframes(
             year=2025,
             week=10,
             data_cumulative=df_cum,
             dataset=DataOption.CUMULATIVE,
+            save_output=False,
         )
     """
     from studentprognose.config import load_defaults
@@ -130,7 +152,7 @@ def run_pipeline_from_dataframes(
         configuration = load_defaults()
 
     if filtering is None:
-        filtering = load_filtering("__nonexistent__")
+        filtering = load_defaults_filtering()
 
     if cwd is None:
         cwd = os.getcwd()
@@ -155,10 +177,10 @@ def run_pipeline_from_dataframes(
         data_weighted_ensemble,
     )
 
-    return _run_pipeline_core(cfg, datasets, configuration, filtering, cwd)
+    return _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output=save_output)
 
 
-def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd):
+def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output: bool = True):
     """Gemeenschappelijke pipeline-kern: strategy, preprocessing, predict, opslaan.
 
     Zowel ``main()`` (CLI) als ``run_pipeline_from_dataframes()`` (Python API)
@@ -204,7 +226,8 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd):
             _predict_and_postprocess(strategy, cfg, data_cumulative, year, week)
 
     # Step 7: Save output
-    _save_results(strategy, cfg)
+    if save_output:
+        _save_results(strategy, cfg)
 
     return strategy.postprocessor.data
 
