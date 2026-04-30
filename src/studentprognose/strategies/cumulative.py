@@ -341,8 +341,8 @@ class CumulativeStrategy(PredictionStrategy):
             if not test2_merged.empty:
                 if train2.empty:
                     print(
-                        f"WARNING: Skipping XGBoost prediction: no training data "
-                        f"available (try increasing --ci test N)."
+                        "WARNING: Skipping XGBoost prediction: no training data "
+                        "available (try increasing --ci test N)."
                     )
                     return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
@@ -371,8 +371,8 @@ class CumulativeStrategy(PredictionStrategy):
             if not test_merged.empty:
                 if train.empty:
                     print(
-                        f"WARNING: Skipping XGBoost prediction: no training data "
-                        f"available (try increasing --ci test N)."
+                        "WARNING: Skipping XGBoost prediction: no training data "
+                        "available (try increasing --ci test N)."
                     )
                     return data_to_predict
                 predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS)

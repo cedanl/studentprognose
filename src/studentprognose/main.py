@@ -2,7 +2,7 @@ import os
 import sys
 
 from studentprognose.cli import parse_args
-from studentprognose.config import load_configuration
+from studentprognose.config import load_configuration, load_filtering
 from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.utils.ci_subset import apply_ci_test_subset
@@ -15,6 +15,11 @@ from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
 
 
 def main(argv):
+    if len(argv) > 1 and argv[1] == "init":
+        from studentprognose.init import run_init
+        run_init()
+        return
+
     cfg = parse_args(argv)
 
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
@@ -28,7 +33,7 @@ def main(argv):
         run_etl(configuration)
 
     # Step 1: Load data
-    filtering = load_configuration(cfg.filtering_path)
+    filtering = load_filtering(cfg.filtering_path)
 
     print("Loading data...")
     datasets = load_data(configuration, cfg.data_option)
@@ -153,6 +158,11 @@ def _preprocess(strategy, student_year_prediction):
         return strategy.preprocess()
 
     if student_year_prediction == StudentYearPrediction.HIGHER_YEARS:
+        if strategy.postprocessor.data_latest is None:
+            print("\nFout: geen 'totaal'-bestand gevonden voor hogerjaarsvoorspelling.")
+            print("  Dit bestand wordt aangemaakt na een eerste first-years run.")
+            print("  Draai eerst: studentprognose -d cumulative (of -d both)")
+            sys.exit(1)
         strategy.postprocessor.data = strategy.postprocessor.data_latest[HIGHER_YEARS_COLUMNS]
         return None
 

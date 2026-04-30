@@ -28,14 +28,31 @@
 
 ## 📦 Aan de slag
 
-**Via pip** (aanbevolen voor gebruik):
-
 ```bash
 pip install studentprognose
+studentprognose init
+```
+
+`init` maakt de benodigde mapstructuur aan en legt uit welke bestanden je moet aanleveren. Daarna:
+
+```bash
 studentprognose -w 6 -y 2024
 ```
 
-**Via de broncode** (aanbevolen voor ontwikkeling / demodata):
+Voor geautomatiseerde runs (cron, taakplanner) — sla de interactieve prompt over:
+
+```bash
+studentprognose -w 6 -y 2024 --yes
+```
+
+> [!NOTE]
+> Heb je afwijkende kolomnamen in je Studielink-export? Voeg een `"columns"`-blok toe aan `configuration/configuration.json`. Zie [Configuratie](https://cedanl.github.io/studentprognose/configuratie/) voor uitleg en voorbeelden.
+
+---
+
+## 🛠️ Aan de slag voor ontwikkelaars
+
+**Via de broncode** (met demodata):
 
 ```bash
 # 1. Installeer uv (zie https://docs.astral.sh/uv/getting-started/installation/)
@@ -46,14 +63,11 @@ git clone https://github.com/cedanl/studentprognose.git
 cd studentprognose
 
 # 3. Draai het model met demodata
-uv run main.py
+uv run studentprognose -w 6 -y 2020
 ```
 
 > [!NOTE]
-> Demodata is meegeleverd in `data/input`, zodat je direct kunt starten. Controleer welke jaren en weken beschikbaar zijn — zonder specificatie gebruikt het script de huidige week, wat mogelijk niet werkt met de meegeleverde data.
-
-> [!TIP]
-> Na `pip install studentprognose` is het commando `studentprognose` beschikbaar en kun je alle `uv run main.py` voorbeelden vervangen door `studentprognose`.
+> Demodata is meegeleverd in `data/input_raw/`, zodat je direct kunt starten. Gebruik `-y 2020` t/m `-y 2024` en `-w 1` t/m `-w 52`.
 
 ---
 

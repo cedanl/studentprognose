@@ -14,6 +14,23 @@ uv add studentprognose
 
 Vereisten: Python 3.12+
 
+## Eerste keer: mapstructuur aanmaken
+
+Na installatie maak je in een lege werkmap de benodigde mappen en een startconfiguratie aan:
+
+```bash
+studentprognose init
+```
+
+Dit schrijft:
+
+- `configuration/configuration.json` — aanpasbare configuratie met alle standaardwaarden
+- `configuration/filtering/base.json` — lege filtering (geen opleiding- of herkomstfilter)
+- `data/input_raw/telbestanden/` — map voor je Studielink-telbestanden
+- `data/input_raw/README.md` — beschrijving van welke bestanden hier horen
+
+Bestaat een bestand al, dan wordt het overgeslagen. Je kunt `init` dus veilig opnieuw uitvoeren.
+
 ## Je data neerzetten
 
 Zet je inputbestanden in de juiste mappen voordat je de pipeline start:

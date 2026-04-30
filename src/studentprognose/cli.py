@@ -89,15 +89,15 @@ def parse_args(argv):
     cfg.noetl = args.noetl
     cfg.yes = args.yes
 
-    # Configuration path
-    if args.configuration and os.path.exists(args.configuration):
+    # Configuration path — load_configuration handles missing files gracefully
+    if args.configuration:
         cfg.configuration_path = args.configuration
 
     # Filtering path (supports multiple files via -f path1 -f path2 or -f path1 path2)
+    # load_filtering handles missing files gracefully (falls back to bundled base.json)
     if args.filtering is not None:
         for path in args.filtering:
-            if os.path.exists(path):
-                cfg.filtering_path = path
+            cfg.filtering_path = path
 
     # Dataset
     if args.dataset is not None:

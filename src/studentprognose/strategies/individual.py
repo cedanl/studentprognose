@@ -101,7 +101,7 @@ class IndividualStrategy(PredictionStrategy):
         def get_new_column(row):
             if (
                 row["Weeknummer"] == 17
-                and not row["Croho groepeernaam"] in self.numerus_fixus_list
+                and row["Croho groepeernaam"] not in self.numerus_fixus_list
             ):
                 return True
             else:

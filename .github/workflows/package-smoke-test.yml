@@ -1,0 +1,19 @@
+name: Package smoke test
+
+on:
+  workflow_call:
+
+jobs:
+  smoke:
+    name: Standalone package smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # hatch-vcs heeft git-history nodig voor versienummer
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Run standalone package test
+        run: bash scripts/test_package.sh

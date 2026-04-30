@@ -1,6 +1,20 @@
 # Configuratie
 
-De pipeline wordt geconfigureerd via `configuration/configuration.json`. Het bestand heeft vier secties: `paths`, `model_config`, `numerus_fixus` en `columns`.
+De pipeline wordt geconfigureerd via `configuration/configuration.json`.
+
+## Beginnen
+
+Voer eenmalig `studentprognose init` uit in je werkmap. Dit schrijft een startconfiguratie met alle standaardwaarden. Je hoeft daarna alleen de velden aan te passen die bij jouw instelling afwijken.
+
+## Hoe configuratie laden werkt
+
+De pipeline laadt altijd eerst de **ingebakken standaardwaarden** uit het package, en past jouw `configuration.json` daar bovenop als een *overschrijving*. Dat betekent:
+
+- Je hoeft alleen te specificeren wat afwijkt van de standaard.
+- Een ontbrekend veld in jouw bestand valt automatisch terug op de standaardwaarde.
+- Als het configuratiebestand helemaal niet bestaat, worden de standaardwaarden gebruikt en verschijnt er een waarschuwing.
+
+Het bestand heeft de volgende secties: `paths`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
 
 ## `paths` — bestandspaden
 
@@ -209,39 +223,17 @@ Zie [Validatie](validatie.md) voor een volledig overzicht van alle controles.
 
 ## Voorbeeld minimale configuratie
 
+Omdat de pipeline standaardwaarden inbouwt, hoef je alleen te specificeren wat afwijkt. Een typische startconfiguratie bevat alleen de instelling-specifieke velden:
+
 ```json
 {
-    "paths": {
-        "path_cumulative": "data/input/vooraanmeldingen_cumulatief.csv",
-        "path_individual": "data/input/vooraanmeldingen_individueel.csv",
-        "path_cumulative_new": "",
-        "path_latest_individual": "data/input/totaal_individueel.xlsx",
-        "path_latest_cumulative": "data/input/totaal_cumulatief.xlsx",
-        "path_ensemble_weights": "data/input/ensemble_weights.xlsx",
-        "path_raw_october": "data/input_raw/oktober_bestand.xlsx",
-        "path_student_count_first-years": "data/input/student_count_first-years.xlsx",
-        "path_student_count_higher-years": "data/input/student_count_higher-years.xlsx",
-        "path_student_volume": "data/input/student_volume.xlsx",
-        "path_ratios": "data/input/ratiobestand.xlsx",
-        "path_raw_telbestanden": "data/input_raw/telbestanden",
-        "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
+    "numerus_fixus": {
+        "B Geneeskunde": 340
     },
-    "model_config": {
-        "status_mapping": {
-            "Ingeschreven": 1,
-            "Geannuleerd": 0,
-            "Uitgeschreven": 1,
-            "Verzoek tot inschrijving": 0,
-            "Studie gestaakt": 0,
-            "Aanmelding vervolgen": 0
-        },
-        "min_training_year": 2016
-    },
-    "numerus_fixus": {},
-    "columns": {
-        "individual": {},
-        "oktober": {},
-        "cumulative": {}
-    }
+    "ensemble_override_cumulative": [
+        "B Geneeskunde"
+    ]
 }
 ```
+
+Alle overige velden — paden, kolomnamen, modelparameters, ensemble-gewichten — vallen terug op de ingebakken standaardwaarden. Voer `studentprognose init` uit om een volledig ingevuld startbestand te krijgen dat je als referentie kunt gebruiken.
