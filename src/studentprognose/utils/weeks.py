@@ -42,6 +42,27 @@ HIGHER_YEARS_COLUMNS = [
 ]
 
 
+def detect_last_available(data: pd.DataFrame) -> tuple[int, int | None]:
+    """Retourneer het hoogste Collegejaar en het bijbehorende hoogste Weeknummer.
+
+    Args:
+        data: DataFrame met minimaal een ``Collegejaar``-kolom en optioneel een
+            ``Weeknummer``-kolom.
+
+    Returns:
+        Een tuple ``(jaar, week)`` waarbij ``week`` ``None`` is als de
+        ``Weeknummer``-kolom niet aanwezig is in ``data``.
+    """
+    max_year = int(data["Collegejaar"].dropna().astype(int).max())
+
+    if "Weeknummer" not in data.columns:
+        return max_year, None
+
+    year_data = data[data["Collegejaar"].astype(int) == max_year]
+    max_week = int(year_data["Weeknummer"].dropna().astype(int).max())
+    return max_year, max_week
+
+
 def get_max_week_from_weeks(weeks: pd.Series) -> int:
     if len(weeks.unique()) == WEEKS_PER_YEAR:
         max_week = FINAL_ACADEMIC_WEEK
@@ -66,14 +87,18 @@ def get_weeks_list(weeknummer: int) -> list:
 
 def get_max_week(predict_year, max_year, data, key):
     if predict_year == max_year:
-        max_week = get_max_week_from_weeks(data[data[key] == predict_year]["Weeknummer"])
+        max_week = get_max_week_from_weeks(
+            data[data[key] == predict_year]["Weeknummer"]
+        )
     else:
         if predict_year == 2021:
             # COVID-jaar: het aanmeldpatroon week 38 week was afwijkend waardoor
             # get_max_week_from_weeks() een onjuiste waarde teruggeeft. Zie #84.
             max_week = FINAL_ACADEMIC_WEEK
         else:
-            max_week = get_max_week_from_weeks(data[data[key] == predict_year]["Weeknummer"])
+            max_week = get_max_week_from_weeks(
+                data[data[key] == predict_year]["Weeknummer"]
+            )
 
     return max_week
 
