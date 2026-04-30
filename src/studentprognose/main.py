@@ -1,7 +1,10 @@
 import os
 import sys
+from typing import Optional
 
-from studentprognose.cli import parse_args
+import pandas as pd
+
+from studentprognose.cli import PipelineConfig, parse_args
 from studentprognose.config import load_configuration, load_filtering
 from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
@@ -50,8 +53,118 @@ def main(argv):
     _apply_auto_defaults(datasets, cfg)
     _check_data_range(datasets, cfg)
 
-    # Step 2: Initialize strategy (Individual / Cumulative / Combined)
+    # Steps 2-7: gemeenschappelijke pipeline-kern
     cwd = os.getcwd()
+    _run_pipeline_core(cfg, datasets, configuration, filtering, cwd)
+
+
+def cli():
+    main(sys.argv)
+
+
+def run_pipeline_from_dataframes(
+    year: int,
+    week: int,
+    data_cumulative: Optional[pd.DataFrame] = None,
+    data_individual: Optional[pd.DataFrame] = None,
+    configuration: Optional[dict] = None,
+    data_student_numbers: Optional[pd.DataFrame] = None,
+    data_latest: Optional[pd.DataFrame] = None,
+    data_weighted_ensemble: Optional[pd.DataFrame] = None,
+    dataset: DataOption = DataOption.BOTH_DATASETS,
+    student_year_prediction: StudentYearPrediction = StudentYearPrediction.FIRST_YEARS,
+    skip_years: int = 0,
+    filtering: Optional[dict] = None,
+    cwd: Optional[str] = None,
+) -> Optional[pd.DataFrame]:
+    """Run de voorspellingspipeline met data die al als DataFrames in-memory aanwezig is.
+
+    Bedoeld voor cloud- en script-gebruikers die hun data niet als lokale bestanden
+    hebben (bijv. geladen vanuit Azure Blob Storage of Amazon S3). ETL wordt overgeslagen.
+
+    Args:
+        year: Academisch jaar om te voorspellen (bijv. ``2025``).
+        week: ISO-weeknummer waarvandaan voorspeld wordt (bijv. ``10``).
+        data_cumulative: Cumulatief vooraanmeld-DataFrame. Vereist wanneer
+            ``dataset`` ``CUMULATIVE`` of ``BOTH_DATASETS`` is.
+        data_individual: Individueel aanmeld-DataFrame. Vereist wanneer
+            ``dataset`` ``INDIVIDUAL`` of ``BOTH_DATASETS`` is.
+        configuration: Configuratiedict (zelfde structuur als ``configuration.json``).
+            Bij ``None`` worden de gebundelde package-defaults gebruikt.
+        data_student_numbers: Studentaantallen eerstejaars DataFrame (optioneel).
+        data_latest: Laatste output Excel DataFrame voor hogerejaarsvoorspellingen (optioneel).
+        data_weighted_ensemble: Ensemble-gewichten DataFrame (optioneel).
+        dataset: Welke dataset(s) te gebruiken. Standaard ``BOTH_DATASETS``.
+        student_year_prediction: Welke studentcohort te voorspellen. Standaard ``FIRST_YEARS``.
+        skip_years: Aantal meest recente jaren om uit training te sluiten (backtesting).
+        filtering: Filteringdict (zelfde structuur als een filtering-JSON-bestand).
+            Bij ``None`` wordt de gebundelde ``base.json`` gebruikt (geen filters).
+        cwd: Werkmap voor uitvoerbestanden. Standaard ``os.getcwd()``.
+
+    Returns:
+        Het gepostprocessde voorspellings-DataFrame, of ``None`` als geen rijen
+        overeenkwamen met de filters of voorspellingscriteria.
+
+    Example::
+
+        import pandas as pd
+        from studentprognose import run_pipeline_from_dataframes, DataOption
+
+        df_cum = pd.read_csv("vooraanmeldingen_cumulatief.csv", sep=";", skiprows=[1])
+        result = run_pipeline_from_dataframes(
+            year=2025,
+            week=10,
+            data_cumulative=df_cum,
+            dataset=DataOption.CUMULATIVE,
+        )
+    """
+    from studentprognose.config import load_defaults
+
+    if week == FINAL_ACADEMIC_WEEK:
+        raise ValueError(
+            f"week {FINAL_ACADEMIC_WEEK} is de laatste week van het academisch jaar. "
+            f"Kies een eerdere week, bijvoorbeeld week {FINAL_ACADEMIC_WEEK - 1}."
+        )
+
+    if configuration is None:
+        configuration = load_defaults()
+
+    if filtering is None:
+        filtering = load_filtering("__nonexistent__")
+
+    if cwd is None:
+        cwd = os.getcwd()
+
+    cfg = PipelineConfig(
+        years=[year],
+        weeks=[week],
+        weeks_specified=True,
+        years_specified=True,
+        data_option=dataset,
+        student_year_prediction=student_year_prediction,
+        skip_years=skip_years,
+        noetl=True,
+        yes=True,
+    )
+
+    datasets = (
+        data_individual,
+        data_cumulative,
+        data_student_numbers,
+        data_latest,
+        data_weighted_ensemble,
+    )
+
+    return _run_pipeline_core(cfg, datasets, configuration, filtering, cwd)
+
+
+def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd):
+    """Gemeenschappelijke pipeline-kern: strategy, preprocessing, predict, opslaan.
+
+    Zowel ``main()`` (CLI) als ``run_pipeline_from_dataframes()`` (Python API)
+    delegeren hiernaartoe na hun eigen setup-stappen.
+    """
+    # Step 2: Initialize strategy (Individual / Cumulative / Combined)
     strategy = create_strategy(cfg, datasets, configuration, cwd)
 
     PostProcessor.check_output_writable(
@@ -93,9 +206,7 @@ def main(argv):
     # Step 7: Save output
     _save_results(strategy, cfg)
 
-
-def cli():
-    main(sys.argv)
+    return strategy.postprocessor.data
 
 
 def _apply_auto_defaults(datasets, cfg):
