@@ -5,7 +5,7 @@ import sys
 from statistics import mean
 
 from studentprognose.utils.weeks import (
-    DataOption, StudentYearPrediction, increment_week, convert_nan_to_zero,
+    DataOption, StudentYearPrediction, increment_week,
 )
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, LOOKBACK_YEARS
 from studentprognose.models.ratio import predict_with_ratio as _predict_with_ratio
@@ -288,113 +288,20 @@ class PostProcessor:
     def _create_ensemble_columns(self, predict_year, predict_week):
         self.data = self.data.sort_values(
             by=["Croho groepeernaam", "Herkomst", "Collegejaar", "Weeknummer"]
+        ).reset_index(drop=True)
+
+        base_mask = (
+            (self.data["Collegejaar"] == predict_year)
+            & (self.data["Weeknummer"] == predict_week)
         )
-        self.data = self.data.reset_index(drop=True)
 
-        self.data.loc[
-            (self.data["Collegejaar"] == predict_year) & (self.data["Weeknummer"] == predict_week),
-            "Ensemble_prediction",
-        ] = np.nan
-        self.data.loc[
-            (self.data["Collegejaar"] == predict_year) & (self.data["Weeknummer"] == predict_week),
-            "Weighted_ensemble_prediction",
-        ] = -1.0
+        self.data.loc[base_mask, "Ensemble_prediction"] = np.nan
+        self.data.loc[base_mask, "Weighted_ensemble_prediction"] = -1.0
 
-        for examentype in self.data[
-            (self.data["Collegejaar"] == predict_year) & (self.data["Weeknummer"] == predict_week)
-        ]["Examentype"].unique():
-            self.data.loc[
-                (self.data["Collegejaar"] == predict_year)
-                & (self.data["Weeknummer"] == predict_week)
-                & (self.data["Examentype"] == examentype),
-                "Ensemble_prediction",
-            ] = self.data[
-                (self.data["Collegejaar"] == predict_year)
-                & (self.data["Weeknummer"] == predict_week)
-                & (self.data["Examentype"] == examentype)
-            ].apply(
-                self._get_normal_ensemble, axis=1
-            )
+        self._compute_normal_ensemble(base_mask)
 
-            if self.ensemble_weights is not None:
-                weights = self.ensemble_weights.rename(columns={"Programme": "Croho groepeernaam"})
-                if "Average_ensemble_prediction" not in self.data.columns:
-                    weights = weights.rename(
-                        columns={
-                            "Average_ensemble_prediction": "Average_ensemble_prediction_weight"
-                        }
-                    )
-                self.data = self.data.merge(
-                    weights,
-                    on=["Collegejaar", "Croho groepeernaam", "Examentype", "Herkomst"],
-                    how="left",
-                    suffixes=("", "_weight"),
-                )
-
-                weighted_ensemble = (
-                    self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["SARIMA_cumulative"].fillna(0)
-                    * self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["SARIMA_cumulative_weight"].fillna(0)
-                    + self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["SARIMA_individual"].fillna(0)
-                    * self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["SARIMA_individual_weight"].fillna(0)
-                    + self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["Prognose_ratio"].fillna(0)
-                    * self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["Prognose_ratio_weight"].fillna(0)
-                )
-
-                self.data.loc[
-                    (self.data["Collegejaar"] == predict_year)
-                    & (self.data["Weeknummer"] == predict_week)
-                    & (self.data["Examentype"] == examentype),
-                    "Weighted_ensemble_prediction",
-                ] = np.where(
-                    self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["Average_ensemble_prediction_weight"]
-                    != 1,
-                    weighted_ensemble,
-                    self.data[
-                        (self.data["Collegejaar"] == predict_year)
-                        & (self.data["Weeknummer"] == predict_week)
-                        & (self.data["Examentype"] == examentype)
-                    ]["Weighted_ensemble_prediction"],
-                )
-
-                self.data = self.data.drop(
-                    [
-                        "SARIMA_cumulative_weight",
-                        "SARIMA_individual_weight",
-                        "Prognose_ratio_weight",
-                        "Average_ensemble_prediction_weight",
-                    ],
-                    axis=1,
-                )
-
-        self.data["Average_ensemble_prediction"] = np.nan
+        if self.ensemble_weights is not None:
+            self._compute_weighted_ensemble(base_mask)
 
         self.data["Average_ensemble_prediction"] = self.data.groupby(
             ["Croho groepeernaam", "Examentype", "Herkomst", "Collegejaar"]
@@ -408,23 +315,71 @@ class PostProcessor:
             self.data["Weighted_ensemble_prediction"],
         )
 
-    def _get_normal_ensemble(self, row):
-        sarima_cumulative = convert_nan_to_zero(row["SARIMA_cumulative"])
-        sarima_individual = convert_nan_to_zero(row["SARIMA_individual"])
+    def _compute_normal_ensemble(self, mask):
+        """Vectorized ensemble-berekening (vervangt row-by-row .apply)."""
+        d = self.data
         w = self.ensemble_weights_config
 
-        if row["Croho groepeernaam"] in self.ensemble_override_cumulative:
-            return sarima_cumulative
-        elif row["Weeknummer"] in range(17, 24) and row["Examentype"] == "Master":
-            return sarima_individual * w["master_week_17_23"]["individual"] + sarima_cumulative * w["master_week_17_23"]["cumulative"]
-        elif row["Weeknummer"] in range(30, 35):
-            return sarima_individual * w["week_30_34"]["individual"] + sarima_cumulative * w["week_30_34"]["cumulative"]
-        elif row["Weeknummer"] in range(35, FINAL_ACADEMIC_WEEK):
-            return sarima_individual * w["week_35_37"]["individual"] + sarima_cumulative * w["week_35_37"]["cumulative"]
-        elif row["Weeknummer"] == FINAL_ACADEMIC_WEEK:
-            return sarima_individual
-        else:
-            return sarima_individual * w["default"]["individual"] + sarima_cumulative * w["default"]["cumulative"]
+        cum = d.loc[mask, "SARIMA_cumulative"].fillna(0)
+        ind = d.loc[mask, "SARIMA_individual"].fillna(0)
+        wk = d.loc[mask, "Weeknummer"]
+        ex = d.loc[mask, "Examentype"]
+        prog = d.loc[mask, "Croho groepeernaam"]
+
+        override = prog.isin(self.ensemble_override_cumulative)
+        master_17_23 = ~override & wk.between(17, 23) & (ex == "Master")
+        week_30_34 = ~override & ~master_17_23 & wk.between(30, 34)
+        week_35_37 = ~override & ~master_17_23 & ~week_30_34 & wk.between(35, FINAL_ACADEMIC_WEEK - 1)
+        week_final = ~override & ~master_17_23 & ~week_30_34 & ~week_35_37 & (wk == FINAL_ACADEMIC_WEEK)
+
+        conditions = [override, master_17_23, week_30_34, week_35_37, week_final]
+        choices = [
+            cum,
+            ind * w["master_week_17_23"]["individual"] + cum * w["master_week_17_23"]["cumulative"],
+            ind * w["week_30_34"]["individual"] + cum * w["week_30_34"]["cumulative"],
+            ind * w["week_35_37"]["individual"] + cum * w["week_35_37"]["cumulative"],
+            ind,
+        ]
+        default = ind * w["default"]["individual"] + cum * w["default"]["cumulative"]
+
+        d.loc[mask, "Ensemble_prediction"] = np.select(conditions, choices, default=default)
+
+    def _compute_weighted_ensemble(self, base_mask):
+        """Vectorized weighted ensemble berekening."""
+        weights = self.ensemble_weights.rename(columns={"Programme": "Croho groepeernaam"})
+        if "Average_ensemble_prediction" not in self.data.columns:
+            weights = weights.rename(
+                columns={"Average_ensemble_prediction": "Average_ensemble_prediction_weight"}
+            )
+
+        self.data = self.data.merge(
+            weights,
+            on=["Collegejaar", "Croho groepeernaam", "Examentype", "Herkomst"],
+            how="left",
+            suffixes=("", "_weight"),
+        )
+
+        d = self.data.loc[base_mask]
+        weighted = (
+            d["SARIMA_cumulative"].fillna(0) * d["SARIMA_cumulative_weight"].fillna(0)
+            + d["SARIMA_individual"].fillna(0) * d["SARIMA_individual_weight"].fillna(0)
+            + d["Prognose_ratio"].fillna(0) * d["Prognose_ratio_weight"].fillna(0)
+        )
+
+        self.data.loc[base_mask, "Weighted_ensemble_prediction"] = np.where(
+            d["Average_ensemble_prediction_weight"] != 1,
+            weighted,
+            self.data.loc[base_mask, "Weighted_ensemble_prediction"],
+        )
+
+        self.data = self.data.drop(
+            columns=[
+                "SARIMA_cumulative_weight",
+                "SARIMA_individual_weight",
+                "Prognose_ratio_weight",
+                "Average_ensemble_prediction_weight",
+            ],
+        )
 
     def _create_error_columns(self):
         if self.data_option == DataOption.BOTH_DATASETS:

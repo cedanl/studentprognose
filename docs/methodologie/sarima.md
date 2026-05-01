@@ -57,6 +57,20 @@ Dit forceert de maximale week voor dat jaar op 38 (de standaard inschrijfdeadlin
 
 Dit illustreert een bredere aanname: **het model gaat ervan uit dat historische aanmeldpatronen representatief zijn**. Uitzonderingsjaren zoals 2021 moeten handmatig worden afgehandeld.
 
+## Alternatieve tijdreeksmodellen
+
+Naast SARIMA zijn drie alternatieve tijdreeksmodellen beschikbaar, configureerbaar via `model_config.cumulative_timeseries` in `configuration.json`:
+
+| Model | Config-waarde | Beschrijving |
+|-------|---------------|-------------|
+| **ETS** (AutoETS) | `ets` | Exponential smoothing met automatische componentkeuze. Stabieler bij korte reeksen (<10 jaar) doordat er geen vaste ARIMA-ordes gekozen hoeven te worden. |
+| **Theta** (AutoTheta) | `theta` | Zeer simpel model dat competitief is bij korte tijdreeksen (winnaar M3-competitie). Goede robuuste baseline. |
+| **AutoARIMA** | `auto_arima` | Automatische selectie van ARIMA-ordes via AICc-minimalisatie. Flexibeler dan de vaste ordes van SARIMA, maar trager door de zoekprocedure. |
+
+Alle modellen gebruiken dezelfde `BaseForecaster`-interface en dezelfde seizoenslengte van 52 weken. ETS en Theta ondersteunen geen exogene variabelen (relevant voor het individuele spoor).
+
+Gebruik `studentprognose benchmark -w <week>` om te vergelijken welk model het best presteert op jouw data voordat je de keuze in de configuratie wijzigt.
+
 ## Relatie tot andere modellen
 
 SARIMA levert een voorspelling per opleiding per week. In het `-d b` scenario wordt deze gecombineerd met de XGBoost-uitkomsten via het ensemble. Zie [Ensemble](ensemble.md).

@@ -8,6 +8,7 @@ import warnings
 
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import increment_week, compute_pred_len
+from studentprognose.models import create_forecaster, create_regressor
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
 from studentprognose.data.transforms import TRANSFORM_GROUP_COLS
@@ -118,6 +119,9 @@ class CumulativeStrategy(PredictionStrategy):
         self.skip_years = 0
         self.xgboost_importance = None
         self._importance_dicts: list[dict] = []
+
+        self._forecaster_factory = lambda: create_forecaster(configuration)
+        self._regressor = create_regressor(configuration)
 
     def get_dashboard_data(self) -> dict:
         return {
@@ -257,7 +261,8 @@ class CumulativeStrategy(PredictionStrategy):
     def _predict_sarima(self, row, already_printed=False):
         return predict_with_sarima_cumulative(
             self.data_cumulative, row, self.predict_year, self.predict_week,
-            self.pred_len, self.skip_years, already_printed, self.min_training_year
+            self.pred_len, self.skip_years, already_printed, self.min_training_year,
+            forecaster_factory=self._forecaster_factory,
         )
 
     def _predict_students_with_preapplicants(self, data, predictions, data_to_predict):
@@ -346,7 +351,7 @@ class CumulativeStrategy(PredictionStrategy):
                     )
                     return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
-                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS)
+                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor)
                 if imp is not None:
                     self._importance_dicts.append(imp)
                 test2["Collegejaar"] = test2["Collegejaar"] + self.skip_years
@@ -375,7 +380,7 @@ class CumulativeStrategy(PredictionStrategy):
                         "available (try increasing --ci test N)."
                     )
                     return data_to_predict
-                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS)
+                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor)
                 if imp is not None:
                     self._importance_dicts.append(imp)
 

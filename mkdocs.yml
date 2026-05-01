@@ -90,6 +90,7 @@ nav:
     - XGBoost: methodologie/xgboost.md
     - Ratio-model: methodologie/ratio-model.md
     - Ensemble: methodologie/ensemble.md
+    - Benchmarks: methodologie/benchmarks.md
   - API-referentie:
     - api/index.md
     - Modellen: api/models.md

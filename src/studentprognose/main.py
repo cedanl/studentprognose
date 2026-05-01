@@ -28,6 +28,13 @@ def main(argv):
         run_init()
         return
 
+    if cfg.command == "benchmark":
+        from studentprognose.benchmark.runner import main as run_benchmark
+
+        predict_week = cfg.weeks[0] if cfg.weeks else 12
+        run_benchmark(cfg.configuration_path, predict_week)
+        return
+
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
     print("Loading configuration...")
     configuration = load_configuration(cfg.configuration_path)

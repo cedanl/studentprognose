@@ -1,50 +1,49 @@
 import numpy as np
-from xgboost import XGBRegressor
-from sklearn.preprocessing import OneHotEncoder
-from sklearn.compose import ColumnTransformer
 
-from studentprognose.utils.weeks import get_weeks_list
 from studentprognose.models.importance import extract_grouped_importance
+from studentprognose.models.regressors import (
+    BaseRegressor,
+    XGBoostRegressor,
+    build_preprocessor,
+)
 
 
 def predict_with_xgboost(
-    train, test, data_studentcount, extra_numeric_cols: list[str] | None = None
-) -> np.ndarray | float:
-    """
-    Train an XGBoost regressor to predict student counts from cumulative pre-application data.
+    train,
+    test,
+    data_studentcount,
+    extra_numeric_cols: list[str] | None = None,
+    regressor: BaseRegressor | None = None,
+) -> tuple[np.ndarray, dict[str, float] | None]:
+    """Train een regressor om studentaantallen te voorspellen uit cumulatieve vooraanmelddata.
 
     Returns:
-        np.ndarray: rounded integer predictions, or np.nan if no student count data.
+        (predictions, importance_dict) — predictions afgerond op integers,
+        importance_dict is None als het model geen feature importances ondersteunt.
     """
-    if data_studentcount is not None:
-        train = train.merge(
-            data_studentcount[
-                [
-                    "Croho groepeernaam",
-                    "Collegejaar",
-                    "Herkomst",
-                    "Examentype",
-                    "Aantal_studenten",
-                ]
-            ],
-            on=["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"],
-        )
-    else:
+    if data_studentcount is None:
         return np.nan, None
 
-    train.drop_duplicates(inplace=True, ignore_index=True)
+    train = train.merge(
+        data_studentcount[
+            [
+                "Croho groepeernaam",
+                "Collegejaar",
+                "Herkomst",
+                "Examentype",
+                "Aantal_studenten",
+            ]
+        ],
+        on=["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"],
+    )
+
+    train = train.drop_duplicates(ignore_index=True)
 
     if train.empty:
         return np.full(len(test), np.nan), None
 
-    X_train = train.drop(["Aantal_studenten"], axis=1)
-    y_train = train.pop("Aantal_studenten")
-
-    numeric_cols = (
-        ["Collegejaar"]
-        + [str(x) for x in get_weeks_list(38)]
-        + (extra_numeric_cols or [])
-    )
+    X_train = train.drop(columns=["Aantal_studenten"])
+    y_train = train["Aantal_studenten"]
 
     if extra_numeric_cols:
         missing = [c for c in extra_numeric_cols if c not in X_train.columns]
@@ -54,29 +53,24 @@ def predict_with_xgboost(
                 f"trainingsdata: {missing}. Controleer of _add_engineered_features is "
                 f"aangeroepen vóór predict_with_xgboost."
             )
-    categorical_cols = ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
 
-    numeric_transformer = "passthrough"
-    categorical_transformer = OneHotEncoder(handle_unknown="ignore")
+    preprocessor, numeric_cols, categorical_cols = build_preprocessor(extra_numeric_cols)
 
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("numeric", numeric_transformer, numeric_cols),
-            ("categorical", categorical_transformer, categorical_cols),
-        ]
-    )
+    X_train_transformed = preprocessor.fit_transform(X_train)
+    test_transformed = preprocessor.transform(test)
 
-    X_train = preprocessor.fit_transform(X_train)
-    test = preprocessor.transform(test)
+    if regressor is None:
+        regressor = XGBoostRegressor()
 
-    model = XGBRegressor(learning_rate=0.25)
+    regressor.fit(X_train_transformed, y_train)
 
-    model.fit(X_train, y_train)
-    importance = extract_grouped_importance(model, preprocessor, numeric_cols, categorical_cols)
+    importance = None
+    if regressor.feature_importances_ is not None:
+        importance = extract_grouped_importance(
+            regressor, preprocessor, numeric_cols, categorical_cols
+        )
 
-    predictions = model.predict(test)
-
-    for i in range(len(predictions)):
-        predictions[i] = int(round(predictions[i], 0))
+    predictions = regressor.predict(test_transformed)
+    predictions = np.rint(predictions).astype(int)
 
     return predictions, importance

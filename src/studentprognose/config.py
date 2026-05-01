@@ -4,6 +4,9 @@ from importlib.resources import files
 
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
+_VALID_TIMESERIES_MODELS = {"sarima", "ets", "theta", "auto_arima"}
+_VALID_REGRESSOR_MODELS = {"xgboost", "ridge", "random_forest"}
+
 
 def _deep_merge(base: dict, override: dict) -> dict:
     """Deep-merge override into base. override wins on conflicts."""
@@ -50,6 +53,7 @@ def load_configuration(file_path: str) -> dict:
 
     if "excluded_data_points" in cfg:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
+    _validate_model_config(cfg, file_path)
     return cfg
 
 
@@ -103,3 +107,25 @@ def _validate_excluded_data_points(rules, file_path):
                     f"De combinatie sluit nooit rijen uit."
                 )
                 sys.exit(1)
+
+
+def _validate_model_config(cfg, file_path):
+    model_config = cfg.get("model_config", {})
+
+    ts_model = model_config.get("cumulative_timeseries")
+    if ts_model is not None and ts_model not in _VALID_TIMESERIES_MODELS:
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'model_config.cumulative_timeseries' is '{ts_model}'. "
+            f"Geldige opties: {sorted(_VALID_TIMESERIES_MODELS)}."
+        )
+        sys.exit(1)
+
+    reg_model = model_config.get("cumulative_regressor")
+    if reg_model is not None and reg_model not in _VALID_REGRESSOR_MODELS:
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'model_config.cumulative_regressor' is '{reg_model}'. "
+            f"Geldige opties: {sorted(_VALID_REGRESSOR_MODELS)}."
+        )
+        sys.exit(1)

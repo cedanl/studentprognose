@@ -23,7 +23,9 @@
             "Studie gestaakt": 0,
             "Aanmelding vervolgen": 0
         },
-        "min_training_year": 2016
+        "min_training_year": 2016,
+        "cumulative_timeseries": "sarima",
+        "cumulative_regressor": "xgboost"
     },
     "numerus_fixus": {},
     "excluded_data_points": [],

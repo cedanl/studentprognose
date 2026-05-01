@@ -93,6 +93,7 @@ studentprognose --help
 | Commando | Beschrijving |
 |----------|-------------|
 | `init` | Maak een nieuwe projectmap aan met configuratie en mappenstructuur |
+| `benchmark` | Vergelijk alternatieve ML-modellen voor het cumulatieve spoor (zie [Benchmarks](methodologie/benchmarks.md)) |
 
 ### Vlaggen
 

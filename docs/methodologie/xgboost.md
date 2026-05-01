@@ -64,6 +64,19 @@ Na het trainen van elk XGBoost-model wordt de **feature importance** geëxtrahee
 
 De gegroepeerde importances worden getoond in het interactieve dashboard (zie [Output begrijpen](../output-begrijpen.md#interactief-dashboard)).
 
+## Alternatieve regressiemodellen (cumulatief spoor)
+
+Naast XGBoost zijn twee alternatieve regressiemodellen beschikbaar, configureerbaar via `model_config.cumulative_regressor` in `configuration.json`:
+
+| Model | Config-waarde | Beschrijving |
+|-------|---------------|-------------|
+| **Ridge Regression** | `ridge` | L2-geregulariseerde lineaire regressie. Stabiel bij weinig trainingsdata en bij multicollineariteit (de weekkolommen zijn onderling sterk gecorreleerd). Interpreteerbare coëfficiënten. |
+| **Random Forest** | `random_forest` | Ensemble van beslisbomen. Robuust bij kleine datasets, ingebouwde feature importance, minder gevoelig voor outliers dan gradient boosting. |
+
+Alle regressors delen dezelfde preprocessing-pipeline (OneHotEncoding voor categorische features, passthrough voor numerieke features). Dit garandeert een eerlijke vergelijking.
+
+Gebruik `studentprognose benchmark -w <week>` om te vergelijken welk model het best presteert op jouw data.
+
 ## Implementatie
 
-Zie `src/studentprognose/models/xgboost_classifier.py`, `src/studentprognose/models/xgboost_regressor.py` en `src/studentprognose/models/importance.py`.
+Zie `src/studentprognose/models/xgboost_classifier.py`, `src/studentprognose/models/xgboost_regressor.py`, `src/studentprognose/models/regressors.py` en `src/studentprognose/models/importance.py`.
