@@ -111,6 +111,84 @@ studentprognose --help
 
 Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
 
+## Gebruik als Python-package
+
+Naast de CLI kun je `studentprognose` ook direct vanuit Python-scripts importeren. Dit is handig voor geautomatiseerde pipelines, notebooks, of cloudworkflows waarbij de data al in-memory beschikbaar is.
+
+### Beschikbare bouwstenen
+
+```python
+from studentprognose import (
+    load_configuration,            # laad configuration.json (of package defaults)
+    load_filtering,                # laad filtering JSON (of package defaults)
+    load_data,                     # laad data vanaf schijf als DataFrames
+    run_pipeline_cli,              # volledige CLI-pipeline (accepteert argv-lijst)
+    run_pipeline_from_dataframes,  # pipeline met DataFrames in-memory
+    PipelineConfig,                # configuratie-dataclass voor de pipeline
+    DataOption,                    # enum: INDIVIDUAL / CUMULATIVE / BOTH_DATASETS
+    StudentYearPrediction,         # enum: FIRST_YEARS / HIGHER_YEARS / VOLUME
+)
+```
+
+### Minimaal werkend voorbeeld (bestandsgebaseerd)
+
+```python
+from studentprognose import run_pipeline_cli
+
+# Zelfde als de CLI — start de volledige pipeline inclusief ETL
+run_pipeline_cli(["studentprognose", "-d", "c", "-y", "2025", "-w", "10"])
+
+# Of sla ETL over als de data al verwerkt is
+run_pipeline_cli(["studentprognose", "--noetl", "-d", "c", "-y", "2025", "-w", "10"])
+```
+
+### Cloud-gebruik (data al in-memory)
+
+Gebruik `run_pipeline_from_dataframes` als je de data al geladen hebt, bijvoorbeeld vanuit Azure Blob Storage of Amazon S3. De ETL-stap wordt volledig overgeslagen.
+
+```python
+import pandas as pd
+from studentprognose import run_pipeline_from_dataframes, DataOption
+
+# Laad data uit cloud-opslag (voorbeeld met Azure SDK)
+# from azure.storage.blob import BlobServiceClient
+# blob_data = blob_client.download_blob().readall()
+# df_cum = pd.read_csv(io.BytesIO(blob_data), sep=";", skiprows=[1])
+
+# Of lokaal voor testen
+df_cum = pd.read_csv("vooraanmeldingen_cumulatief.csv", sep=";", skiprows=[1])
+
+result = run_pipeline_from_dataframes(
+    year=2025,
+    week=10,
+    data_cumulative=df_cum,
+    dataset=DataOption.CUMULATIVE,
+    save_output=False,  # geen lokale uitvoerbestanden aanmaken
+)
+
+if result is not None:
+    print(result[["Croho groepeernaam", "Weighted_ensemble_prediction"]].head())
+```
+
+De functie accepteert ook een eigen configuratiedict, zodat je geen bestandssysteem nodig hebt:
+
+```python
+from studentprognose import run_pipeline_from_dataframes, DataOption
+from studentprognose.config import load_defaults
+
+# Begin met package-defaults en pas aan
+config = load_defaults()
+config["numerus_fixus"] = ["B Geneeskunde", "B Tandheelkunde"]
+
+result = run_pipeline_from_dataframes(
+    year=2025,
+    week=10,
+    data_cumulative=df_cum,
+    configuration=config,
+    dataset=DataOption.CUMULATIVE,
+)
+```
+
 ## Bekende valkuil: stille modus-downgrade
 
 !!! warning "Let op bij `-d b`"
