@@ -229,6 +229,8 @@ class CumulativeStrategy(PredictionStrategy):
 
         data_to_predict["SARIMA_individual"] = np.nan
         data_to_predict["Voorspelde vooraanmelders"] = np.nan
+        if skip_years > 0:
+            data_to_predict["Skip_prediction"] = np.nan
 
         data_to_predict = self.postprocessor.add_predicted_preregistrations(
             data_to_predict, [x[: self.pred_len] for x in self.predicted_data]
