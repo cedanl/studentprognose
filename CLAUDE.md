@@ -70,6 +70,30 @@ uv run mkdocs serve
 uv run mkdocs build
 ```
 
+## Teststrategie
+
+### Niveaus
+
+| Niveau | Bestand | Wat het bewaakt |
+|--------|---------|-----------------|
+| Unit | `tests/studentprognose/test_cli.py` | Argument-parsing, vlagcombinaties, exitcodes |
+| Unit | `tests/studentprognose/test_validation.py` | Validatielogica, `_handle_result` exitcodes |
+| Unit | `tests/studentprognose/test_strategies.py` | Strategie-contracten (preprocess return types) |
+| Integratie | `scripts/test_package.sh` | Volledige pipeline met demodata, exitcode 0 |
+
+CI draait alle unit tests + smoke test bij elke push en PR naar `main` (zie `.github/workflows/`).
+
+### Wanneer schrijf je een test?
+
+- **Nieuwe CLI-vlag** → voeg een `parse_args`-test toe in `test_cli.py` die de vlag en de default bewaakt.
+- **Nieuwe validatiecheck** → voeg een test toe in `test_validation.py`. Test minimaal: correcte bevinding bij slechte data, geen bevinding bij geldige data, en het juiste type (hard/soft/warning).
+- **Exitcode-gedrag** → gebruik altijd `pytest.raises(SystemExit) as exc` en assert `exc.value.code` expliciet — `pytest.raises(SystemExit)` zonder codeverificatie vangt ook `sys.exit(0)`.
+- **Nieuwe strategie of model** → voeg een contracttest toe die de return-types van `preprocess()` en `predict_nr_of_students()` bewaakt.
+
+### Wat de unit tests niet doen
+
+De unit tests draaien zonder echte inputdata en zonder de volledige pipeline. Correctheid van voorspellingen en end-to-end uitvoer wordt bewaakt door de smoke test (`scripts/test_package.sh`), niet door pytest.
+
 ## Documentatie-regel (verplicht bij elke PR)
 
 De documentatie in `docs/` is gericht op **analisten en onderzoekers**: niet alleen hoe de tool werkt, maar het **waarom** achter methodologische keuzes — aannames, beperkingen, en wanneer je output kritisch moet interpreteren.
