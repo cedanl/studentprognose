@@ -13,6 +13,111 @@ from studentprognose.models.sarima import predict_with_sarima_individual
 from studentprognose.data.preprocessing.excluded_data_points import apply_excluded_data_points
 
 
+def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]) -> pd.DataFrame:
+    """Preprocess individuele data voor benchmark of pipeline.
+
+    Standalone versie van IndividualStrategy.preprocess() zodat de
+    benchmark-runner deze kan aanroepen zonder een volledige strategy te instantiëren.
+    """
+    data = data.drop(labels=["Aantal studenten"], axis=1)
+
+    data = data[
+        ~(
+            (data["Croho groepeernaam"] == "B English Language and Culture")
+            & (data["Collegejaar"] == 2021)
+            & (data["Examentype"] != "Propedeuse Bachelor")
+        )
+    ]
+
+    grouped = data.groupby(["Collegejaar", "Sleutel"])
+    data["Sleutel_count"] = grouped["Sleutel"].transform("count")
+
+    def to_weeknummer(date):
+        try:
+            split_data = date.split("-")
+            year = int(split_data[2])
+            month = int(split_data[1])
+            day = int(split_data[0])
+            weeknummer = datetime.date(year, month, day).isocalendar()[1]
+            return weeknummer
+        except AttributeError:
+            return np.nan
+
+    data["Datum intrekking vooraanmelding"] = data["Datum intrekking vooraanmelding"].apply(
+        to_weeknummer
+    )
+    data["Weeknummer"] = data["Datum Verzoek Inschr"].apply(to_weeknummer)
+
+    def get_herkomst(nat, eer):
+        if nat == "Nederlandse":
+            return "NL"
+        elif nat != "Nederlandse" and eer == "J":
+            return "EER"
+        else:
+            return "Niet-EER"
+
+    data["Herkomst"] = data.apply(lambda x: get_herkomst(x["Nationaliteit"], x["EER"]), axis=1)
+
+    data = data[
+        data["Ingangsdatum"].str.contains("01-09-")
+        | data["Ingangsdatum"].str.contains("01-10-")
+    ]
+
+    data["is_numerus_fixus"] = (
+        data["Croho groepeernaam"].isin(numerus_fixus_list)
+    ).astype(int)
+
+    data["Examentype"] = data["Examentype"].replace("Propedeuse Bachelor", "Bachelor")
+
+    data = data[data["Inschrijfstatus"].notna()]
+    data = data[data["Examentype"].isin(["Bachelor", "Master", "Pre-master"])]
+
+    nationaliteit_counts = data["Nationaliteit"].value_counts()
+    values_to_change = nationaliteit_counts[nationaliteit_counts < 100].index
+    data["Nationaliteit"] = data["Nationaliteit"].replace(values_to_change, "Overig")
+
+    def get_new_column(row):
+        if (
+            row["Weeknummer"] == 17
+            and row["Croho groepeernaam"] not in numerus_fixus_list
+        ):
+            return True
+        else:
+            return False
+
+    data["Deadlineweek"] = data.apply(get_new_column, axis=1)
+
+    data = data.drop(["Sleutel"], axis=1)
+
+    for col in ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"]:
+        data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0).astype(int)
+
+    data.loc[
+        data["Examentype"] == "Pre-master",
+        ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"],
+    ] = [1, 0, 0]
+
+    data = data[
+        (data["Is eerstejaars croho opleiding"] == 1)
+        & (data["Is hogerejaars"] == 0)
+        & (data["BBC ontvangen"] == 0)
+    ]
+
+    data = data.drop(
+        [
+            "Eerstejaars croho jaar",
+            "Is eerstejaars croho opleiding",
+            "Ingangsdatum",
+            "BBC ontvangen",
+            "Croho",
+            "Is hogerejaars",
+        ],
+        axis=1,
+    )
+
+    return data
+
+
 class IndividualStrategy(PredictionStrategy):
     def __init__(self, data_individual, configuration,
                  data_latest, ensemble_weights, data_studentcount,
@@ -39,106 +144,10 @@ class IndividualStrategy(PredictionStrategy):
         self.data_individual = data
 
     def preprocess(self):
-        data = self.data_individual
-
-        data = data.drop(labels=["Aantal studenten"], axis=1)
-
-        data = data[
-            ~(
-                (data["Croho groepeernaam"] == "B English Language and Culture")
-                & (data["Collegejaar"] == 2021)
-                & (data["Examentype"] != "Propedeuse Bachelor")
-            )
-        ]
-
-        grouped = data.groupby(["Collegejaar", "Sleutel"])
-        data["Sleutel_count"] = grouped["Sleutel"].transform("count")
-
-        def to_weeknummer(date):
-            try:
-                split_data = date.split("-")
-                year = int(split_data[2])
-                month = int(split_data[1])
-                day = int(split_data[0])
-                weeknummer = datetime.date(year, month, day).isocalendar()[1]
-                return weeknummer
-            except AttributeError:
-                return np.nan
-
-        data["Datum intrekking vooraanmelding"] = data["Datum intrekking vooraanmelding"].apply(
-            to_weeknummer
-        )
-        data["Weeknummer"] = data["Datum Verzoek Inschr"].apply(to_weeknummer)
-
-        def get_herkomst(nat, eer):
-            if nat == "Nederlandse":
-                return "NL"
-            elif nat != "Nederlandse" and eer == "J":
-                return "EER"
-            else:
-                return "Niet-EER"
-
-        data["Herkomst"] = data.apply(lambda x: get_herkomst(x["Nationaliteit"], x["EER"]), axis=1)
-
-        data = data[
-            data["Ingangsdatum"].str.contains("01-09-")
-            | data["Ingangsdatum"].str.contains("01-10-")
-        ]
-
-        data["is_numerus_fixus"] = (
-            data["Croho groepeernaam"].isin(self.numerus_fixus_list)
-        ).astype(int)
-
-        data["Examentype"] = data["Examentype"].replace("Propedeuse Bachelor", "Bachelor")
-
-        data = data[data["Inschrijfstatus"].notna()]
-        data = data[data["Examentype"].isin(["Bachelor", "Master", "Pre-master"])]
-
-        nationaliteit_counts = data["Nationaliteit"].value_counts()
-        values_to_change = nationaliteit_counts[nationaliteit_counts < 100].index
-        data["Nationaliteit"] = data["Nationaliteit"].replace(values_to_change, "Overig")
-
-        def get_new_column(row):
-            if (
-                row["Weeknummer"] == 17
-                and row["Croho groepeernaam"] not in self.numerus_fixus_list
-            ):
-                return True
-            else:
-                return False
-
-        data["Deadlineweek"] = data.apply(get_new_column, axis=1)
-
-        data = data.drop(["Sleutel"], axis=1)
-
-        # Ensure numeric types for flag columns (raw data may contain strings like "Nee"/"Ja")
-        for col in ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"]:
-            data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0).astype(int)
-
-        data.loc[
-            data["Examentype"] == "Pre-master",
-            ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"],
-        ] = [1, 0, 0]
-
-        data = data[
-            (data["Is eerstejaars croho opleiding"] == 1)
-            & (data["Is hogerejaars"] == 0)
-            & (data["BBC ontvangen"] == 0)
-        ]
-
-        self.data_individual = data.drop(
-            [
-                "Eerstejaars croho jaar",
-                "Is eerstejaars croho opleiding",
-                "Ingangsdatum",
-                "BBC ontvangen",
-                "Croho",
-                "Is hogerejaars",
-            ],
-            axis=1,
+        self.data_individual = preprocess_individual_data(
+            self.data_individual, self.numerus_fixus_list
         )
         self.data_individual_backup = self.data_individual
-
         return None
 
     def predict_nr_of_students(self, predict_year, predict_week, skip_years=0):

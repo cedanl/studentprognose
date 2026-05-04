@@ -15,6 +15,7 @@ class PipelineConfig:
     configuration_path: str = "configuration/configuration.json"
     filtering_path: str = "configuration/filtering/base.json"
     student_year_prediction: StudentYearPrediction = StudentYearPrediction.FIRST_YEARS
+    dataset_specified: bool = False
     skip_years: int = 0
     ci_test_n: int | None = None
     noetl: bool = False
@@ -78,7 +79,7 @@ def parse_args(argv):
         nargs="?",
         choices=["init", "benchmark"],
         help="init       Maak een nieuwe projectmap aan met configuratie en mappenstructuur\n"
-             "benchmark  Vergelijk alternatieve modellen voor het cumulatieve spoor",
+             "benchmark  Vergelijk alternatieve modellen (-d c of -d i verplicht)",
     )
     parser.add_argument("-w", "-W", "-week", nargs="*", default=None, dest="weeks")
     parser.add_argument("-y", "-Y", "-year", nargs="*", default=None, dest="years")
@@ -143,6 +144,7 @@ def parse_args(argv):
     # Dataset
     if args.dataset is not None:
         cfg.data_option = DATASET_MAP[args.dataset]
+        cfg.dataset_specified = True
 
     # Student year prediction
     if args.studentyear is not None:

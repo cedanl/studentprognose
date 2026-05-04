@@ -6,6 +6,7 @@ _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype
 
 _VALID_TIMESERIES_MODELS = {"sarima", "ets", "theta", "auto_arima"}
 _VALID_REGRESSOR_MODELS = {"xgboost", "ridge", "random_forest"}
+_VALID_CLASSIFIER_MODELS = {"xgboost", "random_forest", "logistic_regression"}
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -127,5 +128,14 @@ def _validate_model_config(cfg, file_path):
             f"Configuratiefout in {file_path}: "
             f"'model_config.cumulative_regressor' is '{reg_model}'. "
             f"Geldige opties: {sorted(_VALID_REGRESSOR_MODELS)}."
+        )
+        sys.exit(1)
+
+    clf_model = model_config.get("individual_classifier")
+    if clf_model is not None and clf_model not in _VALID_CLASSIFIER_MODELS:
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'model_config.individual_classifier' is '{clf_model}'. "
+            f"Geldige opties: {sorted(_VALID_CLASSIFIER_MODELS)}."
         )
         sys.exit(1)

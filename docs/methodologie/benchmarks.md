@@ -4,11 +4,23 @@ Het benchmarkcommando vergelijkt alle beschikbare modellen op jouw eigen data, z
 
 ## Draaien
 
+De `-d` flag is verplicht bij benchmark: kies `-d c` (cumulatief) of `-d i` (individueel). `-d both` is niet toegestaan.
+
 ```bash
-studentprognose benchmark -w 12
+# Cumulatief spoor
+studentprognose benchmark -d c -w 12
+
+# Individueel spoor
+studentprognose benchmark -d i -w 12
 ```
 
-De benchmark evalueert alle combinaties van tijdreeksmodellen (SARIMA, ETS, Theta, AutoARIMA) en regressiemodellen (XGBoost, Ridge, Random Forest) via time-series cross-validatie.
+### Cumulatief spoor
+
+De cumulatieve benchmark evalueert alle combinaties van tijdreeksmodellen (SARIMA, ETS, Theta, AutoARIMA) en regressiemodellen (XGBoost, Ridge, Random Forest) via time-series cross-validatie.
+
+### Individueel spoor
+
+De individuele benchmark evalueert classificatiemodellen (XGBoost, Random Forest, Logistic Regression) die voorspellen of een aanmelder zich daadwerkelijk inschrijft.
 
 ## Methodologie
 
@@ -32,9 +44,13 @@ Dit bootst de productiescenario na: het model traint op historische data en voor
 
 | Metric | Omschrijving |
 |--------|-------------|
-| **MAPE** | Mean Absolute Percentage Error — relatieve fout, vergelijkbaar tussen opleidingen van verschillende grootte |
-| **MAE** | Mean Absolute Error — absolute fout in studentaantallen |
-| **RMSE** | Root Mean Squared Error — penaliseert grote fouten zwaarder |
+| **MAPE** | Mean Absolute Percentage Error — relatieve fout, vergelijkbaar tussen opleidingen van verschillende grootte (cumulatief) |
+| **MAE** | Mean Absolute Error — absolute fout in studentaantallen (cumulatief + individueel geaggregeerd) |
+| **RMSE** | Root Mean Squared Error — penaliseert grote fouten zwaarder (cumulatief) |
+| **Accuracy** | Fractie correct geclassificeerde aanmelders (individueel) |
+| **AUC-ROC** | Area Under the ROC Curve — hoe goed scheidt het model inschrijvers van niet-inschrijvers (individueel) |
+| **F1** | Harmonisch gemiddelde van precision en recall (individueel) |
+| **Aggregate MAE** | MAE op geaggregeerd niveau per opleiding/herkomst/examentype — de uiteindelijke business-metric (individueel) |
 | **Trainingstijd** | Gemiddelde fittijd per model in seconden |
 
 ### Twee stappen apart gemeten
@@ -50,10 +66,16 @@ Door apart te meten kun je zien waar de fout zit: in de extrapolatie of in de ve
 
 De benchmark slaat resultaten op in:
 
+**Cumulatief spoor (`-d c`):**
+
 - `data/output/benchmark_timeseries.csv` — resultaten per tijdreeksmodel
 - `data/output/benchmark_regressor.csv` — resultaten per regressiemodel
 
-Kolommen bevatten model, programme, herkomst, examentype, testjaar, metrics, trainingssetgrootte en convergentie-informatie.
+**Individueel spoor (`-d i`):**
+
+- `data/output/benchmark_classifier.csv` — resultaten per classificatiemodel
+
+Kolommen bevatten model, testjaar, metrics, trainingssetgrootte en (bij cumulatief) convergentie-informatie.
 
 ## Interpretatie
 

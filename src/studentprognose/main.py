@@ -31,8 +31,15 @@ def main(argv):
     if cfg.command == "benchmark":
         from studentprognose.benchmark.runner import main as run_benchmark
 
+        if not cfg.dataset_specified:
+            print("Geef -d c (cumulatief) of -d i (individueel) mee bij benchmark.")
+            sys.exit(1)
+        if cfg.data_option == DataOption.BOTH_DATASETS:
+            print("Benchmark ondersteunt geen -d both. Kies -d c (cumulatief) of -d i (individueel).")
+            sys.exit(1)
+
         predict_week = cfg.weeks[0] if cfg.weeks else 12
-        run_benchmark(cfg.configuration_path, predict_week)
+        run_benchmark(cfg.configuration_path, predict_week, cfg.data_option)
         return
 
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)

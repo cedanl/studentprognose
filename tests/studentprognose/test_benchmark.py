@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from studentprognose.benchmark.metrics import mape, mae, rmse
+from studentprognose.benchmark.metrics import mape, mae, rmse, accuracy, auc_roc, f1
 from studentprognose.benchmark.splitter import time_series_split
 
 
@@ -133,3 +133,97 @@ class TestModelConfig:
 
         with pytest.raises(ValueError, match="Onbekend regressiemodel"):
             create_regressor({"model_config": {"cumulative_regressor": "nonexistent"}})
+
+
+class TestClassificationMetrics:
+    def test_accuracy_known_values(self):
+        y_true = np.array([1, 0, 1, 1, 0])
+        y_pred = np.array([1, 0, 0, 1, 0])
+        assert accuracy(y_true, y_pred) == pytest.approx(0.8)
+
+    def test_accuracy_empty_returns_nan(self):
+        assert np.isnan(accuracy(np.array([]), np.array([])))
+
+    def test_auc_roc_known_values(self):
+        y_true = np.array([0, 0, 1, 1])
+        y_proba = np.array([0.1, 0.4, 0.6, 0.9])
+        assert auc_roc(y_true, y_proba) == pytest.approx(1.0)
+
+    def test_auc_roc_single_class_returns_nan(self):
+        y_true = np.array([1, 1, 1])
+        y_proba = np.array([0.5, 0.6, 0.7])
+        assert np.isnan(auc_roc(y_true, y_proba))
+
+    def test_f1_known_values(self):
+        y_true = np.array([1, 0, 1, 1, 0])
+        y_pred = np.array([1, 0, 0, 1, 0])
+        result = f1(y_true, y_pred)
+        assert 0.0 < result < 1.0
+
+    def test_f1_empty_returns_nan(self):
+        assert np.isnan(f1(np.array([]), np.array([])))
+
+
+class TestClassifierModelConfig:
+    def test_create_classifier_default(self):
+        from studentprognose.models import create_classifier
+        from studentprognose.models.classifiers import XGBoostClassifier
+
+        c = create_classifier({})
+        assert isinstance(c, XGBoostClassifier)
+
+    def test_create_classifier_random_forest(self):
+        from studentprognose.models import create_classifier
+        from studentprognose.models.classifiers import RandomForestClassifier
+
+        c = create_classifier({"model_config": {"individual_classifier": "random_forest"}})
+        assert isinstance(c, RandomForestClassifier)
+
+    def test_create_classifier_logistic_regression(self):
+        from studentprognose.models import create_classifier
+        from studentprognose.models.classifiers import LogisticRegressionClassifier
+
+        c = create_classifier({"model_config": {"individual_classifier": "logistic_regression"}})
+        assert isinstance(c, LogisticRegressionClassifier)
+
+    def test_create_classifier_invalid_raises(self):
+        from studentprognose.models import create_classifier
+
+        with pytest.raises(ValueError, match="Onbekend classificatiemodel"):
+            create_classifier({"model_config": {"individual_classifier": "nonexistent"}})
+
+
+class TestBenchmarkValidation:
+    def test_benchmark_without_d_flag_exits(self):
+        from studentprognose.cli import parse_args
+
+        cfg = parse_args(["prog", "benchmark"])
+        assert cfg.command == "benchmark"
+        assert cfg.dataset_specified is False
+
+    def test_benchmark_with_d_both_exits(self):
+        from studentprognose.cli import parse_args
+        from studentprognose.utils.weeks import DataOption
+
+        cfg = parse_args(["prog", "benchmark", "-d", "b"])
+        assert cfg.command == "benchmark"
+        assert cfg.data_option == DataOption.BOTH_DATASETS
+        assert cfg.dataset_specified is True
+
+    def test_benchmark_with_d_cumulative(self):
+        from studentprognose.cli import parse_args
+        from studentprognose.utils.weeks import DataOption
+
+        cfg = parse_args(["prog", "benchmark", "-d", "c"])
+        assert cfg.command == "benchmark"
+        assert cfg.data_option == DataOption.CUMULATIVE
+        assert cfg.dataset_specified is True
+
+    def test_benchmark_with_d_individual(self):
+        from studentprognose.cli import parse_args
+        from studentprognose.utils.weeks import DataOption
+
+        cfg = parse_args(["prog", "benchmark", "-d", "i"])
+        assert cfg.command == "benchmark"
+        assert cfg.data_option == DataOption.INDIVIDUAL
+        assert cfg.dataset_specified is True

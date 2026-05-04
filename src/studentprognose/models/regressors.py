@@ -80,6 +80,44 @@ class RandomForestRegressor(BaseRegressor):
         return self._model.feature_importances_
 
 
+class GradientBoostingRegressor(BaseRegressor):
+    """Sklearn Gradient Boosting — geen extra dependency nodig."""
+
+    def __init__(self, n_estimators: int = 100, random_state: int = 42):
+        from sklearn.ensemble import GradientBoostingRegressor as GBR
+        self._model = GBR(n_estimators=n_estimators, random_state=random_state)
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "GradientBoostingRegressor":
+        self._model.fit(X, y)
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self._model.predict(X)
+
+    @property
+    def feature_importances_(self) -> np.ndarray | None:
+        return self._model.feature_importances_
+
+
+class ExtraTreesRegressor(BaseRegressor):
+    """Extra Trees — variant op Random Forest met random splits, sneller."""
+
+    def __init__(self, n_estimators: int = 100, random_state: int = 42):
+        from sklearn.ensemble import ExtraTreesRegressor as ETR
+        self._model = ETR(n_estimators=n_estimators, random_state=random_state)
+
+    def fit(self, X: np.ndarray, y: np.ndarray) -> "ExtraTreesRegressor":
+        self._model.fit(X, y)
+        return self
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        return self._model.predict(X)
+
+    @property
+    def feature_importances_(self) -> np.ndarray | None:
+        return self._model.feature_importances_
+
+
 def build_preprocessor(
     extra_numeric_cols: list[str] | None = None,
 ) -> tuple[ColumnTransformer, list[str], list[str]]:

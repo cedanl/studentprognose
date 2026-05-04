@@ -4,37 +4,78 @@ import pandas as pd
 
 from studentprognose.benchmark.evaluate_ts import evaluate_timeseries_model
 from studentprognose.benchmark.evaluate_regressor import evaluate_regressor_model
+from studentprognose.benchmark.evaluate_classifier import evaluate_classifier_model
+from studentprognose.benchmark.report import generate_cumulative_report, generate_individual_report
 from studentprognose.config import load_configuration
 from studentprognose.data.loader import load_data
 from studentprognose.models.sarima import SARIMAForecaster, _get_transformed_data
-from studentprognose.models.forecasters import ETSForecaster, ThetaForecaster, AutoARIMAForecaster
-from studentprognose.models.regressors import XGBoostRegressor, RidgeRegressor, RandomForestRegressor
+from studentprognose.models.forecasters import ETSForecaster, ThetaForecaster
+from studentprognose.models.regressors import (
+    XGBoostRegressor,
+    RidgeRegressor,
+    RandomForestRegressor,
+    GradientBoostingRegressor,
+    ExtraTreesRegressor,
+)
+from studentprognose.models.classifiers import (
+    XGBoostClassifier,
+    RandomForestClassifier,
+    LogisticRegressionClassifier,
+    GradientBoostingClassifier,
+    ExtraTreesClassifier,
+)
 from studentprognose.strategies.cumulative import _add_engineered_features
+from studentprognose.strategies.individual import preprocess_individual_data
+from studentprognose.utils.weeks import DataOption
 
 
 _FORECASTER_FACTORIES = {
     "sarima": lambda: SARIMAForecaster(),
     "ets": lambda: ETSForecaster(),
     "theta": lambda: ThetaForecaster(),
-    "auto_arima": lambda: AutoARIMAForecaster(),
 }
 
 _REGRESSOR_FACTORIES = {
     "xgboost": lambda: XGBoostRegressor(),
     "ridge": lambda: RidgeRegressor(),
     "random_forest": lambda: RandomForestRegressor(),
+    "gradient_boosting": lambda: GradientBoostingRegressor(),
+    "extra_trees": lambda: ExtraTreesRegressor(),
+}
+
+_CLASSIFIER_FACTORIES = {
+    "xgboost": lambda: XGBoostClassifier(),
+    "random_forest": lambda: RandomForestClassifier(),
+    "logistic_regression": lambda: LogisticRegressionClassifier(),
+    "gradient_boosting": lambda: GradientBoostingClassifier(),
+    "extra_trees": lambda: ExtraTreesClassifier(),
 }
 
 
-def main(configuration_path: str = "configuration/configuration.json", predict_week: int = 12):
+def main(
+    configuration_path: str = "configuration/configuration.json",
+    predict_week: int = 12,
+    data_option: DataOption = DataOption.CUMULATIVE,
+):
     """Draai benchmarks voor alle model-combinaties."""
     config = load_configuration(configuration_path)
     min_year = config.get("model_config", {}).get("min_training_year", 2016)
     nf_list = list(config.get("numerus_fixus", {}).keys())
 
+    output_dir = os.path.join(os.getcwd(), "data", "output")
+    os.makedirs(output_dir, exist_ok=True)
+
+    if data_option == DataOption.CUMULATIVE:
+        _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_dir)
+    elif data_option == DataOption.INDIVIDUAL:
+        _run_individual_benchmark(config, predict_week, min_year, output_dir)
+
+
+def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_dir):
+    """Draai benchmark voor het cumulatieve spoor (tijdreeks + regressie)."""
     print("Benchmark: alternatieve modellen cumulatief spoor\n")
 
-    data_cumulative, data_studentcount = _load_benchmark_data(config)
+    data_cumulative, data_studentcount = _load_cumulative_benchmark_data(config)
     if data_cumulative is None:
         print("Geen cumulatieve data gevonden. Benchmark afgebroken.")
         return
@@ -82,9 +123,6 @@ def main(configuration_path: str = "configuration/configuration.json", predict_w
         _print_reg_summary(reg_df)
 
     # --- Opslaan ---
-    output_dir = os.path.join(os.getcwd(), "data", "output")
-    os.makedirs(output_dir, exist_ok=True)
-
     if not ts_df.empty:
         ts_path = os.path.join(output_dir, "benchmark_timeseries.csv")
         ts_df.to_csv(ts_path, index=False)
@@ -95,32 +133,84 @@ def main(configuration_path: str = "configuration/configuration.json", predict_w
         reg_df.to_csv(reg_path, index=False)
         print(f"Regressieresultaten: {reg_path}")
 
+    if not ts_df.empty and not reg_df.empty:
+        generate_cumulative_report(ts_df, reg_df, output_dir)
+
     print("\nBenchmark voltooid.")
 
 
-def _load_benchmark_data(config):
+def _run_individual_benchmark(config, predict_week, min_year, output_dir):
+    """Draai benchmark voor het individuele spoor (classificatie)."""
+    print("Benchmark: alternatieve modellen individueel spoor\n")
+
+    data_individual = _load_individual_benchmark_data(config)
+    if data_individual is None:
+        print("Geen individuele data gevonden. Benchmark afgebroken.")
+        return
+
+    print(f"Predict week: {predict_week}, min trainingsjaar: {min_year}\n")
+
+    print("Stap 1: Classificatiemodellen evalueren")
+    clf_results = []
+    all_roc_curves = {}
+    for name, factory in _CLASSIFIER_FACTORIES.items():
+        print(f"  Evalueren: {name}...")
+        result, roc_curves = evaluate_classifier_model(
+            data_individual, factory, predict_week,
+            config=config,
+            min_training_year=min_year,
+        )
+        result["model"] = name
+        clf_results.append(result)
+        all_roc_curves[name] = roc_curves
+
+    clf_df = pd.concat(clf_results, ignore_index=True) if clf_results else pd.DataFrame()
+
+    if not clf_df.empty:
+        _print_clf_summary(clf_df)
+
+    # --- Opslaan ---
+    if not clf_df.empty:
+        clf_path = os.path.join(output_dir, "benchmark_classifier.csv")
+        clf_df.to_csv(clf_path, index=False)
+        print(f"\nClassificatieresultaten: {clf_path}")
+
+        generate_individual_report(clf_df, output_dir, all_roc_curves)
+
+    print("\nBenchmark voltooid.")
+
+
+def _load_cumulative_benchmark_data(config):
     """Laad en preprocess cumulatieve data voor benchmark."""
-    paths = config.get("paths", {})
-    cumulative_path = paths.get("path_cumulative", "")
-    studentcount_path = paths.get("path_student_count_first-years", "")
-
-    data_cumulative = None
-    data_studentcount = None
-
     try:
-        data_cumulative = load_data(cumulative_path)
+        _, data_cumulative, data_studentcount, _, _ = load_data(
+            config, DataOption.CUMULATIVE
+        )
     except Exception:
         return None, None
 
-    try:
-        data_studentcount = load_data(studentcount_path)
-    except Exception:
-        pass
+    if data_cumulative is None:
+        return None, None
 
-    if data_cumulative is not None:
-        data_cumulative = _preprocess_cumulative(data_cumulative)
+    data_cumulative = _preprocess_cumulative(data_cumulative)
 
     return data_cumulative, data_studentcount
+
+
+def _load_individual_benchmark_data(config):
+    """Laad en preprocess individuele data voor benchmark."""
+    try:
+        data_individual, _, _, _, _ = load_data(
+            config, DataOption.INDIVIDUAL
+        )
+    except Exception:
+        return None
+
+    if data_individual is None:
+        return None
+
+    nf_list = list(config.get("numerus_fixus", {}).keys())
+    return preprocess_individual_data(data_individual, nf_list)
 
 
 def _preprocess_cumulative(data):
@@ -210,5 +300,36 @@ def _print_reg_summary(df):
         rmse_s = f"{row['mean_rmse']:.1f}" if pd.notna(row["mean_rmse"]) else "—"
         print(
             f"  {str(model):<15} {mape_s:>10} {mae_s:>10} {rmse_s:>10} "
+            f"{row['mean_time']:>10.3f} {row['mean_train_size']:>10.0f} {int(row['n_evals']):>5}"
+        )
+
+
+def _print_clf_summary(df):
+    """Print samenvattingstabel voor classificatiemodellen."""
+    summary = (
+        df.groupby("model")
+        .agg(
+            mean_accuracy=("accuracy", "mean"),
+            mean_auc_roc=("auc_roc", "mean"),
+            mean_f1=("f1", "mean"),
+            mean_agg_mae=("aggregate_mae", "mean"),
+            mean_time=("train_time_s", "mean"),
+            mean_train_size=("n_train", "mean"),
+            n_evals=("n_train", "count"),
+        )
+        .sort_values("mean_auc_roc", ascending=False)
+    )
+
+    header = f"{'Model':<20} {'Accuracy':>10} {'AUC-ROC':>10} {'F1':>10} {'Agg MAE':>10} {'Tijd (s)':>10} {'Train N':>10} {'N':>5}"
+    print(f"\n  Classificatiemodellen — Samenvatting\n  {header}")
+    print(f"  {'─' * len(header)}")
+
+    for model, row in summary.iterrows():
+        acc_s = f"{row['mean_accuracy']:.4f}" if pd.notna(row["mean_accuracy"]) else "—"
+        auc_s = f"{row['mean_auc_roc']:.4f}" if pd.notna(row["mean_auc_roc"]) else "—"
+        f1_s = f"{row['mean_f1']:.4f}" if pd.notna(row["mean_f1"]) else "—"
+        mae_s = f"{row['mean_agg_mae']:.1f}" if pd.notna(row["mean_agg_mae"]) else "—"
+        print(
+            f"  {str(model):<20} {acc_s:>10} {auc_s:>10} {f1_s:>10} {mae_s:>10} "
             f"{row['mean_time']:>10.3f} {row['mean_train_size']:>10.0f} {int(row['n_evals']):>5}"
         )
