@@ -31,6 +31,10 @@ In de output staan zowel de individuele modelvoorspellingen (`SARIMA_individual`
 
 Zie [Output begrijpen](../output-begrijpen.md) voor uitleg over de outputkolommen.
 
+<iframe src="../../assets/plots/ensemble_comparison.html" width="100%" height="500" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Vergelijking individuele modellen vs ensemble voor drie voorbeeldopleidingen (demodata)*
+
 ## Configureerbare ensemble-gewichten
 
 De gewichten die bepalen hoe zwaar SARIMA-individueel en SARIMA-cumulatief meewegen zijn instelbaar via `configuration.json`:

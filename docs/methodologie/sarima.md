@@ -6,6 +6,10 @@ SARIMA staat voor **Seasonal AutoRegressive Integrated Moving Average**. Het is 
 
 SARIMA extrapoleert het wekelijkse aanmeldpatroon van een opleiding naar het verwachte eindaantal inschrijvingen op week 38. Het model leert van historische seizoenspatronen: in welke weken stromen de meeste aanmeldingen binnen, hoe ziet de curve eruit vlak voor de inschrijfdeadline?
 
+<iframe src="../../assets/plots/sarima_extrapolation.html" width="100%" height="500" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Cumulatieve aanmeldcurve met SARIMA-extrapolatie (demodata)*
+
 ## Waarom SARIMA?
 
 Aanmelddata heeft een sterk seizoenspatroon (jaarlijkse cyclus, wekelijkse granulariteit). SARIMA is specifiek ontworpen voor tijdreeksen met zulke structuur. Alternatieven zoals lineaire regressie op weeknummer negeren autokorrelatie in de data; neurale netwerken vereisen veel meer historische data dan de meeste instellingen beschikbaar hebben.
