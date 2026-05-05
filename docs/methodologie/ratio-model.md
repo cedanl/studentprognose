@@ -18,6 +18,10 @@ $$\bar{R}_{t} = \frac{1}{3} \sum_{j=1}^{3} \frac{\text{Aanmelding}_{jaar-j,\, we
 
 $$\hat{y} = \frac{\text{Aanmelding}_{huidig,\, week=t}}{\bar{R}_{t}}$$
 
+<iframe src="../../assets/plots/ratio_historical.html" width="100%" height="480" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Ratio vooraanmelders / inschrijvingen per week voor een voorbeeldopleiding (demodata)*
+
 Het venster van 3 jaar is vastgelegd in de constante `LOOKBACK_YEARS` (`src/studentprognose/utils/constants.py`) en geldt voor alle modellen die een historisch gemiddelde berekenen.
 
 ## Numerus fixus-correctie
