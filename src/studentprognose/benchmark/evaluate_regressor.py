@@ -5,6 +5,7 @@ import pandas as pd
 
 from studentprognose.benchmark.metrics import mape, mae, rmse
 from studentprognose.benchmark.splitter import time_series_split
+from studentprognose.config import get_columns, get_model_features
 from studentprognose.models.regressors import build_preprocessor
 from studentprognose.strategies.cumulative import ENGINEERED_FEATURE_COLS
 
@@ -13,6 +14,7 @@ def evaluate_regressor_model(
     full_data: pd.DataFrame,
     data_studentcount: pd.DataFrame,
     regressor_factory: callable,
+    config: dict,
     min_training_year: int = 2016,
     min_train_years: int = 3,
     numerus_fixus_list: list[str] | None = None,
@@ -21,8 +23,9 @@ def evaluate_regressor_model(
 
     Args:
         full_data: Wide-format data met SARIMA-voorspellingen en engineered features.
-        data_studentcount: DataFrame met Aantal_studenten per (programme, jaar, herkomst, examentype).
+        data_studentcount: DataFrame met studentaantallen per (programme, jaar, herkomst, examentype).
         regressor_factory: Callable die een vers BaseRegressor-object retourneert.
+        config: Configuratie-dict met column_roles en model_features.
         min_training_year: Vroegste trainingsjaar.
         min_train_years: Minimaal aantal trainingsjaren.
         numerus_fixus_list: Lijst van NF-programma's (voor aparte rapportage).
@@ -30,36 +33,40 @@ def evaluate_regressor_model(
     Returns:
         DataFrame met per (examentype, test_year) de metrics en trainingsset-grootte.
     """
+    c = get_columns(config)
+    mf = get_model_features(config)
+    reg_categorical = mf.get("regressor", {}).get("categorical")
+
     if numerus_fixus_list is None:
         numerus_fixus_list = []
 
+    merge_cols = [c.programme, c.academic_year, c.origin, c.exam_type]
+
     merged = full_data.merge(
-        data_studentcount[
-            ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype", "Aantal_studenten"]
-        ],
-        on=["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"],
+        data_studentcount[merge_cols + [c.student_count]],
+        on=merge_cols,
         how="inner",
     ).drop_duplicates(ignore_index=True)
 
     if merged.empty:
         return pd.DataFrame()
 
-    splits = time_series_split(merged, min_training_year, min_train_years)
+    splits = time_series_split(merged, min_training_year, min_train_years, year_col=c.academic_year)
     results = []
 
     for train_df, test_df in splits:
-        test_year = int(test_df["Collegejaar"].iloc[0])
+        test_year = int(test_df[c.academic_year].iloc[0])
 
-        assert train_df["Collegejaar"].max() < test_year, "Leakage: train bevat testjaar"
+        assert train_df[c.academic_year].max() < test_year, "Leakage: train bevat testjaar"
 
-        for examentype in test_df["Examentype"].unique():
+        for examentype in test_df[c.exam_type].unique():
             train_et = train_df[
-                (train_df["Examentype"] == examentype)
-                & (~train_df["Croho groepeernaam"].isin(numerus_fixus_list))
+                (train_df[c.exam_type] == examentype)
+                & (~train_df[c.programme].isin(numerus_fixus_list))
             ]
             test_et = test_df[
-                (test_df["Examentype"] == examentype)
-                & (~test_df["Croho groepeernaam"].isin(numerus_fixus_list))
+                (test_df[c.exam_type] == examentype)
+                & (~test_df[c.programme].isin(numerus_fixus_list))
             ]
 
             if train_et.empty or test_et.empty:
@@ -68,22 +75,28 @@ def evaluate_regressor_model(
             result = _evaluate_single(
                 train_et, test_et, regressor_factory,
                 examentype, test_year, is_numerus_fixus=False,
+                target_col=c.student_count,
+                year_col=c.academic_year,
+                reg_categorical=reg_categorical,
             )
             if result:
                 results.append(result)
 
         for nf_prog in numerus_fixus_list:
-            train_nf = train_df[train_df["Croho groepeernaam"] == nf_prog]
-            test_nf = test_df[test_df["Croho groepeernaam"] == nf_prog]
+            train_nf = train_df[train_df[c.programme] == nf_prog]
+            test_nf = test_df[test_df[c.programme] == nf_prog]
 
             if train_nf.empty or test_nf.empty:
                 continue
 
-            examentype = test_nf["Examentype"].iloc[0]
+            examentype = test_nf[c.exam_type].iloc[0]
             result = _evaluate_single(
                 train_nf, test_nf, regressor_factory,
                 examentype, test_year, is_numerus_fixus=True,
                 programme=nf_prog,
+                target_col=c.student_count,
+                year_col=c.academic_year,
+                reg_categorical=reg_categorical,
             )
             if result:
                 results.append(result)
@@ -94,14 +107,20 @@ def evaluate_regressor_model(
 def _evaluate_single(
     train_df, test_df, regressor_factory,
     examentype, test_year, is_numerus_fixus, programme=None,
+    target_col="Aantal_studenten", year_col="Collegejaar",
+    reg_categorical=None,
 ):
     """Evalueer een regressor op een enkele train/test split."""
-    y_train = train_df["Aantal_studenten"].values
-    y_test = test_df["Aantal_studenten"].values
-    X_train = train_df.drop(columns=["Aantal_studenten"])
-    X_test = test_df.drop(columns=["Aantal_studenten"])
+    y_train = train_df[target_col].values
+    y_test = test_df[target_col].values
+    X_train = train_df.drop(columns=[target_col])
+    X_test = test_df.drop(columns=[target_col])
 
-    preprocessor, numeric_cols, categorical_cols = build_preprocessor(ENGINEERED_FEATURE_COLS)
+    preprocessor, numeric_cols, categorical_cols = build_preprocessor(
+        ENGINEERED_FEATURE_COLS,
+        categorical_cols=reg_categorical,
+        year_col=year_col,
+    )
 
     try:
         X_train_t = preprocessor.fit_transform(X_train)

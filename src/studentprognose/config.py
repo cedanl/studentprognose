@@ -1,6 +1,7 @@
 import json
 import sys
 from importlib.resources import files
+from types import SimpleNamespace
 
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
@@ -56,6 +57,21 @@ def load_configuration(file_path: str) -> dict:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     _validate_model_config(cfg, file_path)
     return cfg
+
+
+def get_columns(config: dict) -> SimpleNamespace:
+    """Get column names as a namespace from configuration.
+
+    Each attribute maps a semantic role to the actual column name used by
+    this institution.  Example: ``cols.programme`` resolves to
+    ``"Croho groepeernaam"`` with the default configuration.
+    """
+    return SimpleNamespace(**config.get("column_roles", {}))
+
+
+def get_model_features(config: dict) -> dict:
+    """Get model feature lists (numeric / categorical) from configuration."""
+    return config.get("model_features", {})
 
 
 def _validate_excluded_data_points(rules, file_path):

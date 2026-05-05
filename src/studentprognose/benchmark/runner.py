@@ -6,7 +6,7 @@ from studentprognose.benchmark.evaluate_ts import evaluate_timeseries_model
 from studentprognose.benchmark.evaluate_regressor import evaluate_regressor_model
 from studentprognose.benchmark.evaluate_classifier import evaluate_classifier_model
 from studentprognose.benchmark.report import generate_cumulative_report, generate_individual_report
-from studentprognose.config import load_configuration
+from studentprognose.config import load_configuration, get_columns
 from studentprognose.data.loader import load_data
 from studentprognose.models.sarima import SARIMAForecaster, _get_transformed_data
 from studentprognose.models.forecasters import ETSForecaster, ThetaForecaster
@@ -89,6 +89,7 @@ def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_di
         print(f"  Evalueren: {name}...")
         result = evaluate_timeseries_model(
             data_cumulative, factory, predict_week,
+            config=config,
             min_training_year=min_year,
         )
         result["model"] = name
@@ -111,6 +112,7 @@ def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_di
         print(f"  Evalueren: {name}...")
         result = evaluate_regressor_model(
             full_data, data_studentcount, factory,
+            config=config,
             min_training_year=min_year,
             numerus_fixus_list=nf_list,
         )
@@ -192,7 +194,7 @@ def _load_cumulative_benchmark_data(config):
     if data_cumulative is None:
         return None, None
 
-    data_cumulative = _preprocess_cumulative(data_cumulative)
+    data_cumulative = _preprocess_cumulative(data_cumulative, config)
 
     return data_cumulative, data_studentcount
 
@@ -213,10 +215,13 @@ def _load_individual_benchmark_data(config):
     return preprocess_individual_data(data_individual, nf_list)
 
 
-def _preprocess_cumulative(data):
+def _preprocess_cumulative(data, config):
     """Minimale preprocessing voor benchmark (zelfde als CumulativeStrategy.preprocess)."""
-    for col in ["Ongewogen vooraanmelders", "Gewogen vooraanmelders",
-                "Aantal aanmelders met 1 aanmelding", "Inschrijvingen"]:
+    c = get_columns(config)
+
+    float_cols = [c.unweighted_applicants, c.weighted_applicants,
+                  c.single_applicants, c.enrollments]
+    for col in float_cols:
         if col not in data.columns:
             continue
         if pd.api.types.is_string_dtype(data[col].dtype):
@@ -224,24 +229,24 @@ def _preprocess_cumulative(data):
         data[col] = pd.to_numeric(data[col], errors="coerce").astype("float64")
 
     data = data.rename(columns={
-        "Type hoger onderwijs": "Examentype",
-        "Groepeernaam Croho": "Croho groepeernaam",
+        c.higher_education_type: c.exam_type,
+        c.croho_source: c.programme,
     })
 
-    if "Hogerejaars" in data.columns:
-        data.loc[data["Examentype"] == "Pre-master", "Hogerejaars"] = "Nee"
-        data = data[data["Hogerejaars"] == "Nee"]
+    if c.higher_years in data.columns:
+        data.loc[data[c.exam_type] == "Pre-master", c.higher_years] = "Nee"
+        data = data[data[c.higher_years] == "Nee"]
 
     data = (
         data.groupby([
-            "Collegejaar", "Croho groepeernaam", "Faculteit",
-            "Examentype", "Herkomst", "Weeknummer",
+            c.academic_year, c.programme, c.faculty,
+            c.exam_type, c.origin, c.week,
         ])
         .sum(numeric_only=False)
         .reset_index()
     )
 
-    data["ts"] = data["Gewogen vooraanmelders"] + data["Inschrijvingen"]
+    data["ts"] = data[c.weighted_applicants] + data[c.enrollments]
 
     return data
 

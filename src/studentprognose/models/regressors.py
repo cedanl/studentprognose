@@ -7,7 +7,7 @@ from sklearn.preprocessing import OneHotEncoder
 from studentprognose.utils.weeks import get_weeks_list
 
 
-CATEGORICAL_COLS = ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
+_DEFAULT_CATEGORICAL_COLS = ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
 
 
 class BaseRegressor(ABC):
@@ -120,14 +120,26 @@ class ExtraTreesRegressor(BaseRegressor):
 
 def build_preprocessor(
     extra_numeric_cols: list[str] | None = None,
+    categorical_cols: list[str] | None = None,
+    year_col: str = "Collegejaar",
 ) -> tuple[ColumnTransformer, list[str], list[str]]:
     """Bouw de gedeelde preprocessing pipeline voor alle regressors.
+
+    Args:
+        extra_numeric_cols: Extra numerieke kolommen (bijv. engineered features).
+        categorical_cols: Categorische kolommen voor one-hot encoding.
+            Standaard uit ``_DEFAULT_CATEGORICAL_COLS``; configureerbaar via
+            ``config["model_features"]["regressor"]["categorical"]``.
+        year_col: Naam van de jaar-kolom (standaard ``"Collegejaar"``).
 
     Returns:
         (preprocessor, numeric_cols, categorical_cols)
     """
+    if categorical_cols is None:
+        categorical_cols = list(_DEFAULT_CATEGORICAL_COLS)
+
     numeric_cols = (
-        ["Collegejaar"]
+        [year_col]
         + [str(x) for x in get_weeks_list(38)]
         + (extra_numeric_cols or [])
     )
@@ -135,8 +147,8 @@ def build_preprocessor(
     preprocessor = ColumnTransformer(
         transformers=[
             ("numeric", "passthrough", numeric_cols),
-            ("categorical", OneHotEncoder(handle_unknown="ignore"), CATEGORICAL_COLS),
+            ("categorical", OneHotEncoder(handle_unknown="ignore"), categorical_cols),
         ]
     )
 
-    return preprocessor, numeric_cols, CATEGORICAL_COLS
+    return preprocessor, numeric_cols, categorical_cols

@@ -5,6 +5,7 @@ import pandas as pd
 
 from studentprognose.benchmark.metrics import mape, mae, rmse
 from studentprognose.benchmark.splitter import time_series_split
+from studentprognose.config import get_columns
 from studentprognose.models.sarima import _get_transformed_data
 from studentprognose.utils.weeks import compute_pred_len, get_all_weeks_valid
 
@@ -13,6 +14,7 @@ def evaluate_timeseries_model(
     data_cumulative: pd.DataFrame,
     forecaster_factory: callable,
     predict_week: int,
+    config: dict,
     min_training_year: int = 2016,
     min_train_years: int = 3,
 ) -> pd.DataFrame:
@@ -25,6 +27,7 @@ def evaluate_timeseries_model(
         data_cumulative: Preprocessed cumulatieve data (lang formaat).
         forecaster_factory: Callable die een vers BaseForecaster-object retourneert.
         predict_week: Week waarvandaan voorspeld wordt.
+        config: Configuratie-dict met column_roles.
         min_training_year: Vroegste trainingsjaar.
         min_train_years: Minimaal aantal trainingsjaren.
 
@@ -32,23 +35,24 @@ def evaluate_timeseries_model(
         DataFrame met per (programme, herkomst, examentype, test_year)
         de metrics MAPE, MAE, RMSE en trainingstijd.
     """
+    c = get_columns(config)
     pred_len = compute_pred_len(predict_week)
 
     group_keys = data_cumulative.groupby(
-        ["Croho groepeernaam", "Herkomst", "Examentype"]
+        [c.programme, c.origin, c.exam_type]
     ).first()[[]].reset_index()
 
     results = []
 
     for _, group_row in group_keys.iterrows():
-        programme = group_row["Croho groepeernaam"]
-        herkomst = group_row["Herkomst"]
-        examentype = group_row["Examentype"]
+        programme = group_row[c.programme]
+        herkomst = group_row[c.origin]
+        examentype = group_row[c.exam_type]
 
         subset = data_cumulative[
-            (data_cumulative["Croho groepeernaam"] == programme)
-            & (data_cumulative["Herkomst"] == herkomst)
-            & (data_cumulative["Examentype"] == examentype)
+            (data_cumulative[c.programme] == programme)
+            & (data_cumulative[c.origin] == herkomst)
+            & (data_cumulative[c.exam_type] == examentype)
         ]
 
         wide = _get_transformed_data(subset.copy(), min_training_year)
@@ -56,10 +60,10 @@ def evaluate_timeseries_model(
             continue
         wide["39"] = 0
 
-        splits = time_series_split(wide, min_training_year, min_train_years)
+        splits = time_series_split(wide, min_training_year, min_train_years, year_col=c.academic_year)
 
         for train_wide, test_wide in splits:
-            test_year = int(test_wide["Collegejaar"].iloc[0])
+            test_year = int(test_wide[c.academic_year].iloc[0])
 
             train_for_ts = pd.concat([train_wide, test_wide])
             ts_data = train_for_ts.loc[
