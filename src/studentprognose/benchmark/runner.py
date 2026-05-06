@@ -8,48 +8,15 @@ from studentprognose.benchmark.evaluate_classifier import evaluate_classifier_mo
 from studentprognose.benchmark.report import generate_cumulative_report, generate_individual_report
 from studentprognose.config import load_configuration, get_columns
 from studentprognose.data.loader import load_data
-from studentprognose.models.sarima import SARIMAForecaster, _get_transformed_data
-from studentprognose.models.forecasters import ETSForecaster, ThetaForecaster
-from studentprognose.models.regressors import (
-    XGBoostRegressor,
-    RidgeRegressor,
-    RandomForestRegressor,
-    GradientBoostingRegressor,
-    ExtraTreesRegressor,
+from studentprognose.models import (
+    FORECASTER_REGISTRY,
+    REGRESSOR_REGISTRY,
+    CLASSIFIER_REGISTRY,
 )
-from studentprognose.models.classifiers import (
-    XGBoostClassifier,
-    RandomForestClassifier,
-    LogisticRegressionClassifier,
-    GradientBoostingClassifier,
-    ExtraTreesClassifier,
-)
+from studentprognose.models.sarima import _get_transformed_data
 from studentprognose.strategies.cumulative import _add_engineered_features
 from studentprognose.strategies.individual import preprocess_individual_data
 from studentprognose.utils.weeks import DataOption
-
-
-_FORECASTER_FACTORIES = {
-    "sarima": lambda: SARIMAForecaster(),
-    "ets": lambda: ETSForecaster(),
-    "theta": lambda: ThetaForecaster(),
-}
-
-_REGRESSOR_FACTORIES = {
-    "xgboost": lambda: XGBoostRegressor(),
-    "ridge": lambda: RidgeRegressor(),
-    "random_forest": lambda: RandomForestRegressor(),
-    "gradient_boosting": lambda: GradientBoostingRegressor(),
-    "extra_trees": lambda: ExtraTreesRegressor(),
-}
-
-_CLASSIFIER_FACTORIES = {
-    "xgboost": lambda: XGBoostClassifier(),
-    "random_forest": lambda: RandomForestClassifier(),
-    "logistic_regression": lambda: LogisticRegressionClassifier(),
-    "gradient_boosting": lambda: GradientBoostingClassifier(),
-    "extra_trees": lambda: ExtraTreesClassifier(),
-}
 
 
 def main(
@@ -85,7 +52,7 @@ def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_di
     # --- Stap 1: tijdreeksmodellen ---
     print("Stap 1: Tijdreeksmodellen evalueren")
     ts_results = []
-    for name, factory in _FORECASTER_FACTORIES.items():
+    for name, factory in FORECASTER_REGISTRY.items():
         print(f"  Evalueren: {name}...")
         result = evaluate_timeseries_model(
             data_cumulative, factory, predict_week,
@@ -108,7 +75,7 @@ def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_di
     full_data = _add_engineered_features(full_data, data_cumulative, predict_week)
 
     reg_results = []
-    for name, factory in _REGRESSOR_FACTORIES.items():
+    for name, factory in REGRESSOR_REGISTRY.items():
         print(f"  Evalueren: {name}...")
         result = evaluate_regressor_model(
             full_data, data_studentcount, factory,
@@ -155,7 +122,7 @@ def _run_individual_benchmark(config, predict_week, min_year, output_dir):
     print("Stap 1: Classificatiemodellen evalueren")
     clf_results = []
     all_roc_curves = {}
-    for name, factory in _CLASSIFIER_FACTORIES.items():
+    for name, factory in CLASSIFIER_REGISTRY.items():
         print(f"  Evalueren: {name}...")
         result, roc_curves = evaluate_classifier_model(
             data_individual, factory, predict_week,
@@ -212,7 +179,7 @@ def _load_individual_benchmark_data(config):
         return None
 
     nf_list = list(config.get("numerus_fixus", {}).keys())
-    return preprocess_individual_data(data_individual, nf_list)
+    return preprocess_individual_data(data_individual, nf_list, config)
 
 
 def _preprocess_cumulative(data, config):

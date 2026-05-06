@@ -16,6 +16,17 @@ def _cfg():
             "week_35_37": {"individual": 0.5, "cumulative": 0.5},
             "default": {"individual": 0.5, "cumulative": 0.5},
         },
+        "column_roles": {
+            "programme": "Croho groepeernaam",
+            "academic_year": "Collegejaar",
+            "exam_type": "Examentype",
+            "origin": "Herkomst",
+            "faculty": "Faculteit",
+            "week": "Weeknummer",
+            "enrollment_status": "Inschrijfstatus",
+            "cancellation_date": "Datum intrekking vooraanmelding",
+            "student_count": "Aantal_studenten",
+        },
     }
 
 

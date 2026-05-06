@@ -6,8 +6,8 @@ from types import SimpleNamespace
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
 _VALID_TIMESERIES_MODELS = {"sarima", "ets", "theta", "auto_arima"}
-_VALID_REGRESSOR_MODELS = {"xgboost", "ridge", "random_forest"}
-_VALID_CLASSIFIER_MODELS = {"xgboost", "random_forest", "logistic_regression"}
+_VALID_REGRESSOR_MODELS = {"xgboost", "ridge", "random_forest", "gradient_boosting", "extra_trees"}
+_VALID_CLASSIFIER_MODELS = {"xgboost", "random_forest", "logistic_regression", "gradient_boosting", "extra_trees"}
 
 
 def _deep_merge(base: dict, override: dict) -> dict:

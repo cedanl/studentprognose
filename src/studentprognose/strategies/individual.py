@@ -5,6 +5,7 @@ import joblib
 import os
 import math
 
+from studentprognose.config import get_columns
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import get_weeks_list, get_all_weeks_valid, decrement_week, week_sort_key, compute_pred_len
 from studentprognose.data.transforms import transform_data
@@ -13,23 +14,25 @@ from studentprognose.models.sarima import predict_with_sarima_individual
 from studentprognose.data.preprocessing.excluded_data_points import apply_excluded_data_points
 
 
-def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]) -> pd.DataFrame:
+def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str], config: dict) -> pd.DataFrame:
     """Preprocess individuele data voor benchmark of pipeline.
 
     Standalone versie van IndividualStrategy.preprocess() zodat de
     benchmark-runner deze kan aanroepen zonder een volledige strategy te instantiëren.
     """
+    c = get_columns(config)
+
     data = data.drop(labels=["Aantal studenten"], axis=1)
 
     data = data[
         ~(
-            (data["Croho groepeernaam"] == "B English Language and Culture")
-            & (data["Collegejaar"] == 2021)
-            & (data["Examentype"] != "Propedeuse Bachelor")
+            (data[c.programme] == "B English Language and Culture")
+            & (data[c.academic_year] == 2021)
+            & (data[c.exam_type] != "Propedeuse Bachelor")
         )
     ]
 
-    grouped = data.groupby(["Collegejaar", "Sleutel"])
+    grouped = data.groupby([c.academic_year, "Sleutel"])
     data["Sleutel_count"] = grouped["Sleutel"].transform("count")
 
     def to_weeknummer(date):
@@ -43,10 +46,10 @@ def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]
         except AttributeError:
             return np.nan
 
-    data["Datum intrekking vooraanmelding"] = data["Datum intrekking vooraanmelding"].apply(
+    data[c.cancellation_date] = data[c.cancellation_date].apply(
         to_weeknummer
     )
-    data["Weeknummer"] = data["Datum Verzoek Inschr"].apply(to_weeknummer)
+    data[c.week] = data["Datum Verzoek Inschr"].apply(to_weeknummer)
 
     def get_herkomst(nat, eer):
         if nat == "Nederlandse":
@@ -56,7 +59,7 @@ def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]
         else:
             return "Niet-EER"
 
-    data["Herkomst"] = data.apply(lambda x: get_herkomst(x["Nationaliteit"], x["EER"]), axis=1)
+    data[c.origin] = data.apply(lambda x: get_herkomst(x["Nationaliteit"], x["EER"]), axis=1)
 
     data = data[
         data["Ingangsdatum"].str.contains("01-09-")
@@ -64,13 +67,13 @@ def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]
     ]
 
     data["is_numerus_fixus"] = (
-        data["Croho groepeernaam"].isin(numerus_fixus_list)
+        data[c.programme].isin(numerus_fixus_list)
     ).astype(int)
 
-    data["Examentype"] = data["Examentype"].replace("Propedeuse Bachelor", "Bachelor")
+    data[c.exam_type] = data[c.exam_type].replace("Propedeuse Bachelor", "Bachelor")
 
-    data = data[data["Inschrijfstatus"].notna()]
-    data = data[data["Examentype"].isin(["Bachelor", "Master", "Pre-master"])]
+    data = data[data[c.enrollment_status].notna()]
+    data = data[data[c.exam_type].isin(["Bachelor", "Master", "Pre-master"])]
 
     nationaliteit_counts = data["Nationaliteit"].value_counts()
     values_to_change = nationaliteit_counts[nationaliteit_counts < 100].index
@@ -78,8 +81,8 @@ def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]
 
     def get_new_column(row):
         if (
-            row["Weeknummer"] == 17
-            and row["Croho groepeernaam"] not in numerus_fixus_list
+            row[c.week] == 17
+            and row[c.programme] not in numerus_fixus_list
         ):
             return True
         else:
@@ -93,7 +96,7 @@ def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]
         data[col] = pd.to_numeric(data[col], errors="coerce").fillna(0).astype(int)
 
     data.loc[
-        data["Examentype"] == "Pre-master",
+        data[c.exam_type] == "Pre-master",
         ["Is eerstejaars croho opleiding", "Is hogerejaars", "BBC ontvangen"],
     ] = [1, 0, 0]
 
@@ -145,7 +148,7 @@ class IndividualStrategy(PredictionStrategy):
 
     def preprocess(self):
         self.data_individual = preprocess_individual_data(
-            self.data_individual, self.numerus_fixus_list
+            self.data_individual, self.numerus_fixus_list, self.configuration
         )
         self.data_individual_backup = self.data_individual
         return None

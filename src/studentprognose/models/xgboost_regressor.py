@@ -1,5 +1,6 @@
 import numpy as np
 
+from studentprognose.config import get_columns, load_defaults
 from studentprognose.models.importance import extract_grouped_importance
 from studentprognose.models.regressors import (
     BaseRegressor,
@@ -14,6 +15,7 @@ def predict_with_xgboost(
     data_studentcount,
     extra_numeric_cols: list[str] | None = None,
     regressor: BaseRegressor | None = None,
+    config: dict | None = None,
 ) -> tuple[np.ndarray, dict[str, float] | None]:
     """Train een regressor om studentaantallen te voorspellen uit cumulatieve vooraanmelddata.
 
@@ -24,17 +26,12 @@ def predict_with_xgboost(
     if data_studentcount is None:
         return np.nan, None
 
+    c = get_columns(config if config is not None else load_defaults())
+    merge_cols = [c.programme, c.academic_year, c.origin, c.exam_type]
+
     train = train.merge(
-        data_studentcount[
-            [
-                "Croho groepeernaam",
-                "Collegejaar",
-                "Herkomst",
-                "Examentype",
-                "Aantal_studenten",
-            ]
-        ],
-        on=["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"],
+        data_studentcount[merge_cols + [c.student_count]],
+        on=merge_cols,
     )
 
     train = train.drop_duplicates(ignore_index=True)
@@ -42,8 +39,8 @@ def predict_with_xgboost(
     if train.empty:
         return np.full(len(test), np.nan), None
 
-    X_train = train.drop(columns=["Aantal_studenten"])
-    y_train = train["Aantal_studenten"]
+    X_train = train.drop(columns=[c.student_count])
+    y_train = train[c.student_count]
 
     if extra_numeric_cols:
         missing = [c for c in extra_numeric_cols if c not in X_train.columns]

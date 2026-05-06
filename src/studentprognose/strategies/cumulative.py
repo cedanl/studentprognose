@@ -351,7 +351,7 @@ class CumulativeStrategy(PredictionStrategy):
                     )
                     return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
-                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor)
+                ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor, config=self.configuration)
                 if imp is not None:
                     self._importance_dicts.append(imp)
                 test2["Collegejaar"] = test2["Collegejaar"] + self.skip_years
@@ -380,7 +380,7 @@ class CumulativeStrategy(PredictionStrategy):
                         "available (try increasing --ci test N)."
                     )
                     return data_to_predict
-                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor)
+                predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor, config=self.configuration)
                 if imp is not None:
                     self._importance_dicts.append(imp)
 
