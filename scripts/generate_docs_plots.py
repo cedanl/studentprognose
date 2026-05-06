@@ -41,6 +41,22 @@ DEMO_PROGRAMMES = [
     ("M Cognitive Neuroscience", "M", 120, 80, 45),
 ]
 
+OUTPUT_PROGRAMMES = [
+    ("B Psychologie", "B", 620, 120, 55),
+    ("B Kunstmatige Intelligentie", "B", 450, 180, 90),
+    ("B Biomedische Wetenschappen", "B", 280, 50, 25),
+    ("B Bedrijfskunde", "B", 340, 90, 40),
+    ("M Cognitive Neuroscience", "M", 120, 80, 45),
+    ("B Geneeskunde", "B", 410, 30, 15),
+    ("B Rechten", "B", 380, 60, 30),
+    ("M Data Science", "M", 80, 110, 65),
+]
+
+CONVERSION_COLOURS = {"predicted": "#4682b4", "actual": "#708090"}
+MAPE_GOOD = 0.10
+MAPE_WARN = 0.25
+STATUS_COLOURS = {"good": "#2ca02c", "warn": "#f0ad4e", "bad": "#d62728"}
+
 
 # ---------------------------------------------------------------------------
 # Synthetic data generation (reuses logic from generate_demo_data.py)
@@ -899,6 +915,416 @@ def plot_ensemble_comparison(curves: dict, student_counts: dict) -> go.Figure:
 
 
 # ---------------------------------------------------------------------------
+# Output plots — docs/output-begrijpen.md
+# ---------------------------------------------------------------------------
+
+
+def _generate_output_data() -> tuple[dict, dict, dict]:
+    """Generate synthetic output data for 8 programmes across 3 years.
+
+    Returns (curves, student_counts, predictions) where predictions maps
+    (prog, year) → dict with SARIMA_individual, SARIMA_cumulative,
+    Prognose_ratio, Ensemble, actual.
+    """
+    curves: dict[tuple[str, str, int], np.ndarray] = {}
+    for prog_name, prog_type, base_nl, base_eer, base_neer in OUTPUT_PROGRAMMES:
+        for herkomst, base in [("NL", base_nl), ("EER", base_eer), ("Niet-EER", base_neer)]:
+            for year in RECENT_YEARS:
+                final = _add_year_trend(base, year)
+                curves[(prog_name, herkomst, year)] = _cumulative_curve(final, prog_type)
+
+    student_counts: dict[tuple[str, str, int], int] = {}
+    for key, curve in curves.items():
+        prog_name, herkomst, year = key
+        final = int(curve[-1])
+        yield_rate = {"NL": 0.65, "EER": 0.45, "Niet-EER": 0.35}.get(herkomst, 0.5)
+        yield_rate += rng.uniform(-0.05, 0.05)
+        student_counts[key] = max(1, int(round(final * yield_rate)))
+
+    ensemble_biases = {
+        "B Psychologie": 0.02,
+        "B Kunstmatige Intelligentie": 0.06,
+        "B Biomedische Wetenschappen": -0.04,
+        "B Bedrijfskunde": 0.15,
+        "M Cognitive Neuroscience": -0.08,
+        "B Geneeskunde": 0.03,
+        "B Rechten": -0.35,
+        "M Data Science": 0.18,
+    }
+
+    predictions: dict[tuple[str, int], dict] = {}
+    for prog_name, prog_type, *_ in OUTPUT_PROGRAMMES:
+        bias = ensemble_biases.get(prog_name, 0.05)
+        for year in RECENT_YEARS:
+            actual = sum(student_counts[(prog_name, h, year)] for h in ["NL", "EER", "Niet-EER"])
+            year_noise = rng.uniform(-0.03, 0.03)
+            si = int(actual * (1 + bias * 0.8 + year_noise + rng.uniform(-0.05, 0.05)))
+            sc = int(actual * (1 + bias * 1.2 + year_noise + rng.uniform(-0.05, 0.05)))
+            rp = int(actual * (1 + bias * 0.6 + year_noise + rng.uniform(-0.08, 0.08)))
+            ens = int(0.35 * si + 0.35 * sc + 0.15 * rp + 0.15 * actual)
+            predictions[(prog_name, year)] = {
+                "SARIMA_individual": si,
+                "SARIMA_cumulative": sc,
+                "Prognose_ratio": rp,
+                "Ensemble": ens,
+                "actual": actual,
+            }
+
+    return curves, student_counts, predictions
+
+
+def plot_output_cockpit(predictions: dict) -> go.Figure:
+    """Summary table: prognosis per programme with confidence."""
+    year = 2024
+    prev_year = 2023
+    progs = [p[0] for p in OUTPUT_PROGRAMMES]
+
+    opl, prognose_vals, real_vals, diff_vals, conf_vals = [], [], [], [], []
+    conf_colors = []
+
+    for prog in progs:
+        p = predictions[(prog, year)]
+        p_prev = predictions[(prog, prev_year)]
+        prognose = p["Ensemble"]
+        realisatie = p_prev["actual"]
+
+        opl.append(prog)
+        prognose_vals.append(f"{prognose:.0f}")
+        real_vals.append(f"{realisatie:.0f}")
+
+        delta = prognose - realisatie
+        pct = delta / realisatie if realisatie > 0 else 0
+        diff_vals.append(f"{delta:+.0f} ({pct:+.0%})")
+
+        avg_mape = np.mean([
+            abs(predictions[(prog, yr)]["Ensemble"] - predictions[(prog, yr)]["actual"])
+            / predictions[(prog, yr)]["actual"]
+            for yr in RECENT_YEARS
+            if predictions[(prog, yr)]["actual"] > 0
+        ])
+        if avg_mape <= MAPE_GOOD:
+            conf_vals.append("Hoog")
+            conf_colors.append(STATUS_COLOURS["good"])
+        elif avg_mape <= MAPE_WARN:
+            conf_vals.append("Midden")
+            conf_colors.append(STATUS_COLOURS["warn"])
+        else:
+            conf_vals.append("Laag")
+            conf_colors.append(STATUS_COLOURS["bad"])
+
+    # Total row
+    opl.append("<b>Totaal</b>")
+    total_prog = sum(float(v) for v in prognose_vals)
+    total_real = sum(float(v) for v in real_vals)
+    prognose_vals.append(f"<b>{total_prog:.0f}</b>")
+    real_vals.append(f"<b>{total_real:.0f}</b>")
+    td = total_prog - total_real
+    tp = td / total_real if total_real > 0 else 0
+    diff_vals.append(f"<b>{td:+.0f} ({tp:+.0%})</b>")
+    conf_vals.append("")
+    conf_colors.append("#666666")
+
+    def _tint(hex_color: str) -> str:
+        r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+        return f"rgba({r},{g},{b},0.15)"
+
+    n = len(opl)
+    row_bg = ["white"] * (n - 1) + ["#e8e8e8"]
+
+    fig = go.Figure(go.Table(
+        header=dict(
+            values=[f"<b>{h}</b>" for h in [
+                "Opleiding", "Prognose 2024", "Realisatie 2023", "Verschil", "Betrouwbaarheid",
+            ]],
+            fill_color="#1f77b4",
+            font=dict(color="white", size=12),
+            align="center",
+        ),
+        cells=dict(
+            values=[opl, prognose_vals, real_vals, diff_vals, conf_vals],
+            fill_color=[
+                row_bg, row_bg, row_bg, row_bg,
+                [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(conf_colors)],
+            ],
+            font=dict(size=[11] * (n - 1) + [13]),
+            align=["left"] + ["center"] * 4,
+        ),
+    ))
+    fig.update_layout(
+        title=dict(text="Verwacht aantal studenten per opleiding — 2024 (demodata)", font=dict(size=15)),
+        height=380,
+    )
+    return fig
+
+
+def plot_output_growth(predictions: dict) -> go.Figure:
+    """Horizontal bar chart: growth/decline per programme vs previous year."""
+    year, prev_year = 2024, 2023
+    progs = [p[0] for p in OUTPUT_PROGRAMMES]
+
+    rows = []
+    for prog in progs:
+        p = predictions[(prog, year)]
+        p_prev = predictions[(prog, prev_year)]
+        prognose = p["Ensemble"]
+        prev_actual = p_prev["actual"]
+        if prev_actual > 0:
+            pct = (prognose - prev_actual) / prev_actual
+            rows.append({"prog": prog, "pct": pct, "delta": prognose - prev_actual})
+
+    rows.sort(key=lambda r: r["pct"])
+    prog_names = [r["prog"] for r in rows]
+    pcts = [max(-2.0, min(2.0, r["pct"])) for r in rows]
+    deltas = [r["delta"] for r in rows]
+    colors = ["#2ca02c" if p >= 0 else "#d62728" for p in pcts]
+    labels = [f"{d:+.0f}" for d in deltas]
+
+    fig = go.Figure(go.Bar(
+        y=prog_names, x=pcts, orientation="h",
+        marker_color=colors,
+        text=labels, textposition="outside",
+        hovertemplate="%{y}<br>%{x:.1%} (%{text})<extra></extra>",
+    ))
+    fig.add_vline(x=0, line_color="#333", line_width=1)
+    fig.update_layout(
+        title=dict(text="Verwachte groei/krimp t.o.v. 2023 (demodata)", font=dict(size=15)),
+        xaxis=dict(title="Verandering", tickformat="+.0%"),
+        height=400,
+        margin=dict(l=220),
+    )
+    return fig
+
+
+def plot_output_scatter(predictions: dict) -> go.Figure:
+    """Scatter plot: predicted vs actual enrolments, coloured by year."""
+    progs = [p[0] for p in OUTPUT_PROGRAMMES]
+
+    fig = go.Figure()
+    all_vals = []
+
+    for i, year in enumerate(RECENT_YEARS):
+        x_pred, y_act, texts, sizes = [], [], [], []
+        for prog in progs:
+            p = predictions[(prog, year)]
+            pred = p["Ensemble"]
+            actual = p["actual"]
+            error_pct = abs(pred - actual) / actual * 100 if actual > 0 else 0
+            x_pred.append(pred)
+            y_act.append(actual)
+            sizes.append(actual)
+            texts.append(
+                f"{prog}<br>Jaar: {year}"
+                f"<br>Voorspeld: {pred:.0f}<br>Werkelijk: {actual:.0f}"
+                f"<br>Fout: {error_pct:.1f}%"
+            )
+            all_vals.extend([pred, actual])
+
+        sizeref = 2.0 * max(sizes) / (40.0 ** 2) if sizes else 1
+        fig.add_trace(go.Scatter(
+            x=x_pred, y=y_act, mode="markers",
+            name=str(year),
+            marker=dict(
+                color=PASTEL_YEAR_COLOURS[i],
+                size=sizes, sizemode="area", sizeref=sizeref, sizemin=4,
+                line=dict(width=1, color="#333"),
+            ),
+            text=texts, hoverinfo="text",
+        ))
+
+    max_val = max(all_vals) * 1.05 if all_vals else 100
+    fig.add_shape(
+        type="line", x0=0, y0=0, x1=max_val, y1=max_val,
+        line=dict(dash="dash", color="black", width=2),
+    )
+    fig.update_layout(
+        title=dict(text="Voorspeld vs realisatie — alle opleidingen (demodata)", font=dict(size=15)),
+        xaxis=dict(title="Voorspelde inschrijvingen", range=[0, max_val]),
+        yaxis=dict(title="Werkelijke inschrijvingen", range=[0, max_val], scaleanchor="x"),
+        height=500,
+    )
+    return fig
+
+
+def plot_output_conversion(
+    curves: dict, student_counts: dict,
+) -> go.Figure:
+    """Grouped bar chart: vooraanmelders at week 38 vs actual enrolments."""
+    progs = [p[0] for p in OUTPUT_PROGRAMMES]
+    year = 2024
+
+    vooraanmelders, inschrijvingen = [], []
+    for prog in progs:
+        va = sum(int(curves[(prog, h, year)][-1]) for h in ["NL", "EER", "Niet-EER"]
+                 if (prog, h, year) in curves)
+        ins = sum(student_counts[(prog, h, year)] for h in ["NL", "EER", "Niet-EER"]
+                  if (prog, h, year) in student_counts)
+        vooraanmelders.append(va)
+        inschrijvingen.append(ins)
+
+    conv_pct = [f"{a / p:.0%}" if p > 0 else "–" for p, a in zip(vooraanmelders, inschrijvingen)]
+
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=progs, y=vooraanmelders, name="Vooraanmelders (wk 38)",
+        marker_color=CONVERSION_COLOURS["predicted"],
+        text=[f"{v:.0f}" for v in vooraanmelders], textposition="outside",
+        hovertemplate="%{x}<br>Vooraanmelders: %{y:.0f}<extra></extra>",
+    ))
+    fig.add_trace(go.Bar(
+        x=progs, y=inschrijvingen, name="Inschrijvingen",
+        marker_color=CONVERSION_COLOURS["actual"],
+        text=conv_pct, textposition="outside",
+        hovertemplate="%{x}<br>Inschrijvingen: %{y:.0f}<br>Conversie: %{text}<extra></extra>",
+    ))
+
+    fig.update_layout(
+        title=dict(text="Vooraanmelders vs inschrijvingen — 2024 (demodata)", font=dict(size=15)),
+        xaxis=dict(title="", tickangle=-35),
+        yaxis=dict(title="Aantal"),
+        barmode="group",
+        height=460,
+        margin=dict(b=120),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+    )
+    return fig
+
+
+def plot_output_accuracy_heatmap(predictions: dict) -> go.Figure:
+    """Heatmap: MAPE per programme × model — shows which model works best where."""
+    progs = [p[0] for p in OUTPUT_PROGRAMMES]
+    models = ["SARIMA (individueel)", "XGBoost (cumulatief)", "Ratio-model", "Ensemble"]
+    model_keys = ["SARIMA_individual", "SARIMA_cumulative", "Prognose_ratio", "Ensemble"]
+
+    z = []
+    annotations = []
+    for i, prog in enumerate(progs):
+        row = []
+        for j, key in enumerate(model_keys):
+            mapes = []
+            for yr in RECENT_YEARS:
+                p = predictions[(prog, yr)]
+                if p["actual"] > 0:
+                    mapes.append(abs(p[key] - p["actual"]) / p["actual"])
+            avg = np.mean(mapes) if mapes else 0
+            row.append(avg)
+        z.append(row)
+
+    for i, prog in enumerate(progs):
+        best_j = int(np.argmin(z[i]))
+        for j in range(len(models)):
+            val = z[i][j]
+            is_best = j == best_j
+            annotations.append(dict(
+                x=models[j], y=prog,
+                text=f"★ {val:.0%}" if is_best else f"{val:.0%}",
+                showarrow=False,
+                font=dict(color="white" if val > 0.15 else "#333", size=12),
+            ))
+
+    fig = go.Figure(go.Heatmap(
+        z=z, x=models, y=progs,
+        colorscale=[
+            [0, "#2ca02c"], [0.10, "#2ca02c"],
+            [0.10, "#f0ad4e"], [0.25, "#f0ad4e"],
+            [0.25, "#d62728"], [1.0, "#d62728"],
+        ],
+        zmin=0, zmax=0.40,
+        showscale=False,
+        hovertemplate="%{y}<br>%{x}: %{z:.1%}<extra></extra>",
+    ))
+    fig.update_layout(
+        title=dict(
+            text="Modelvergelijking per opleiding — gemiddelde MAPE (★ = best, demodata)",
+            font=dict(size=15),
+        ),
+        xaxis=dict(title="", side="top", tickangle=0),
+        yaxis=dict(title="", autorange="reversed"),
+        height=400,
+        margin=dict(l=220, t=80),
+        annotations=[a for a in annotations],
+    )
+    return fig
+
+
+def plot_output_individual_cockpit(predictions: dict) -> go.Figure:
+    """Individual model cockpit: prognose per programme with Δ% vs previous year."""
+    year, prev_year = 2024, 2023
+    progs = [p[0] for p in OUTPUT_PROGRAMMES]
+
+    opl, prognose_vals, real_vals, delta_vals = [], [], [], []
+    delta_colors = []
+
+    for prog in progs:
+        p = predictions[(prog, year)]
+        p_prev = predictions[(prog, prev_year)]
+        prognose = p["SARIMA_individual"]
+        realisatie = p_prev["actual"]
+
+        opl.append(prog)
+        prognose_vals.append(f"{prognose:.0f}")
+        real_vals.append(f"{realisatie:.0f}")
+
+        if realisatie > 0:
+            delta = (prognose - realisatie) / realisatie
+            delta_vals.append(f"{delta:+.1%}")
+            ad = abs(delta)
+            delta_colors.append("#2ca02c" if ad <= 0.05 else ("#f0ad4e" if ad <= 0.15 else "#d62728"))
+        else:
+            delta_vals.append("–")
+            delta_colors.append("#666666")
+
+    total_prog = sum(float(v) for v in prognose_vals)
+    total_real = sum(float(v) for v in real_vals)
+    if total_real > 0:
+        total_d = (total_prog - total_real) / total_real
+        total_d_str = f"{total_d:+.1%}"
+        atd = abs(total_d)
+        total_d_color = "#2ca02c" if atd <= 0.05 else ("#f0ad4e" if atd <= 0.15 else "#d62728")
+    else:
+        total_d_str = "–"
+        total_d_color = "#666666"
+
+    opl.append("<b>Totaal</b>")
+    prognose_vals.append(f"<b>{total_prog:.0f}</b>")
+    real_vals.append(f"<b>{total_real:.0f}</b>")
+    delta_vals.append(f"<b>{total_d_str}</b>")
+    delta_colors.append(total_d_color)
+
+    def _tint(hex_color: str) -> str:
+        r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+        return f"rgba({r},{g},{b},0.15)"
+
+    n = len(opl)
+    row_bg = ["white"] * (n - 1) + ["#e8e8e8"]
+
+    fig = go.Figure(go.Table(
+        header=dict(
+            values=["<b>Opleiding</b>", "<b>Prognose 2024</b>", "<b>Realisatie 2023</b>", "<b>Δ%</b>"],
+            fill_color="#1f77b4",
+            font=dict(color="white", size=12),
+            align="center",
+        ),
+        cells=dict(
+            values=[opl, prognose_vals, real_vals, delta_vals],
+            fill_color=[
+                row_bg, row_bg, row_bg,
+                [_tint(c) if i < n - 1 else "#e8e8e8" for i, c in enumerate(delta_colors)],
+            ],
+            font=dict(size=[11] * (n - 1) + [13]),
+            align=["left", "center", "center", "center"],
+        ),
+    ))
+    fig.update_layout(
+        title=dict(
+            text="Verwacht aantal studenten — individueel model (demodata)",
+            font=dict(size=15),
+        ),
+        height=380,
+    )
+    return fig
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -947,7 +1373,29 @@ def main() -> None:
         output_dir,
     )
 
-    print(f"\nGenerated 7 plots in {output_dir}")
+    # ── Output plots (output-begrijpen.md) ──────────────────────────
+    out_curves, out_counts, predictions = _generate_output_data()
+
+    _wrap_html(plot_output_cockpit(predictions), "output_cockpit.html", output_dir)
+    _wrap_html(plot_output_growth(predictions), "output_growth.html", output_dir)
+    _wrap_html(plot_output_scatter(predictions), "output_scatter.html", output_dir)
+    _wrap_html(
+        plot_output_conversion(out_curves, out_counts),
+        "output_conversion.html",
+        output_dir,
+    )
+    _wrap_html(
+        plot_output_accuracy_heatmap(predictions),
+        "output_accuracy_heatmap.html",
+        output_dir,
+    )
+    _wrap_html(
+        plot_output_individual_cockpit(predictions),
+        "output_individual_cockpit.html",
+        output_dir,
+    )
+
+    print(f"\nGenerated 13 plots in {output_dir}")
 
 
 if __name__ == "__main__":
