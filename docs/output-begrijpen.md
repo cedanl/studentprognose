@@ -119,3 +119,41 @@ De dashboards zijn zelfstandige HTML-bestanden (geen server nodig) en kunnen in 
 
 !!! note "Dashboard toont alleen de laatste week"
     Bij een multi-week run (bijv. `-w 10:20`) toont het dashboard alleen de prognose van de **laatste week** in de reeks. De Excel-output bevat wel alle weken.
+
+Hieronder staan voorbeelden van de belangrijkste grafieken per dashboard, gegenereerd met demodata.
+
+### Eindoverzicht (`final/dashboard.html`)
+
+Altijd beschikbaar, ongeacht de gekozen modus. Toont het totaalplaatje: prognose per opleiding, verwachte groei/krimp, en betrouwbaarheid.
+
+<iframe src="../assets/plots/output_cockpit.html" width="100%" height="400" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Prognose per opleiding met realisatie vorig jaar, verschil en betrouwbaarheid. Betrouwbaarheid is gebaseerd op historische modelfouten: groen = hoog, geel = midden, rood = laag (demodata).*
+
+<iframe src="../assets/plots/output_growth.html" width="100%" height="420" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Verwachte groei (groen) en krimp (rood) t.o.v. vorig jaar. Het getal toont het absolute verschil in studenten (demodata).*
+
+### Cumulatief dashboard (`cumulative/dashboard.html`)
+
+Beschikbaar bij `-d c` of `-d b`. Toont analyses op basis van Studielink-telbestanden: wekelijkse aanmeldcurves, SARIMA-extrapolatie, en conversie van vooraanmelders naar inschrijvingen.
+
+<iframe src="../assets/plots/output_conversion.html" width="100%" height="480" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Vooraanmelders (week 38) naast werkelijke inschrijvingen per opleiding. Het percentage toont de conversieratio (demodata).*
+
+<iframe src="../assets/plots/output_accuracy_heatmap.html" width="100%" height="420" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*MAPE per opleiding × model. Groen ≤ 10%, geel 10–25%, rood > 25%. De ★ markeert het best presterende model per opleiding (demodata).*
+
+### Individueel dashboard (`individual/dashboard.html`)
+
+Beschikbaar bij `-d i` of `-d b`. Toont analyses op basis van per-student aanmelddata: XGBoost-classificatie, SARIMA-trajecten, en nauwkeurigheid per opleiding.
+
+<iframe src="../assets/plots/output_individual_cockpit.html" width="100%" height="400" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Prognose per opleiding op basis van het individuele model, vergeleken met de realisatie van vorig jaar. Kleur in de Δ%-kolom toont de afwijking: groen ≤ 5%, geel 5–15%, rood > 15% (demodata).*
+
+<iframe src="../assets/plots/output_scatter.html" width="100%" height="520" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Elke bol is een opleiding in een bepaald jaar. Hoe dichter bij de diagonaal, hoe beter de voorspelling. Bolgrootte toont het werkelijke aantal studenten (demodata).*
