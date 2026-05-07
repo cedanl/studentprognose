@@ -30,7 +30,7 @@
 
 Vereisten: **Python 3.12+**
 
-<details>
+<details open>
 <summary><strong>pipx</strong> — aanbevolen voor CLI-gebruik</summary>
 
 <a href="https://pipx.pypa.io/">pipx</a> installeert de tool in een eigen, geïsoleerde omgeving. Je hoeft zelf geen virtual environment aan te maken.
@@ -87,6 +87,19 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/) voo
 
 ---
 
+## Waarom dit model?
+
+Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig.
+
+| | |
+|---|---|
+| **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
+| **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
+| **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
+| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input_raw/` |
+
+---
+
 ## 🛠️ Aan de slag voor ontwikkelaars
 
 **Via de broncode** (met demodata):
@@ -115,126 +128,23 @@ uv run studentprognose -w 6 -y 2020
 
 ---
 
-## Waarom dit model?
-
-Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig.
-
-| | |
-|---|---|
-| **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
-| **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
-| **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
-| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input_raw/` |
-
----
-
 ## ✨ Gebruik
 
-### Jaren en weken
-
-Specificeer jaar en week met `-y` en `-w`:
-
 ```bash
-studentprognose -w 6 -y 2024
-studentprognose -W 1 2 3 -Y 2024
-studentprognose -year 2023 2024
-studentprognose -week 40 41
+studentprognose -w 6 -y 2024                  # specifieke week en jaar
+studentprognose -w 10 : 20 -y 2023            # weekbereik
+studentprognose -d c                           # alleen cumulatief spoor
+studentprognose -y 2023 2024 -w 10 : 20 -d b  # meerdere jaren, beide sporen
 ```
 
-Gebruik slicing voor een reeks weken:
+| Vlag | Beschrijving | Opties |
+|------|-------------|--------|
+| `-w` | Voorspelweek(en) | weeknummers of bereik, bijv. `10 : 20` |
+| `-y` | Voorspeljaar(en) | bijv. `2024` of `2023 2024` |
+| `-d` | Dataset | `i`ndividual, `c`umulative, `b`oth (standaard) |
+| `--yes` | Sla interactieve prompts over | voor CI/CD en cron |
 
-```bash
-studentprognose -w 10 : 20 -y 2023
-```
-
-### Datasets
-
-Er zijn twee datasets beschikbaar: **individual** (per student) en **cumulative** (geaggregeerd per opleiding/herkomst/jaar/week). Standaard worden beide gebruikt.
-
-```bash
-studentprognose -d individual
-studentprognose -D cumulative
-studentprognose -dataset both
-```
-
-### Datakwaliteitscontrole
-
-Bij elke run wordt de ruwe inputdata automatisch gevalideerd **voordat de ETL start**. Zo weet je zeker dat je nooit 20 minuten wacht voor een prognose op basis van corrupte data.
-
-Er zijn drie soorten bevindingen:
-
-| Type | Voorbeeld | Wat er gebeurt |
-|---|---|---|
-| **Fout** | Ontbrekend bestand, ontbrekende kolom | Pipeline stopt direct |
-| **Probleem** | Negatieve waarden, onbekende herkomstcode | Prompt: doorgaan of stoppen? |
-| **Waarschuwing** | Klein percentage ontbrekende waarden, weekgaten | Gelogd, pipeline loopt door |
-
-```
-Validatie gevonden problemen die prognoses kunnen beïnvloeden:
-  [PROBLEEM] telbestandY2025W10.csv: meercode_V = 0 voor 1 opleiding(en): B Opleiding X
-
-Als je doorgaat, kunnen sommige opleidingen worden overgeslagen of
-onbetrouwbare prognoses opleveren.
-
-Wil je doorgaan met de pipeline? [j/N]
-```
-
-Gebruik `--yes` om de prompt te omzeilen in geautomatiseerde runs (bijv. CI/CD):
-
-```bash
-studentprognose -w 6 -y 2025 --yes
-```
-
-> [!NOTE]
-> Met `--noetl` worden ETL én validatie overgeslagen. Gebruik dit alleen als de ruwe data al eerder succesvol verwerkt en gevalideerd is.
-
-#### Validatie-instellingen aanpassen
-
-De standaardwaarden (jaarbereiken, NaN-drempels, toegestane categorische waarden) staan in de broncode. Je kunt ze overschrijven door een `"validation"`-blok toe te voegen aan je `configuration.json`. Vermeld alleen de waarden die afwijken:
-
-```json
-{
-    "validation": {
-        "nan_error_threshold": 0.20,
-        "telbestand": {
-            "herkomst_allowed": ["N", "E", "R", "ONBEKEND"]
-        }
-    }
-}
-```
-
-### Configuratie
-
-Het standaard configuratiebestand is `configuration/configuration.json`. Dit kan worden overschreven:
-
-```bash
-studentprognose -c pad/naar/configuration.json
-studentprognose -configuration langer/pad/naar/config.json
-```
-
-### Uitgebreid voorbeeld
-
-Voorspel eerstejaars voor 2023 en 2024, weken 10 t/m 20, met beide datasets:
-
-```bash
-studentprognose -y 2023 2024 -w 10 : 20 -d b
-```
-
-Voorspel eerstejaars voor collegejaar 2025/2026, week 5, alleen cumulatief:
-
-```bash
-studentprognose -y 2025 -w 5 -d c
-```
-
-### Syntax overzicht
-
-| Instelling              | Korte notatie  | Lange notatie    | Opties                                      |
-|-------------------------|----------------|------------------|---------------------------------------------|
-| Voorspellingsjaren      | `-y` of `-Y`   | `-year`          | Eén of meer jaren, bijv. `2023 2024`        |
-| Voorspellingsweken      | `-w` of `-W`   | `-week`          | Eén of meer weken, bijv. `10 11 12`         |
-| Slicing                 |                |                  | Gebruik `:` voor reeksen, bijv. `10 : 20`   |
-| Dataset                 | `-d` of `-D`   | `-dataset`       | `i`/`individual`, `c`/`cumulative`, `b`/`both` |
-| Configuratie            | `-c` of `-C`   | `-configuration` | Pad naar configuratiebestand                |
+Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-referentie) voor alle vlaggen, configuratie, validatie-instellingen en uitgebreide voorbeelden.
 
 ---
 

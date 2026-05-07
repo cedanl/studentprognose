@@ -139,11 +139,16 @@ Er zijn drie manieren om studentprognose te installeren. Kies de methode die het
 
 ## Eerste keer: mapstructuur aanmaken
 
-Na installatie maak je in een lege werkmap de benodigde mappen en een startconfiguratie aan:
+Maak een werkmap aan voor je prognoseproject en draai daar `init`:
 
 ```bash
+mkdir mijn-prognose
+cd mijn-prognose
 studentprognose init
 ```
+
+!!! tip "Al een map aangemaakt tijdens de pip-installatie?"
+    Als je bij de pip-installatie al `mkdir mijn-prognose` hebt gedaan, hoef je alleen `studentprognose init` te draaien in diezelfde map.
 
 Dit schrijft:
 
