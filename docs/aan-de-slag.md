@@ -1,18 +1,141 @@
 # Aan de slag
 
+## Voordat je begint
+
+Je hebt **Python 3.12 of hoger** nodig. Controleer je versie:
+
+```bash
+python --version
+```
+
+??? tip "Python niet gevonden of te oud?"
+
+    Als je `python: command not found` ziet, of een versie lager dan 3.12:
+
+    - **Windows**: Download Python via [python.org](https://www.python.org/downloads/). Vink bij installatie **"Add python.exe to PATH"** aan.
+    - **macOS**: Installeer via [python.org](https://www.python.org/downloads/) of met Homebrew: `brew install python@3.12`
+    - **Linux**: Gebruik je pakketbeheerder, bijv. `sudo apt install python3.12` (Ubuntu/Debian) of `sudo dnf install python3.12` (Fedora).
+
+    Op sommige systemen heet het commando `python3` in plaats van `python`. Probeer `python3 --version` als `python --version` niet werkt.
+
 ## Installatie
 
-```bash
-pip install studentprognose
-```
+Er zijn drie manieren om studentprognose te installeren. Kies de methode die het beste bij je situatie past:
 
-Of met uv in een project:
+| Methode | Wanneer kiezen? |
+|---------|----------------|
+| **pipx** | Je wilt de tool als CLI gebruiken en verder niets configureren |
+| **pip** | Je wilt de tool ook als Python-library importeren in scripts |
+| **uv** | Je werkt al met uv, of je wilt bijdragen aan de broncode |
 
-```bash
-uv add studentprognose
-```
+=== "pipx (aanbevolen)"
 
-Vereisten: Python 3.12+
+    [pipx](https://pipx.pypa.io/) installeert CLI-tools in een eigen, geïsoleerde omgeving. Je hoeft zelf geen virtual environment aan te maken.
+
+    **pipx installeren** (eenmalig):
+
+    ```bash
+    python -m pip install --user pipx
+    python -m pipx ensurepath
+    ```
+
+    Start hierna je terminal opnieuw op zodat het `pipx`-commando beschikbaar is.
+
+    **studentprognose installeren:**
+
+    ```bash
+    pipx install studentprognose
+    ```
+
+    **Updaten** naar een nieuwere versie:
+
+    ```bash
+    pipx upgrade studentprognose
+    ```
+
+=== "pip (in een virtual environment)"
+
+    !!! warning "Installeer niet zonder virtual environment"
+        Een `pip install` buiten een virtual environment plaatst packages in je systeemomgeving. Dit kan conflicten veroorzaken met andere projecten. Maak altijd eerst een virtual environment aan.
+
+    **Stap 1 — Maak een projectmap en virtual environment aan:**
+
+    ```bash
+    mkdir mijn-prognose
+    cd mijn-prognose
+    python -m venv .venv
+    ```
+
+    **Stap 2 — Activeer de virtual environment:**
+
+    === "Windows (PowerShell)"
+
+        ```powershell
+        .venv\Scripts\Activate.ps1
+        ```
+
+    === "Windows (CMD)"
+
+        ```cmd
+        .venv\Scripts\activate.bat
+        ```
+
+    === "macOS / Linux"
+
+        ```bash
+        source .venv/bin/activate
+        ```
+
+    Je ziet nu `(.venv)` voor je prompt — dat bevestigt dat de omgeving actief is.
+
+    **Stap 3 — Installeer studentprognose:**
+
+    ```bash
+    pip install studentprognose
+    ```
+
+    **Updaten** naar een nieuwere versie:
+
+    ```bash
+    pip install --upgrade studentprognose
+    ```
+
+    !!! tip "Virtual environment opnieuw activeren"
+        Elke keer dat je een nieuwe terminal opent, moet je de environment opnieuw activeren (stap 2) voordat je `studentprognose` kunt gebruiken.
+
+=== "uv"
+
+    [uv](https://docs.astral.sh/uv/) is een snelle Python-pakketbeheerder die virtual environments automatisch afhandelt.
+
+    **uv installeren** (eenmalig):
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+    Op Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+
+    **Als CLI-tool gebruiken** (zonder project):
+
+    ```bash
+    uv tool install studentprognose
+    ```
+
+    **In een bestaand uv-project:**
+
+    ```bash
+    uv add studentprognose
+    ```
+
+    **Bijdragen aan de broncode:**
+
+    ```bash
+    git clone https://github.com/cedanl/studentprognose.git
+    cd studentprognose
+    uv run studentprognose --help
+    ```
+
+    `uv run` maakt automatisch een virtual environment aan op basis van `pyproject.toml`.
 
 ## Eerste keer: mapstructuur aanmaken
 
@@ -66,16 +189,16 @@ Dit voorkomt dat de tool faalt omdat de huidige systeemweek/-jaar nog niet in je
 
 ```bash
 # Beide sporen + ensemble (standaard) — automatisch laatste beschikbare week/jaar
-uv run studentprognose
+studentprognose
 
 # Specifieke week en jaar
-uv run studentprognose -w 10 -y 2025
+studentprognose -w 10 -y 2025
 
 # Alleen cumulatief spoor (geen individuele data nodig)
-uv run studentprognose -d c
+studentprognose -d c
 
 # ETL overslaan (data al eerder verwerkt)
-uv run studentprognose --noetl
+studentprognose --noetl
 ```
 
 De output verschijnt in `data/output/`.
@@ -199,3 +322,31 @@ result = run_pipeline_from_dataframes(
 
     Controleer altijd of `SARIMA_individual` kolommen aanwezig zijn in je output als je
     het ensemble verwacht.
+
+## Veelvoorkomende fouten
+
+??? failure "`python: command not found` of versie te laag"
+
+    Python is niet geïnstalleerd of niet beschikbaar in je PATH. Zie [Voordat je begint](#voordat-je-begint) voor installatie-instructies.
+
+    Op sommige systemen heet het commando `python3` in plaats van `python`.
+
+??? failure "`studentprognose: command not found` na installatie"
+
+    **Met pipx:** Start je terminal opnieuw op, of draai `pipx ensurepath` en open een nieuwe terminal.
+
+    **Met pip:** Je virtual environment is niet actief. Activeer deze eerst:
+
+    - Windows PowerShell: `.venv\Scripts\Activate.ps1`
+    - Windows CMD: `.venv\Scripts\activate.bat`
+    - macOS/Linux: `source .venv/bin/activate`
+
+    Zie je `(.venv)` voor je prompt? Dan is de omgeving actief.
+
+??? failure "`ModuleNotFoundError: No module named 'studentprognose'`"
+
+    Je draait Python buiten de omgeving waarin studentprognose is geïnstalleerd. Activeer je virtual environment (bij pip) of gebruik `uv run` / `pipx run` om het juiste Python te gebruiken.
+
+??? failure "`Permission denied` bij `pip install`"
+
+    Je probeert te installeren in de systeemomgeving zonder rechten. Gebruik een virtual environment (zie [Installatie](#installatie)) of installeer met pipx.

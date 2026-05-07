@@ -8,12 +8,36 @@ Deze documentatie richt zich op **data-analisten en onderzoekers** bij Nederland
 
 ## Snelstart
 
+Vereisten: **Python 3.12+** ([installatie-instructies](aan-de-slag.md#voordat-je-begint))
+
+=== "pipx (aanbevolen)"
+
+    ```bash
+    pipx install studentprognose
+    ```
+
+=== "pip (in een virtual environment)"
+
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
+    pip install studentprognose
+    ```
+
+=== "uv"
+
+    ```bash
+    uv tool install studentprognose
+    ```
+
+Daarna:
+
 ```bash
-pip install studentprognose
-studentprognose --help
+studentprognose init      # mapstructuur + configuratie aanmaken
+studentprognose --help    # alle opties bekijken
 ```
 
-Zie [Aan de slag](aan-de-slag.md) voor een complete walkthrough met demodata.
+Zie [Aan de slag](aan-de-slag.md) voor een complete walkthrough inclusief data klaarzetten en je eerste run.
 
 ## Architectuur op hoofdlijnen
 

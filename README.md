@@ -28,16 +28,51 @@
 
 ## 📦 Aan de slag
 
+Vereisten: **Python 3.12+**
+
+<details>
+<summary><strong>pipx</strong> — aanbevolen voor CLI-gebruik</summary>
+
+<a href="https://pipx.pypa.io/">pipx</a> installeert de tool in een eigen, geïsoleerde omgeving. Je hoeft zelf geen virtual environment aan te maken.
+
 ```bash
-pip install studentprognose
-studentprognose init
+pipx install studentprognose
 ```
 
-`init` maakt de benodigde mapstructuur aan en legt uit welke bestanden je moet aanleveren. Daarna:
+</details>
+
+<details>
+<summary><strong>pip</strong> — in een virtual environment</summary>
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
+pip install studentprognose
+```
+
+> **Tip:** Gebruik altijd een virtual environment. Een `pip install` buiten een venv kan conflicten veroorzaken.
+
+</details>
+
+<details>
+<summary><strong>uv</strong></summary>
+
+```bash
+uv tool install studentprognose
+```
+
+Of in een bestaand uv-project: `uv add studentprognose`
+
+</details>
+
+Na installatie:
+
+```bash
+studentprognose init        # mapstructuur + configuratie aanmaken
 studentprognose -w 6 -y 2024
 ```
+
+`init` maakt de benodigde mapstructuur aan en legt uit welke bestanden je moet aanleveren.
 
 Voor geautomatiseerde runs (cron, taakplanner) — sla de interactieve prompt over:
 
@@ -47,6 +82,8 @@ studentprognose -w 6 -y 2024 --yes
 
 > [!NOTE]
 > Heb je afwijkende kolomnamen in je Studielink-export? Voeg een `"columns"`-blok toe aan `configuration/configuration.json`. Zie [Configuratie](https://cedanl.github.io/studentprognose/configuratie/) voor uitleg en voorbeelden.
+
+Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/) voor een complete walkthrough met uitleg over Python-installatie, data klaarzetten en veelvoorkomende fouten.
 
 ---
 
@@ -87,7 +124,7 @@ Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen
 | **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
 | **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
 | **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
-| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input` |
+| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input_raw/` |
 
 ---
 
@@ -98,16 +135,16 @@ Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen
 Specificeer jaar en week met `-y` en `-w`:
 
 ```bash
-uv run main.py -w 6 -y 2024
-uv run main.py -W 1 2 3 -Y 2024
-uv run main.py -year 2023 2024
-uv run main.py -week 40 41
+studentprognose -w 6 -y 2024
+studentprognose -W 1 2 3 -Y 2024
+studentprognose -year 2023 2024
+studentprognose -week 40 41
 ```
 
 Gebruik slicing voor een reeks weken:
 
 ```bash
-uv run main.py -w 10 : 20 -y 2023
+studentprognose -w 10 : 20 -y 2023
 ```
 
 ### Datasets
@@ -115,9 +152,9 @@ uv run main.py -w 10 : 20 -y 2023
 Er zijn twee datasets beschikbaar: **individual** (per student) en **cumulative** (geaggregeerd per opleiding/herkomst/jaar/week). Standaard worden beide gebruikt.
 
 ```bash
-uv run main.py -d individual
-uv run main.py -D cumulative
-uv run main.py -dataset both
+studentprognose -d individual
+studentprognose -D cumulative
+studentprognose -dataset both
 ```
 
 ### Datakwaliteitscontrole
@@ -171,8 +208,8 @@ De standaardwaarden (jaarbereiken, NaN-drempels, toegestane categorische waarden
 Het standaard configuratiebestand is `configuration/configuration.json`. Dit kan worden overschreven:
 
 ```bash
-uv run main.py -c pad/naar/configuration.json
-uv run main.py -configuration langer/pad/naar/config.json
+studentprognose -c pad/naar/configuration.json
+studentprognose -configuration langer/pad/naar/config.json
 ```
 
 ### Uitgebreid voorbeeld
@@ -180,13 +217,13 @@ uv run main.py -configuration langer/pad/naar/config.json
 Voorspel eerstejaars voor 2023 en 2024, weken 10 t/m 20, met beide datasets:
 
 ```bash
-uv run main.py -y 2023 2024 -w 10 : 20 -d b
+studentprognose -y 2023 2024 -w 10 : 20 -d b
 ```
 
 Voorspel eerstejaars voor collegejaar 2025/2026, week 5, alleen cumulatief:
 
 ```bash
-uv run main.py -y 2025 -w 5 -d c
+studentprognose -y 2025 -w 5 -d c
 ```
 
 ### Syntax overzicht
@@ -198,6 +235,7 @@ uv run main.py -y 2025 -w 5 -d c
 | Slicing                 |                |                  | Gebruik `:` voor reeksen, bijv. `10 : 20`   |
 | Dataset                 | `-d` of `-D`   | `-dataset`       | `i`/`individual`, `c`/`cumulative`, `b`/`both` |
 | Configuratie            | `-c` of `-C`   | `-configuration` | Pad naar configuratiebestand                |
+
 ---
 
 ## 📁 Beschrijving van bestanden
