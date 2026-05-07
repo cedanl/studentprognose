@@ -142,6 +142,7 @@ studentprognose -y 2023 2024 -w 10 : 20 -d b  # meerdere jaren, beide sporen
 | `-w` | Voorspelweek(en) | weeknummers of bereik, bijv. `10 : 20` |
 | `-y` | Voorspeljaar(en) | bijv. `2024` of `2023 2024` |
 | `-d` | Dataset | `i`ndividual, `c`umulative, `b`oth (standaard) |
+| `--noetl` | Sla ETL over | als je al verwerkte data in `data/input/` hebt |
 | `--yes` | Sla interactieve prompts over | voor CI/CD en cron |
 
 Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-referentie) voor alle vlaggen, configuratie, validatie-instellingen en uitgebreide voorbeelden.

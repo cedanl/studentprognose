@@ -161,6 +161,9 @@ Bestaat een bestand al, dan wordt het overgeslagen. Je kunt `init` dus veilig op
 
 ## Je data neerzetten
 
+!!! tip "Heb je al verwerkte data?"
+    Als je al beschikt over de verwerkte bestanden in `data/input/` (bijv. uit een eigen ETL-proces of een eerdere run), kun je de ETL overslaan met `--noetl`. Zie [ETL overslaan](je-data-voorbereiden.md#etl-overslaan) voor welke bestanden je nodig hebt.
+
 Zet je inputbestanden in de juiste mappen voordat je de pipeline start:
 
 ```
