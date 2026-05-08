@@ -26,6 +26,9 @@ jobs:
       - name: Install dependencies
         run: uv sync --group docs
 
+      - name: Generate documentation plots
+        run: uv run python scripts/generate_docs_plots.py
+
       - name: Build docs
         run: uv run mkdocs build --strict
 

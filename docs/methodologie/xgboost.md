@@ -64,6 +64,14 @@ Na het trainen van elk XGBoost-model wordt de **feature importance** geëxtrahee
 
 De gegroepeerde importances worden getoond in het interactieve dashboard (zie [Output begrijpen](../output-begrijpen.md#interactief-dashboard)).
 
+<iframe src="../../assets/plots/xgb_classifier_importance.html" width="100%" height="450" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Feature importance — XGBoost classifier · individueel spoor: welke kenmerken zijn het meest bepalend voor de individuele inschrijfkans? (demodata)*
+
+<iframe src="../../assets/plots/xgb_regressor_importance.html" width="100%" height="450" frameborder="0" style="border-radius: 8px;"></iframe>
+
+*Feature importance — XGBoost regressor · cumulatief spoor: welke features dragen het meest bij aan de voorspelling van het totale cohortaantal? (demodata)*
+
 ## Alternatieve regressiemodellen (cumulatief spoor)
 
 Naast XGBoost zijn twee alternatieve regressiemodellen beschikbaar, configureerbaar via `model_config.cumulative_regressor` in `configuration.json`:

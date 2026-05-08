@@ -8,6 +8,10 @@
 #   4. Integratiepijplijn met repo-demodata — controleert dat de volledige
 #      pipeline tot outputbestand loopt; data wordt gekopieerd vanuit de repo,
 #      NIET meegeleverd in het wheel.
+#   5. --noetl --yes combinatie — pipeline slaagt met al verwerkte data,
+#      ETL en validatie worden overgeslagen
+#   6. -sk (skipyears) vlag — pipeline slaagt met skip_years > 0
+#   7. Exitcode 1 bij harde validatiefout — kapot telbestand triggert sys.exit(1)
 #
 # Gebruik: bash scripts/test_package.sh [--skip-build]
 
@@ -52,6 +56,36 @@ cp    "$REPO_ROOT/data/input_raw/individuele_aanmelddata.csv" data/input_raw/
 cp    "$REPO_ROOT/data/input_raw/oktober_bestand.xlsx"   data/input_raw/
 uv run studentprognose -w 6 -y 2020 --yes > /dev/null
 [ -f data/output/output_first-years_beide.xlsx ] || { echo "FOUT: output ontbreekt"; exit 1; }
+echo "OK"
+
+echo ""
+echo "=== [5] --noetl --yes combinatie ==="
+# Stap 4 heeft de verwerkte inputbestanden al aangemaakt in data/input/.
+# --noetl slaat ETL en validatie over; de pipeline moet slagen op de bestaande data.
+uv run studentprognose -w 6 -y 2020 --noetl --yes > /dev/null
+[ -f data/output/output_first-years_beide.xlsx ] || { echo "FOUT: output ontbreekt na --noetl run"; exit 1; }
+echo "OK"
+
+echo ""
+echo "=== [6] -sk (skipyears) vlag ==="
+# Bewaakt regressie op issue #109: Skip_prediction KeyError bij skip_years > 0.
+uv run studentprognose -w 6 -y 2022 -d cumulative -sk 1 --noetl --yes > /dev/null
+[ -f data/output/output_prelim_cumulatief.xlsx ] || { echo "FOUT: output ontbreekt na -sk run"; exit 1; }
+echo "OK"
+
+echo ""
+echo "=== [7] Exitcode 1 bij harde validatiefout ==="
+# Maak een kapot telbestand aan zonder de vereiste kolommen.
+# De validatie moet een hard error geven en afsluiten met exitcode 1.
+BROKEN_DIR="$(mktemp -d)"
+trap 'rm -rf "$BROKEN_DIR"' EXIT
+mkdir -p "$BROKEN_DIR/data/input_raw/telbestanden"
+echo "col1;col2" > "$BROKEN_DIR/data/input_raw/telbestanden/telbestandY2024W10.csv"
+echo "a;b"       >> "$BROKEN_DIR/data/input_raw/telbestanden/telbestandY2024W10.csv"
+if (cd "$BROKEN_DIR" && uv run --with "$WHEEL" studentprognose -w 10 -y 2024 --yes 2>/dev/null); then
+    echo "FOUT: exitcode 0 verwacht bij harde validatiefout, maar pipeline slaagde"
+    exit 1
+fi
 echo "OK"
 
 echo ""

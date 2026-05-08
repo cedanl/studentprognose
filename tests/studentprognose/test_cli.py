@@ -1,5 +1,6 @@
 import pytest
 from studentprognose.cli import _expand_slices, parse_args
+from studentprognose.utils.weeks import DataOption
 
 
 class TestExpandSlices:
@@ -49,8 +50,9 @@ class TestParseArgs:
         assert cfg.ci_test_n == 5
 
     def test_ci_invalid_raises(self):
-        with pytest.raises(SystemExit):
+        with pytest.raises(SystemExit) as exc:
             parse_args(["prog", "--ci", "invalid", "5"])
+        assert exc.value.code != 0
 
     def test_dataset_cumulative(self):
         from studentprognose.utils.weeks import DataOption
@@ -77,3 +79,42 @@ class TestParseArgs:
     def test_years_not_specified_flag(self):
         cfg = parse_args(["prog"])
         assert cfg.years_specified is False
+
+    def test_yes_flag(self):
+        cfg = parse_args(["prog", "--yes"])
+        assert cfg.yes is True
+
+    def test_yes_default_is_false(self):
+        cfg = parse_args(["prog"])
+        assert cfg.yes is False
+
+    def test_noetl_and_yes_combination(self):
+        cfg = parse_args(["prog", "--noetl", "--yes"])
+        assert cfg.noetl is True
+        assert cfg.yes is True
+
+    def test_week_53_accepted(self):
+        cfg = parse_args(["prog", "-w", "53"])
+        assert cfg.weeks == [53]
+        assert cfg.weeks_specified is True
+
+    def test_skipyears_flag(self):
+        cfg = parse_args(["prog", "-sk", "2"])
+        assert cfg.skip_years == 2
+
+    def test_skipyears_default_is_zero(self):
+        cfg = parse_args(["prog"])
+        assert cfg.skip_years == 0
+
+    def test_ci_invalid_exits_nonzero(self):
+        with pytest.raises(SystemExit) as exc:
+            parse_args(["prog", "--ci", "invalid", "5"])
+        assert exc.value.code != 0
+
+    def test_dataset_individual(self):
+        cfg = parse_args(["prog", "-d", "i"])
+        assert cfg.data_option == DataOption.INDIVIDUAL
+
+    def test_dataset_both(self):
+        cfg = parse_args(["prog", "-d", "b"])
+        assert cfg.data_option == DataOption.BOTH_DATASETS
