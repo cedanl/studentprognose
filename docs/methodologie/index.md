@@ -6,11 +6,14 @@ Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt
 
 | Model | Pagina | Rol in de pipeline |
 |-------|--------|--------------------|
-| SARIMA | [SARIMA](sarima.md) | Tijdreeksextrapolatie op basis van historische aanmeldpatronen |
+| SARIMA / ETS / Theta / AutoARIMA | [Tijdreeksmodellen](sarima.md) | Tijdreeksextrapolatie op basis van historische aanmeldpatronen |
 | XGBoost classifier | [XGBoost](xgboost.md) | Kans per individuele student dat deze zich inschrijft |
-| XGBoost regressor | [XGBoost](xgboost.md) | Vertaling van vooraanmelders naar verwachte inschrijvingen |
+| XGBoost / Ridge / Random Forest | [Regressiemodellen](xgboost.md) | Vertaling van vooraanmelders naar verwachte inschrijvingen |
 | Ratio-model | [Ratio-model](ratio-model.md) | Eenvoudige historische ratio als referentiemodel |
 | Ensemble | [Ensemble](ensemble.md) | Gewogen combinatie van bovenstaande modellen |
+| Benchmarks | [Benchmarks](benchmarks.md) | Vergelijking van alternatieve modellen |
+
+Het cumulatieve spoor is configureerbaar: via `model_config.cumulative_timeseries` en `model_config.cumulative_regressor` in de [configuratie](../configuratie.md#cumulative_timeseries) kies je welk tijdreeksmodel en welk regressiemodel wordt gebruikt.
 
 ## Datasporen
 

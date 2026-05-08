@@ -45,12 +45,30 @@ def create_time_series(data, pred_len):
     return np.array(ts_data)
 
 
-def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_week, pred_len, skip_years=0, already_printed=False, min_training_year: int = 2016) -> list:
-    """
-    Predicts pre-registrations with SARIMA per programme/origin/week for cumulative data.
+def _default_forecaster_factory() -> BaseForecaster:
+    return SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
+
+
+def predict_with_sarima_cumulative(
+    data_cumulative,
+    row,
+    predict_year,
+    predict_week,
+    pred_len,
+    skip_years=0,
+    already_printed=False,
+    min_training_year: int = 2016,
+    forecaster_factory: "callable | None" = None,
+) -> list:
+    """Voorspelt vooraanmeldingen per programme/herkomst/week voor cumulatieve data.
+
+    Args:
+        forecaster_factory: Callable die een vers BaseForecaster-object retourneert.
+            Wordt per aanroep gecalld zodat joblib-parallellisatie veilig werkt.
+            Default: SARIMAForecaster met standaard ordes.
 
     Returns:
-        list: predictions for each future week, or empty list on error.
+        list: predictions per toekomstige week, of lege lijst bij fout.
     """
     programme = row["Croho groepeernaam"]
     herkomst = row["Herkomst"]
@@ -78,7 +96,8 @@ def predict_with_sarima_cumulative(data_cumulative, row, predict_year, predict_w
     ts_data = create_time_series(data, pred_len)
 
     try:
-        model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
+        factory = forecaster_factory or _default_forecaster_factory
+        model = factory()
         model.fit(ts_data)
         pred = model.forecast(steps=pred_len)
         return pred

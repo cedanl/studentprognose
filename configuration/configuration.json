@@ -23,7 +23,9 @@
             "Studie gestaakt": 0,
             "Aanmelding vervolgen": 0
         },
-        "min_training_year": 2016
+        "min_training_year": 2016,
+        "cumulative_timeseries": "sarima",
+        "cumulative_regressor": "xgboost"
     },
     "numerus_fixus": {
         "B Opleiding": 0
@@ -42,6 +44,54 @@
         "week_30_34":        {"individual": 0.6, "cumulative": 0.4},
         "week_35_37":        {"individual": 0.7, "cumulative": 0.3},
         "default":           {"individual": 0.5, "cumulative": 0.5}
+    },
+    "column_roles": {
+        "academic_year": "Collegejaar",
+        "week": "Weeknummer",
+        "programme": "Croho groepeernaam",
+        "exam_type": "Examentype",
+        "origin": "Herkomst",
+        "faculty": "Faculteit",
+        "enrollment_status": "Inschrijfstatus",
+        "cancellation_date": "Datum intrekking vooraanmelding",
+        "student_count": "Aantal_studenten",
+        "weighted_applicants": "Gewogen vooraanmelders",
+        "unweighted_applicants": "Ongewogen vooraanmelders",
+        "single_applicants": "Aantal aanmelders met 1 aanmelding",
+        "enrollments": "Inschrijvingen",
+        "higher_education_type": "Type hoger onderwijs",
+        "croho_source": "Groepeernaam Croho",
+        "higher_years": "Hogerejaars"
+    },
+    "model_features": {
+        "classifier": {
+            "numeric": ["Collegejaar", "Sleutel_count", "is_numerus_fixus"],
+            "categorical": [
+                "Examentype",
+                "Faculteit",
+                "Croho groepeernaam",
+                "Deadlineweek",
+                "Herkomst",
+                "Weeknummer",
+                "Opleiding",
+                "Type vooropleiding",
+                "Nationaliteit",
+                "EER",
+                "Geslacht",
+                "Plaats code eerste vooropleiding",
+                "Studieadres postcode",
+                "Studieadres land",
+                "Geverifieerd adres plaats",
+                "Geverifieerd adres land",
+                "Geverifieerd adres postcode",
+                "School code eerste vooropleiding",
+                "School eerste vooropleiding",
+                "Land code eerste vooropleiding"
+            ]
+        },
+        "regressor": {
+            "categorical": ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
+        }
     },
     "columns": {
         "individual": {

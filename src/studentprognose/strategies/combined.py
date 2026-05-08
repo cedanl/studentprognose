@@ -183,6 +183,7 @@ class CombinedStrategy(PredictionStrategy):
                 self.cumulative.data_cumulative, row, self.predict_year, self.predict_week,
                 self.cumulative.pred_len, self.cumulative.skip_years, already_printed=True,
                 min_training_year=self.min_training_year,
+                forecaster_factory=self.cumulative._forecaster_factory,
             )
 
         return sarima_individual, predicted_preregistration

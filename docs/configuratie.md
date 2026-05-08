@@ -61,6 +61,33 @@ Standaard: `2016`
 
 Het vroegste collegejaar dat als trainingsdata wordt meegenomen. Data van vóór dit jaar wordt genegeerd. Verlaag dit alleen als je betrouwbare historische data hebt die verder teruggaat.
 
+### `cumulative_timeseries`
+
+Standaard: `"sarima"`
+
+Het tijdreeksmodel voor de cumulatieve curve-extrapolatie (stap 1 van het cumulatieve spoor). De keuze bepaalt hoe de vooraanmelderscurve tot week 38 wordt geëxtrapoleerd.
+
+| Waarde | Model | Omschrijving |
+|--------|-------|-------------|
+| `sarima` | SARIMA(1,0,1)×(1,1,1,52) | Standaard — vaste ordes, bewezen in productie |
+| `ets` | AutoETS | Automatische componentkeuze (error/trend/seizoen), stabieler bij korte reeksen |
+| `theta` | AutoTheta | Zeer simpel, competitief bij korte tijdreeksen |
+| `auto_arima` | AutoARIMA | Automatische orde-selectie via AICc, flexibeler dan vaste SARIMA |
+
+Gebruik `studentprognose benchmark` om te vergelijken welk model het best presteert op jouw data.
+
+### `cumulative_regressor`
+
+Standaard: `"xgboost"`
+
+Het regressiemodel dat vooraanmelderscijfers vertaalt naar verwachte inschrijvingen (stap 2 van het cumulatieve spoor).
+
+| Waarde | Model | Omschrijving |
+|--------|-------|-------------|
+| `xgboost` | XGBoost Regressor | Standaard — gradient boosting, krachtig bij voldoende data |
+| `ridge` | Ridge Regression | L2-regularisatie, stabiel bij weinig trainingsdata en multicollineariteit |
+| `random_forest` | Random Forest | Robuust bij kleine datasets, ingebouwde feature importance |
+
 ## `numerus_fixus`
 
 Een object met opleidingsnamen als sleutels en het maximale inschrijvingsaantal als waarde:
