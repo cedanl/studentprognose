@@ -2,6 +2,17 @@
 
 Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt** en **wanneer je de output kritisch moet beoordelen**.
 
+!!! info "Referentie-implementatie — Radboud Universiteit"
+    Voor methodologische keuzes is **[radboudir/studentprognose](https://github.com/radboudir/studentprognose)** de **leidende referentie**. Die repo bevat de productie-implementatie van Radboud — de instelling waar dit model oorspronkelijk werd ontwikkeld en doorlopend wordt verfijnd.
+
+    Gebruik deze referentie wanneer je:
+
+    - **Methodologische keuzes wilt onderbouwen** (waarom een specifieke feature, parameter, of weging?)
+    - **Een fork of eigen aanpassing maakt** — om de redenering vanuit de oorspronkelijke context te begrijpen
+    - **De overdraagbaarheid wilt valideren** — vergelijk hoe Radboud-specifieke logica zich verhoudt tot de generieke implementatie hier
+
+    Deze CEDA-versie volgt de Radboud-implementatie als blauwdruk; verschillen worden expliciet gedocumenteerd.
+
 ## Modellen in het ensemble
 
 | Model | Pagina | Rol in de pipeline |
