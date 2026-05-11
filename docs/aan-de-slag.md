@@ -28,30 +28,39 @@ Er zijn drie manieren om studentprognose te installeren. Kies de methode die het
 | **pip** | Je wilt de tool ook als Python-library importeren in scripts |
 | **uv** | Je werkt al met uv, of je wilt bijdragen aan de broncode |
 
-=== "pipx (aanbevolen)"
+=== "uv"
 
-    [pipx](https://pipx.pypa.io/) installeert CLI-tools in een eigen, geïsoleerde omgeving. Je hoeft zelf geen virtual environment aan te maken.
+    [uv](https://docs.astral.sh/uv/) is een snelle Python-pakketbeheerder die virtual environments automatisch afhandelt.
 
-    **pipx installeren** (eenmalig):
-
-    ```bash
-    python -m pip install --user pipx
-    python -m pipx ensurepath
-    ```
-
-    Start hierna je terminal opnieuw op zodat het `pipx`-commando beschikbaar is.
-
-    **studentprognose installeren:**
+    **uv installeren** (eenmalig):
 
     ```bash
-    pipx install studentprognose
+    curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
 
-    **Updaten** naar een nieuwere versie:
+    Op Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+
+    **Als CLI-tool gebruiken** (zonder project):
 
     ```bash
-    pipx upgrade studentprognose
+    uv tool install studentprognose
     ```
+
+    **In een bestaand uv-project:**
+
+    ```bash
+    uv add studentprognose
+    ```
+
+    **Bijdragen aan de broncode:**
+
+    ```bash
+    git clone https://github.com/cedanl/studentprognose.git
+    cd studentprognose
+    uv run studentprognose --help
+    ```
+
+    `uv run` maakt automatisch een virtual environment aan op basis van `pyproject.toml`.
 
 === "pip (in een virtual environment)"
 
@@ -103,39 +112,30 @@ Er zijn drie manieren om studentprognose te installeren. Kies de methode die het
     !!! tip "Virtual environment opnieuw activeren"
         Elke keer dat je een nieuwe terminal opent, moet je de environment opnieuw activeren (stap 2) voordat je `studentprognose` kunt gebruiken.
 
-=== "uv"
+=== "pipx (aanbevolen)"
 
-    [uv](https://docs.astral.sh/uv/) is een snelle Python-pakketbeheerder die virtual environments automatisch afhandelt.
+    [pipx](https://pipx.pypa.io/) installeert CLI-tools in een eigen, geïsoleerde omgeving. Je hoeft zelf geen virtual environment aan te maken.
 
-    **uv installeren** (eenmalig):
-
-    ```bash
-    curl -LsSf https://astral.sh/uv/install.sh | sh
-    ```
-
-    Op Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
-
-    **Als CLI-tool gebruiken** (zonder project):
+    **pipx installeren** (eenmalig):
 
     ```bash
-    uv tool install studentprognose
+    python -m pip install --user pipx
+    python -m pipx ensurepath
     ```
 
-    **In een bestaand uv-project:**
+    Start hierna je terminal opnieuw op zodat het `pipx`-commando beschikbaar is.
+
+    **studentprognose installeren:**
 
     ```bash
-    uv add studentprognose
+    pipx install studentprognose
     ```
 
-    **Bijdragen aan de broncode:**
+    **Updaten** naar een nieuwere versie:
 
     ```bash
-    git clone https://github.com/cedanl/studentprognose.git
-    cd studentprognose
-    uv run studentprognose --help
+    pipx upgrade studentprognose
     ```
-
-    `uv run` maakt automatisch een virtual environment aan op basis van `pyproject.toml`.
 
 ## Eerste keer: mapstructuur aanmaken
 
@@ -161,12 +161,9 @@ Bestaat een bestand al, dan wordt het overgeslagen. Je kunt `init` dus veilig op
 
 ## Je data neerzetten
 
-!!! tip "Heb je al verwerkte data?"
-    Als je al beschikt over de verwerkte bestanden in `data/input/` (bijv. uit een eigen ETL-proces of een eerdere run), kun je de ETL overslaan met `--noetl`. Zie [ETL overslaan](je-data-voorbereiden.md#etl-overslaan) voor welke bestanden je nodig hebt.
-
 Zet je inputbestanden in de juiste mappen voordat je de pipeline start:
 
-```
+``` { .text hl_lines="8" }
 data/
 ├── input/                          ← verwerkte inputbestanden (na ETL)
 │   ├── vooraanmeldingen_cumulatief.csv
@@ -174,7 +171,7 @@ data/
 │   ├── student_count_first-years.xlsx
 │   ├── student_count_higher-years.xlsx
 │   └── student_volume.xlsx
-└── input_raw/                      ← ruwe bronbestanden (voor ETL)
+└── input_raw/                      ← ruwe bronbestanden (NIET nodig met --noetl)
     ├── telbestanden/               ← Studielink telbestanden
     │   ├── telbestandY2024W01.csv
     │   └── ...
@@ -183,6 +180,41 @@ data/
 ```
 
 Zie [Je data voorbereiden](je-data-voorbereiden.md) voor kolomspecificaties per bestand.
+
+## ETL overslaan met `--noetl`
+
+**Heb je al verwerkte bestanden in `data/input/`** (bijv. uit een eigen ETL-proces, een eerdere run, of aangeleverd door een collega)? Dan hoef je de ruwe bronbestanden in `data/input_raw/` helemaal niet neer te zetten. Sla de ETL én de bijbehorende validatie over met `--noetl`:
+
+```bash
+studentprognose --noetl
+```
+
+Welke bestanden je dan precies in `data/input/` nodig hebt — en in welk formaat — lees je op [ETL overslaan](je-data-voorbereiden.md#etl-overslaan).
+
+!!! warning "Wanneer je `--noetl` níét moet gebruiken"
+    Heb je alleen ruwe bronbestanden (Studielink-telbestanden, Osiris/Usis-export, DUO oktober-bestand)? Laat `--noetl` dan weg, zodat de ingebouwde ETL de verwerkte bestanden voor je aanmaakt.
+
+## Wat voorspelt `-w 16 -y 2025`?
+
+Voor `studentprognose` is `-w` de **peilweek** (kalenderweek 1–52) en `-y` het **collegejaar** waarvoor je een prognose wilt. Met `-w 16 -y 2025` zeg je dus: *"gebruik alle vooraanmelddata tot en met week 16 van collegejaar 2025 en geef me een prognose voor het eindcohort van datzelfde collegejaar"*.
+
+!!! example "Voorbeeld-run · B Psychologie · NL (demodata)"
+    **178** vooraanmelders @ wk 16 (peilmoment) &nbsp;→&nbsp; **520** verwacht @ wk 38 &nbsp;→&nbsp; **400** ingeschreven (77% yield)
+
+=== "Week voor week"
+
+    <iframe src="../assets/plots/whatif_timeline.html" width="100%" height="540" frameborder="0" style="border-radius: 8px;"></iframe>
+
+    De blauwe lijn toont de geobserveerde cumulatieve vooraanmelders tot peilmoment (wk 16). De oranje gestippelde lijn extrapoleert naar week 38 — met scherp knikpunt rond de 1-mei-deadline en een late-zomer-naloop. De gearceerde band groeit met de horizon: ±12 bij peilmoment, ±34 bij wk 38.
+
+=== "In één oogopslag"
+
+    <iframe src="../assets/plots/whatif_slope.html" width="100%" height="420" frameborder="0" style="border-radius: 8px;"></iframe>
+
+    Drie kerngetallen op één schaal: peilmoment → SARIMA-extrapolatie naar wk 38 → verwacht eindcohort. De badges tussen de punten kwantificeren de overgangen — eerst de groei (×2.92 in vooraanmelders), daarna de yield (77% conversie naar ingeschreven).
+
+!!! tip "Andere peilweek of collegejaar?"
+    Vervang `-w 16` door je eigen peilweek (1–52) en `-y 2025` door het collegejaar dat je wilt voorspellen. De pipeline pakt automatisch de data tot en met die week om het eindcohort van datzelfde collegejaar te schatten.
 
 ## Eerste run
 

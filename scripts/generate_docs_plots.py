@@ -1325,6 +1325,671 @@ def plot_output_individual_cockpit(predictions: dict) -> go.Figure:
 
 
 # ---------------------------------------------------------------------------
+# Plot: "Wat voorspelt -w 16 -y 2025?" — aan-de-slag.md
+# ---------------------------------------------------------------------------
+
+WHATIF_OBSERVED = "#1f77b4"
+WHATIF_PRED = "#ff7f0e"
+WHATIF_PEIL = "#d62728"
+WHATIF_TARGET = "#2ca02c"
+
+_WHATIF_REALISTIC_CACHE: np.ndarray | None = None
+
+
+def _whatif_realistic_curve() -> np.ndarray:
+    """Realistic Dutch HE cumulative application curve over 52 academic weeks (wk 39 -> wk 38).
+
+    Captures the dominant inflow patterns:
+      - slow start (Oct-Dec),
+      - steady January build-up,
+      - major 1-mei deadline spike (wk 18),
+      - post-deadline tail (May-Jul),
+      - small late-summer rush (Aug-Sep).
+    """
+    global _WHATIF_REALISTIC_CACHE
+    if _WHATIF_REALISTIC_CACHE is not None:
+        return _WHATIF_REALISTIC_CACHE
+
+    local_rng = np.random.default_rng(2025)
+
+    phases = [
+        (8, 3.0, 1.5),    # wk 39-46: slow autumn start
+        (3, 6.5, 2.0),    # wk 47-49: pre-Christmas modest uptick
+        (3, 1.2, 0.8),    # wk 50-52: CHRISTMAS DIP (near-zero activity)
+        (3, 6.5, 1.8),    # wk 1-3: post-Christmas pickup
+        (12, 8.5, 2.2),   # wk 4-15: Feb-mid Apr steady build-up
+        (1, 13.0, 3.0),   # wk 16: peilmoment week
+        (1, 30.0, 6.0),   # wk 17: ramp-up to deadline
+        (1, 115.0, 18.0), # wk 18: 1-MEI DEADLINE spike
+        (1, 38.0, 8.0),   # wk 19: post-deadline tail
+        (8, 9.5, 2.8),    # wk 20-27: May-mid Jul
+        (5, 4.0, 1.5),    # wk 28-32: late Jul-Aug lull
+        (6, 7.0, 2.2),    # wk 33-38: late-summer enrollment rush
+    ]
+
+    weekly = []
+    for n_weeks, mean, std in phases:
+        weekly.extend(local_rng.normal(mean, std, n_weeks).tolist())
+    weekly = np.maximum(np.asarray(weekly, dtype=float), 0.0)
+    curve = np.cumsum(weekly)
+
+    _WHATIF_REALISTIC_CACHE = curve
+    return curve
+
+
+def _whatif_curve(curves: dict, year: int = 2024, prog: str = "B Psychologie",
+                  herkomst: str = "NL") -> np.ndarray:
+    """Realistic Dutch HE cumulative curve (curves/year/prog kept for API compat)."""
+    return _whatif_realistic_curve()
+
+
+_WHATIF_FUNNEL_VALUES: tuple[int, int, int] | None = None
+
+
+def _whatif_funnel_values() -> tuple[int, int, int]:
+    """Return (aanmelders_w16, aanmelders_w38, eindcohort) — stable across plots."""
+    global _WHATIF_FUNNEL_VALUES
+    if _WHATIF_FUNNEL_VALUES is not None:
+        return _WHATIF_FUNNEL_VALUES
+    curve = _whatif_realistic_curve()
+    pw_idx = WEEKS_ORDERED.index(16)
+    aanmelders_w16 = int(round(curve[pw_idx]))
+    aanmelders_w38 = int(round(curve[-1] * 1.04))
+    eindcohort = 400
+    _WHATIF_FUNNEL_VALUES = (aanmelders_w16, aanmelders_w38, eindcohort)
+    return _WHATIF_FUNNEL_VALUES
+
+
+def plot_whatif_timeline(curves: dict, student_counts: dict) -> go.Figure:
+    """Plot A — tijdlijn met peilmoment, observed vs predicted segment."""
+    curve = _whatif_curve(curves).astype(float)
+    pw_idx = WEEKS_ORDERED.index(16)
+    vline_idx = min(pw_idx + 13, len(WEEKS_ORDERED) - 1)
+    n = len(curve)
+
+    observed = curve[: pw_idx + 1]
+    n_fc = n - pw_idx  # 23 points: anchor + 22 weekly forecasts
+
+    # SARIMA-style prediction with realistic Dutch HE inflow shape:
+    #   ramp-up → 1-mei spike → post-deadline tail → summer plateau → late-summer rush
+    _, aanmelders_w38_target, _ = _whatif_funnel_values()
+    pred_rng = np.random.default_rng(99)
+    pred_inc = [
+        max(28 + pred_rng.normal(0, 3), 8),       # wk 17: pre-deadline ramp
+        max(85 + pred_rng.normal(0, 10), 60),     # wk 18: 1-MEI SPIKE (sharp)
+        max(45 + pred_rng.normal(0, 5), 25),      # wk 19: post-deadline tail
+    ]
+    for k in range(6):                            # wk 20-25: declining May-Jun
+        pred_inc.append(max(20 - 2 * k + pred_rng.normal(0, 2), 4))
+    for _ in range(7):                            # wk 26-32: summer plateau
+        pred_inc.append(max(pred_rng.normal(4.0, 1.5), 1))
+    for _ in range(5):                            # wk 33-37: late-summer rush
+        pred_inc.append(max(pred_rng.normal(8.5, 2.0), 3))
+    pred_inc.append(max(pred_rng.normal(5.0, 2.0), 1))  # wk 38: final week
+
+    pred_inc = np.asarray(pred_inc, dtype=float)
+    # Scale increments so the predicted endpoint matches the slope-chart's wk-38 value
+    scale = (aanmelders_w38_target - float(observed[-1])) / pred_inc.sum()
+    pred_inc *= scale
+
+    predicted = np.concatenate(([float(observed[-1])], float(observed[-1]) + np.cumsum(pred_inc)))
+    predicted = np.maximum.accumulate(predicted)
+
+    # Uncertainty band: noticeable width already at peilmoment, sqrt-t growth.
+    t = np.linspace(0, 1, n_fc)
+    band = 12.0 + 22.0 * np.sqrt(t)
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=ACADEMIC_WEEKS[pw_idx:], y=(predicted + band).tolist(),
+        mode="lines", line=dict(width=0), hoverinfo="skip", showlegend=False,
+    ))
+    fig.add_trace(go.Scatter(
+        x=ACADEMIC_WEEKS[pw_idx:], y=np.maximum(predicted - band, 0).tolist(),
+        mode="lines", line=dict(width=0),
+        fill="tonexty", fillcolor="rgba(255,127,14,0.20)",
+        name="Onzekerheid", hoverinfo="skip",
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=ACADEMIC_WEEKS[: pw_idx + 1], y=observed.tolist(),
+        mode="lines", line=dict(color=WHATIF_OBSERVED, width=3),
+        name="Geobserveerd (Studielink)",
+        hovertemplate="<b>Week %{x}</b><br>%{y:.0f} vooraanmelders<extra></extra>",
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=ACADEMIC_WEEKS[pw_idx:], y=predicted.tolist(),
+        mode="lines", line=dict(color=WHATIF_PRED, width=3, dash="dash"),
+        name="SARIMA",
+        hovertemplate="<b>Week %{x}</b><br>%{y:.0f} (voorspeld)<extra></extra>",
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[ACADEMIC_WEEKS[pw_idx]], y=[float(observed[-1])],
+        mode="markers", marker=dict(size=14, color=WHATIF_PEIL, symbol="diamond",
+                                    line=dict(width=2, color="white")),
+        name="Peilmoment", hovertemplate="<b>Peilmoment</b><br>wk 16 · jaar 2025<extra></extra>",
+    ))
+
+    _, _, eindcohort_target = _whatif_funnel_values()
+    fig.add_trace(go.Scatter(
+        x=[ACADEMIC_WEEKS[-1]], y=[eindcohort_target],
+        mode="markers", marker=dict(size=14, color=WHATIF_TARGET, symbol="star",
+                                    line=dict(width=2, color="white")),
+        name="Voorspeld eindcohort",
+        hovertemplate="<b>Voorspeld eindcohort</b><br>%{y:.0f} studenten<extra></extra>",
+    ))
+
+    fig.add_vline(
+        x=ACADEMIC_WEEKS[vline_idx], line_dash="dot", line_color=WHATIF_PEIL,
+        line_width=1.5, opacity=0.6,
+    )
+
+    fig.add_annotation(
+        x=ACADEMIC_WEEKS[pw_idx + (n - pw_idx) // 2],
+        y=float(predicted[(n - pw_idx) // 2]) - curve[-1] * 0.18,
+        text="<b>Voorspeld →</b><br><span style='font-size:11px'>wat het model verwacht</span>",
+        showarrow=False, font=dict(color=WHATIF_PRED, size=12),
+        align="center",
+    )
+    fig.add_annotation(
+        x=ACADEMIC_WEEKS[vline_idx], y=float(observed[-1]) + 400,
+        text="<b>-w 16 -y 2025</b>",
+        showarrow=False,
+        xanchor="center", yanchor="middle",
+        bgcolor="white", bordercolor=WHATIF_PEIL, borderwidth=1.5,
+        borderpad=4,
+        font=dict(color=WHATIF_PEIL, size=13),
+    )
+    fig.add_annotation(
+        xref="paper", yref="y",
+        x=1.0, y=300,
+        xanchor="right", yanchor="middle",
+        text=f"<b>≈ {eindcohort_target} studenten</b><br><span style='font-size:11px'>eindcohort (wk 38)</span>",
+        showarrow=False,
+        bgcolor="white", bordercolor=WHATIF_TARGET, borderwidth=1.5,
+        borderpad=4,
+        font=dict(color=WHATIF_TARGET, size=12),
+    )
+
+    tickvals = [str(w) for w in [39, 45, 51, 5, 11, 17, 23, 29, 35]]
+    fig.update_xaxes(
+        categoryorder="array", categoryarray=ACADEMIC_WEEKS,
+        tickvals=tickvals, title_text="Week in collegejaar (wk 39 = start)",
+    )
+    fig.update_yaxes(title_text="Cumulatieve vooraanmelders")
+
+    fig.update_layout(
+        title=dict(
+            text="<b>Wat voorspelt -w 16 -y 2025?</b><br>"
+                 "<span style='font-size:13px;color:#666'>"
+                 "Realistische demodata · typisch NL-aanmeldverloop met 1-mei-deadline"
+                 "</span>",
+            x=0.5, xanchor="center", font=dict(size=17),
+        ),
+        height=500,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.28, xanchor="center", x=0.5),
+        margin=dict(t=90, b=110, l=70, r=30),
+    )
+    return fig
+
+
+def plot_whatif_funnel(curves: dict, student_counts: dict) -> go.Figure:
+    """Plot B — cohort funnel: aanmelders @ wk 16 → wk 38 → eindcohort."""
+    aanmelders_w16, aanmelders_w38, eindcohort = _whatif_funnel_values()
+    conv_w16_w38 = aanmelders_w38 / aanmelders_w16
+    yield_rate = eindcohort / aanmelders_w38
+
+    fig = go.Figure(go.Funnel(
+        y=[
+            "<b>Vooraanmelders @ wk 16, 2025</b><br>"
+            "<span style='font-size:11px;color:#666'>wat je nu ziet</span>",
+            "<b>Verwachte vooraanmelders @ wk 38, 2025</b><br>"
+            "<span style='font-size:11px;color:#666'>SARIMA-extrapolatie</span>",
+            "<b>Verwacht eindcohort (ingeschreven)</b><br>"
+            "<span style='font-size:11px;color:#666'>XGBoost regressor + ensemble</span>",
+        ],
+        x=[aanmelders_w16, aanmelders_w38, eindcohort],
+        text=[
+            f"<b style='font-size:20px'>{aanmelders_w16}</b>"
+            f"<br><span style='font-size:12px;opacity:0.9'>peilmoment</span>",
+            f"<b style='font-size:20px'>{aanmelders_w38}</b>"
+            f"<br><span style='font-size:12px;opacity:0.9'>×{conv_w16_w38:.2f} vs wk 16</span>",
+            f"<b style='font-size:20px'>{eindcohort}</b>"
+            f"<br><span style='font-size:12px;opacity:0.9'>{yield_rate*100:.0f}% yield</span>",
+        ],
+        textposition="inside",
+        textinfo="text",
+        textfont=dict(color="white"),
+        insidetextanchor="middle",
+        marker=dict(
+            color=[WHATIF_OBSERVED, WHATIF_PRED, WHATIF_TARGET],
+            line=dict(width=2, color="white"),
+        ),
+        connector=dict(line=dict(color="#999", dash="dot", width=1.5)),
+        hovertemplate="<b>%{y}</b><br>Aantal: %{x}<extra></extra>",
+    ))
+
+    fig.update_layout(
+        title=dict(
+            text="<b>Van vooraanmelders bij peilmoment → eindcohort</b><br>"
+                 "<span style='font-size:13px;color:#666'>"
+                 "Voorbeeld: -w 16 -y 2025 · B Psychologie · NL (demodata)"
+                 "</span>",
+            x=0.5, xanchor="center", font=dict(size=14),
+        ),
+        height=390,
+        margin=dict(t=58, b=24, l=24, r=24),
+        showlegend=False,
+    )
+    return fig
+
+
+def plot_whatif_sankey(curves: dict, student_counts: dict) -> go.Figure:
+    """Plot — Sankey flow: peilmoment → wk 38 → ingeschreven/niet-ingeschreven."""
+    aanmelders_w16, aanmelders_w38, eindcohort = _whatif_funnel_values()
+    nieuwe = aanmelders_w38 - aanmelders_w16
+    niet_ingeschreven = aanmelders_w38 - eindcohort
+    yield_pct = eindcohort / aanmelders_w38 * 100
+    conv = aanmelders_w38 / aanmelders_w16
+
+    node_labels = [
+        f"<b>Wk 16 peilmoment</b><br>{aanmelders_w16} vooraanmelders",
+        f"<b>Bijgekomen wk 17–38</b><br>+{nieuwe} (verwacht)",
+        f"<b>Wk 38 totaal</b><br>{aanmelders_w38} vooraanmelders",
+        f"<b>Ingeschreven</b><br>{eindcohort} studenten",
+        f"<b>Niet ingeschreven</b><br>{niet_ingeschreven} (uitval)",
+    ]
+    node_colors = [WHATIF_OBSERVED, "#9ec5f0", WHATIF_PRED, WHATIF_TARGET, "#cccccc"]
+
+    fig = go.Figure(go.Sankey(
+        arrangement="snap",
+        node=dict(
+            pad=22, thickness=22,
+            line=dict(color="white", width=1.5),
+            label=node_labels,
+            color=node_colors,
+            x=[0.01, 0.01, 0.50, 0.99, 0.99],
+            y=[0.20, 0.80, 0.50, 0.25, 0.85],
+        ),
+        link=dict(
+            source=[0, 1, 2, 2],
+            target=[2, 2, 3, 4],
+            value=[aanmelders_w16, nieuwe, eindcohort, niet_ingeschreven],
+            color=[
+                "rgba(31,119,180,0.35)",
+                "rgba(158,197,240,0.45)",
+                "rgba(44,160,44,0.45)",
+                "rgba(180,180,180,0.40)",
+            ],
+            hovertemplate="<b>%{source.label}</b><br>→ %{target.label}<br>%{value}<extra></extra>",
+        ),
+    ))
+
+    fig.add_annotation(
+        x=0.25, y=1.04, xref="paper", yref="paper",
+        text=f"<b style='color:{WHATIF_PRED}'>×{conv:.2f} groei</b>",
+        showarrow=False, font=dict(size=12), xanchor="center",
+    )
+    fig.add_annotation(
+        x=0.75, y=1.04, xref="paper", yref="paper",
+        text=f"<b style='color:{WHATIF_TARGET}'>{yield_pct:.0f}% yield</b>",
+        showarrow=False, font=dict(size=12), xanchor="center",
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="<b>Cohortstroom van peilmoment naar eindcohort</b><br>"
+                 "<span style='font-size:13px;color:#666'>"
+                 "Voorbeeld: -w 16 -y 2025 · B Psychologie · NL (demodata)"
+                 "</span>",
+            x=0.5, xanchor="center", font=dict(size=14),
+        ),
+        height=390,
+        margin=dict(t=80, b=24, l=24, r=24),
+        font=dict(size=11),
+    )
+    return fig
+
+
+def plot_whatif_kpi(curves: dict, student_counts: dict) -> go.Figure:
+    """Plot — KPI-cards: 3 grote indicatoren naast elkaar."""
+    aanmelders_w16, aanmelders_w38, eindcohort = _whatif_funnel_values()
+    nieuwe = aanmelders_w38 - aanmelders_w16
+    yield_pct = eindcohort / aanmelders_w38 * 100
+
+    fig = make_subplots(
+        rows=1, cols=3,
+        specs=[[{"type": "indicator"}, {"type": "indicator"}, {"type": "indicator"}]],
+        horizontal_spacing=0.04,
+    )
+
+    fig.add_trace(go.Indicator(
+        mode="number",
+        value=aanmelders_w16,
+        title=dict(
+            text="<span style='font-size:13px;color:#333'><b>Vooraanmelders @ wk 16</b></span><br>"
+                 "<span style='font-size:11px;color:#888'>peilmoment</span>",
+        ),
+        number=dict(font=dict(color=WHATIF_OBSERVED, size=52)),
+    ), row=1, col=1)
+
+    fig.add_trace(go.Indicator(
+        mode="number+delta",
+        value=aanmelders_w38,
+        delta=dict(reference=aanmelders_w16, valueformat="+,", relative=False,
+                   increasing=dict(color=WHATIF_PRED),
+                   font=dict(size=14)),
+        title=dict(
+            text="<span style='font-size:13px;color:#333'><b>Vooraanmelders @ wk 38</b></span><br>"
+                 "<span style='font-size:11px;color:#888'>SARIMA-extrapolatie</span>",
+        ),
+        number=dict(font=dict(color=WHATIF_PRED, size=52)),
+    ), row=1, col=2)
+
+    fig.add_trace(go.Indicator(
+        mode="number+delta",
+        value=eindcohort,
+        delta=dict(reference=aanmelders_w38, valueformat="+,", relative=False,
+                   decreasing=dict(color="#888"),
+                   font=dict(size=14)),
+        title=dict(
+            text="<span style='font-size:13px;color:#333'><b>Eindcohort (ingeschreven)</b></span><br>"
+                 f"<span style='font-size:11px;color:#888'>{yield_pct:.0f}% yield · XGBoost</span>",
+        ),
+        number=dict(font=dict(color=WHATIF_TARGET, size=52)),
+    ), row=1, col=3)
+
+    fig.add_annotation(
+        x=0.335, y=0.18, xref="paper", yref="paper",
+        text="<span style='font-size:24px;color:#bbb'>→</span>",
+        showarrow=False,
+    )
+    fig.add_annotation(
+        x=0.665, y=0.18, xref="paper", yref="paper",
+        text="<span style='font-size:24px;color:#bbb'>→</span>",
+        showarrow=False,
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="<b>Drie kerngetallen voor -w 16 -y 2025</b><br>"
+                 "<span style='font-size:13px;color:#666'>"
+                 "Peilmoment → verwachte vooraanmelders @ wk 38 → verwacht eindcohort"
+                 "</span>",
+            x=0.5, xanchor="center", font=dict(size=14),
+        ),
+        height=390,
+        margin=dict(t=80, b=24, l=24, r=24),
+    )
+    return fig
+
+
+def plot_whatif_slope(curves: dict, student_counts: dict) -> go.Figure:
+    """Plot — slope/connected-dots: 3 stadia op één lijn."""
+    aanmelders_w16, aanmelders_w38, eindcohort = _whatif_funnel_values()
+    conv = aanmelders_w38 / aanmelders_w16
+    yield_pct = eindcohort / aanmelders_w38 * 100
+
+    stages = ["Wk 16<br>peilmoment", "Wk 38<br>SARIMA", "Eindcohort<br>ingeschreven"]
+    values = [aanmelders_w16, aanmelders_w38, eindcohort]
+    colors = [WHATIF_OBSERVED, WHATIF_PRED, WHATIF_TARGET]
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=stages, y=values,
+        mode="lines",
+        line=dict(color="#cccccc", width=3, dash="dot"),
+        hoverinfo="skip", showlegend=False,
+    ))
+
+    for i, (stage, val, col) in enumerate(zip(stages, values, colors)):
+        fig.add_trace(go.Scatter(
+            x=[stage], y=[val],
+            mode="markers+text",
+            marker=dict(size=46, color=col, line=dict(color="white", width=3)),
+            text=[f"<b>{val}</b>"],
+            textposition="middle center",
+            textfont=dict(color="white", size=15),
+            hovertemplate=f"<b>{stage.replace('<br>', ' · ')}</b><br>%{{y}} aantal<extra></extra>",
+            showlegend=False,
+        ))
+
+    y_top = max(values) * 1.18
+    fig.add_annotation(
+        x=0.5, y=(values[0] + values[1]) / 2 + max(values) * 0.05,
+        ax=0, ay=0, xref="x", yref="y",
+        text=f"<b style='color:{WHATIF_PRED}'>×{conv:.2f}</b><br>"
+             f"<span style='font-size:11px;color:#666'>groei tot wk 38</span>",
+        showarrow=False, align="center",
+        bgcolor="white", bordercolor=WHATIF_PRED, borderwidth=1.5, borderpad=4,
+        font=dict(size=12),
+    )
+    fig.add_annotation(
+        x=1.5, y=(values[1] + values[2]) / 2 + max(values) * 0.05,
+        ax=0, ay=0, xref="x", yref="y",
+        text=f"<b style='color:{WHATIF_TARGET}'>{yield_pct:.0f}% yield</b><br>"
+             f"<span style='font-size:11px;color:#666'>aanmelders → ingeschreven</span>",
+        showarrow=False, align="center",
+        bgcolor="white", bordercolor=WHATIF_TARGET, borderwidth=1.5, borderpad=4,
+        font=dict(size=12),
+    )
+
+    fig.update_xaxes(showgrid=False, tickfont=dict(size=12))
+    fig.update_yaxes(
+        title_text="Aantal",
+        range=[0, y_top],
+        gridcolor="#eee",
+        zeroline=False,
+    )
+
+    fig.update_layout(
+        title=dict(
+            text="<b>Drie stadia voor -w 16 -y 2025</b><br>"
+                 "<span style='font-size:13px;color:#666'>"
+                 "Peilmoment · SARIMA wk 38 · verwacht eindcohort (demodata)"
+                 "</span>",
+            x=0.5, xanchor="center", font=dict(size=14),
+        ),
+        height=390,
+        margin=dict(t=80, b=50, l=60, r=30),
+        showlegend=False,
+        plot_bgcolor="white",
+    )
+    return fig
+
+
+def plot_whatif_yoy(curves: dict, student_counts: dict) -> go.Figure:
+    """Plot C — year-over-year overlay: historische curves + 2025 half-voorspeld."""
+    pw_idx = WEEKS_ORDERED.index(16)
+    prog, herkomst = "B Psychologie", "NL"
+    history_years = [2021, 2022, 2023, 2024]
+    current_year = 2025
+
+    fig = go.Figure()
+
+    pastel = ["#bccddd", "#a8bfd6", "#94b1cf", "#80a3c8"]
+    for i, yr in enumerate(history_years):
+        c = curves[(prog, herkomst, yr)].astype(float)
+        fig.add_trace(go.Scatter(
+            x=ACADEMIC_WEEKS, y=c.tolist(),
+            mode="lines", line=dict(color=pastel[i], width=1.8),
+            name=f"Collegejaar {yr}", opacity=0.85,
+            hovertemplate=f"<b>{yr} · wk %{{x}}</b><br>%{{y:.0f}} vooraanmelders<extra></extra>",
+        ))
+
+    base = curves[(prog, herkomst, 2024)].astype(float)
+    current = base * rng.uniform(1.03, 1.08) + rng.normal(0, 4, len(base))
+    current = np.maximum.accumulate(np.maximum(current, 0))
+    observed = current[: pw_idx + 1]
+
+    predicted_endpoint = current[-1] * rng.uniform(0.98, 1.02)
+    span = len(current) - 1 - pw_idx
+    predicted = observed[-1] + (predicted_endpoint - observed[-1]) * np.linspace(0, 1, span + 1) ** 0.85
+
+    fig.add_trace(go.Scatter(
+        x=ACADEMIC_WEEKS[: pw_idx + 1], y=observed.tolist(),
+        mode="lines", line=dict(color=WHATIF_OBSERVED, width=3.5),
+        name="<b>Collegejaar 2025 (geobserveerd)</b>",
+        hovertemplate="<b>2025 · wk %{x}</b><br>%{y:.0f} (geobserveerd)<extra></extra>",
+    ))
+    fig.add_trace(go.Scatter(
+        x=ACADEMIC_WEEKS[pw_idx:], y=predicted.tolist(),
+        mode="lines", line=dict(color=WHATIF_PRED, width=3.5, dash="dash"),
+        name="<b>Collegejaar 2025 (voorspeld)</b>",
+        hovertemplate="<b>2025 · wk %{x}</b><br>%{y:.0f} (voorspeld)<extra></extra>",
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=[ACADEMIC_WEEKS[pw_idx]], y=[float(observed[-1])],
+        mode="markers",
+        marker=dict(size=14, color=WHATIF_PEIL, symbol="diamond",
+                    line=dict(width=2, color="white")),
+        name="Peilmoment <b>-w 16</b>",
+        hovertemplate="<b>Peilmoment</b><br>wk 16 · jaar 2025<extra></extra>",
+    ))
+
+    fig.add_vline(
+        x=ACADEMIC_WEEKS[pw_idx], line_dash="dot",
+        line_color=WHATIF_PEIL, line_width=1.5, opacity=0.5,
+    )
+    fig.add_annotation(
+        x=ACADEMIC_WEEKS[pw_idx], y=1.05, xref="x", yref="paper",
+        text="<b>← geobserveerd</b> · <b>voorspeld →</b>",
+        showarrow=False, font=dict(size=12, color="#555"),
+    )
+
+    tickvals = [str(w) for w in [39, 45, 51, 5, 11, 17, 23, 29, 35]]
+    fig.update_xaxes(
+        categoryorder="array", categoryarray=ACADEMIC_WEEKS,
+        tickvals=tickvals, title_text="Week in collegejaar",
+    )
+    fig.update_yaxes(title_text="Cumulatieve vooraanmelders")
+
+    fig.update_layout(
+        title=dict(
+            text="<b>Voorspelling 2025 in context van eerdere jaren</b><br>"
+                 "<span style='font-size:13px;color:#666'>"
+                 "<b>-w 16 -y 2025</b> · B Psychologie · NL — peilmoment markeert de overgang van data → prognose"
+                 "</span>",
+            x=0.5, xanchor="center", font=dict(size=17),
+        ),
+        height=520,
+        legend=dict(orientation="h", yanchor="bottom", y=-0.28, xanchor="center", x=0.5,
+                    font=dict(size=11)),
+        margin=dict(t=90, b=130, l=70, r=30),
+    )
+    return fig
+
+
+def plot_whatif_schema() -> go.Figure:
+    """Plot D — schematisch stappendiagram zonder data."""
+    fig = go.Figure()
+
+    box_y0, box_y1 = 0.30, 0.70
+    box_w = 0.26
+    centers = [0.16, 0.50, 0.84]
+    colors = [WHATIF_OBSERVED, "#555555", WHATIF_TARGET]
+    titles = ["INPUT", "MODEL", "OUTPUT"]
+    subtitles = [
+        "Wat je tot peilmoment ziet",
+        "Hoe de tool extrapoleert",
+        "Wat je terugkrijgt",
+    ]
+    contents = [
+        "Cumulatieve vooraanmelders<br>"
+        "<b>tot wk 16 van collegejaar 2025</b><br>"
+        "<i>(Studielink + optioneel<br>"
+        "individuele aanmelddata)</i>",
+        "SARIMA → wk 38<br>"
+        "+ XGBoost regressor<br>"
+        "+ ratio-model<br>"
+        "<b>= ensemble-voorspelling</b>",
+        "<b>Verwacht eindcohort</b><br>"
+        "voor collegejaar 2025<br>"
+        "(per opleiding ×<br>"
+        "herkomst × examentype)",
+    ]
+
+    for cx, color, title, subtitle, body in zip(centers, colors, titles, subtitles, contents):
+        fig.add_shape(
+            type="rect",
+            x0=cx - box_w / 2, x1=cx + box_w / 2,
+            y0=box_y0, y1=box_y1,
+            line=dict(color=color, width=3),
+            fillcolor="rgba(255,255,255,0.95)",
+            layer="below",
+        )
+        fig.add_annotation(
+            x=cx, y=box_y1 - 0.06,
+            text=f"<b>{title}</b>",
+            showarrow=False, font=dict(size=15, color=color),
+        )
+        fig.add_annotation(
+            x=cx, y=box_y1 - 0.12,
+            text=f"<i>{subtitle}</i>",
+            showarrow=False, font=dict(size=11, color="#888"),
+        )
+        fig.add_annotation(
+            x=cx, y=(box_y0 + box_y1) / 2 - 0.04,
+            text=body,
+            showarrow=False, font=dict(size=12, color="#333"),
+            align="center",
+        )
+
+    for cx in [0.32, 0.66]:
+        fig.add_annotation(
+            x=cx, y=(box_y0 + box_y1) / 2,
+            text="<span style='font-size:30px;color:#bbb'>→</span>",
+            showarrow=False,
+        )
+
+    fig.add_annotation(
+        x=0.16, y=0.22,
+        text="<b style='color:#1f77b4'>-w 16</b> = peilweek<br>"
+             "<b style='color:#1f77b4'>-y 2025</b> = collegejaar",
+        showarrow=False, font=dict(size=11, color="#555"), align="center",
+    )
+    fig.add_annotation(
+        x=0.50, y=0.22,
+        text="Modellen werken samen,<br>gewogen op historische fouten",
+        showarrow=False, font=dict(size=11, color="#555"), align="center",
+    )
+    fig.add_annotation(
+        x=0.84, y=0.22,
+        text="Output verschijnt in<br><b>data/output/</b>",
+        showarrow=False, font=dict(size=11, color="#555"), align="center",
+    )
+
+    fig.add_annotation(
+        x=0.5, y=0.92, xref="paper", yref="paper",
+        text="<b>Wat doet <b>-w 16 -y 2025</b>?</b>",
+        showarrow=False, font=dict(size=18, color="#222"),
+    )
+    fig.add_annotation(
+        x=0.5, y=0.85, xref="paper", yref="paper",
+        text="<span style='font-size:13px;color:#666'>"
+             "Drie stappen — input, model, output — zonder cijfers"
+             "</span>",
+        showarrow=False,
+    )
+
+    fig.update_xaxes(visible=False, range=[0, 1])
+    fig.update_yaxes(visible=False, range=[0, 1])
+    fig.update_layout(
+        height=420,
+        margin=dict(t=20, b=20, l=20, r=20),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        showlegend=False,
+    )
+    return fig
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -1395,7 +2060,23 @@ def main() -> None:
         output_dir,
     )
 
-    print(f"\nGenerated 13 plots in {output_dir}")
+    # ── "Wat voorspelt -w 16 -y 2025?" plots (aan-de-slag.md) ───────
+    _wrap_html(plot_whatif_timeline(curves, student_counts),
+               "whatif_timeline.html", output_dir)
+    _wrap_html(plot_whatif_funnel(curves, student_counts),
+               "whatif_funnel.html", output_dir)
+    _wrap_html(plot_whatif_sankey(curves, student_counts),
+               "whatif_sankey.html", output_dir)
+    _wrap_html(plot_whatif_kpi(curves, student_counts),
+               "whatif_kpi.html", output_dir)
+    _wrap_html(plot_whatif_slope(curves, student_counts),
+               "whatif_slope.html", output_dir)
+    _wrap_html(plot_whatif_yoy(curves, student_counts),
+               "whatif_yoy.html", output_dir)
+    _wrap_html(plot_whatif_schema(),
+               "whatif_schema.html", output_dir)
+
+    print(f"\nGenerated 20 plots in {output_dir}")
 
 
 if __name__ == "__main__":
