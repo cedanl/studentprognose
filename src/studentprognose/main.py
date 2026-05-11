@@ -39,7 +39,7 @@ def main(argv):
         from studentprognose.data.validation import validate_raw_data
         from studentprognose.data.etl import run_etl
 
-        validate_raw_data(configuration, yes=cfg.yes)
+        validate_raw_data(configuration, yes=cfg.yes, data_option=cfg.data_option)
         run_etl(configuration)
 
     # Step 1: Load data

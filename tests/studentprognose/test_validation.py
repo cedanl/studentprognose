@@ -9,15 +9,19 @@ import pytest
 from studentprognose.data.validation import (
     ValidationResult,
     _check_categoricals_per_programme,
+    _check_file_presence,
     _check_nan_rate,
     _check_telbestand_completeness,
     _coerce_to_numeric,
     _handle_result,
     _normalize_series,
+    _print_file_overview,
+    _required_files_for,
     _resolve_column,
     _DEFAULT_VALIDATION_CFG,
     validate_raw_data,
 )
+from studentprognose.utils.weeks import DataOption
 
 
 # ---------------------------------------------------------------------------
@@ -256,7 +260,7 @@ class TestValidateOktober:
         assert not result.hard_errors
         assert not result.soft_errors
 
-    def test_missing_file_produces_warning(self, tmp_path, monkeypatch):
+    def test_missing_file_returns_silently(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
         from studentprognose.data.validation import _validate_oktober, _DEFAULT_VALIDATION_CFG
         result = ValidationResult()
@@ -264,8 +268,7 @@ class TestValidateOktober:
         validation_cfg = {**_DEFAULT_VALIDATION_CFG}
         _validate_oktober(str(tmp_path), cfg["paths"], validation_cfg, cfg["columns"], result)
         assert not result.hard_errors
-        assert len(result.warnings) == 1
-        assert "Oktober-bestand" in result.warnings[0]
+        assert not result.warnings
 
     def test_missing_column_produces_hard_error(self, tmp_path, monkeypatch):
         monkeypatch.chdir(tmp_path)
@@ -383,7 +386,7 @@ class TestValidateRawDataIntegration:
         _make_valid_telbestand(telbestanden_dir / "telbestandY2024W01.csv")
         cfg = _make_configuration(tmp_path, telbestanden_dir)
         monkeypatch.chdir(tmp_path)
-        validate_raw_data(cfg, yes=True)
+        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
 
     def test_missing_telbestanden_dir_exits(self, tmp_path, monkeypatch):
         cfg = _make_configuration(tmp_path, tmp_path / "nonexistent")
@@ -418,7 +421,7 @@ class TestValidateRawDataIntegration:
         df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
         cfg = _make_configuration(tmp_path, telbestanden_dir)
         monkeypatch.chdir(tmp_path)
-        validate_raw_data(cfg, yes=True)
+        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
 
     def test_invalid_herkomst_prompts_and_n_exits(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"
@@ -438,7 +441,7 @@ class TestValidateRawDataIntegration:
         monkeypatch.chdir(tmp_path)
         with patch("builtins.input", return_value="n"):
             with pytest.raises(SystemExit):
-                validate_raw_data(cfg, yes=False)
+                validate_raw_data(cfg, yes=False, data_option=DataOption.CUMULATIVE)
 
     def test_yes_flag_skips_prompt_for_soft_errors(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"
@@ -456,7 +459,7 @@ class TestValidateRawDataIntegration:
         df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
         cfg = _make_configuration(tmp_path, telbestanden_dir)
         monkeypatch.chdir(tmp_path)
-        validate_raw_data(cfg, yes=True)
+        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
 
     def test_whitespace_in_herkomst_produces_warning_not_error(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"
@@ -474,7 +477,7 @@ class TestValidateRawDataIntegration:
         df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
         cfg = _make_configuration(tmp_path, telbestanden_dir)
         monkeypatch.chdir(tmp_path)
-        validate_raw_data(cfg, yes=True)
+        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
 
     def test_string_studiejaar_produces_warning_not_error(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"
@@ -492,7 +495,7 @@ class TestValidateRawDataIntegration:
         df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
         cfg = _make_configuration(tmp_path, telbestanden_dir)
         monkeypatch.chdir(tmp_path)
-        validate_raw_data(cfg, yes=True)
+        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
 
     def test_institution_specific_column_names_in_individueel(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"
@@ -533,6 +536,62 @@ class TestValidateRawDataIntegration:
         monkeypatch.chdir(tmp_path)
         with pytest.raises(SystemExit):
             validate_raw_data(cfg, yes=True)
+
+    def test_individual_mode_skips_missing_telbestanden(self, tmp_path, monkeypatch, capsys):
+        cfg = _make_configuration(tmp_path, tmp_path / "nonexistent_dir", with_individueel=True)
+        monkeypatch.chdir(tmp_path)
+        validate_raw_data(cfg, yes=True, data_option=DataOption.INDIVIDUAL)
+        out = capsys.readouterr().out
+        assert "Telbestanden-map niet gevonden" not in out
+
+    def test_cumulative_mode_skips_missing_individueel(self, tmp_path, monkeypatch, capsys):
+        telbestanden_dir = tmp_path / "telbestanden"
+        telbestanden_dir.mkdir()
+        _make_valid_telbestand(telbestanden_dir / "telbestandY2024W01.csv")
+        cfg = _make_configuration(tmp_path, telbestanden_dir, with_individueel=False)
+        monkeypatch.chdir(tmp_path)
+        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
+        out = capsys.readouterr().out
+        assert "Individuele aanmelddata niet gevonden" not in out
+
+    def test_missing_telbestanden_in_both_mode_hints_at_individual(self, tmp_path, monkeypatch, capsys):
+        cfg = _make_configuration(tmp_path, tmp_path / "nonexistent_dir", with_individueel=True)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            validate_raw_data(cfg, yes=True, data_option=DataOption.BOTH_DATASETS)
+        out = capsys.readouterr().out
+        assert "Telbestanden-map niet gevonden" in out
+        assert "-d individual" in out
+
+    def test_missing_individueel_in_both_mode_hints_at_cumulative(self, tmp_path, monkeypatch, capsys):
+        telbestanden_dir = tmp_path / "telbestanden"
+        telbestanden_dir.mkdir()
+        _make_valid_telbestand(telbestanden_dir / "telbestandY2024W01.csv")
+        cfg = _make_configuration(tmp_path, telbestanden_dir, with_individueel=False)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(SystemExit):
+            validate_raw_data(cfg, yes=True, data_option=DataOption.BOTH_DATASETS)
+        out = capsys.readouterr().out
+        assert "Individuele aanmelddata niet gevonden" in out
+        assert "-d cumulative" in out
+
+
+# ---------------------------------------------------------------------------
+# _required_files_for
+# ---------------------------------------------------------------------------
+
+class TestRequiredFilesFor:
+    def test_none_requires_both(self):
+        assert _required_files_for(None) == (True, True)
+
+    def test_both_datasets_requires_both(self):
+        assert _required_files_for(DataOption.BOTH_DATASETS) == (True, True)
+
+    def test_individual_requires_only_individueel(self):
+        assert _required_files_for(DataOption.INDIVIDUAL) == (False, True)
+
+    def test_cumulative_requires_only_telbestanden(self):
+        assert _required_files_for(DataOption.CUMULATIVE) == (True, False)
 
 
 # ---------------------------------------------------------------------------
@@ -599,3 +658,142 @@ class TestCoerceToNumeric:
         assert was_coerced is True
         assert pd.isna(result.iloc[0])
         assert result.iloc[1] == 2024.0
+
+
+# ---------------------------------------------------------------------------
+# _check_file_presence
+# ---------------------------------------------------------------------------
+
+class TestCheckFilePresence:
+    def test_all_present(self, tmp_path):
+        tel_dir = tmp_path / "telbestanden"
+        tel_dir.mkdir()
+        (tel_dir / "telbestandY2024W01.csv").write_text("dummy")
+        (tmp_path / "individuele_aanmelddata.csv").write_text("dummy")
+        (tmp_path / "oktober_bestand.xlsx").write_text("dummy")
+
+        paths = {
+            "path_raw_telbestanden": str(tel_dir),
+            "path_raw_individueel": str(tmp_path / "individuele_aanmelddata.csv"),
+            "path_raw_october": str(tmp_path / "oktober_bestand.xlsx"),
+        }
+        files = _check_file_presence(str(tmp_path), paths)
+        assert all(f[1] for f in files)
+
+    def test_all_missing(self, tmp_path):
+        paths = {
+            "path_raw_telbestanden": str(tmp_path / "telbestanden"),
+            "path_raw_individueel": str(tmp_path / "individuele_aanmelddata.csv"),
+            "path_raw_october": str(tmp_path / "oktober_bestand.xlsx"),
+        }
+        files = _check_file_presence(str(tmp_path), paths)
+        assert not any(f[1] for f in files)
+
+    def test_telbestanden_dir_exists_but_empty(self, tmp_path):
+        tel_dir = tmp_path / "telbestanden"
+        tel_dir.mkdir()
+
+        paths = {
+            "path_raw_telbestanden": str(tel_dir),
+            "path_raw_individueel": str(tmp_path / "nonexistent.csv"),
+            "path_raw_october": str(tmp_path / "nonexistent.xlsx"),
+        }
+        files = _check_file_presence(str(tmp_path), paths)
+        assert files[0][1] is False
+
+    def test_telbestanden_dir_with_wrong_filenames(self, tmp_path):
+        tel_dir = tmp_path / "telbestanden"
+        tel_dir.mkdir()
+        (tel_dir / "random_file.csv").write_text("dummy")
+
+        paths = {
+            "path_raw_telbestanden": str(tel_dir),
+            "path_raw_individueel": str(tmp_path / "nonexistent.csv"),
+            "path_raw_october": str(tmp_path / "nonexistent.xlsx"),
+        }
+        files = _check_file_presence(str(tmp_path), paths)
+        assert files[0][1] is False
+
+    def test_empty_oktober_path(self, tmp_path):
+        paths = {
+            "path_raw_telbestanden": str(tmp_path / "telbestanden"),
+            "path_raw_individueel": str(tmp_path / "nonexistent.csv"),
+            "path_raw_october": "",
+        }
+        files = _check_file_presence(str(tmp_path), paths)
+        assert files[2][1] is False
+
+    def test_uses_default_paths_when_keys_missing(self, tmp_path):
+        files = _check_file_presence(str(tmp_path), {})
+        assert len(files) == 3
+        assert "telbestanden" in files[0][0]
+        assert "individuele_aanmelddata" in files[1][0]
+        assert "oktober_bestand" in files[2][0]
+
+
+# ---------------------------------------------------------------------------
+# _print_file_overview
+# ---------------------------------------------------------------------------
+
+class TestPrintFileOverview:
+    def test_all_present_shows_alle_beschikbaar(self, tmp_path, capsys):
+        tel_dir = tmp_path / "telbestanden"
+        tel_dir.mkdir()
+        (tel_dir / "telbestandY2024W01.csv").write_text("dummy")
+        (tmp_path / "individuele_aanmelddata.csv").write_text("dummy")
+        (tmp_path / "oktober_bestand.xlsx").write_text("dummy")
+
+        paths = {
+            "path_raw_telbestanden": str(tel_dir),
+            "path_raw_individueel": str(tmp_path / "individuele_aanmelddata.csv"),
+            "path_raw_october": str(tmp_path / "oktober_bestand.xlsx"),
+        }
+        _print_file_overview(str(tmp_path), paths)
+        out = capsys.readouterr().out
+        assert "Alle bestanden aanwezig" in out
+        assert "Beschikbare modi" not in out
+
+    def test_missing_individueel_shows_modes(self, tmp_path, capsys):
+        tel_dir = tmp_path / "telbestanden"
+        tel_dir.mkdir()
+        (tel_dir / "telbestandY2024W01.csv").write_text("dummy")
+
+        paths = {
+            "path_raw_telbestanden": str(tel_dir),
+            "path_raw_individueel": str(tmp_path / "nonexistent.csv"),
+            "path_raw_october": str(tmp_path / "nonexistent.xlsx"),
+        }
+        _print_file_overview(str(tmp_path), paths)
+        out = capsys.readouterr().out
+        assert "Beschikbare modi" in out
+        assert "-d cumulative" in out
+        assert "-d individual" in out
+        assert "-d both" in out
+        assert "ontbreekt" in out
+
+    def test_missing_telbestanden_marks_cumulative_unavailable(self, tmp_path, capsys):
+        (tmp_path / "individuele_aanmelddata.csv").write_text("dummy")
+
+        paths = {
+            "path_raw_telbestanden": str(tmp_path / "telbestanden"),
+            "path_raw_individueel": str(tmp_path / "individuele_aanmelddata.csv"),
+            "path_raw_october": "",
+        }
+        _print_file_overview(str(tmp_path), paths)
+        out = capsys.readouterr().out
+        assert "Beschikbare modi" in out
+
+    def test_no_ansi_when_not_tty(self, tmp_path, capsys, monkeypatch):
+        monkeypatch.setattr(sys.stdout, "isatty", lambda: False)
+        tel_dir = tmp_path / "telbestanden"
+        tel_dir.mkdir()
+        (tel_dir / "telbestandY2024W01.csv").write_text("dummy")
+
+        paths = {
+            "path_raw_telbestanden": str(tel_dir),
+            "path_raw_individueel": str(tmp_path / "nonexistent.csv"),
+            "path_raw_october": "",
+        }
+        _print_file_overview(str(tmp_path), paths)
+        out = capsys.readouterr().out
+        assert "\033[" not in out

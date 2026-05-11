@@ -71,6 +71,38 @@ from dataclasses import dataclass, field
 import pandas as pd
 
 
+# ---------------------------------------------------------------------------
+# ANSI color helpers (disabled when stdout is not a terminal)
+# ---------------------------------------------------------------------------
+
+def _supports_color():
+    return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
+
+
+def _green(text):
+    if _supports_color():
+        return f"\033[32m{text}\033[0m"
+    return text
+
+
+def _red(text):
+    if _supports_color():
+        return f"\033[31m{text}\033[0m"
+    return text
+
+
+def _bold(text):
+    if _supports_color():
+        return f"\033[1m{text}\033[0m"
+    return text
+
+
+def _dim(text):
+    if _supports_color():
+        return f"\033[2m{text}\033[0m"
+    return text
+
+
 # Enige bron van waarheid voor validatiedefaults.
 # Waarden hier worden gebruikt tenzij configuration.json ze overschrijft.
 # Zie de module-docstring hierboven voor uitleg en het override-patroon.
@@ -111,15 +143,24 @@ class ValidationResult:
     warnings: list = field(default_factory=list)
 
 
-def validate_raw_data(configuration, yes=False):
+def validate_raw_data(configuration, yes=False, data_option=None):
     """Validate all raw input files before ETL. Blocks on hard errors, prompts on soft errors.
 
     Skipped automatically when --noetl is used, on the assumption that if ETL has
     run before, the data was validated at that point.
+
+    ``data_option`` controls *which* files are required. If omitted, both
+    telbestanden and individueel zijn vereist (overeenkomend met ``-d both``).
+    Wanneer de gebruiker expliciet ``-d individual`` of ``-d cumulative`` koos,
+    wordt het ongebruikte bestand niet als hard-error gerapporteerd.
     """
     print("==== Valideren van ruwe inputdata ====")
 
     paths = configuration["paths"]
+    cwd = os.getcwd()
+
+    _print_file_overview(cwd, paths)
+
     # Top-level merge: voegt flat overrides toe (bijv. nan_error_threshold).
     # Nested sub-dicts (telbestand, individueel, oktober) worden hier shallow
     # vervangen als de gebruiker ze overschrijft. Elke _validate_*-functie
@@ -128,30 +169,125 @@ def validate_raw_data(configuration, yes=False):
     # sectie toe, volg dan hetzelfde patroon: zie _validate_telbestanden.
     validation_cfg = {**_DEFAULT_VALIDATION_CFG, **configuration.get("validation", {})}
     columns_cfg = configuration.get("columns", {})
-    cwd = os.getcwd()
     result = ValidationResult()
 
-    _validate_telbestanden(cwd, paths, validation_cfg, result)
-    _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result)
+    needs_telbestanden, needs_individueel = _required_files_for(data_option)
+
+    _validate_telbestanden(cwd, paths, validation_cfg, result, required=needs_telbestanden)
+    _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result, required=needs_individueel)
     _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result)
 
     _handle_result(result, yes)
     print("==== Validatie voltooid ====\n")
 
 
+def _required_files_for(data_option):
+    """Return ``(needs_telbestanden, needs_individueel)`` voor de gekozen ``-d``-modus.
+
+    Bij ``None`` of ``BOTH_DATASETS`` zijn beide vereist. De file-overview-tabel
+    laat de gebruiker zien welke alternatieve modi nog werken als er één ontbreekt.
+    """
+    from studentprognose.utils.weeks import DataOption
+
+    if data_option == DataOption.INDIVIDUAL:
+        return False, True
+    if data_option == DataOption.CUMULATIVE:
+        return True, False
+    return True, True
+
+
+# ---------------------------------------------------------------------------
+# File overview table
+# ---------------------------------------------------------------------------
+
+def _check_file_presence(cwd, paths):
+    """Check which input files exist and return a list of (label, relative_path, found, required_for)."""
+    telbestanden_rel = paths.get("path_raw_telbestanden", "data/input_raw/telbestanden")
+    telbestanden_dir = os.path.join(cwd, telbestanden_rel)
+    telbestanden_ok = (
+        os.path.isdir(telbestanden_dir)
+        and any(re.search(r"telbestandY\d{4}W\d+", f) for f in os.listdir(telbestanden_dir))
+    )
+
+    individueel_rel = paths.get("path_raw_individueel", "data/input_raw/individuele_aanmelddata.csv")
+    individueel_ok = os.path.exists(os.path.join(cwd, individueel_rel))
+
+    oktober_rel = paths.get("path_raw_october", "data/input_raw/oktober_bestand.xlsx")
+    oktober_ok = os.path.exists(os.path.join(cwd, oktober_rel)) if oktober_rel else False
+
+    return [
+        (telbestanden_rel, telbestanden_ok, "-d cumulative, -d both"),
+        (individueel_rel, individueel_ok, "-d individual, -d both"),
+        (oktober_rel, oktober_ok, "studentaantallen (optioneel)"),
+    ]
+
+
+def _print_file_overview(cwd, paths):
+    """Print a table showing which input files are present and which run modes are available."""
+    files = _check_file_presence(cwd, paths)
+
+    col_file = max(len(f[0]) for f in files)
+    col_status = 8
+    header_file = "Bestand".ljust(col_file)
+    header_status = "Status".ljust(col_status)
+    header_needed = "Nodig voor"
+    separator = "─" * (col_file + col_status + len(header_needed) + 6)
+
+    print(f"\n  {_bold(header_file)}  {_bold(header_status)}  {_bold(header_needed)}")
+    print(f"  {separator}")
+
+    for rel_path, found, needed_for in files:
+        status = _green("✓") if found else _red("✗")
+        label = rel_path.ljust(col_file)
+        print(f"  {label}  {status}         {needed_for}")
+
+    telbestanden_ok = files[0][1]
+    individueel_ok = files[1][1]
+
+    modes = [
+        ("-d cumulative", telbestanden_ok, [files[0][0]]),
+        ("-d individual", individueel_ok, [files[1][0]]),
+        ("-d both", telbestanden_ok and individueel_ok, [f[0] for f in files[:2] if not f[1]]),
+    ]
+
+    any_unavailable = any(not available for _, available, _ in modes)
+
+    if any_unavailable:
+        print(f"\n  {_bold('Beschikbare modi:')}")
+        for mode, available, missing in modes:
+            if available:
+                print(f"    {mode:<18} {_green('✓')}")
+            else:
+                verb = "ontbreken" if len(missing) > 1 else "ontbreekt"
+                missing_str = ", ".join(missing) + f" {verb}"
+                print(f"    {mode:<18} {_red('✗')}  {missing_str}")
+    else:
+        print(f"\n  {_green('Alle bestanden aanwezig')} — alle modi beschikbaar.")
+
+    print()
+
+
 # ---------------------------------------------------------------------------
 # Per-file validators
 # ---------------------------------------------------------------------------
 
-def _validate_telbestanden(cwd, paths, validation_cfg, result):
+def _validate_telbestanden(cwd, paths, validation_cfg, result, required=True):
     telbestanden_dir = os.path.join(
         cwd, paths.get("path_raw_telbestanden", "data/input_raw/telbestanden")
     )
+    individueel_path = os.path.join(
+        cwd, paths.get("path_raw_individueel", "data/input_raw/individuele_aanmelddata.csv")
+    )
+    hint = (
+        " — Tip: draai met `-d individual` om alleen de individuele aanmelddata te gebruiken."
+        if os.path.exists(individueel_path) else ""
+    )
 
     if not os.path.isdir(telbestanden_dir):
-        result.hard_errors.append(
-            f"Telbestanden-map niet gevonden: {telbestanden_dir}"
-        )
+        if required:
+            result.hard_errors.append(
+                f"Telbestanden-map niet gevonden: {telbestanden_dir}{hint}"
+            )
         return
 
     files = sorted([
@@ -160,10 +296,11 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result):
     ])
 
     if not files:
-        result.hard_errors.append(
-            f"Geen telbestanden gevonden in {telbestanden_dir} "
-            f"(verwacht patroon: telbestandY{{jaar}}W{{week}}.csv)"
-        )
+        if required:
+            result.hard_errors.append(
+                f"Geen telbestanden gevonden in {telbestanden_dir} "
+                f"(verwacht patroon: telbestandY{{jaar}}W{{week}}.csv){hint}"
+            )
         return
 
     _check_telbestand_completeness(files, validation_cfg, result)
@@ -258,15 +395,27 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result):
             _check_nan_rate(df, col, filename, nan_warn, nan_error, result)
 
 
-def _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result):
+def _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result, required=True):
     path = os.path.join(
         cwd, paths.get("path_raw_individueel", "data/input_raw/individuele_aanmelddata.csv")
     )
 
     if not os.path.exists(path):
-        result.warnings.append(
-            f"Individuele aanmelddata niet gevonden: {path} — wordt overgeslagen."
-        )
+        if required:
+            telbestanden_dir = os.path.join(
+                cwd, paths.get("path_raw_telbestanden", "data/input_raw/telbestanden")
+            )
+            has_telbestanden = (
+                os.path.isdir(telbestanden_dir)
+                and any(re.search(r"telbestandY\d{4}W\d+", f) for f in os.listdir(telbestanden_dir))
+            )
+            hint = (
+                " — Tip: draai met `-d cumulative` om alleen de telbestanden te gebruiken."
+                if has_telbestanden else ""
+            )
+            result.hard_errors.append(
+                f"Individuele aanmelddata niet gevonden: {path}{hint}"
+            )
         return
 
     try:
@@ -305,9 +454,6 @@ def _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result):
     )
 
     if not os.path.exists(path):
-        result.warnings.append(
-            f"Oktober-bestand niet gevonden: {path} — studentaantallen worden niet berekend."
-        )
         return
 
     try:
