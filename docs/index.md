@@ -10,25 +10,11 @@ Deze documentatie richt zich op **data-analisten en onderzoekers** bij Nederland
 
 Vereisten: **Python 3.12+** ([installatie-instructies](aan-de-slag.md#voordat-je-begint))
 
-=== "uv"
+```bash
+uv tool install studentprognose
+```
 
-    ```bash
-    uv tool install studentprognose
-    ```
-
-=== "pip (in een virtual environment)"
-
-    ```bash
-    python -m venv .venv
-    source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
-    pip install studentprognose
-    ```
-
-=== "pipx (aanbevolen)"
-
-    ```bash
-    pipx install studentprognose
-    ```
+Heb je [uv](https://docs.astral.sh/uv/) nog niet, of werk je liever met pip? Zie [Aan de slag → Installatie](aan-de-slag.md#installatie).
 
 Daarna:
 

@@ -20,122 +20,33 @@ python --version
 
 ## Installatie
 
-Er zijn drie manieren om studentprognose te installeren. Kies de methode die het beste bij je situatie past:
+We gebruiken [uv](https://docs.astral.sh/uv/) — een snelle Python-pakketbeheerder die virtual environments automatisch afhandelt.
 
-| Methode | Wanneer kiezen? |
-|---------|----------------|
-| **pipx** | Je wilt de tool als CLI gebruiken en verder niets configureren |
-| **pip** | Je wilt de tool ook als Python-library importeren in scripts |
-| **uv** | Je werkt al met uv, of je wilt bijdragen aan de broncode |
+**Stap 1 — Installeer uv** (eenmalig):
 
-=== "uv"
-
-    [uv](https://docs.astral.sh/uv/) is een snelle Python-pakketbeheerder die virtual environments automatisch afhandelt.
-
-    **uv installeren** (eenmalig):
+=== "macOS / Linux"
 
     ```bash
     curl -LsSf https://astral.sh/uv/install.sh | sh
     ```
 
-    Op Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`
+=== "Windows"
 
-    **Als CLI-tool gebruiken** (zonder project):
-
-    ```bash
-    uv tool install studentprognose
+    ```powershell
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
     ```
 
-    **In een bestaand uv-project:**
+**Stap 2 — Installeer studentprognose:**
 
-    ```bash
-    uv add studentprognose
-    ```
+```bash
+uv tool install studentprognose
+```
 
-    **Bijdragen aan de broncode:**
+**Updaten** naar een nieuwere versie:
 
-    ```bash
-    git clone https://github.com/cedanl/studentprognose.git
-    cd studentprognose
-    uv run studentprognose --help
-    ```
-
-    `uv run` maakt automatisch een virtual environment aan op basis van `pyproject.toml`.
-
-=== "pip (in een virtual environment)"
-
-    !!! warning "Installeer niet zonder virtual environment"
-        Een `pip install` buiten een virtual environment plaatst packages in je systeemomgeving. Dit kan conflicten veroorzaken met andere projecten. Maak altijd eerst een virtual environment aan.
-
-    **Stap 1 — Maak een projectmap en virtual environment aan:**
-
-    ```bash
-    mkdir mijn-prognose
-    cd mijn-prognose
-    python -m venv .venv
-    ```
-
-    **Stap 2 — Activeer de virtual environment:**
-
-    === "Windows (PowerShell)"
-
-        ```powershell
-        .venv\Scripts\Activate.ps1
-        ```
-
-    === "Windows (CMD)"
-
-        ```cmd
-        .venv\Scripts\activate.bat
-        ```
-
-    === "macOS / Linux"
-
-        ```bash
-        source .venv/bin/activate
-        ```
-
-    Je ziet nu `(.venv)` voor je prompt — dat bevestigt dat de omgeving actief is.
-
-    **Stap 3 — Installeer studentprognose:**
-
-    ```bash
-    pip install studentprognose
-    ```
-
-    **Updaten** naar een nieuwere versie:
-
-    ```bash
-    pip install --upgrade studentprognose
-    ```
-
-    !!! tip "Virtual environment opnieuw activeren"
-        Elke keer dat je een nieuwe terminal opent, moet je de environment opnieuw activeren (stap 2) voordat je `studentprognose` kunt gebruiken.
-
-=== "pipx (aanbevolen)"
-
-    [pipx](https://pipx.pypa.io/) installeert CLI-tools in een eigen, geïsoleerde omgeving. Je hoeft zelf geen virtual environment aan te maken.
-
-    **pipx installeren** (eenmalig):
-
-    ```bash
-    python -m pip install --user pipx
-    python -m pipx ensurepath
-    ```
-
-    Start hierna je terminal opnieuw op zodat het `pipx`-commando beschikbaar is.
-
-    **studentprognose installeren:**
-
-    ```bash
-    pipx install studentprognose
-    ```
-
-    **Updaten** naar een nieuwere versie:
-
-    ```bash
-    pipx upgrade studentprognose
-    ```
+```bash
+uv tool upgrade studentprognose
+```
 
 ## Eerste keer: mapstructuur aanmaken
 
@@ -146,9 +57,6 @@ mkdir mijn-prognose
 cd mijn-prognose
 studentprognose init
 ```
-
-!!! tip "Al een map aangemaakt tijdens de pip-installatie?"
-    Als je bij de pip-installatie al `mkdir mijn-prognose` hebt gedaan, hoef je alleen `studentprognose init` te draaien in diezelfde map.
 
 Dit schrijft:
 
@@ -373,20 +281,65 @@ result = run_pipeline_from_dataframes(
 
 ??? failure "`studentprognose: command not found` na installatie"
 
-    **Met pipx:** Start je terminal opnieuw op, of draai `pipx ensurepath` en open een nieuwe terminal.
-
-    **Met pip:** Je virtual environment is niet actief. Activeer deze eerst:
-
-    - Windows PowerShell: `.venv\Scripts\Activate.ps1`
-    - Windows CMD: `.venv\Scripts\activate.bat`
-    - macOS/Linux: `source .venv/bin/activate`
-
-    Zie je `(.venv)` voor je prompt? Dan is de omgeving actief.
+    Start je terminal opnieuw op zodat het `studentprognose`-commando beschikbaar wordt. Als het probleem aanhoudt, draai `uv tool update-shell` en open een nieuwe terminal.
 
 ??? failure "`ModuleNotFoundError: No module named 'studentprognose'`"
 
-    Je draait Python buiten de omgeving waarin studentprognose is geïnstalleerd. Activeer je virtual environment (bij pip) of gebruik `uv run` / `pipx run` om het juiste Python te gebruiken.
+    Je draait Python buiten de omgeving waarin studentprognose is geïnstalleerd. Gebruik `uv run studentprognose ...` om de juiste Python-omgeving te kiezen.
 
-??? failure "`Permission denied` bij `pip install`"
+## Andere installatiemethoden
 
-    Je probeert te installeren in de systeemomgeving zonder rechten. Gebruik een virtual environment (zie [Installatie](#installatie)) of installeer met pipx.
+??? note "Installeren met pip in een virtual environment"
+
+    !!! warning "Installeer niet zonder virtual environment"
+        Een `pip install` buiten een virtual environment plaatst packages in je systeemomgeving en kan conflicten veroorzaken met andere projecten.
+
+    **Stap 1 — Maak een projectmap en virtual environment aan:**
+
+    ```bash
+    mkdir mijn-prognose
+    cd mijn-prognose
+    python -m venv .venv
+    ```
+
+    **Stap 2 — Activeer de virtual environment:**
+
+    === "Windows (PowerShell)"
+
+        ```powershell
+        .venv\Scripts\Activate.ps1
+        ```
+
+    === "Windows (CMD)"
+
+        ```cmd
+        .venv\Scripts\activate.bat
+        ```
+
+    === "macOS / Linux"
+
+        ```bash
+        source .venv/bin/activate
+        ```
+
+    Je ziet nu `(.venv)` voor je prompt — dat bevestigt dat de omgeving actief is.
+
+    **Stap 3 — Installeer studentprognose:**
+
+    ```bash
+    pip install studentprognose
+    ```
+
+    **Updaten:** `pip install --upgrade studentprognose`
+
+    Elke nieuwe terminal vereist een nieuwe activatie (stap 2) vóór `studentprognose` werkt.
+
+??? note "Bijdragen aan de broncode"
+
+    ```bash
+    git clone https://github.com/cedanl/studentprognose.git
+    cd studentprognose
+    uv run studentprognose --help
+    ```
+
+    `uv run` maakt automatisch een virtual environment aan op basis van `pyproject.toml`.

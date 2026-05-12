@@ -30,40 +30,13 @@
 
 Vereisten: **Python 3.12+**
 
-<details open>
-<summary><strong>pipx</strong> — aanbevolen voor CLI-gebruik</summary>
-
-<a href="https://pipx.pypa.io/">pipx</a> installeert de tool in een eigen, geïsoleerde omgeving. Je hoeft zelf geen virtual environment aan te maken.
-
-```bash
-pipx install studentprognose
-```
-
-</details>
-
-<details>
-<summary><strong>pip</strong> — in een virtual environment</summary>
-
-```bash
-python -m venv .venv
-source .venv/bin/activate   # Windows: .venv\Scripts\Activate.ps1
-pip install studentprognose
-```
-
-> **Tip:** Gebruik altijd een virtual environment. Een `pip install` buiten een venv kan conflicten veroorzaken.
-
-</details>
-
-<details>
-<summary><strong>uv</strong></summary>
+Installeer met [uv](https://docs.astral.sh/uv/):
 
 ```bash
 uv tool install studentprognose
 ```
 
-Of in een bestaand uv-project: `uv add studentprognose`
-
-</details>
+> Heb je uv nog niet? Eenmalig installeren met `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) of `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` (Windows). Voor pip-instructies, zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#andere-installatiemethoden).
 
 Na installatie:
 
