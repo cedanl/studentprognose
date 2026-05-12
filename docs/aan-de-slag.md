@@ -108,6 +108,7 @@ studentprognose --help
 | `-sk` | getal | `0` | Skip N jaren (backtesting) |
 | `--noetl` | — | uit | Sla ETL én validatie over |
 | `--yes` | — | uit | Sla validatieprompts over (voor CI/CD) |
+| `--dashboard` | — | uit | Genereer interactieve Plotly-dashboards (`data/output/visualisations/`) |
 | `--ci test N` | getal | — | Testmodus: beperkt tot N opleidingen |
 
 Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.

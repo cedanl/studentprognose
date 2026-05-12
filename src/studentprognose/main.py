@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 from typing import Optional
 
 import pandas as pd
@@ -452,26 +453,41 @@ def _save_results(strategy, cfg):
             print("Saving output...")
             strategy.postprocessor.save_output(cfg.student_year_prediction)
 
-            if len(cfg.weeks) > 1:
-                print(
-                    f"Let op: het dashboard toont alleen de prognose voor week {cfg.weeks[-1]} (laatste week in de reeks)."
-                )
-
-            dd = strategy.get_dashboard_data()
-            dashboard = DashboardBuilder(
-                data=strategy.postprocessor.data,
-                data_option=cfg.data_option,
-                numerus_fixus_list=strategy.postprocessor.numerus_fixus_list,
-                student_year_prediction=cfg.student_year_prediction,
-                ci_test_n=cfg.ci_test_n,
-                cwd=os.getcwd(),
-                predict_week=cfg.weeks[-1] if cfg.weeks else None,
-                data_cumulative=dd["data_cumulative"],
-                data_studentcount=strategy.postprocessor.data_studentcount,
-                data_xgboost_curve=dd["xgboost_curve"],
-                xgb_classifier_importance=dd["xgb_classifier_importance"],
-                xgb_regressor_importance=dd["xgb_regressor_importance"],
-            )
-            dashboard.build_and_save()
+            if cfg.dashboard:
+                _try_build_dashboard(strategy, cfg)
         else:
             print("No data to save. Saving output skipped.")
+
+
+def _try_build_dashboard(strategy, cfg):
+    """Build the Plotly dashboard. A failure here is logged but never crashes the pipeline."""
+    if len(cfg.weeks) > 1:
+        print(
+            f"Let op: het dashboard toont alleen de prognose voor week {cfg.weeks[-1]} (laatste week in de reeks)."
+        )
+
+    try:
+        dd = strategy.get_dashboard_data()
+        dashboard = DashboardBuilder(
+            data=strategy.postprocessor.data,
+            data_option=cfg.data_option,
+            numerus_fixus_list=strategy.postprocessor.numerus_fixus_list,
+            student_year_prediction=cfg.student_year_prediction,
+            ci_test_n=cfg.ci_test_n,
+            cwd=os.getcwd(),
+            predict_week=cfg.weeks[-1] if cfg.weeks else None,
+            data_cumulative=dd["data_cumulative"],
+            data_studentcount=strategy.postprocessor.data_studentcount,
+            data_xgboost_curve=dd["xgboost_curve"],
+            xgb_classifier_importance=dd["xgb_classifier_importance"],
+            xgb_regressor_importance=dd["xgb_regressor_importance"],
+        )
+        dashboard.build_and_save()
+    except Exception:
+        log_path = os.path.join(os.getcwd(), "data", "output", "dashboard_error.log")
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+        print(
+            f"Waarschuwing: dashboard niet gegenereerd. Zie {log_path} voor details."
+        )

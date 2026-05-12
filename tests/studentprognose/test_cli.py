@@ -88,6 +88,14 @@ class TestParseArgs:
         cfg = parse_args(["prog"])
         assert cfg.yes is False
 
+    def test_dashboard_flag(self):
+        cfg = parse_args(["prog", "--dashboard"])
+        assert cfg.dashboard is True
+
+    def test_dashboard_default_is_false(self):
+        cfg = parse_args(["prog"])
+        assert cfg.dashboard is False
+
     def test_noetl_and_yes_combination(self):
         cfg = parse_args(["prog", "--noetl", "--yes"])
         assert cfg.noetl is True
