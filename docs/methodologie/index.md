@@ -2,16 +2,14 @@
 
 Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt** en **wanneer je de output kritisch moet beoordelen**.
 
-!!! info "Referentie-implementatie — Radboud Universiteit"
-    Voor methodologische keuzes is **[radboudir/studentprognose](https://github.com/radboudir/studentprognose)** de **leidende referentie**. Die repo bevat de productie-implementatie van Radboud — de instelling waar dit model oorspronkelijk werd ontwikkeld en doorlopend wordt verfijnd.
+!!! info "Verhouding tot de Radboud-implementatie"
+    De methodologie op deze pagina's komt voort uit het model dat oorspronkelijk bij Radboud is ontwikkeld. Die productie-implementatie draait intern en is niet publiek toegankelijk; deze CEDA-versie is de publieke, generieke variant.
 
-    Gebruik deze referentie wanneer je:
+    Concreet betekent dat:
 
-    - **Methodologische keuzes wilt onderbouwen** (waarom een specifieke feature, parameter, of weging?)
-    - **Een fork of eigen aanpassing maakt** — om de redenering vanuit de oorspronkelijke context te begrijpen
-    - **De overdraagbaarheid wilt valideren** — vergelijk hoe Radboud-specifieke logica zich verhoudt tot de generieke implementatie hier
-
-    Deze CEDA-versie volgt de Radboud-implementatie als blauwdruk; verschillen worden expliciet gedocumenteerd.
+    - Modelkeuzes (features, parameters, ensemble-gewichten) zijn dezelfde als die in de Radboud-implementatie en worden hier per pagina onderbouwd.
+    - Radboud-specifieke configuratie (faculteitsnamen, programma-lijsten) is uit de gedeelde code gehaald en moet door elke instelling zelf worden ingevuld via `configuration.json`.
+    - Waar de aanpak afwijkt van een rechttoe rechtaan implementatie — bijvoorbeeld de vaste week-38 override voor 2021 — wordt dat expliciet vermeld.
 
 ## Modellen in het ensemble
 

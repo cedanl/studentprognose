@@ -44,10 +44,8 @@ Zie [Methodologie](methodologie/index.md) voor een diepgaande uitleg per model.
 
 Dit model is oorspronkelijk ontwikkeld door **Radboud Universiteit** en vervolgens samen met CEDA open source gemaakt zodat andere Nederlandse onderwijsinstellingen er ook van kunnen profiteren. Radboud is daarmee de grondlegger van dit project. VOX Nijmegen schreef hierover: [*De universiteit heeft nu haar eigen glazen bol*](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten).
 
-!!! info "Referentie-implementatie — Radboud Universiteit"
-    De productie-implementatie van Radboud staat in **[radboudir/studentprognose](https://github.com/radboudir/studentprognose)**. Dit is de **leidende referentie** voor verdere ontwikkeling van deze tool:
+!!! info "Verhouding tot de Radboud-implementatie"
+    De productie-implementatie van Radboud draait intern en is niet publiek toegankelijk. Deze CEDA-versie is de publieke, generieke variant: dezelfde methodologie, maar zonder Radboud-specifieke configuratie.
 
-    - **Uitlegbaarheid** — methodologische keuzes (features, modelparameters, ensemble-gewichten) zijn onderbouwd vanuit een concrete instellingscontext.
-    - **Overdraagbaarheid** — voorbeelden van hoe Radboud-specifieke configuratie wordt vertaald naar generieke logica in deze CEDA-versie.
-
-    Raadpleeg deze repo bij eigen aanpassingen, forks of methodologische discussies.
+    - **Uitlegbaarheid** — methodologische keuzes (features, modelparameters, ensemble-gewichten) zijn onderbouwd vanuit een concrete instellingscontext en hier gedocumenteerd.
+    - **Overdraagbaarheid** — Radboud-specifieke logica is in deze versie generiek gemaakt zodat andere instellingen er direct mee aan de slag kunnen.
