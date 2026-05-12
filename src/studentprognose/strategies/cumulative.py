@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
 import joblib
-import os
 import math
 
 import warnings
 
+from studentprognose.config import get_cpu_count
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import increment_week, compute_pred_len
 from studentprognose.models import create_forecaster, create_regressor
@@ -218,7 +218,7 @@ class CumulativeStrategy(PredictionStrategy):
         if len(data_to_predict) == 0:
             return None
 
-        nr_CPU_cores = os.cpu_count()
+        nr_CPU_cores = get_cpu_count(self.configuration)
         chunk_size = math.ceil(len(data_to_predict) / nr_CPU_cores)
         chunks = [
             data_to_predict[i : i + chunk_size] for i in range(0, len(data_to_predict), chunk_size)

@@ -2,10 +2,9 @@ import datetime
 import numpy as np
 import pandas as pd
 import joblib
-import os
 import math
 
-from studentprognose.config import get_columns
+from studentprognose.config import get_columns, get_cpu_count
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import get_weeks_list, get_all_weeks_valid, decrement_week, week_sort_key, compute_pred_len
 from studentprognose.data.transforms import transform_data
@@ -186,7 +185,7 @@ class IndividualStrategy(PredictionStrategy):
         if len(data_to_predict) == 0:
             return None
 
-        nr_CPU_cores = os.cpu_count()
+        nr_CPU_cores = get_cpu_count(self.configuration)
         chunk_size = math.ceil(len(data_to_predict) / nr_CPU_cores)
 
         chunks = [
