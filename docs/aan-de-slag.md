@@ -1,24 +1,60 @@
 # Aan de slag
 
+## Voordat je begint
+
+Je hebt **Python 3.12 of hoger** nodig. Controleer je versie:
+
+```bash
+python --version
+```
+
+??? tip "Python niet gevonden of te oud?"
+
+    Als je `python: command not found` ziet, of een versie lager dan 3.12:
+
+    - **Windows**: Download Python via [python.org](https://www.python.org/downloads/). Vink bij installatie **"Add python.exe to PATH"** aan.
+    - **macOS**: Installeer via [python.org](https://www.python.org/downloads/) of met Homebrew: `brew install python@3.12`
+    - **Linux**: Gebruik je pakketbeheerder, bijv. `sudo apt install python3.12` (Ubuntu/Debian) of `sudo dnf install python3.12` (Fedora).
+
+    Op sommige systemen heet het commando `python3` in plaats van `python`. Probeer `python3 --version` als `python --version` niet werkt.
+
 ## Installatie
 
+We gebruiken [uv](https://docs.astral.sh/uv/) — een snelle Python-pakketbeheerder die virtual environments automatisch afhandelt.
+
+**Stap 1 — Installeer uv** (eenmalig):
+
+=== "macOS / Linux"
+
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+
+=== "Windows"
+
+    ```powershell
+    powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+    ```
+
+**Stap 2 — Installeer studentprognose:**
+
 ```bash
-pip install studentprognose
+uv tool install studentprognose
 ```
 
-Of met uv in een project:
+**Updaten** naar een nieuwere versie:
 
 ```bash
-uv add studentprognose
+uv tool upgrade studentprognose
 ```
-
-Vereisten: Python 3.12+
 
 ## Eerste keer: mapstructuur aanmaken
 
-Na installatie maak je in een lege werkmap de benodigde mappen en een startconfiguratie aan:
+Maak een werkmap aan voor je prognoseproject en draai daar `init`:
 
 ```bash
+mkdir mijn-prognose
+cd mijn-prognose
 studentprognose init
 ```
 
@@ -35,7 +71,7 @@ Bestaat een bestand al, dan wordt het overgeslagen. Je kunt `init` dus veilig op
 
 Zet je inputbestanden in de juiste mappen voordat je de pipeline start:
 
-```
+``` { .text hl_lines="8" }
 data/
 ├── input/                          ← verwerkte inputbestanden (na ETL)
 │   ├── vooraanmeldingen_cumulatief.csv
@@ -43,7 +79,7 @@ data/
 │   ├── student_count_first-years.xlsx
 │   ├── student_count_higher-years.xlsx
 │   └── student_volume.xlsx
-└── input_raw/                      ← ruwe bronbestanden (voor ETL)
+└── input_raw/                      ← ruwe bronbestanden (NIET nodig met --noetl)
     ├── telbestanden/               ← Studielink telbestanden
     │   ├── telbestandY2024W01.csv
     │   └── ...
@@ -52,6 +88,41 @@ data/
 ```
 
 Zie [Je data voorbereiden](je-data-voorbereiden.md) voor kolomspecificaties per bestand.
+
+## ETL overslaan met `--noetl`
+
+**Heb je al verwerkte bestanden in `data/input/`** (bijv. uit een eigen ETL-proces, een eerdere run, of aangeleverd door een collega)? Dan hoef je de ruwe bronbestanden in `data/input_raw/` helemaal niet neer te zetten. Sla de ETL én de bijbehorende validatie over met `--noetl`:
+
+```bash
+studentprognose --noetl
+```
+
+Welke bestanden je dan precies in `data/input/` nodig hebt — en in welk formaat — lees je op [ETL overslaan](je-data-voorbereiden.md#etl-overslaan).
+
+!!! warning "Wanneer je `--noetl` níét moet gebruiken"
+    Heb je alleen ruwe bronbestanden (Studielink-telbestanden, Osiris/Usis-export, DUO oktober-bestand)? Laat `--noetl` dan weg, zodat de ingebouwde ETL de verwerkte bestanden voor je aanmaakt.
+
+## Wat voorspelt `-w 16 -y 2025`?
+
+Voor `studentprognose` is `-w` de **peilweek** (kalenderweek 1–52) en `-y` het **collegejaar** waarvoor je een prognose wilt. Met `-w 16 -y 2025` zeg je dus: *"gebruik alle vooraanmelddata tot en met week 16 van collegejaar 2025 en geef me een prognose voor het eindcohort van datzelfde collegejaar"*.
+
+!!! example "Voorbeeld-run · B Psychologie · NL (demodata)"
+    **178** vooraanmelders @ wk 16 (peilmoment) &nbsp;→&nbsp; **520** verwacht @ wk 38 &nbsp;→&nbsp; **400** ingeschreven (77% yield)
+
+=== "Week voor week"
+
+    <iframe src="../assets/plots/whatif_timeline.html" width="100%" height="540" frameborder="0" style="border-radius: 8px;"></iframe>
+
+    De blauwe lijn toont de geobserveerde cumulatieve vooraanmelders tot peilmoment (wk 16). De oranje gestippelde lijn extrapoleert naar week 38 — met scherp knikpunt rond de 1-mei-deadline en een late-zomer-naloop. De gearceerde band groeit met de horizon: ±12 bij peilmoment, ±34 bij wk 38.
+
+=== "In één oogopslag"
+
+    <iframe src="../assets/plots/whatif_slope.html" width="100%" height="420" frameborder="0" style="border-radius: 8px;"></iframe>
+
+    Drie kerngetallen op één schaal: peilmoment → SARIMA-extrapolatie naar wk 38 → verwacht eindcohort. De badges tussen de punten kwantificeren de overgangen — eerst de groei (×2.92 in vooraanmelders), daarna de yield (77% conversie naar ingeschreven).
+
+!!! tip "Andere peilweek of collegejaar?"
+    Vervang `-w 16` door je eigen peilweek (1–52) en `-y 2025` door het collegejaar dat je wilt voorspellen. De pipeline pakt automatisch de data tot en met die week om het eindcohort van datzelfde collegejaar te schatten.
 
 ## Eerste run
 
@@ -66,16 +137,16 @@ Dit voorkomt dat de tool faalt omdat de huidige systeemweek/-jaar nog niet in je
 
 ```bash
 # Beide sporen + ensemble (standaard) — automatisch laatste beschikbare week/jaar
-uv run studentprognose
+studentprognose
 
 # Specifieke week en jaar
-uv run studentprognose -w 10 -y 2025
+studentprognose -w 10 -y 2025
 
 # Alleen cumulatief spoor (geen individuele data nodig)
-uv run studentprognose -d c
+studentprognose -d c
 
 # ETL overslaan (data al eerder verwerkt)
-uv run studentprognose --noetl
+studentprognose --noetl
 ```
 
 De output verschijnt in `data/output/`.
@@ -200,3 +271,76 @@ result = run_pipeline_from_dataframes(
 
     Controleer altijd of `SARIMA_individual` kolommen aanwezig zijn in je output als je
     het ensemble verwacht.
+
+## Veelvoorkomende fouten
+
+??? failure "`python: command not found` of versie te laag"
+
+    Python is niet geïnstalleerd of niet beschikbaar in je PATH. Zie [Voordat je begint](#voordat-je-begint) voor installatie-instructies.
+
+    Op sommige systemen heet het commando `python3` in plaats van `python`.
+
+??? failure "`studentprognose: command not found` na installatie"
+
+    Start je terminal opnieuw op zodat het `studentprognose`-commando beschikbaar wordt. Als het probleem aanhoudt, draai `uv tool update-shell` en open een nieuwe terminal.
+
+??? failure "`ModuleNotFoundError: No module named 'studentprognose'`"
+
+    Je draait Python buiten de omgeving waarin studentprognose is geïnstalleerd. Gebruik `uv run studentprognose ...` om de juiste Python-omgeving te kiezen.
+
+## Andere installatiemethoden
+
+??? note "Installeren met pip in een virtual environment"
+
+    !!! warning "Installeer niet zonder virtual environment"
+        Een `pip install` buiten een virtual environment plaatst packages in je systeemomgeving en kan conflicten veroorzaken met andere projecten.
+
+    **Stap 1 — Maak een projectmap en virtual environment aan:**
+
+    ```bash
+    mkdir mijn-prognose
+    cd mijn-prognose
+    python -m venv .venv
+    ```
+
+    **Stap 2 — Activeer de virtual environment:**
+
+    === "Windows (PowerShell)"
+
+        ```powershell
+        .venv\Scripts\Activate.ps1
+        ```
+
+    === "Windows (CMD)"
+
+        ```cmd
+        .venv\Scripts\activate.bat
+        ```
+
+    === "macOS / Linux"
+
+        ```bash
+        source .venv/bin/activate
+        ```
+
+    Je ziet nu `(.venv)` voor je prompt — dat bevestigt dat de omgeving actief is.
+
+    **Stap 3 — Installeer studentprognose:**
+
+    ```bash
+    pip install studentprognose
+    ```
+
+    **Updaten:** `pip install --upgrade studentprognose`
+
+    Elke nieuwe terminal vereist een nieuwe activatie (stap 2) vóór `studentprognose` werkt.
+
+??? note "Bijdragen aan de broncode"
+
+    ```bash
+    git clone https://github.com/cedanl/studentprognose.git
+    cd studentprognose
+    uv run studentprognose --help
+    ```
+
+    `uv run` maakt automatisch een virtual environment aan op basis van `pyproject.toml`.

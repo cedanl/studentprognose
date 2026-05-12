@@ -2,6 +2,15 @@
 
 Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt** en **wanneer je de output kritisch moet beoordelen**.
 
+!!! info "Verhouding tot de Radboud-implementatie"
+    De methodologie op deze pagina's komt voort uit het model dat oorspronkelijk bij Radboud is ontwikkeld. Die productie-implementatie draait intern en is niet publiek toegankelijk; deze CEDA-versie is de publieke, generieke variant.
+
+    Concreet betekent dat:
+
+    - Modelkeuzes (features, parameters, ensemble-gewichten) zijn dezelfde als die in de Radboud-implementatie en worden hier per pagina onderbouwd.
+    - Radboud-specifieke configuratie (faculteitsnamen, programma-lijsten) is uit de gedeelde code gehaald en moet door elke instelling zelf worden ingevuld via `configuration.json`.
+    - Waar de aanpak afwijkt van een rechttoe rechtaan implementatie — bijvoorbeeld de vaste week-38 override voor 2021 — wordt dat expliciet vermeld.
+
 ## Modellen in het ensemble
 
 | Model | Pagina | Rol in de pipeline |

@@ -4,6 +4,27 @@ De pipeline voert vóór de ETL automatisch een datakwaliteitscontrole uit op al
 
 Gebruik `--noetl` om zowel de ETL als de validatie over te slaan (alleen als de data eerder al gevalideerd is).
 
+## Bestandsoverzicht bij opstart
+
+Bij het starten van de validatie toont de pipeline een overzichtstabel met de status van alle verwachte inputbestanden. Dit helpt je snel te zien wat aanwezig is, wat ontbreekt, en welke run-modi (`-d`) beschikbaar zijn.
+
+```
+==== Valideren van ruwe inputdata ====
+
+  Bestand                                     Status    Nodig voor
+  ──────────────────────────────────────────────────────────────────
+  data/input_raw/telbestanden                 ✓         -d cumulative, -d both
+  data/input_raw/individuele_aanmelddata.csv  ✗         -d individual, -d both
+  data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (optioneel)
+
+  Beschikbare modi:
+    -d cumulative      ✓
+    -d individual      ✗  individuele_aanmelddata.csv ontbreekt
+    -d both            ✗  individuele_aanmelddata.csv ontbreekt
+```
+
+De ✓ en ✗ symbolen worden in kleur weergegeven (groen/rood) als de terminal dat ondersteunt. Als alle bestanden aanwezig zijn, wordt de modi-sectie vervangen door een compacte bevestiging.
+
 ## Drie typen bevindingen
 
 | Type | Gedrag | Wanneer gebruiken |
@@ -38,7 +59,7 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
-| Bestand bestaat | Waarschuwing | Niet aanwezig → overgeslagen (individueel spoor werkt niet) |
+| Bestand bestaat | — | Wordt getoond in het bestandsoverzicht bij opstart |
 | Verplichte kolommen | Hard error | `Collegejaar`, `Croho`, `Inschrijfstatus`, `Datum Verzoek Inschr` (via kolomnamen-mapping) |
 | Ontbrekende waarden | Waarschuwing / Soft error | Per verplichte kolom, zelfde drempels als telbestanden |
 
@@ -46,7 +67,7 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
-| Bestand bestaat | Waarschuwing | Niet aanwezig → studentaantallen worden niet berekend |
+| Bestand bestaat | — | Wordt getoond in het bestandsoverzicht bij opstart |
 | Verplichte kolommen | Hard error | `Collegejaar`, `Groepeernaam Croho`, `Aantal eerstejaars croho`, `EER-NL-nietEER`, `Examentype code`, `Aantal Hoofdinschrijvingen` |
 | Collegejaar bereik | Soft error | Zelfde bereikcontrole als telbestanden |
 | Ontbrekende waarden | Waarschuwing / Soft error | Per verplichte kolom |

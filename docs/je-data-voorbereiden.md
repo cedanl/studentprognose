@@ -6,6 +6,9 @@ De pipeline verwacht twee typen inputmappen: `data/input_raw/` voor de ruwe bron
 
 Zie de [volledige dataflow](https://github.com/cedanl/studentprognose/blob/main/doc/PIPELINE.md) voor een visueel Mermaid-diagram.
 
+!!! tip "Heb je al verwerkte data?"
+    Heb je verwerkte bestanden uit een eigen ETL of van een collega, dan kun je de ingebouwde ETL overslaan met `--noetl`. **Let op:** de bestanden moeten voldoen aan het schema in [Verwerkte inputbestanden](#verwerkte-inputbestanden-data-input) — dezelfde kolomnamen, types en betekenis. Wijkende kolomnamen kun je remappen via `configuration.json` (zie [Institutiespecifieke kolomnamen](#institutiespecifieke-kolomnamen)).
+
 ## Ruwe bronbestanden (`data/input_raw/`)
 
 ### Studielink telbestanden
@@ -75,9 +78,19 @@ De ETL draait automatisch bij elke run (tenzij `--noetl` is opgegeven). De stapp
 | 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` | `student_count_*.xlsx`, `student_volume.xlsx` |
 | 4 | Kopiëren individuele data | `individuele_aanmelddata.csv` | `vooraanmeldingen_individueel.csv` |
 
+## ETL overslaan
+
+Als je al beschikt over verwerkte data — bijvoorbeeld uit een eigen ETL-pipeline, van een collega, of uit een eerdere run — kun je de ingebouwde ETL-stappen overslaan met de `--noetl`-vlag:
+
+```bash
+studentprognose --noetl -d cumulative -w 12 -y 2025
+```
+
+Zorg ervoor dat de vereiste bestanden in `data/input/` staan voordat je de tool draait. Welke bestanden je nodig hebt hangt af van de gekozen datamodus (`-d`). Zie de tabel hieronder.
+
 ## Verwerkte inputbestanden (`data/input/`)
 
-Dit zijn de bestanden die het model direct inleest. Ze worden aangemaakt door de ETL of handmatig aangeleverd als je `--noetl` gebruikt.
+Dit zijn de bestanden die het model direct inleest. Ze worden aangemaakt door de ETL, of je plaatst ze zelf in `data/input/` als je `--noetl` gebruikt.
 
 | Bestand | Wanneer nodig | Bron |
 |---------|---------------|------|

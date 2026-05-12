@@ -28,16 +28,24 @@
 
 ## 📦 Aan de slag
 
+Vereisten: **Python 3.12+**
+
+Installeer met [uv](https://docs.astral.sh/uv/):
+
 ```bash
-pip install studentprognose
-studentprognose init
+uv tool install studentprognose
 ```
 
-`init` maakt de benodigde mapstructuur aan en legt uit welke bestanden je moet aanleveren. Daarna:
+> Heb je uv nog niet? Eenmalig installeren met `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) of `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` (Windows). Voor pip-instructies, zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#andere-installatiemethoden).
+
+Na installatie:
 
 ```bash
+studentprognose init        # mapstructuur + configuratie aanmaken
 studentprognose -w 6 -y 2024
 ```
+
+`init` maakt de benodigde mapstructuur aan en legt uit welke bestanden je moet aanleveren.
 
 Voor geautomatiseerde runs (cron, taakplanner) — sla de interactieve prompt over:
 
@@ -47,6 +55,21 @@ studentprognose -w 6 -y 2024 --yes
 
 > [!NOTE]
 > Heb je afwijkende kolomnamen in je Studielink-export? Voeg een `"columns"`-blok toe aan `configuration/configuration.json`. Zie [Configuratie](https://cedanl.github.io/studentprognose/configuratie/) voor uitleg en voorbeelden.
+
+Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/) voor een complete walkthrough met uitleg over Python-installatie, data klaarzetten en veelvoorkomende fouten.
+
+---
+
+## Waarom dit model?
+
+Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig.
+
+| | |
+|---|---|
+| **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
+| **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
+| **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
+| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input_raw/` |
 
 ---
 
@@ -78,126 +101,25 @@ uv run studentprognose -w 6 -y 2020
 
 ---
 
-## Waarom dit model?
-
-Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen** die werken met Studielink-data. Je hebt geen machine learning-expertise nodig.
-
-| | |
-|---|---|
-| **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
-| **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
-| **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
-| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input` |
-
----
-
 ## ✨ Gebruik
 
-### Jaren en weken
-
-Specificeer jaar en week met `-y` en `-w`:
-
 ```bash
-uv run main.py -w 6 -y 2024
-uv run main.py -W 1 2 3 -Y 2024
-uv run main.py -year 2023 2024
-uv run main.py -week 40 41
+studentprognose -w 6 -y 2024                  # specifieke week en jaar
+studentprognose -w 10 : 20 -y 2023            # weekbereik
+studentprognose -d c                           # alleen cumulatief spoor
+studentprognose -y 2023 2024 -w 10 : 20 -d b  # meerdere jaren, beide sporen
 ```
 
-Gebruik slicing voor een reeks weken:
+| Vlag | Beschrijving | Opties |
+|------|-------------|--------|
+| `-w` | Voorspelweek(en) | weeknummers of bereik, bijv. `10 : 20` |
+| `-y` | Voorspeljaar(en) | bijv. `2024` of `2023 2024` |
+| `-d` | Dataset | `i`ndividual, `c`umulative, `b`oth (standaard) |
+| `--noetl` | Sla ETL over | als je al verwerkte data in `data/input/` hebt |
+| `--yes` | Sla interactieve prompts over | voor CI/CD en cron |
 
-```bash
-uv run main.py -w 10 : 20 -y 2023
-```
+Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-referentie) voor alle vlaggen, configuratie, validatie-instellingen en uitgebreide voorbeelden.
 
-### Datasets
-
-Er zijn twee datasets beschikbaar: **individual** (per student) en **cumulative** (geaggregeerd per opleiding/herkomst/jaar/week). Standaard worden beide gebruikt.
-
-```bash
-uv run main.py -d individual
-uv run main.py -D cumulative
-uv run main.py -dataset both
-```
-
-### Datakwaliteitscontrole
-
-Bij elke run wordt de ruwe inputdata automatisch gevalideerd **voordat de ETL start**. Zo weet je zeker dat je nooit 20 minuten wacht voor een prognose op basis van corrupte data.
-
-Er zijn drie soorten bevindingen:
-
-| Type | Voorbeeld | Wat er gebeurt |
-|---|---|---|
-| **Fout** | Ontbrekend bestand, ontbrekende kolom | Pipeline stopt direct |
-| **Probleem** | Negatieve waarden, onbekende herkomstcode | Prompt: doorgaan of stoppen? |
-| **Waarschuwing** | Klein percentage ontbrekende waarden, weekgaten | Gelogd, pipeline loopt door |
-
-```
-Validatie gevonden problemen die prognoses kunnen beïnvloeden:
-  [PROBLEEM] telbestandY2025W10.csv: meercode_V = 0 voor 1 opleiding(en): B Opleiding X
-
-Als je doorgaat, kunnen sommige opleidingen worden overgeslagen of
-onbetrouwbare prognoses opleveren.
-
-Wil je doorgaan met de pipeline? [j/N]
-```
-
-Gebruik `--yes` om de prompt te omzeilen in geautomatiseerde runs (bijv. CI/CD):
-
-```bash
-studentprognose -w 6 -y 2025 --yes
-```
-
-> [!NOTE]
-> Met `--noetl` worden ETL én validatie overgeslagen. Gebruik dit alleen als de ruwe data al eerder succesvol verwerkt en gevalideerd is.
-
-#### Validatie-instellingen aanpassen
-
-De standaardwaarden (jaarbereiken, NaN-drempels, toegestane categorische waarden) staan in de broncode. Je kunt ze overschrijven door een `"validation"`-blok toe te voegen aan je `configuration.json`. Vermeld alleen de waarden die afwijken:
-
-```json
-{
-    "validation": {
-        "nan_error_threshold": 0.20,
-        "telbestand": {
-            "herkomst_allowed": ["N", "E", "R", "ONBEKEND"]
-        }
-    }
-}
-```
-
-### Configuratie
-
-Het standaard configuratiebestand is `configuration/configuration.json`. Dit kan worden overschreven:
-
-```bash
-uv run main.py -c pad/naar/configuration.json
-uv run main.py -configuration langer/pad/naar/config.json
-```
-
-### Uitgebreid voorbeeld
-
-Voorspel eerstejaars voor 2023 en 2024, weken 10 t/m 20, met beide datasets:
-
-```bash
-uv run main.py -y 2023 2024 -w 10 : 20 -d b
-```
-
-Voorspel eerstejaars voor collegejaar 2025/2026, week 5, alleen cumulatief:
-
-```bash
-uv run main.py -y 2025 -w 5 -d c
-```
-
-### Syntax overzicht
-
-| Instelling              | Korte notatie  | Lange notatie    | Opties                                      |
-|-------------------------|----------------|------------------|---------------------------------------------|
-| Voorspellingsjaren      | `-y` of `-Y`   | `-year`          | Eén of meer jaren, bijv. `2023 2024`        |
-| Voorspellingsweken      | `-w` of `-W`   | `-week`          | Eén of meer weken, bijv. `10 11 12`         |
-| Slicing                 |                |                  | Gebruik `:` voor reeksen, bijv. `10 : 20`   |
-| Dataset                 | `-d` of `-D`   | `-dataset`       | `i`/`individual`, `c`/`cumulative`, `b`/`both` |
-| Configuratie            | `-c` of `-C`   | `-configuration` | Pad naar configuratiebestand                |
 ---
 
 ## 📁 Beschrijving van bestanden

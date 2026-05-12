@@ -171,14 +171,19 @@ class PostProcessor:
         self.data = self.data[columns_to_select]
 
         if self.data_studentcount is not None:
-            self.data = self.data.merge(
-                self.data_studentcount,
-                on=["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"],
-                how="left",
-            )
+            # Faculteit kan in studentcount voorkomen (bijv. bij Radboud). We
+            # droppen 'm en aggregeren naar opleidings-niveau zodat:
+            #   1) de merge geen Faculteit_x/_y suffixes produceert
+            #      (self.data behoudt de eigen Faculteit uit de aanmelddata),
+            #   2) meerdere Faculteit-rijen per opleiding niet leiden tot
+            #      rij-multiplicatie maar tot een correcte som.
+            studentcount = self.data_studentcount.drop(columns="Faculteit", errors="ignore")
+            join_cols = ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"]
+            studentcount = studentcount.groupby(join_cols, as_index=False)["Aantal_studenten"].sum()
+            self.data = self.data.merge(studentcount, on=join_cols, how="left")
 
         if data_cumulative is not None:
-            data_cumulative = data_cumulative.drop(columns="Faculteit")
+            data_cumulative = data_cumulative.drop(columns="Faculteit", errors="ignore")
 
             self.data = self.data.merge(
                 data_cumulative,
