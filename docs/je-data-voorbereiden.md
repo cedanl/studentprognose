@@ -7,7 +7,7 @@ De pipeline verwacht twee typen inputmappen: `data/input_raw/` voor de ruwe bron
 Zie de [volledige dataflow](https://github.com/cedanl/studentprognose/blob/main/doc/PIPELINE.md) voor een visueel Mermaid-diagram.
 
 !!! tip "Heb je al verwerkte data?"
-    Als je al beschikt over de verwerkte bestanden (bijv. uit een eigen ETL-proces of van een collega), kun je de ingebouwde ETL overslaan. Ga direct naar [ETL overslaan](#etl-overslaan) om te zien welke bestanden je nodig hebt en hoe je de tool zonder ETL draait.
+    Heb je verwerkte bestanden uit een eigen ETL of van een collega, dan kun je de ingebouwde ETL overslaan met `--noetl`. **Let op:** de bestanden moeten voldoen aan het schema in [Verwerkte inputbestanden](#verwerkte-inputbestanden-data-input) — dezelfde kolomnamen, types en betekenis. Wijkende kolomnamen kun je remappen via `configuration.json` (zie [Institutiespecifieke kolomnamen](#institutiespecifieke-kolomnamen)).
 
 ## Ruwe bronbestanden (`data/input_raw/`)
 

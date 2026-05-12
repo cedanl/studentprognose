@@ -26,7 +26,7 @@ studentprognose --help    # alle opties bekijken
 Zie [Aan de slag](aan-de-slag.md) voor een complete walkthrough inclusief data klaarzetten en je eerste run.
 
 !!! tip "Heb je al verwerkte data?"
-    Als je al beschikt over verwerkte bestanden (bijv. uit een eigen ETL-proces of van een collega), kun je de ingebouwde ETL overslaan met `--noetl`. Zie [ETL overslaan](je-data-voorbereiden.md#etl-overslaan) voor details.
+    Als je verwerkte bestanden hebt die voldoen aan het [verwachte schema](je-data-voorbereiden.md#verwerkte-inputbestanden-data-input) (kolommen, types, namen), kun je de ETL overslaan met `--noetl`. Zie [ETL overslaan](je-data-voorbereiden.md#etl-overslaan) voor de exacte vereisten.
 
 ## Architectuur op hoofdlijnen
 
