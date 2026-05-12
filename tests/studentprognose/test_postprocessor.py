@@ -13,19 +13,9 @@ from studentprognose.utils.weeks import DataOption
 
 
 def _make_postprocessor(tmp_path, data_studentcount):
-    cfg = {
-        "numerus_fixus": {},
-        "ensemble_override_cumulative": [],
-        "ensemble_weights": {
-            "master_week_17_23": {"individual": 0.5, "cumulative": 0.5},
-            "week_30_34": {"individual": 0.5, "cumulative": 0.5},
-            "week_35_37": {"individual": 0.5, "cumulative": 0.5},
-            "default": {"individual": 0.5, "cumulative": 0.5},
-        },
-    }
     os.makedirs(tmp_path / "data" / "output", exist_ok=True)
     return PostProcessor(
-        configuration=cfg,
+        configuration={"numerus_fixus": {}},
         data_latest=None,
         ensemble_weights=None,
         data_studentcount=data_studentcount,
