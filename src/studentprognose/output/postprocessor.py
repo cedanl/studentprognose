@@ -183,7 +183,7 @@ class PostProcessor:
             self.data = self.data.merge(studentcount, on=join_cols, how="left")
 
         if data_cumulative is not None:
-            data_cumulative = data_cumulative.drop(columns="Faculteit")
+            data_cumulative = data_cumulative.drop(columns="Faculteit", errors="ignore")
 
             self.data = self.data.merge(
                 data_cumulative,
