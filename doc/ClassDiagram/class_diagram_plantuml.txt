@@ -72,13 +72,6 @@ class DataTotal {
   +save_output(student_year_prediction)
 }
 
-class HigherYears {
-  data_student_numbers_first_years
-  data_student_numbers_higher_years
-  data_student_numbers_volume
-  predict_nr_of_students(first_year_data, all_data, predict_year, predict_week, skip_years)
-}
-
 BothDatasets -down-> Individual
 BothDatasets -down-> Cumulative
 
@@ -91,7 +84,5 @@ AvailableData --> DataTotal
 Main ..> LoadData
 Main --> AvailableData
 Main ..> DataTotal
-
-Main --> HigherYears
 
 @enduml

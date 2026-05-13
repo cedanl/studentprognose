@@ -8,8 +8,8 @@ De pipeline schrijft de resultaten naar `data/output/`. Er zijn twee typen uitvo
 |---------|------|-------------|
 | `output_prelim_{modus}.xlsx` | Tussenresultaat | Voorlopige voorspellingen vóór ratio-model, ensemble en foutmaten. Nuttig voor debugging. |
 | `output_first-years_{modus}.xlsx` | Eindresultaat | Eerstejaars voorspellingen per opleiding/herkomst/week |
-| `output_higher-years_{modus}.xlsx` | Eindresultaat | Hogerjaars voorspellingen |
-| `output_volume_{modus}.xlsx` | Eindresultaat | Totaal studentvolume-voorspellingen |
+| `output_higher-years_{modus}.xlsx` | Eindresultaat | Hogerjaars voorspellingen (alleen bij `-sy h`) |
+| `output_volume_{modus}.xlsx` | Eindresultaat | Totaal studentvolume-voorspellingen (alleen bij `-sy v`) |
 
 `{modus}` is `cumulatief`, `individueel` of `beide`, afhankelijk van de gebruikte `-d` vlag.
 

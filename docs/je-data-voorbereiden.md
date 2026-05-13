@@ -97,8 +97,8 @@ Dit zijn de bestanden die het model direct inleest. Ze worden aangemaakt door de
 | `vooraanmeldingen_cumulatief.csv` | `-d c` of `-d b` | ETL stap 1+2 |
 | `vooraanmeldingen_individueel.csv` | `-d i` of `-d b` | ETL stap 4 |
 | `student_count_first-years.xlsx` | Altijd | ETL stap 3 |
-| `student_count_higher-years.xlsx` | Altijd | ETL stap 3 |
-| `student_volume.xlsx` | Altijd | ETL stap 3 |
+| `student_count_higher-years.xlsx` | Alleen bij `-sy h` of `-sy v` | ETL stap 3 |
+| `student_volume.xlsx` | Alleen bij `-sy v` | ETL stap 3 |
 | `ensemble_weights.xlsx` | Optioneel | `archive/calculate_ensemble_weights.py` |
 | `totaal_cumulatief.xlsx` | Optioneel | `archive/append_studentcount_and_compute_errors.py` |
 | `totaal_individueel.xlsx` | Optioneel | `archive/append_studentcount_and_compute_errors.py` |

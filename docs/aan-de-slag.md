@@ -71,13 +71,12 @@ Bestaat een bestand al, dan wordt het overgeslagen. Je kunt `init` dus veilig op
 
 Zet je inputbestanden in de juiste mappen voordat je de pipeline start:
 
-``` { .text hl_lines="8" }
+```text
 data/
 ├── input/                          ← verwerkte inputbestanden (na ETL)
 │   ├── vooraanmeldingen_cumulatief.csv
 │   ├── vooraanmeldingen_individueel.csv
 │   ├── student_count_first-years.xlsx
-│   ├── student_count_higher-years.xlsx
 │   └── student_volume.xlsx
 └── input_raw/                      ← ruwe bronbestanden (NIET nodig met --noetl)
     ├── telbestanden/               ← Studielink telbestanden
@@ -183,6 +182,9 @@ studentprognose --help
 | `--ci test N` | getal | — | Testmodus: beperkt tot N opleidingen |
 
 Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
+
+!!! note "Eerstejaars als focus"
+    De tool draait standaard op `-sy f` (eerstejaars). De modi `-sy h` (hogerejaars) en `-sy v` (volume) zijn vervolgstappen — gebruik die pas als je eerstejaarsvoorspelling op orde is.
 
 ## Gebruik als Python-package
 

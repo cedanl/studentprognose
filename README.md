@@ -129,11 +129,11 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 | Bestand | Beschrijving |
 |---------|-------------|
 | **individual** | Individuele (voor)aanmeldingen per student. Wordt gebruikt voor de SARIMA_individual voorspelling. |
-| **cumulative** | Aantal aanmeldingen per opleiding, herkomst, jaar, week en herinschrijving/hogerejaars. Wordt gebruikt voor de SARIMA_cumulative voorspelling. Verkregen via Studielink. |
-| **latest** | Per opleiding, herkomst, jaar en week: aanmeldingen, voorspellingen en foutwaarden (MAE/MAPE). Wordt gebruikt voor volume- en hogerjaarsvoorspellingen. |
+| **cumulative** | Aantal aanmeldingen per opleiding, herkomst, jaar, week en herinschrijving. Wordt gebruikt voor de SARIMA_cumulative voorspelling. Verkregen via Studielink. |
+| **latest** | Per opleiding, herkomst, jaar en week: aanmeldingen, voorspellingen en foutwaarden (MAE/MAPE). |
 | **student_count_first-years** | Werkelijk aantal eerstejaars studenten per jaar, opleiding en herkomst. |
-| **student_count_higher-years** | Werkelijk aantal hogerjaars studenten per jaar, opleiding en herkomst. |
-| **student_volume** | Werkelijk totaal aantal studenten (eerstejaars + hogerjaars) per jaar, opleiding en herkomst. |
+| **student_count_higher-years** | Werkelijk aantal hogerjaars studenten per jaar, opleiding en herkomst (alleen nodig bij `-sy h`). |
+| **student_volume** | Werkelijk totaal aantal ingeschreven studenten per jaar, opleiding en herkomst (alleen nodig bij `-sy v`). |
 | **weighted_ensemble** | Gewichten per model voor de ensemble-voorspelling. |
 
 ### Output
@@ -142,7 +142,7 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 |---------|-------------|
 | **output_prelim.xlsx** | Voorlopige output met alle voorspellingen van de huidige run. |
 | **output_first-years.xlsx** | Volledige output met voorspellingen voor eerstejaars studenten. |
-| **output_higher-years.xlsx** | Volledige output met voorspellingen voor hogerjaars studenten. |
+| **output_higher-years.xlsx** | Voorspellingen voor hogerjaars studenten (alleen bij `-sy h`). |
 | **output_volume.xlsx** | Volledige output met volume-voorspellingen (totaal). |
 
 ---

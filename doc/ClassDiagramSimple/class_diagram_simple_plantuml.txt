@@ -16,8 +16,6 @@ class LoadData << (P,orchid) >>
 
 class DataTotal
 
-class HigherYears
-
 BothDatasets -down-> Individual
 BothDatasets -down-> Cumulative
 
@@ -30,7 +28,5 @@ AvailableData --> DataTotal
 Main ..> LoadData
 Main --> AvailableData
 Main ..> DataTotal
-
-Main --> HigherYears
 
 @enduml
