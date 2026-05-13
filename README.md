@@ -132,7 +132,6 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 | **cumulative** | Aantal aanmeldingen per opleiding, herkomst, jaar, week en herinschrijving. Wordt gebruikt voor de SARIMA_cumulative voorspelling. Verkregen via Studielink. |
 | **latest** | Per opleiding, herkomst, jaar en week: aanmeldingen, voorspellingen en foutwaarden (MAE/MAPE). |
 | **student_count_first-years** | Werkelijk aantal eerstejaars studenten per jaar, opleiding en herkomst. |
-| **student_count_higher-years** | Werkelijk aantal hogerjaars studenten per jaar, opleiding en herkomst (alleen nodig bij `-sy h`). |
 | **student_volume** | Werkelijk totaal aantal ingeschreven studenten per jaar, opleiding en herkomst (alleen nodig bij `-sy v`). |
 | **weighted_ensemble** | Gewichten per model voor de ensemble-voorspelling. |
 

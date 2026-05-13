@@ -13,7 +13,6 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 | `vooraanmeldingen_cumulatief.csv` | Gewogen/ongewogen vooraanmelders per opleiding, herkomst, week, jaar | Studielink telbestanden (extern) → ETL stap 1 + 2 | Bij `-d c` of `-d b` (default) |
 | `vooraanmeldingen_individueel.csv` | Een rij per student-aanmelding met persoonskenmerken | Osiris/Usis (intern) → ETL stap 4 | Bij `-d i` of `-d b` (default) |
 | `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
-| `student_count_higher-years.xlsx` | Werkelijk aantal hogerjaars per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Alleen bij `-sy h` of `-sy v` |
 | `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Alleen bij `-sy v` |
 
 ### Optionele bestanden
@@ -73,7 +72,7 @@ flowchart TD
         VC["vooraanmeldingen_cumulatief.csv"]:::verplicht
         VI["vooraanmeldingen_individueel.csv"]:::verplicht
         SC["student_count_first-years.xlsx"]:::verplicht
-        SCH["student_count_higher-years.xlsx<br/>student_volume.xlsx<br/><i>alleen bij -sy h / -sy v</i>"]:::optioneel
+        SCV["student_volume.xlsx<br/><i>alleen bij -sy v</i>"]:::optioneel
     end
 
     %% ══════════════════════════════════════
