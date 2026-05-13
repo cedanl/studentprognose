@@ -109,13 +109,22 @@ MAE en MAPE worden berekend **exclusief numerus-fixusopleidingen**. Voor deze op
 
 ## Interactief dashboard
 
-Naast de Excel-bestanden genereert de pipeline interactieve HTML-dashboards onder `data/output/visualisaties/`. Per modus (`-d i`, `-d c`, `-d b`) wordt een apart dashboard aangemaakt met daarin:
+Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren onder `data/output/visualisaties/`. Per modus (`-d i`, `-d c`, `-d b`) wordt een apart dashboard aangemaakt met daarin:
 
 - **Individueel dashboard**: XGBoost-voorspellingen per opleiding, SARIMA-trajecten, feature importance (classifier).
 - **Cumulatief dashboard**: SARIMA-voorspellingen op cumulatieve teldata, XGBoost-regressorresultaten, feature importance (regressor).
 - **Eindoverzicht**: ensemble-voorspellingen per opleiding, foutmaten, vergelijking met vorige jaren.
 
 De dashboards zijn zelfstandige HTML-bestanden (geen server nodig) en kunnen in elke browser geopend worden.
+
+!!! info "Dashboard is opt-in"
+    Sinds deze versie wordt het dashboard alleen gegenereerd als je expliciet `--dashboard` meegeeft. Een voorbeeld:
+
+    ```bash
+    studentprognose --dashboard -d both -w 10 -y 2025
+    ```
+
+    Mocht dashboard-generatie onverhoopt falen, dan loopt de rest van de pipeline gewoon door en wordt de stack trace weggeschreven naar `data/output/dashboard_error.log`. De Excel-output blijft in dat geval beschikbaar.
 
 !!! note "Dashboard toont alleen de laatste week"
     Bij een multi-week run (bijv. `-w 10:20`) toont het dashboard alleen de prognose van de **laatste week** in de reeks. De Excel-output bevat wel alle weken.

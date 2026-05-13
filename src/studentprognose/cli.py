@@ -20,6 +20,7 @@ class PipelineConfig:
     ci_test_n: int | None = None
     noetl: bool = False
     yes: bool = False
+    dashboard: bool = False
     command: str | None = None
 
 
@@ -123,6 +124,11 @@ def parse_args(argv):
         action="store_true",
         help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)",
     )
+    parser.add_argument(
+        "--dashboard",
+        action="store_true",
+        help="Genereer interactieve Plotly-dashboards in data/output/visualisations/. Standaard uit.",
+    )
 
     args = parser.parse_args(argv[1:])
 
@@ -130,6 +136,7 @@ def parse_args(argv):
     cfg.command = args.command
     cfg.noetl = args.noetl
     cfg.yes = args.yes
+    cfg.dashboard = args.dashboard
 
     # Configuration path — load_configuration handles missing files gracefully
     if args.configuration:

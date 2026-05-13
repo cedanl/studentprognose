@@ -2391,6 +2391,10 @@ class DashboardBuilder:
                 prog_traces[prog].append((idx, True))
 
             # ── SARIMA forecast (red dashed) + uncertainty band ──────────
+            # data_cumulative may contain programmes that were filtered out of self.data
+            # (e.g. by min_training_year, filtering rules). In that case the aggregation
+            # below is empty and pandas can drop the Weeknummer column on the empty
+            # groupby result, so we guard explicitly before sorting.
             if "Voorspelde vooraanmelders" in self.data.columns:
                 sarima_sub = (
                     self.data[
@@ -2400,6 +2404,10 @@ class DashboardBuilder:
                     .groupby("Weeknummer")["Voorspelde vooraanmelders"].sum().reset_index()
                     .dropna(subset=["Voorspelde vooraanmelders"])
                 )
+            else:
+                sarima_sub = pd.DataFrame()
+
+            if not sarima_sub.empty and "Weeknummer" in sarima_sub.columns:
                 # Only weeks after predict_week
                 if self.predict_week is not None:
                     pw_key = week_sort_key(self.predict_week)
