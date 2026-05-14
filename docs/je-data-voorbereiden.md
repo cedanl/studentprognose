@@ -25,7 +25,6 @@ Scheidingsteken: `;`
 | `Aantal` | int | Aantal vooraanmelders |
 | `meercode_V` | int | Weegfactor; mag niet 0 zijn (leidt tot deling door nul in ETL) |
 | `Herinschrijving` | str | `J` of `N` |
-| `Hogerejaars` | str | `J` of `N` |
 | `Herkomst` | str | `N` (Nederland), `E` (EER), `R` (rest) |
 
 ### Individuele aanmelddata

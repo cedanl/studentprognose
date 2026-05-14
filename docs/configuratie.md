@@ -32,7 +32,6 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_raw_telbestanden` | `data/input_raw/telbestanden` | Map met Studielink telbestanden |
 | `path_raw_individueel` | `data/input_raw/individuele_aanmelddata.csv` | Ruwe individuele aanmelddata |
 | `path_student_count_first-years` | `data/input/student_count_first-years.xlsx` | Werkelijk aantal eerstejaars (DUO) |
-| `path_student_count_higher-years` | `data/input/student_count_higher-years.xlsx` | Werkelijk aantal hogerjaars (DUO) |
 | `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (DUO) |
 | `path_ratios` | `data/input/ratiobestand.xlsx` | Ratiobestand (optioneel) |
 
@@ -213,7 +212,7 @@ Maakt het mogelijk dat instellingen andere kolomnamen gebruiken dan de kanonieke
 
 Volledige lijst van kanonieke kolomnamen die gemapped kunnen worden:
 
-`Sleutel`, `Datum Verzoek Inschr`, `Ingangsdatum`, `Collegejaar`, `Datum intrekking vooraanmelding`, `Inschrijfstatus`, `Faculteit`, `Examentype`, `Croho`, `Croho groepeernaam`, `Opleiding`, `Hoofdopleiding`, `Eerstejaars croho jaar`, `Is eerstejaars croho opleiding`, `Is hogerejaars`, `BBC ontvangen`, `Type vooropleiding`, `Nationaliteit`, `EER`, `Geslacht`, `Geverifieerd adres postcode`, `Geverifieerd adres plaats`, `Geverifieerd adres land`, `Studieadres postcode`, `Studieadres land`, `School code eerste vooropleiding`, `School eerste vooropleiding`, `Plaats code eerste vooropleiding`, `Land code eerste vooropleiding`, `Aantal studenten`
+`Sleutel`, `Datum Verzoek Inschr`, `Ingangsdatum`, `Collegejaar`, `Datum intrekking vooraanmelding`, `Inschrijfstatus`, `Faculteit`, `Examentype`, `Croho`, `Croho groepeernaam`, `Opleiding`, `Hoofdopleiding`, `Eerstejaars croho jaar`, `Is eerstejaars croho opleiding`, `BBC ontvangen`, `Type vooropleiding`, `Nationaliteit`, `EER`, `Geslacht`, `Geverifieerd adres postcode`, `Geverifieerd adres plaats`, `Geverifieerd adres land`, `Studieadres postcode`, `Studieadres land`, `School code eerste vooropleiding`, `School eerste vooropleiding`, `Plaats code eerste vooropleiding`, `Land code eerste vooropleiding`, `Aantal studenten`
 
 ### `oktober` — DUO oktober-bestand
 
@@ -221,7 +220,7 @@ Volledige lijst van kanonieke kolomnamen die gemapped kunnen worden:
 
 ### `cumulative` — Studielink cumulatieve data
 
-`Korte naam instelling`, `Collegejaar`, `Weeknummer rapportage`, `Weeknummer`, `Faculteit`, `Type hoger onderwijs`, `Groepeernaam Croho`, `Naam Croho opleiding Nederlands`, `Croho`, `Herinschrijving`, `Hogerejaars`, `Herkomst`, `Gewogen vooraanmelders`, `Ongewogen vooraanmelders`, `Aantal aanmelders met 1 aanmelding`, `Inschrijvingen`
+`Korte naam instelling`, `Collegejaar`, `Weeknummer rapportage`, `Weeknummer`, `Faculteit`, `Type hoger onderwijs`, `Groepeernaam Croho`, `Naam Croho opleiding Nederlands`, `Croho`, `Herinschrijving`, `Herkomst`, `Gewogen vooraanmelders`, `Ongewogen vooraanmelders`, `Aantal aanmelders met 1 aanmelding`, `Inschrijvingen`
 
 ## `validation` — validatiedrempels overschrijven
 

@@ -172,7 +172,7 @@ studentprognose --help
 | `-w` | weeknummer(s) | laatste week in data | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |
 | `-y` | jaar(en) | laatste jaar in data | Voorspeljaar(en), bijv. `-y 2025` of `-y 2024 2025` |
 | `-d` | `b` / `c` / `i` | `b` | Dataset: `both`, `cumulative`, `individual` |
-| `-sy` | `f` / `h` / `v` | `f` | Studentjaar: `first-years`, `higher-years`, `volume` |
+| `-sy` | `f` / `v` | `f` | Studentjaar: `first-years` (standaard), `volume` |
 | `-c` | pad | `configuration/configuration.json` | Configuratiebestand |
 | `-f` | pad | `configuration/filtering/base.json` | Filterbestand |
 | `-sk` | getal | `0` | Skip N jaren (backtesting) |
@@ -184,7 +184,7 @@ studentprognose --help
 Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
 
 !!! note "Eerstejaars als focus"
-    De tool draait standaard op `-sy f` (eerstejaars). De modi `-sy h` (hogerejaars) en `-sy v` (volume) zijn vervolgstappen — gebruik die pas als je eerstejaarsvoorspelling op orde is.
+    De tool draait standaard op `-sy f` (eerstejaars). De modus `-sy v` (volume) is een vervolgstap — gebruik die pas als je eerstejaarsvoorspelling op orde is.
 
 ## Gebruik als Python-package
 
@@ -201,7 +201,7 @@ from studentprognose import (
     run_pipeline_from_dataframes,  # pipeline met DataFrames in-memory
     PipelineConfig,                # configuratie-dataclass voor de pipeline
     DataOption,                    # enum: INDIVIDUAL / CUMULATIVE / BOTH_DATASETS
-    StudentYearPrediction,         # enum: FIRST_YEARS / HIGHER_YEARS / VOLUME
+    StudentYearPrediction,         # enum: FIRST_YEARS / VOLUME
 )
 ```
 

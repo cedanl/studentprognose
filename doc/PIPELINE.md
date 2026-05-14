@@ -130,7 +130,7 @@ flowchart TD
     %% ══════════════════════════════════════
     S10A -.-> OUT_PRELIM
     OUT_PRELIM["<b>data/output/</b><br/><i>output_prelim_*.xlsx</i><br/>(tussenresultaat)"]:::output
-    OUT["<b>data/output/</b><br/><br/>output_first-years_*.xlsx<br/><i>output_higher-years_*.xlsx (bij -sy h)</i><br/><i>output_volume_*.xlsx (bij -sy v)</i>"]:::output
+    OUT["<b>data/output/</b><br/><br/>output_first-years_*.xlsx<br/><i>output_volume_*.xlsx (bij -sy v)</i>"]:::output
 
     %% ══════════════════════════════════════
     %% LAAG 6 — Post-processing (archive/)
@@ -241,7 +241,6 @@ Na een model-run kunnen de volgende scripts worden gedraaid om de input voor de 
 |---------|------|-------------|
 | `output_prelim_*.xlsx` | Tussenresultaat (stap 12) | Voorlopige voorspellingen, vóór ratio/ensemble/foutmaten |
 | `output_first-years_*.xlsx` | Eindresultaat (stap 15) | Eerstejaars voorspellingen |
-| `output_higher-years_*.xlsx` | Eindresultaat (stap 15) | Hogerjaars voorspellingen (alleen bij `-sy h`) |
 | `output_volume_*.xlsx` | Eindresultaat (stap 15) | Volume-voorspellingen (alleen bij `-sy v`) |
 
 ### Kolommen in output

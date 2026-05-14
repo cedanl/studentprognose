@@ -141,7 +141,6 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 |---------|-------------|
 | **output_prelim.xlsx** | Voorlopige output met alle voorspellingen van de huidige run. |
 | **output_first-years.xlsx** | Volledige output met voorspellingen voor eerstejaars studenten. |
-| **output_higher-years.xlsx** | Voorspellingen voor hogerjaars studenten (alleen bij `-sy h`). |
 | **output_volume.xlsx** | Volledige output met volume-voorspellingen (totaal). |
 
 ---
