@@ -2,6 +2,11 @@
 
 XGBoost wordt op twee plekken ingezet in de pipeline, met fundamenteel verschillende rollen: als **classifier** (individueel spoor) en als **regressor** (cumulatief spoor).
 
+!!! tip "Uitgebreide versie — Jupyter notebook"
+    Een uitvoerbare versie met feature-engineering stap voor stap (lagged features, acceleration,
+    exclusivity ratio) en feature importance op de demodata staat in
+    [`notebooks/03_xgboost.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/03_xgboost.ipynb).
+
 ## XGBoost Classifier (individueel spoor)
 
 ### Wat doet het?

@@ -21,3 +21,7 @@ data/output/*
 !data/input_raw
 
 
+
+# Jupyter notebook checkpoints
+**/.ipynb_checkpoints/
+

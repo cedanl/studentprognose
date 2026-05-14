@@ -40,6 +40,16 @@ Het model kent drie verwerkingssporen, afhankelijk van de beschikbare data:
 
 Zie [Methodologie](methodologie/index.md) voor een diepgaande uitleg per model.
 
+## Uitgebreide voorbeelden — Jupyter notebooks
+
+Naast deze documentatie staan in [`notebooks/`](https://github.com/cedanl/studentprognose/tree/main/notebooks) zeven **uitvoerbare** Jupyter-notebooks die de methodologie-pagina's stap-voor-stap doorlopen op de meegeleverde demodata:
+
+- `00_overzicht.ipynb` — pipeline in vijf minuten
+- `01_data_voorbereiden.ipynb` — data laden en valideren
+- `02_sarima.ipynb` t/m `06_output_interpreteren.ipynb` — een notebook per model + outputuitleg
+
+Ze zijn bedoeld voor data-analisten en onderzoekers die niet alleen *willen lezen* maar ook *willen experimenteren* met parameters, peilweken en opleidingen. Zie [`notebooks/README.md`](https://github.com/cedanl/studentprognose/blob/main/notebooks/README.md) voor de installatie- en draai-instructies.
+
 ## In de praktijk
 
 Dit model is oorspronkelijk ontwikkeld door **Radboud Universiteit** en vervolgens samen met CEDA open source gemaakt zodat andere Nederlandse onderwijsinstellingen er ook van kunnen profiteren. Radboud is daarmee de grondlegger van dit project. VOX Nijmegen schreef hierover: [*De universiteit heeft nu haar eigen glazen bol*](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten).
