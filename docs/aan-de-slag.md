@@ -71,13 +71,12 @@ Bestaat een bestand al, dan wordt het overgeslagen. Je kunt `init` dus veilig op
 
 Zet je inputbestanden in de juiste mappen voordat je de pipeline start:
 
-``` { .text hl_lines="8" }
+```text
 data/
 ├── input/                          ← verwerkte inputbestanden (na ETL)
 │   ├── vooraanmeldingen_cumulatief.csv
 │   ├── vooraanmeldingen_individueel.csv
 │   ├── student_count_first-years.xlsx
-│   ├── student_count_higher-years.xlsx
 │   └── student_volume.xlsx
 └── input_raw/                      ← ruwe bronbestanden (NIET nodig met --noetl)
     ├── telbestanden/               ← Studielink telbestanden
@@ -173,7 +172,7 @@ studentprognose --help
 | `-w` | weeknummer(s) | laatste week in data | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |
 | `-y` | jaar(en) | laatste jaar in data | Voorspeljaar(en), bijv. `-y 2025` of `-y 2024 2025` |
 | `-d` | `b` / `c` / `i` | `b` | Dataset: `both`, `cumulative`, `individual` |
-| `-sy` | `f` / `h` / `v` | `f` | Studentjaar: `first-years`, `higher-years`, `volume` |
+| `-sy` | `f` / `v` | `f` | Studentjaar: `first-years` (standaard), `volume` |
 | `-c` | pad | `configuration/configuration.json` | Configuratiebestand |
 | `-f` | pad | `configuration/filtering/base.json` | Filterbestand |
 | `-sk` | getal | `0` | Skip N jaren (backtesting) |
@@ -183,6 +182,9 @@ studentprognose --help
 | `--ci test N` | getal | — | Testmodus: beperkt tot N opleidingen |
 
 Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
+
+!!! note "Eerstejaars als focus"
+    De tool draait standaard op `-sy f` (eerstejaars). De modus `-sy v` (volume) is een vervolgstap — gebruik die pas als je eerstejaarsvoorspelling op orde is.
 
 ## Gebruik als Python-package
 
@@ -199,7 +201,7 @@ from studentprognose import (
     run_pipeline_from_dataframes,  # pipeline met DataFrames in-memory
     PipelineConfig,                # configuratie-dataclass voor de pipeline
     DataOption,                    # enum: INDIVIDUAL / CUMULATIVE / BOTH_DATASETS
-    StudentYearPrediction,         # enum: FIRST_YEARS / HIGHER_YEARS / VOLUME
+    StudentYearPrediction,         # enum: FIRST_YEARS / VOLUME
 )
 ```
 

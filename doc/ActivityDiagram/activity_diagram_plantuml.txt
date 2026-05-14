@@ -36,8 +36,6 @@ repeat
 
     #palegreen:Postprocessing;
 
-    #orchid:Predict nr of higher years students using XGBoost and ratio;
-
   repeat while (Forecast another week) is (yes) not (no)
 
 repeat while (Forecast another year) is (yes) not (no)

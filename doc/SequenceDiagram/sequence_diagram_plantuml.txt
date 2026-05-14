@@ -36,13 +36,6 @@ loop for specified years and weeks
   end
 
   Main -> DataTotal: postprocess(postprocess_subset, year, week)
-
-  alt predict higher years or volume
-    Main -> HigherYears: predict_nr_of_students(data, data_latest, year, week)
-    activate HigherYears
-    HigherYears --> Main: data
-    deactivate HigherYears
-  end
 end
 
 Main -> DataTotal: save_output()

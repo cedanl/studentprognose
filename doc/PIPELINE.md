@@ -13,8 +13,7 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 | `vooraanmeldingen_cumulatief.csv` | Gewogen/ongewogen vooraanmelders per opleiding, herkomst, week, jaar | Studielink telbestanden (extern) → ETL stap 1 + 2 | Bij `-d c` of `-d b` (default) |
 | `vooraanmeldingen_individueel.csv` | Een rij per student-aanmelding met persoonskenmerken | Osiris/Usis (intern) → ETL stap 4 | Bij `-d i` of `-d b` (default) |
 | `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
-| `student_count_higher-years.xlsx` | Werkelijk aantal hogerjaars per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
-| `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
+| `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Alleen bij `-sy v` |
 
 ### Optionele bestanden
 
@@ -72,7 +71,8 @@ flowchart TD
         direction LR
         VC["vooraanmeldingen_cumulatief.csv"]:::verplicht
         VI["vooraanmeldingen_individueel.csv"]:::verplicht
-        SC["student_count_first-years.xlsx<br/>student_count_higher-years.xlsx<br/>student_volume.xlsx"]:::verplicht
+        SC["student_count_first-years.xlsx"]:::verplicht
+        SCV["student_volume.xlsx<br/><i>alleen bij -sy v</i>"]:::optioneel
     end
 
     %% ══════════════════════════════════════
@@ -130,7 +130,7 @@ flowchart TD
     %% ══════════════════════════════════════
     S10A -.-> OUT_PRELIM
     OUT_PRELIM["<b>data/output/</b><br/><i>output_prelim_*.xlsx</i><br/>(tussenresultaat)"]:::output
-    OUT["<b>data/output/</b><br/><br/>output_first-years_*.xlsx<br/>output_higher-years_*.xlsx<br/>output_volume_*.xlsx"]:::output
+    OUT["<b>data/output/</b><br/><br/>output_first-years_*.xlsx<br/><i>output_volume_*.xlsx (bij -sy v)</i>"]:::output
 
     %% ══════════════════════════════════════
     %% LAAG 6 — Post-processing (archive/)
@@ -241,8 +241,7 @@ Na een model-run kunnen de volgende scripts worden gedraaid om de input voor de 
 |---------|------|-------------|
 | `output_prelim_*.xlsx` | Tussenresultaat (stap 12) | Voorlopige voorspellingen, vóór ratio/ensemble/foutmaten |
 | `output_first-years_*.xlsx` | Eindresultaat (stap 15) | Eerstejaars voorspellingen |
-| `output_higher-years_*.xlsx` | Eindresultaat (stap 15) | Hogerjaars voorspellingen |
-| `output_volume_*.xlsx` | Eindresultaat (stap 15) | Volume-voorspellingen (totaal) |
+| `output_volume_*.xlsx` | Eindresultaat (stap 15) | Volume-voorspellingen (alleen bij `-sy v`) |
 
 ### Kolommen in output
 
