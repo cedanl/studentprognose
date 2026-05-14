@@ -84,30 +84,18 @@ def get_model_features(config: dict) -> dict:
 def get_cpu_count(config: dict) -> int:
     """Resolve the number of CPU cores to use for parallel work.
 
-    Reads ``runtime.cpu_count`` from the configuration:
+    Pure lookup with no side-effects. The value has already been validated
+    and capped (with a one-time warning) during :func:`_validate_runtime`
+    when the configuration was loaded.
 
-    - ``None`` (or missing): falls back to ``os.cpu_count()``, or ``1`` when
-      the OS does not report a count (e.g. some cgroup-constrained containers).
-    - Integer ``>= 1``: used as-is, capped to the number of cores the OS
-      reports — a higher request is reduced with a warning so the pipeline
-      does not crash on hardware with fewer cores than configured.
-
-    Invalid values are rejected during configuration loading via
-    :func:`_validate_runtime`, so this function trusts its input.
+    - ``runtime.cpu_count`` is ``None`` (or missing): returns ``os.cpu_count()``,
+      or ``1`` when the OS does not report a count (e.g. some
+      cgroup-constrained containers).
+    - Otherwise: returns the configured integer as-is.
     """
-    available = os.cpu_count() or 1
     requested = config.get("runtime", {}).get("cpu_count")
-
     if requested is None:
-        return available
-
-    if requested > available:
-        print(
-            f"Waarschuwing: 'runtime.cpu_count' ({requested}) is hoger dan het aantal "
-            f"beschikbare cores ({available}). Verlaagd naar {available}."
-        )
-        return available
-
+        return os.cpu_count() or 1
     return requested
 
 
@@ -221,3 +209,14 @@ def _validate_runtime(cfg, file_path):
             f"'runtime.cpu_count' is {cpu_count} — moet >= 1 zijn, of null voor automatische detectie."
         )
         sys.exit(1)
+
+    # Cap aan beschikbare cores. Eenmalig hier — geen herhaalde waarschuwing
+    # tijdens predict-loops over (jaar × week)-combinaties.
+    available = os.cpu_count() or 1
+    if cpu_count > available:
+        print(
+            f"Waarschuwing in {file_path}: "
+            f"'runtime.cpu_count' ({cpu_count}) is hoger dan het aantal beschikbare "
+            f"cores ({available}). Verlaagd naar {available}."
+        )
+        cfg["runtime"]["cpu_count"] = available
