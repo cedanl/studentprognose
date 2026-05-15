@@ -190,6 +190,9 @@ Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
 
 Naast de CLI kun je `studentprognose` ook direct vanuit Python-scripts importeren. Dit is handig voor geautomatiseerde pipelines, notebooks, of cloudworkflows waarbij de data al in-memory beschikbaar is.
 
+!!! tip "Uitvoerbaar voorbeeld — implementatienotebook"
+    Voor een direct inpasbaar startpunt voor MS Fabric, Databricks of Azure: zie [`notebooks/implementatie.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/implementatie.ipynb). Vereist alleen `pip install studentprognose` — geen repo-clone nodig.
+
 ### Beschikbare bouwstenen
 
 ```python
@@ -263,12 +266,6 @@ result = run_pipeline_from_dataframes(
     dataset=DataOption.CUMULATIVE,
 )
 ```
-
-!!! tip "Werkende blauwdruk: `notebooks/07_implementatie.ipynb`"
-    Een uitvoerbaar voorbeeld dat dit pad volgt — `pip install studentprognose`, demodata via
-    GitHub raw URL, geen repo-clone nodig — staat in
-    [`notebooks/07_implementatie.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/07_implementatie.ipynb).
-    Open in je eigen Jupyter-omgeving (Colab, Azure ML, JupyterHub) en pas de databron aan.
 
 ## Bekende valkuil: stille modus-downgrade
 
