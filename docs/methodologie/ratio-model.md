@@ -2,6 +2,10 @@
 
 Het ratio-model is het eenvoudigste model in de pipeline en dient als **referentiemodel**: volledig transparant, altijd beschikbaar, ook zonder betrouwbare trainingsdata voor de complexere modellen.
 
+!!! tip "Uitgebreide versie — Jupyter notebook"
+    Een uitvoerbare versie waarin we de ratio handmatig stap-voor-stap herberekenen en per week
+    visualiseren staat in [`notebooks/04_ratio_model.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/04_ratio_model.ipynb).
+
 ## Wat doet het?
 
 Het ratio-model berekent per opleiding de historische verhouding tussen het totale aanmeldvolume op een bepaald moment in het jaar en het uiteindelijke aantal inschrijvingen. Die ratio wordt vervolgens toegepast op het huidige aanmeldvolume.

@@ -46,6 +46,8 @@ studentprognose = "studentprognose.main:cli"
 
 [dependency-groups]
 dev = [
+    "jupyter>=1.1.1",
+    "nbformat>=5.10.4",
     "pre-commit>=4.1.0",
     "pytest>=9.0.2",
 ]

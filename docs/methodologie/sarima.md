@@ -2,6 +2,10 @@
 
 SARIMA staat voor **Seasonal AutoRegressive Integrated Moving Average**. Het is het kerntijdreeksmodel in de pipeline en wordt ingezet in zowel het cumulatieve als het individuele spoor.
 
+!!! tip "Uitgebreide versie — Jupyter notebook"
+    Wil je het model zien fitten en forecasten op de demodata, inclusief aannames op de testbank?
+    Zie [`notebooks/02_sarima.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/02_sarima.ipynb).
+
 ## Wat doet het?
 
 SARIMA extrapoleert het wekelijkse aanmeldpatroon van een opleiding naar het verwachte eindaantal inschrijvingen op week 38. Het model leert van historische seizoenspatronen: in welke weken stromen de meeste aanmeldingen binnen, hoe ziet de curve eruit vlak voor de inschrijfdeadline?

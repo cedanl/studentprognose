@@ -2,6 +2,11 @@
 
 De pipeline schrijft de resultaten naar `data/output/`. Er zijn twee typen uitvoerbestanden: een tussenresultaat en drie eindresultaten.
 
+!!! tip "Uitgebreide versie — Jupyter notebook"
+    Een uitvoerbare versie die een in-memory pipeline-run uitvoert en de outputkolommen stap
+    voor stap interpreteert (inclusief MAE/MAPE-voorbeelden en modelvergelijking) staat in
+    [`notebooks/06_output_interpreteren.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/06_output_interpreteren.ipynb).
+
 ## Outputbestanden
 
 | Bestand | Fase | Beschrijving |
