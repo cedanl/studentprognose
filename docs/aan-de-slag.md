@@ -262,6 +262,12 @@ result = run_pipeline_from_dataframes(
 )
 ```
 
+!!! tip "Werkende blauwdruk: `notebooks/07_implementatie.ipynb`"
+    Een uitvoerbaar voorbeeld dat dit pad volgt — `pip install studentprognose`, demodata via
+    GitHub raw URL, geen repo-clone nodig — staat in
+    [`notebooks/07_implementatie.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/07_implementatie.ipynb).
+    Open in je eigen Jupyter-omgeving (Colab, Azure ML, JupyterHub) en pas de databron aan.
+
 ## Bekende valkuil: stille modus-downgrade
 
 !!! warning "Let op bij `-d b`"
