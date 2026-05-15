@@ -1,8 +1,8 @@
 import numpy as np
 import joblib
-import os
 import math
 
+from studentprognose.config import get_cpu_count
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy, _add_engineered_features
@@ -131,7 +131,7 @@ class CombinedStrategy(PredictionStrategy):
         if len(data_to_predict) == 0:
             return None
 
-        nr_CPU_cores = os.cpu_count()
+        nr_CPU_cores = get_cpu_count(self.configuration)
         chunk_size = math.ceil(len(data_to_predict) / nr_CPU_cores)
         chunks = [
             data_to_predict[i : i + chunk_size] for i in range(0, len(data_to_predict), chunk_size)

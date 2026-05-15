@@ -155,7 +155,7 @@ def run_pipeline_from_dataframes(
             save_output=False,
         )
     """
-    from studentprognose.config import load_defaults
+    from studentprognose.config import load_defaults, _validate_runtime
 
     if week == FINAL_ACADEMIC_WEEK:
         raise ValueError(
@@ -165,6 +165,11 @@ def run_pipeline_from_dataframes(
 
     if configuration is None:
         configuration = load_defaults()
+
+    # Valideer runtime ook in de in-memory pad: gebruikers die een eigen
+    # configuration dict samenstellen (bv. via load_defaults() + handmatige
+    # aanpassing) krijgen dan dezelfde capping + waarschuwing als CLI-gebruikers.
+    _validate_runtime(configuration, "<in-memory configuration>")
 
     if filtering is None:
         filtering = load_defaults_filtering()

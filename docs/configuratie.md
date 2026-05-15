@@ -14,7 +14,7 @@ De pipeline laadt altijd eerst de **ingebakken standaardwaarden** uit het packag
 - Een ontbrekend veld in jouw bestand valt automatisch terug op de standaardwaarde.
 - Als het configuratiebestand helemaal niet bestaat, worden de standaardwaarden gebruikt en verschijnt er een waarschuwing.
 
-Het bestand heeft de volgende secties: `paths`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
+Het bestand heeft de volgende secties: `paths`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
 
 ## `paths` — bestandspaden
 
@@ -34,6 +34,28 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_student_count_first-years` | `data/input/student_count_first-years.xlsx` | Werkelijk aantal eerstejaars (DUO) |
 | `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (DUO) |
 | `path_ratios` | `data/input/ratiobestand.xlsx` | Ratiobestand (optioneel) |
+
+## `runtime` — uitvoerparameters
+
+Instellingen die bepalen hoe de pipeline zich gedraagt tijdens uitvoer (los van de modelkeuze).
+
+### `cpu_count`
+
+Standaard: `null`
+
+Het aantal CPU-cores dat de pipeline gebruikt voor parallelle voorspellingen. De voorspelling van individuele SARIMA-modellen wordt verdeeld over deze cores via `joblib.Parallel`.
+
+| Waarde | Gedrag |
+|--------|--------|
+| `null` | Automatisch — `os.cpu_count()` wordt gebruikt, of `1` als het besturingssysteem geen waarde teruggeeft (kan voorkomen in containers met cgroup-limieten). |
+| Geheel getal `>= 1` | Gebruikt deze waarde. Als de waarde hoger is dan het aantal beschikbare cores, wordt deze automatisch verlaagd naar dat aantal en verschijnt er een waarschuwing. |
+
+Pas dit aan als:
+
+- De pipeline crasht omdat `os.cpu_count()` geen betrouwbare waarde teruggeeft op jouw hardware of in jouw container (achtergrond van [issue #162](https://github.com/cedanl/studentprognose/issues/162)).
+- Je het CPU-gebruik wilt beperken op een gedeelde machine.
+
+Ongeldige waarden (`0`, negatieve getallen, niet-gehele getallen) leiden tot een configuratiefout en stoppen de pipeline direct.
 
 ## `model_config` — modelparameters
 

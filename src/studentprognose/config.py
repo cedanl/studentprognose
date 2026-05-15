@@ -1,4 +1,5 @@
 import json
+import os
 import sys
 from importlib.resources import files
 from types import SimpleNamespace
@@ -61,6 +62,7 @@ def load_configuration(file_path: str) -> dict:
     if "excluded_data_points" in cfg:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     _validate_model_config(cfg, file_path)
+    _validate_runtime(cfg, file_path)
     return cfg
 
 
@@ -77,6 +79,24 @@ def get_columns(config: dict) -> SimpleNamespace:
 def get_model_features(config: dict) -> dict:
     """Get model feature lists (numeric / categorical) from configuration."""
     return config.get("model_features", {})
+
+
+def get_cpu_count(config: dict) -> int:
+    """Resolve the number of CPU cores to use for parallel work.
+
+    Pure lookup with no side-effects. The value has already been validated
+    and capped (with a one-time warning) during :func:`_validate_runtime`
+    when the configuration was loaded.
+
+    - ``runtime.cpu_count`` is ``None`` (or missing): returns ``os.cpu_count()``,
+      or ``1`` when the OS does not report a count (e.g. some
+      cgroup-constrained containers).
+    - Otherwise: returns the configured integer as-is.
+    """
+    requested = config.get("runtime", {}).get("cpu_count")
+    if requested is None:
+        return os.cpu_count() or 1
+    return requested
 
 
 def _validate_excluded_data_points(rules, file_path):
@@ -160,3 +180,43 @@ def _validate_model_config(cfg, file_path):
             f"Geldige opties: {sorted(_VALID_CLASSIFIER_MODELS)}."
         )
         sys.exit(1)
+
+
+def _validate_runtime(cfg, file_path):
+    runtime = cfg.get("runtime", {})
+    if not isinstance(runtime, dict):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'runtime' moet een object zijn, niet {type(runtime).__name__}."
+        )
+        sys.exit(1)
+
+    cpu_count = runtime.get("cpu_count")
+    if cpu_count is None:
+        return
+
+    if isinstance(cpu_count, bool) or not isinstance(cpu_count, int):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'runtime.cpu_count' moet een geheel getal zijn of null, "
+            f"niet {type(cpu_count).__name__}."
+        )
+        sys.exit(1)
+
+    if cpu_count < 1:
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'runtime.cpu_count' is {cpu_count} — moet >= 1 zijn, of null voor automatische detectie."
+        )
+        sys.exit(1)
+
+    # Cap aan beschikbare cores. Eenmalig hier — geen herhaalde waarschuwing
+    # tijdens predict-loops over (jaar × week)-combinaties.
+    available = os.cpu_count() or 1
+    if cpu_count > available:
+        print(
+            f"Waarschuwing in {file_path}: "
+            f"'runtime.cpu_count' ({cpu_count}) is hoger dan het aantal beschikbare "
+            f"cores ({available}). Verlaagd naar {available}."
+        )
+        cfg["runtime"]["cpu_count"] = available
