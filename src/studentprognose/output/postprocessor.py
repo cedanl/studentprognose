@@ -60,6 +60,7 @@ class PostProcessor:
         self.data_option = data_option
         self.ci_test_n = ci_test_n
         self.data = None
+        self.save_outputs_to_disk = True
 
     def add_predicted_preregistrations(self, data, predicted_preregistrations):
         dict = {
@@ -197,9 +198,12 @@ class PostProcessor:
                 how="left",
             )
 
-        ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
-        output_path = os.path.join(self.CWD, "data", "output", f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx")
-        self.data.to_excel(output_path, index=False)
+        if self.save_outputs_to_disk:
+            ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
+            output_dir = os.path.join(self.CWD, "data", "output")
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx")
+            self.data.to_excel(output_path, index=False)
 
     def predict_with_ratio(self, data_cumulative, predict_year):
         self.data = _predict_with_ratio(

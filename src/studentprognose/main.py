@@ -163,6 +163,29 @@ def run_pipeline_from_dataframes(
             f"Kies een eerdere week, bijvoorbeeld week {FINAL_ACADEMIC_WEEK - 1}."
         )
 
+    if dataset in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS) and data_cumulative is None:
+        raise ValueError(
+            f"dataset={dataset.name} vereist data_cumulative, maar dat is None. "
+            "Geef een cumulatief vooraanmeld-DataFrame mee."
+        )
+
+    if dataset in (DataOption.INDIVIDUAL, DataOption.BOTH_DATASETS) and data_individual is None:
+        raise ValueError(
+            f"dataset={dataset.name} vereist data_individual, maar dat is None. "
+            "Geef een individueel aanmeld-DataFrame mee."
+        )
+
+    if (
+        student_year_prediction == StudentYearPrediction.FIRST_YEARS
+        and data_student_numbers is None
+    ):
+        raise ValueError(
+            "data_student_numbers is None, maar SARIMA en de ratio-modellen hebben "
+            "historische realisatie (eerstejaars per opleiding × jaar) nodig om te trainen. "
+            "Geef een DataFrame mee met kolommen "
+            "['Croho groepeernaam', 'Collegejaar', 'Herkomst', 'Examentype', 'Aantal_studenten']."
+        )
+
     if configuration is None:
         configuration = load_defaults()
 
@@ -203,6 +226,7 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output
     """
     # Step 2: Initialize strategy (Individual / Cumulative / Combined)
     strategy = create_strategy(cfg, datasets, configuration, cwd)
+    strategy.postprocessor.save_outputs_to_disk = save_output
 
     if save_output:
         PostProcessor.check_output_writable(

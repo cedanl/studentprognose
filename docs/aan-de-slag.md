@@ -195,6 +195,7 @@ Naast de CLI kun je `studentprognose` ook direct vanuit Python-scripts importere
 ```python
 from studentprognose import (
     load_configuration,            # laad configuration.json (of package defaults)
+    load_defaults,                 # laad package-defaults voor configuration
     load_filtering,                # laad filtering JSON (of package defaults)
     load_data,                     # laad data vanaf schijf als DataFrames
     run_pipeline_cli,              # volledige CLI-pipeline (accepteert argv-lijst)
@@ -232,24 +233,35 @@ from studentprognose import run_pipeline_from_dataframes, DataOption
 
 # Of lokaal voor testen
 df_cum = pd.read_csv("vooraanmeldingen_cumulatief.csv", sep=";", skiprows=[1])
+df_sc = pd.read_excel("student_count_first-years.xlsx")
 
 result = run_pipeline_from_dataframes(
     year=2025,
     week=10,
     data_cumulative=df_cum,
+    data_student_numbers=df_sc,
     dataset=DataOption.CUMULATIVE,
     save_output=False,  # geen lokale uitvoerbestanden aanmaken
 )
 
 if result is not None:
-    print(result[["Croho groepeernaam", "Weighted_ensemble_prediction"]].head())
+    print(
+        result[
+            ["Croho groepeernaam", "Herkomst", "SARIMA_cumulative", "Prognose_ratio"]
+        ].head()
+    )
 ```
+
+!!! note "Welke voorspellingskolom?"
+    De beschikbare kolommen hangen af van `dataset`. Voor `DataOption.CUMULATIVE`
+    krijg je `SARIMA_cumulative`, `Prognose_ratio` en `Baseline`. Voor
+    `DataOption.BOTH_DATASETS` komt daar `Weighted_ensemble_prediction` bij —
+    de ensemble-combinatie van het cumulatieve en individuele spoor.
 
 De functie accepteert ook een eigen configuratiedict, zodat je geen bestandssysteem nodig hebt:
 
 ```python
-from studentprognose import run_pipeline_from_dataframes, DataOption
-from studentprognose.config import load_defaults
+from studentprognose import run_pipeline_from_dataframes, DataOption, load_defaults
 
 # Begin met package-defaults en pas aan
 config = load_defaults()
@@ -259,6 +271,7 @@ result = run_pipeline_from_dataframes(
     year=2025,
     week=10,
     data_cumulative=df_cum,
+    data_student_numbers=df_sc,
     configuration=config,
     dataset=DataOption.CUMULATIVE,
 )
