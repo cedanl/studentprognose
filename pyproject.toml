@@ -8,7 +8,8 @@ dynamic = ["version"]
 description = "Studentprognose tool voor het voorspellen van eerstejaars instroom in het hoger onderwijs"
 readme = "README.md"
 # Cap op <3.14 is tijdelijk: statsforecast publiceert nog geen cp314-wheels op
-# Windows. Verwijder de cap zodra dat wel het geval is — zie issue #175.
+# Windows (check op PyPI of er een cp314-cp314-win_amd64.whl bestaat).
+# Verwijder de cap zodra dat wel het geval is.
 requires-python = ">=3.12,<3.14"
 license = {text = "MIT"}
 authors = [
