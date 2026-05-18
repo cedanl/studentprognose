@@ -7,7 +7,9 @@ name = "studentprognose"
 dynamic = ["version"]
 description = "Studentprognose tool voor het voorspellen van eerstejaars instroom in het hoger onderwijs"
 readme = "README.md"
-requires-python = ">=3.12"
+# Cap op <3.14 is tijdelijk: statsforecast publiceert nog geen cp314-wheels op
+# Windows. Verwijder de cap zodra dat wel het geval is — zie issue #175.
+requires-python = ">=3.12,<3.14"
 license = {text = "MIT"}
 authors = [
     {name = "CEDA", email = "info@cedanl.nl"},
@@ -20,6 +22,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
     "Topic :: Education",
 ]
@@ -30,7 +33,7 @@ dependencies = [
     "pandas>=2.2.3",
     "scikit-learn>=1.6.1",
     "scipy>=1.13.0",
-    "statsforecast>=2.0.0",
+    "statsforecast>=2.0.3",
     "tqdm>=4.67.1",
     "xgboost>=2.1.3",
     "plotly>=6.7.0",

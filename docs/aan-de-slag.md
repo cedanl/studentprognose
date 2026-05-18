@@ -2,11 +2,20 @@
 
 ## Voordat je begint
 
-Je hebt **Python 3.12 of hoger** nodig. Controleer je versie:
+Je hebt **Python 3.12 of 3.13** nodig. Controleer je versie:
 
 ```bash
 python --version
 ```
+
+!!! warning "Python 3.14 wordt nog niet ondersteund"
+    Een van de dependencies (`statsforecast`) heeft op het moment van schrijven nog geen kant-en-klare wheels voor Python 3.14. Op Windows leidt dat tot een C-compiler-error tijdens `uv sync`. Pin je Python-versie expliciet op 3.12 of 3.13:
+
+    ```bash
+    uv python pin 3.12  # of: uv python pin 3.13
+    ```
+
+    `uv` downloadt zelf de juiste versie als die nog niet op je systeem staat — je hoeft niks van python.org te halen.
 
 ??? tip "Python niet gevonden of te oud?"
 
