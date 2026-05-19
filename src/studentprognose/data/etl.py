@@ -33,7 +33,7 @@ def run_etl(configuration):
     else:
         print("[2/4] Skipping interpolation (no cumulative file)")
 
-    # Step 3: Calculate student counts from 1cijferHO-vergelijkbaar bestand
+    # Step 3: Calculate student counts from telbestand studenten
     path_october_rel = paths.get("path_raw_october", "")
     if not path_october_rel:
         print("[3/4] Skipping student counts (path_raw_october not configured)")
@@ -44,7 +44,7 @@ def run_etl(configuration):
             print("[3/4] Calculating student counts...     → data/input/student_count_*.xlsx")
             _calculate_student_counts(path_october, cwd, oktober_columns)
         else:
-            print(f"[3/4] Skipping student counts (1cijferHO-vergelijkbaar bestand not found: {path_october_rel})")
+            print(f"[3/4] Skipping student counts (telbestand studenten not found: {path_october_rel})")
 
     # Step 4: Copy direct files (raw → canonical input paths)
     copied = _copy_direct_files(cwd, paths, output_individual)
@@ -284,7 +284,7 @@ def _interpolate(data, year, start_week, end_week, max_week=52):
 
 
 def _calculate_student_count(data, volume):
-    """Calculate student counts from the 1cijferHO-vergelijkbaar bestand.
+    """Calculate student counts from the telbestand studenten.
 
     Returns a DataFrame with columns: Collegejaar, Croho groepeernaam,
     Herkomst, Aantal_studenten, Examentype.
@@ -349,7 +349,7 @@ def _calculate_student_count(data, volume):
 
 
 def _calculate_student_counts(path_october, cwd, oktober_columns=None):
-    """Calculate student count files from the 1cijferHO-vergelijkbaar bestand.
+    """Calculate student count files from the telbestand studenten.
 
     oktober_columns maps canonical column names to institution-specific names,
     matching the structure of configuration["columns"]["oktober"]. Columns are

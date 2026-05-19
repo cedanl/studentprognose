@@ -28,11 +28,11 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_latest_cumulative` | `data/input/totaal_cumulatief.xlsx` | Historische cumulatieve voorspellingen (post-processing output) |
 | `path_latest_individual` | `data/input/totaal_individueel.xlsx` | Historische individuele voorspellingen (post-processing output) |
 | `path_ensemble_weights` | `data/input/ensemble_weights.xlsx` | Ensemble-gewichten per opleiding/herkomst/examentype |
-| `path_raw_october` | `data/input_raw/oktober_bestand.xlsx` | 1cijferHO-vergelijkbaar bestand (ruwe bron in DUO 1cijferHO-formaat). De sleutel heet `_october` om historische reden — DUO publiceert 1cijferHO jaarlijks rond 1 oktober. |
+| `path_raw_october` | `data/input_raw/oktober_bestand.xlsx` | Telbestand studenten (ruwe bron, eigen levering instelling). De sleutel heet `_october` om historische redenen. |
 | `path_raw_telbestanden` | `data/input_raw/telbestanden` | Map met Studielink telbestanden |
 | `path_raw_individueel` | `data/input_raw/individuele_aanmelddata.csv` | Ruwe individuele aanmelddata |
-| `path_student_count_first-years` | `data/input/student_count_first-years.xlsx` | Werkelijk aantal eerstejaars (DUO) |
-| `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (DUO) |
+| `path_student_count_first-years` | `data/input/student_count_first-years.xlsx` | Werkelijk aantal eerstejaars (afgeleid uit telbestand studenten) |
+| `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (afgeleid uit telbestand studenten) |
 | `path_ratios` | `data/input/ratiobestand.xlsx` | Ratiobestand (optioneel) |
 
 ## `runtime` — uitvoerparameters
@@ -236,11 +236,11 @@ Volledige lijst van kanonieke kolomnamen die gemapped kunnen worden:
 
 `Sleutel`, `Datum Verzoek Inschr`, `Ingangsdatum`, `Collegejaar`, `Datum intrekking vooraanmelding`, `Inschrijfstatus`, `Faculteit`, `Examentype`, `Croho`, `Croho groepeernaam`, `Opleiding`, `Hoofdopleiding`, `Eerstejaars croho jaar`, `Is eerstejaars croho opleiding`, `BBC ontvangen`, `Type vooropleiding`, `Nationaliteit`, `EER`, `Geslacht`, `Geverifieerd adres postcode`, `Geverifieerd adres plaats`, `Geverifieerd adres land`, `Studieadres postcode`, `Studieadres land`, `School code eerste vooropleiding`, `School eerste vooropleiding`, `Plaats code eerste vooropleiding`, `Land code eerste vooropleiding`, `Aantal studenten`
 
-### `oktober` — 1cijferHO-vergelijkbaar bestand
+### `oktober` — telbestand studenten
 
 `Collegejaar`, `Groepeernaam Croho`, `Aantal eerstejaars croho`, `EER-NL-nietEER`, `Examentype code`, `Aantal Hoofdinschrijvingen`
 
-De sleutel heet `oktober` omdat DUO het 1cijferHO jaarlijks rond 1 oktober publiceert. Inhoudelijk gaat het om een bestand vergelijkbaar met het DUO 1cijferHO — zie [Je data voorbereiden](je-data-voorbereiden.md#1cijferho-vergelijkbaar-bestand).
+De sleutel heet `oktober` om historische redenen — zie [Je data voorbereiden](je-data-voorbereiden.md#telbestand-studenten).
 
 ### `cumulative` — Studielink cumulatieve data
 

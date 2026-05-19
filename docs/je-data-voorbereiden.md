@@ -56,15 +56,15 @@ Verplichte kolommen (kanonieke namen — pas aan via `configuration.json` als jo
 | `Geslacht` | Geslacht |
 | `Type vooropleiding` | Type vooropleiding |
 
-### 1cijferHO-vergelijkbaar bestand
+### Telbestand studenten
 
 Pad: `data/input_raw/oktober_bestand.xlsx`
-Bron: door je instelling zelf aangeleverd, **in hetzelfde formaat als het DUO 1cijferHO**
+Bron: door je instelling zelf aangeleverd
 
-Dit bestand bevat de werkelijke inschrijvingen per opleiding, herkomst en collegejaar — de ground truth waarop het model wordt geëvalueerd en die het ratio-model voedt. De DUO-levering (1cijferHO) is hier de formaat-referentie; de meeste instellingen genereren dit bestand zelf uit hun SIS/datawarehouse (Osiris, Usis, of vergelijkbaar).
+Dit bestand bevat de werkelijke inschrijvingen per opleiding, herkomst en collegejaar — de ground truth waarop het model wordt geëvalueerd en die het ratio-model voedt. De meeste instellingen genereren dit bestand uit hun SIS/datawarehouse (Osiris, Usis, of vergelijkbaar).
 
 !!! note "Waarom heet het bestand `oktober_bestand.xlsx`?"
-    Historisch heette dit bestand zo omdat DUO de 1cijferHO-data jaarlijks rond 1 oktober publiceert. De bestandsnaam en de configuratiesleutels (`path_raw_october`, `columns.oktober`) zijn ongewijzigd gelaten om bestaande installaties niet te breken. Inhoudelijk is het bestand een **1cijferHO-vergelijkbaar bestand**.
+    Historische naam. De bestandsnaam en de configuratiesleutels (`path_raw_october`, `columns.oktober`) zijn ongewijzigd gelaten om bestaande installaties niet te breken. Inhoudelijk is het een **telbestand met studentaantallen**.
 
 | Canonieke naam | Omschrijving |
 |----------------|-------------|
@@ -83,7 +83,7 @@ De ETL draait automatisch bij elke run (tenzij `--noetl` is opgegeven). De stapp
 |------|-------|-------|--------|
 | 1 | Rowbind + reformat | `telbestanden/*.csv` | Samengevoegd cumulatief bestand |
 | 2 | Interpolatie ontbrekende weken | Samengevoegd bestand | `vooraanmeldingen_cumulatief.csv` |
-| 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` (1cijferHO-vergelijkbaar bestand) | `student_count_*.xlsx`, `student_volume.xlsx` |
+| 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` (telbestand studenten) | `student_count_*.xlsx`, `student_volume.xlsx` |
 | 4 | Kopiëren individuele data | `individuele_aanmelddata.csv` | `vooraanmeldingen_individueel.csv` |
 
 ## ETL overslaan
