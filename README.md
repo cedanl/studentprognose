@@ -12,7 +12,7 @@
     <img src="https://img.shields.io/github/license/cedanl/studentprognose" alt="GitHub License">
     <a href="https://pypi.org/project/studentprognose/"><img src="https://img.shields.io/pypi/v/studentprognose" alt="PyPI"></a>
     <br>
-    <a href="#"><img src="https://img.shields.io/badge/Python-≥3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
+    <a href="#"><img src="https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white" alt="Python"></a>
     <img src="https://badgen.net/github/last-commit/cedanl/studentprognose" alt="GitHub Last Commit">
     <a href="#"><img src="https://custom-icon-badges.demolab.com/badge/Windows-0078D6?logo=windows11&logoColor=white" alt="Windows"></a>
     <a href="#"><img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=F0F0F0" alt="macOS"></a>
@@ -28,7 +28,7 @@
 
 ## 📦 Aan de slag
 
-Vereisten: **Python 3.12+**
+Vereisten: **Python 3.12**
 
 Installeer met [uv](https://docs.astral.sh/uv/):
 

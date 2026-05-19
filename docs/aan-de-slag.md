@@ -2,11 +2,20 @@
 
 ## Voordat je begint
 
-Je hebt **Python 3.12 of hoger** nodig. Controleer je versie:
+Je hebt **Python 3.12** nodig. Controleer je versie:
 
 ```bash
 python --version
 ```
+
+!!! warning "Alleen Python 3.12 wordt ondersteund"
+    De pipeline wordt op één Python-versie ontwikkeld en getest. Nieuwere minor-versies (3.13, 3.14) zijn bewust uitgesloten — onder andere omdat `statsforecast` voor sommige minors nog geen Windows-wheels publiceert, wat tot een C-compiler-error tijdens `uv sync` leidt. Pin je Python-versie expliciet op 3.12:
+
+    ```bash
+    uv python pin 3.12
+    ```
+
+    `uv` downloadt zelf de juiste versie als die nog niet op je systeem staat — je hoeft niks van python.org te halen.
 
 ??? tip "Python niet gevonden of te oud?"
 
