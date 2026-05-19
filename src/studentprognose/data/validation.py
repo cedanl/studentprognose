@@ -15,8 +15,9 @@ Tolerantie voor institutie-specifieke data
 Elke instelling kan kolomnamen en lichte type-afwijkingen hebben.
 Dit module probeert data te normaliseren voordat het valideert:
 
-- **Kolomnamen** voor ``individuele_aanmelddata`` en ``oktober_bestand``
-  worden opgezocht via ``configuration["columns"]["individual"]`` en
+- **Kolomnamen** voor ``individuele_aanmelddata`` en het telbestand studenten
+  (``oktober_bestand.xlsx``) worden opgezocht via
+  ``configuration["columns"]["individual"]`` en
   ``configuration["columns"]["oktober"]``. Pas die mapping aan in
   ``configuration.json`` als jouw instelling andere namen gebruikt.
   Telbestanden komen van Studielink en zijn gestandaardiseerd; die
@@ -218,7 +219,7 @@ def _check_file_presence(cwd, paths):
     return [
         (telbestanden_rel, telbestanden_ok, "-d cumulative, -d both"),
         (individueel_rel, individueel_ok, "-d individual, -d both"),
-        (oktober_rel, oktober_ok, "studentaantallen (optioneel)"),
+        (oktober_rel, oktober_ok, "studentaantallen (optioneel, telbestand studenten)"),
     ]
 
 

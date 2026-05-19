@@ -13,7 +13,7 @@ Plaats hier je ruwe Studielink-exportbestanden:
 |---|---|
 | `telbestanden/` | Wekelijkse Studielink-telbestanden (`telbestandY<jaar>W<week>.csv`) |
 | `individuele_aanmelddata.csv` | Individuele vooraanmeldingen per student |
-| `oktober_bestand.xlsx` | 1-cijfer HO oktober-telling (voor studentaantallen) |
+| `oktober_bestand.xlsx` | Telbestand studenten (eigen levering instelling — voor studentaantallen) |
 
 Draai daarna `studentprognose` om de ETL te starten en voorspellingen te genereren.
 """
@@ -60,8 +60,10 @@ Volgende stappen:
   1. Plaats je telbestanden in:     data/input_raw/telbestanden/
                                     (bestandsnamen: telbestandY<jaar>W<week>.csv)
   2. Plaats je individuele data in: data/input_raw/individuele_aanmelddata.csv
-  3. Optioneel — oktober-bestand:  data/input_raw/oktober_bestand.xlsx
-                                    (voor berekening van studentaantallen)
+  3. Optioneel — telbestand studenten:
+                                    data/input_raw/oktober_bestand.xlsx
+                                    (eigen levering instelling, voor
+                                    berekening van studentaantallen)
 
   Draaien:
     studentprognose -w <week> -y <jaar>

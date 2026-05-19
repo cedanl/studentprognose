@@ -56,10 +56,15 @@ Verplichte kolommen (kanonieke namen — pas aan via `configuration.json` als jo
 | `Geslacht` | Geslacht |
 | `Type vooropleiding` | Type vooropleiding |
 
-### Oktober-bestand (DUO 1-cijfer HO)
+### Telbestand studenten
 
 Pad: `data/input_raw/oktober_bestand.xlsx`
-Bron: DUO
+Bron: door je instelling zelf aangeleverd
+
+Dit bestand bevat de werkelijke inschrijvingen per opleiding, herkomst en collegejaar — de ground truth waarop het model wordt geëvalueerd en die het ratio-model voedt. De meeste instellingen genereren dit bestand uit hun SIS/datawarehouse (Osiris, Usis, of vergelijkbaar).
+
+!!! note "Waarom heet het bestand `oktober_bestand.xlsx`?"
+    Historische naam. De bestandsnaam en de configuratiesleutels (`path_raw_october`, `columns.oktober`) zijn ongewijzigd gelaten om bestaande installaties niet te breken. Inhoudelijk is het een **telbestand met studentaantallen**.
 
 | Canonieke naam | Omschrijving |
 |----------------|-------------|
@@ -78,7 +83,7 @@ De ETL draait automatisch bij elke run (tenzij `--noetl` is opgegeven). De stapp
 |------|-------|-------|--------|
 | 1 | Rowbind + reformat | `telbestanden/*.csv` | Samengevoegd cumulatief bestand |
 | 2 | Interpolatie ontbrekende weken | Samengevoegd bestand | `vooraanmeldingen_cumulatief.csv` |
-| 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` | `student_count_*.xlsx`, `student_volume.xlsx` |
+| 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` (telbestand studenten) | `student_count_*.xlsx`, `student_volume.xlsx` |
 | 4 | Kopiëren individuele data | `individuele_aanmelddata.csv` | `vooraanmeldingen_individueel.csv` |
 
 ## ETL overslaan
