@@ -7,10 +7,12 @@ name = "studentprognose"
 dynamic = ["version"]
 description = "Studentprognose tool voor het voorspellen van eerstejaars instroom in het hoger onderwijs"
 readme = "README.md"
-# Cap op <3.14 is tijdelijk: statsforecast publiceert nog geen cp314-wheels op
-# Windows (check op PyPI of er een cp314-cp314-win_amd64.whl bestaat).
-# Verwijder de cap zodra dat wel het geval is.
-requires-python = ">=3.12,<3.14"
+# Vastgezet op Python 3.12.x. Bewuste keuze: de pipeline wordt op één
+# Python-versie ontwikkeld en getest. Nieuwere minor-versies (3.13, 3.14)
+# moeten expliciet worden vrijgegeven na een ronde testen — onder andere
+# omdat statsforecast voor sommige minors nog geen Windows-wheels publiceert
+# (op het moment van schrijven ontbraken cp314-wheels).
+requires-python = ">=3.12,<3.13"
 license = {text = "MIT"}
 authors = [
     {name = "CEDA", email = "info@cedanl.nl"},
@@ -23,7 +25,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.12",
-    "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering",
     "Topic :: Education",
 ]
