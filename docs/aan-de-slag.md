@@ -83,7 +83,7 @@ data/
     │   ├── telbestandY2024W01.csv
     │   └── ...
     ├── individuele_aanmelddata.csv ← Osiris/Usis export
-    └── oktober_bestand.xlsx        ← DUO oktober-bestand
+    └── oktober_bestand.xlsx        ← 1cijferHO-vergelijkbaar bestand
 ```
 
 Zie [Je data voorbereiden](je-data-voorbereiden.md) voor kolomspecificaties per bestand.
@@ -99,7 +99,7 @@ studentprognose --noetl
 Welke bestanden je dan precies in `data/input/` nodig hebt — en in welk formaat — lees je op [ETL overslaan](je-data-voorbereiden.md#etl-overslaan).
 
 !!! warning "Wanneer je `--noetl` níét moet gebruiken"
-    Heb je alleen ruwe bronbestanden (Studielink-telbestanden, Osiris/Usis-export, DUO oktober-bestand)? Laat `--noetl` dan weg, zodat de ingebouwde ETL de verwerkte bestanden voor je aanmaakt.
+    Heb je alleen ruwe bronbestanden (Studielink-telbestanden, Osiris/Usis-export, 1cijferHO-vergelijkbaar bestand)? Laat `--noetl` dan weg, zodat de ingebouwde ETL de verwerkte bestanden voor je aanmaakt.
 
 ## Wat voorspelt `-w 16 -y 2025`?
 

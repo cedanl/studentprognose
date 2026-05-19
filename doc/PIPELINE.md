@@ -12,8 +12,8 @@ Dit document beschrijft hoe ruwe Studielink-data en instellingsdata worden getra
 |---------|-------------|------|---------------|
 | `vooraanmeldingen_cumulatief.csv` | Gewogen/ongewogen vooraanmelders per opleiding, herkomst, week, jaar | Studielink telbestanden (extern) → ETL stap 1 + 2 | Bij `-d c` of `-d b` (default) |
 | `vooraanmeldingen_individueel.csv` | Een rij per student-aanmelding met persoonskenmerken | Osiris/Usis (intern) → ETL stap 4 | Bij `-d i` of `-d b` (default) |
-| `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Altijd |
-| `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | DUO oktober-bestand 1-cijfer HO (extern) → ETL stap 3 | Alleen bij `-sy v` |
+| `student_count_first-years.xlsx` | Werkelijk aantal eerstejaars per opleiding/herkomst/jaar | 1cijferHO-vergelijkbaar bestand (DUO 1cijferHO-formaat, eigen levering instelling) → ETL stap 3 | Altijd |
+| `student_volume.xlsx` | Totaal studentvolume per opleiding/herkomst/jaar | 1cijferHO-vergelijkbaar bestand (DUO 1cijferHO-formaat, eigen levering instelling) → ETL stap 3 | Alleen bij `-sy v` |
 
 ### Optionele bestanden
 
@@ -46,9 +46,9 @@ flowchart TD
         direction LR
         subgraph bronnen_extern ["Externe bronnen"]
             SL["Studielink Telbestanden<br/><i>telbestandY2024WXX.csv</i><br/><b>Bron: Studielink</b>"]:::bron
-            OKT["Oktober-bestand<br/><i>1-cijfer HO</i><br/><b>Bron: DUO</b>"]:::bron
         end
-        subgraph bronnen_intern ["Interne bronnen"]
+        subgraph bronnen_intern ["Interne bronnen (instelling levert zelf)"]
+            OKT["1cijferHO-vergelijkbaar bestand<br/><i>oktober_bestand.xlsx</i><br/><b>Formaat: DUO 1cijferHO</b>"]:::bron
             SIS["Individuele aanmelddata<br/><i>per student-aanmelding</i><br/><b>Bron: Osiris / Usis</b>"]:::bron
         end
     end
@@ -60,7 +60,7 @@ flowchart TD
         direction LR
         S1["Rowbind + reformat<br/><i>samenvoegen telbestanden</i>"]:::script
         S2["Interpolate<br/><i>ontbrekende weken</i>"]:::script
-        S3["Calculate student count<br/><i>oktober → aantallen</i>"]:::script
+        S3["Calculate student count<br/><i>1cijferHO-vergelijkbaar → aantallen</i>"]:::script
         S4["Copy bestanden<br/><i>individueel</i>"]:::script
     end
 
@@ -183,7 +183,7 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 |------|-------|-------|--------|
 | 1 | Rowbind + reformat | `data/input_raw/telbestanden/*.csv` | Samengevoegd CSV |
 | 2 | Interpolatie | Samengevoegd CSV | `vooraanmeldingen_cumulatief.csv` |
-| 3 | Studentaantallen | Oktober-bestand (1-cijfer HO) | `student_count_*.xlsx`, `student_volume.xlsx` |
+| 3 | Studentaantallen | 1cijferHO-vergelijkbaar bestand (`oktober_bestand.xlsx`) | `student_count_*.xlsx`, `student_volume.xlsx` |
 | 4 | Kopieren | Individuele data | `vooraanmeldingen_individueel.csv` |
 
 ---
@@ -217,8 +217,8 @@ Studielink levert wekelijks telbestanden met geaggregeerde aanmeldcijfers per op
 **Individueel spoor (intern: Osiris/Usis → model)**
 De instelling levert per-student aanmelddata uit Osiris/Usis. Dit bestand wordt via ETL stap 4 gekopieerd naar `vooraanmeldingen_individueel.csv`. Het vormt de basis voor de `SARIMA_individual` voorspelling.
 
-**Studentaantallen (extern: DUO oktober-bestand → ground truth)**
-Het DUO oktober-bestand (1-cijfer HO) bevat de werkelijke inschrijvingen na 1 oktober. Het ETL-script leidt hieruit de ground truth af die het model als referentie gebruikt.
+**Studentaantallen (intern: 1cijferHO-vergelijkbaar bestand → ground truth)**
+Dit is een bestand dat de instelling zelf aanlevert, **in hetzelfde formaat als het DUO 1cijferHO**. Het bevat de werkelijke inschrijvingen na 1 oktober. Het ETL-script leidt hieruit de ground truth af die het model als referentie gebruikt. De bestandsnaam `oktober_bestand.xlsx` is historisch (DUO publiceert 1cijferHO rond 1 oktober) en is ongewijzigd gelaten zodat bestaande installaties blijven werken.
 
 Het prognosemodel combineert beide sporen via ensemble weging om een voorspelling te maken van het verwachte aantal studenten.
 

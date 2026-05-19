@@ -15,7 +15,7 @@ Bij het starten van de validatie toont de pipeline een overzichtstabel met de st
   ──────────────────────────────────────────────────────────────────
   data/input_raw/telbestanden                 ✓         -d cumulative, -d both
   data/input_raw/individuele_aanmelddata.csv  ✗         -d individual, -d both
-  data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (optioneel)
+  data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (optioneel, 1cijferHO-vergelijkbaar bestand)
 
   Beschikbare modi:
     -d cumulative      ✓
@@ -62,7 +62,9 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 | Verplichte kolommen | Hard error | `Collegejaar`, `Croho`, `Inschrijfstatus`, `Datum Verzoek Inschr` (via kolomnamen-mapping) |
 | Ontbrekende waarden | Waarschuwing / Soft error | Per verplichte kolom, zelfde drempels als telbestanden |
 
-### Oktober-bestand (`data/input_raw/oktober_bestand.xlsx`)
+### 1cijferHO-vergelijkbaar bestand (`data/input_raw/oktober_bestand.xlsx`)
+
+Dit is het bestand vergelijkbaar met het DUO 1cijferHO — zie [Je data voorbereiden](je-data-voorbereiden.md#1cijferho-vergelijkbaar-bestand). De bestandsnaam heet historisch `oktober_bestand.xlsx`.
 
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
@@ -133,7 +135,7 @@ De standaarddrempels voor NaN-percentages en jaarbereiken zijn instelbaar via `c
 ## Een validatiefout oplossen
 
 **Hard error — ontbrekende kolommen:**
-De kolomnaam in jouw bestand wijkt af van de kanonieke naam. Voeg een kolomnamen-mapping toe in `configuration.json` onder `columns.individual` of `columns.oktober`.
+De kolomnaam in jouw bestand wijkt af van de kanonieke naam. Voeg een kolomnamen-mapping toe in `configuration.json` onder `columns.individual` of `columns.oktober` (de mapping voor het 1cijferHO-vergelijkbare bestand).
 
 **Soft error — onverwacht collegejaar:**
 Controleer of het bestand het juiste studiejaar bevat. Als de afwijking verwacht is (bijv. historische data), kun je `collegejaar_min_offset` verhogen of met `--yes` doorgaan.

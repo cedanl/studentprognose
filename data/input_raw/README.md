@@ -9,7 +9,7 @@ De meegeleverde bestanden bevatten **synthetische demodata**.
 | Bestand | Bron | Beschrijving |
 |---------|------|-------------|
 | `telbestanden/telbestandY{jaar}W{week}.csv` | Studielink | Wekelijkse telbestanden met cumulatieve vooraanmeldingen per opleiding |
-| `oktober_bestand.xlsx` | DUO (1-cijfer HO) | Werkelijke inschrijvingen na 1 oktober (ground truth) |
+| `oktober_bestand.xlsx` | Eigen levering instelling, **in DUO 1cijferHO-formaat** (1cijferHO-vergelijkbaar bestand) | Werkelijke inschrijvingen na 1 oktober (ground truth) |
 | `individuele_aanmelddata.csv` | SIS / datawarehouse instelling | Per-student aanmeldingen met persoonskenmerken |
 
 ## Dataflow
@@ -17,6 +17,7 @@ De meegeleverde bestanden bevatten **synthetische demodata**.
 ```
 telbestanden/*.csv          ──► rowbind + reformat ──► interpolate ──► data/input/vooraanmeldingen_cumulatief.csv
 oktober_bestand.xlsx        ──► calculate_student_count ────────────► data/input/student_count_*.xlsx
+   (1cijferHO-vergelijkbaar bestand)
 individuele_aanmelddata.csv ──► copy ──────────────────────────────► data/input/vooraanmeldingen_individueel.csv
 ```
 
