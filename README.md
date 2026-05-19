@@ -28,7 +28,7 @@
 
 ## 📦 Aan de slag
 
-Vereisten: **Python 3.12** (precies — geen 3.13 of nieuwer)
+Vereisten: **Python 3.12**
 
 Installeer met [uv](https://docs.astral.sh/uv/):
 
