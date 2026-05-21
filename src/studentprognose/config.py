@@ -63,6 +63,7 @@ def load_configuration(file_path: str) -> dict:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     _validate_model_config(cfg, file_path)
     _validate_runtime(cfg, file_path)
+    _validate_preprocessing(cfg, file_path)
     return cfg
 
 
@@ -220,3 +221,42 @@ def _validate_runtime(cfg, file_path):
             f"cores ({available}). Verlaagd naar {available}."
         )
         cfg["runtime"]["cpu_count"] = available
+
+
+def _validate_preprocessing(cfg, file_path):
+    preprocessing = cfg.get("preprocessing", {})
+    if not isinstance(preprocessing, dict):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'preprocessing' moet een object zijn, niet {type(preprocessing).__name__}."
+        )
+        sys.exit(1)
+
+    individual = preprocessing.get("individual", {})
+    if not isinstance(individual, dict):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'preprocessing.individual' moet een object zijn, niet {type(individual).__name__}."
+        )
+        sys.exit(1)
+
+    valid_ingangsdatums = individual.get("valid_ingangsdatums")
+    if valid_ingangsdatums is None:
+        return
+
+    if not isinstance(valid_ingangsdatums, list) or not valid_ingangsdatums:
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'preprocessing.individual.valid_ingangsdatums' moet een niet-lege lijst "
+            f"van strings zijn (bv. [\"01-09\", \"01-10\"])."
+        )
+        sys.exit(1)
+
+    for i, value in enumerate(valid_ingangsdatums):
+        if not isinstance(value, str) or not value:
+            print(
+                f"Configuratiefout in {file_path}: "
+                f"'preprocessing.individual.valid_ingangsdatums[{i}]' moet een "
+                f"niet-lege string zijn (bv. \"01-09\")."
+            )
+            sys.exit(1)

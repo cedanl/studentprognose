@@ -43,7 +43,7 @@ Verplichte kolommen (kanonieke namen — pas aan via `configuration.json` als jo
 |----------------|-------------|
 | `Sleutel` | Unieke studentidentifier |
 | `Datum Verzoek Inschr` | Datum van vooraanmelding |
-| `Ingangsdatum` | Ingangsdatum inschrijving |
+| `Ingangsdatum` | Ingangsdatum inschrijving (`DD-MM-JJJJ`); standaard worden alleen rijen met startdatum 1 september of 1 oktober meegenomen — zie [`preprocessing.individual.valid_ingangsdatums`](configuratie.md#individualvalid_ingangsdatums) om afwijkende startdatums toe te voegen |
 | `Collegejaar` | Collegejaar |
 | `Datum intrekking vooraanmelding` | Weeknummer van intrekking (leeg als niet ingetrokken) |
 | `Inschrijfstatus` | Zie `status_mapping` in configuratie |
