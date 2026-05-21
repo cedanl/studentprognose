@@ -48,7 +48,7 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 | Collegejaar bereik | Soft error | `Studiejaar` buiten `[huidig jaar − 15, huidig jaar + 2]` |
 | Herkomst geldige waarden | Soft error | Elke waarde in `Herkomst` moet `N`, `E` of `R` zijn |
 | Herinschrijving geldige waarden | Soft error | Elke waarde moet `J` of `N` zijn |
-| meercode_V = 0 | Soft error | Leidt tot deling door nul in ETL |
+| meercode_V = 0 | Hard error | Leidt tot deling door nul in ETL (`inf`/`NaN` in `Gewogen vooraanmelders`) — niet omzeilbaar met `--yes` |
 | Aantal < 0 | Soft error | Negatieve aantallen zijn inhoudelijk onjuist |
 | Ontbrekende waarden `Aantal` | Waarschuwing / Soft error | > 5% ontbrekend → waarschuwing; > 30% → soft error |
 | Gaten tussen weken | Waarschuwing | Gat van > 2 weken binnen een jaar |

@@ -405,7 +405,7 @@ class TestValidateRawDataIntegration:
         with pytest.raises(SystemExit):
             validate_raw_data(cfg, yes=True)
 
-    def test_zero_meercode_triggers_soft_error_yes_passes(self, tmp_path, monkeypatch):
+    def test_zero_meercode_is_hard_error_not_bypassable_with_yes(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"
         telbestanden_dir.mkdir()
         df = pd.DataFrame({
@@ -421,7 +421,9 @@ class TestValidateRawDataIntegration:
         df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
         cfg = _make_configuration(tmp_path, telbestanden_dir)
         monkeypatch.chdir(tmp_path)
-        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
+        with pytest.raises(SystemExit) as exc:
+            validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
+        assert exc.value.code == 1
 
     def test_invalid_herkomst_prompts_and_n_exits(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"

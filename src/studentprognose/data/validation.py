@@ -377,10 +377,11 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result, required=True):
         zero_meercode = df[meercode_v == 0]
         if not zero_meercode.empty:
             programmes = zero_meercode["Groepeernaam"].dropna().unique()
-            result.soft_errors.append(
-                f"{filename}: meercode_V = 0 (deling door nul in ETL) voor "
+            result.hard_errors.append(
+                f"{filename}: meercode_V = 0 leidt tot deling door nul in ETL voor "
                 f"{len(programmes)} opleiding(en): "
                 + _format_programmes(programmes)
+                + " — corrigeer of verwijder deze rijen in het bronbestand."
             )
 
         neg_aantal = df[df["Aantal"] < 0]
