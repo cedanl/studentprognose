@@ -76,6 +76,10 @@ def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
 
     data = pd.concat(dataframes, ignore_index=True)
 
+    # Status A = annulering (Studielink PvL §5.12). Voor die rijen is meercode_V
+    # per definitie 0 en horen aantallen semantisch niet bij vooraanmelders.
+    data = data[data["Status"] != "A"].copy()
+
     data["Gewogen vooraanmelders"] = data["Aantal"] / data["meercode_V"]
 
     data.rename(
