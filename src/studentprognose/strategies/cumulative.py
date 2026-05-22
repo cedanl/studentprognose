@@ -6,6 +6,7 @@ import math
 import warnings
 
 from studentprognose.config import get_cpu_count
+from studentprognose.utils.parallel import run_parallel_with_fallback
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import increment_week, compute_pred_len
 from studentprognose.models import create_forecaster, create_regressor
@@ -225,10 +226,13 @@ class CumulativeStrategy(PredictionStrategy):
         ]
 
         print("Start parallel predicting...")
-        self.predicted_data = joblib.Parallel(n_jobs=nr_CPU_cores)(
-            joblib.delayed(self._predict_sarima)(row)
-            for chunk in chunks
-            for _, row in chunk.iterrows()
+        self.predicted_data = run_parallel_with_fallback(
+            (
+                joblib.delayed(self._predict_sarima)(row)
+                for chunk in chunks
+                for _, row in chunk.iterrows()
+            ),
+            n_jobs=nr_CPU_cores,
         )
 
         data_to_predict["SARIMA_individual"] = np.nan
