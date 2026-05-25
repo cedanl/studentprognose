@@ -1,10 +1,19 @@
 """Parallel execution helper with crash fallback."""
 
+import os
+
 import joblib
 from joblib.externals.loky.process_executor import TerminatedWorkerError
 
 
 FALLBACK_N_JOBS = 2
+
+# Test-only kraan: zet ``STUDENTPROGNOSE_TEST_FORCE_WORKER_CRASH=1`` om de
+# eerste poging deterministisch te laten crashen met TerminatedWorkerError.
+# Gebruikt door ``scripts/test_package.sh`` om het fallback-pad op elk
+# CI-besturingssysteem te valideren zonder een echte OOM-kill of segfault te
+# hoeven uitlokken. Geen publieke knop — uitsluitend voor de smoke test.
+_FORCE_CRASH_ENV = "STUDENTPROGNOSE_TEST_FORCE_WORKER_CRASH"
 
 
 def run_parallel_with_fallback(delayed_jobs, n_jobs: int) -> list:
@@ -30,6 +39,10 @@ def run_parallel_with_fallback(delayed_jobs, n_jobs: int) -> list:
     """
     jobs = list(delayed_jobs)
     try:
+        if os.environ.get(_FORCE_CRASH_ENV) == "1":
+            raise TerminatedWorkerError(
+                f"Geforceerde crash via {_FORCE_CRASH_ENV}=1 (test-only injectie)"
+            )
         return joblib.Parallel(n_jobs=n_jobs)(jobs)
     except TerminatedWorkerError:
         if n_jobs <= FALLBACK_N_JOBS:
