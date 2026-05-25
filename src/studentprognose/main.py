@@ -74,6 +74,18 @@ def main(argv):
 
 
 def cli():
+    # Forceer UTF-8 op stdout/stderr. Op Windows is de console default cp1252,
+    # waarin de box-drawing en status-iconen (─, ✓, ✗) uit de validatie-overzichten
+    # niet kunnen worden gecodeerd; resultaat is een UnicodeEncodeError voor er
+    # ook maar iets gebeurt. errors="replace" voorkomt dat een eventueel
+    # niet-reconfigureerbare stream alsnog crasht — slechtere weergave dan
+    # crashen.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, OSError):
+                pass
     main(sys.argv)
 
 
