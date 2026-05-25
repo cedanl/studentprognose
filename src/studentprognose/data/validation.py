@@ -65,11 +65,15 @@ Een nieuw validatiecheck toevoegen
 
 import datetime
 import os
-import re
 import sys
 from dataclasses import dataclass, field
 
 import pandas as pd
+
+from studentprognose.utils.telbestand_filenames import (
+    compile_patterns,
+    match_telbestand,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -159,8 +163,9 @@ def validate_raw_data(configuration, yes=False, data_option=None):
 
     paths = configuration["paths"]
     cwd = os.getcwd()
+    telbestand_patterns = compile_patterns(configuration)
 
-    _print_file_overview(cwd, paths)
+    _print_file_overview(cwd, paths, telbestand_patterns)
 
     # Top-level merge: voegt flat overrides toe (bijv. nan_error_threshold).
     # Nested sub-dicts (telbestand, individueel, oktober) worden hier shallow
@@ -174,8 +179,14 @@ def validate_raw_data(configuration, yes=False, data_option=None):
 
     needs_telbestanden, needs_individueel = _required_files_for(data_option)
 
-    _validate_telbestanden(cwd, paths, validation_cfg, result, required=needs_telbestanden)
-    _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result, required=needs_individueel)
+    _validate_telbestanden(
+        cwd, paths, validation_cfg, telbestand_patterns, result,
+        required=needs_telbestanden,
+    )
+    _validate_individueel(
+        cwd, paths, validation_cfg, columns_cfg, telbestand_patterns, result,
+        required=needs_individueel,
+    )
     _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result)
 
     _handle_result(result, yes)
@@ -201,13 +212,18 @@ def _required_files_for(data_option):
 # File overview table
 # ---------------------------------------------------------------------------
 
-def _check_file_presence(cwd, paths):
+def _check_file_presence(cwd, paths, telbestand_patterns=None):
     """Check which input files exist and return a list of (label, relative_path, found, required_for)."""
+    if telbestand_patterns is None:
+        telbestand_patterns = compile_patterns(None)
+
     telbestanden_rel = paths.get("path_raw_telbestanden", "data/input_raw/telbestanden")
     telbestanden_dir = os.path.join(cwd, telbestanden_rel)
     telbestanden_ok = (
         os.path.isdir(telbestanden_dir)
-        and any(re.search(r"telbestandY\d{4}W\d+", f) for f in os.listdir(telbestanden_dir))
+        and any(
+            match_telbestand(f, telbestand_patterns) for f in os.listdir(telbestanden_dir)
+        )
     )
 
     individueel_rel = paths.get("path_raw_individueel", "data/input_raw/individuele_aanmelddata.csv")
@@ -223,9 +239,9 @@ def _check_file_presence(cwd, paths):
     ]
 
 
-def _print_file_overview(cwd, paths):
+def _print_file_overview(cwd, paths, telbestand_patterns=None):
     """Print a table showing which input files are present and which run modes are available."""
-    files = _check_file_presence(cwd, paths)
+    files = _check_file_presence(cwd, paths, telbestand_patterns)
 
     col_file = max(len(f[0]) for f in files)
     col_status = 8
@@ -272,7 +288,9 @@ def _print_file_overview(cwd, paths):
 # Per-file validators
 # ---------------------------------------------------------------------------
 
-def _validate_telbestanden(cwd, paths, validation_cfg, result, required=True):
+def _validate_telbestanden(
+    cwd, paths, validation_cfg, telbestand_patterns, result, required=True,
+):
     telbestanden_dir = os.path.join(
         cwd, paths.get("path_raw_telbestanden", "data/input_raw/telbestanden")
     )
@@ -293,18 +311,19 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result, required=True):
 
     files = sorted([
         f for f in os.listdir(telbestanden_dir)
-        if re.search(r"telbestandY\d{4}W\d+", f)
+        if match_telbestand(f, telbestand_patterns)
     ])
 
     if not files:
         if required:
+            pattern_examples = ", ".join(f"{p.raw}.csv" for p in telbestand_patterns)
             result.hard_errors.append(
                 f"Geen telbestanden gevonden in {telbestanden_dir} "
-                f"(verwacht patroon: telbestandY{{jaar}}W{{week}}.csv){hint}"
+                f"(verwachte patronen: {pattern_examples}){hint}"
             )
         return
 
-    _check_telbestand_completeness(files, validation_cfg, result)
+    _check_telbestand_completeness(files, validation_cfg, telbestand_patterns, result)
 
     current_year = datetime.date.today().year
     year_min = current_year - validation_cfg["collegejaar_min_offset"]
@@ -335,9 +354,9 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result, required=True):
             )
             continue
 
-        match = re.search(r"telbestandY(\d{4})W(\d+)", filename)
+        match = match_telbestand(filename, telbestand_patterns)
         if match:
-            week_nr = int(match.group(2))
+            week_nr = int(match.group("week"))
             if not (weeknummer_min <= week_nr <= weeknummer_max):
                 result.hard_errors.append(
                     f"{filename}: weeknummer {week_nr} valt buiten verwacht bereik "
@@ -386,7 +405,9 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result, required=True):
             _check_nan_rate(df, col, filename, nan_warn, nan_error, result)
 
 
-def _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result, required=True):
+def _validate_individueel(
+    cwd, paths, validation_cfg, columns_cfg, telbestand_patterns, result, required=True,
+):
     path = os.path.join(
         cwd, paths.get("path_raw_individueel", "data/input_raw/individuele_aanmelddata.csv")
     )
@@ -398,7 +419,10 @@ def _validate_individueel(cwd, paths, validation_cfg, columns_cfg, result, requi
             )
             has_telbestanden = (
                 os.path.isdir(telbestanden_dir)
-                and any(re.search(r"telbestandY\d{4}W\d+", f) for f in os.listdir(telbestanden_dir))
+                and any(
+                    match_telbestand(f, telbestand_patterns)
+                    for f in os.listdir(telbestanden_dir)
+                )
             )
             hint = (
                 " — Tip: draai met `-d cumulative` om alleen de telbestanden te gebruiken."
@@ -530,13 +554,13 @@ def _coerce_to_numeric(series):
     return coerced, True
 
 
-def _check_telbestand_completeness(files, validation_cfg, result):
+def _check_telbestand_completeness(files, validation_cfg, telbestand_patterns, result):
     """Warn when there are unexpected gaps (> 2 weeks) between telbestanden within a year."""
     weeks_per_year = {}
     for filename in files:
-        match = re.search(r"telbestandY(\d{4})W(\d+)", filename)
+        match = match_telbestand(filename, telbestand_patterns)
         if match:
-            year, week = int(match.group(1)), int(match.group(2))
+            year, week = int(match.group("year")), int(match.group("week"))
             weeks_per_year.setdefault(year, []).append(week)
 
     for year, weeks in sorted(weeks_per_year.items()):

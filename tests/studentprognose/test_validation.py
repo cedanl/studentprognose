@@ -21,7 +21,10 @@ from studentprognose.data.validation import (
     _DEFAULT_VALIDATION_CFG,
     validate_raw_data,
 )
+from studentprognose.utils.telbestand_filenames import compile_patterns
 from studentprognose.utils.weeks import DataOption
+
+_DEFAULT_PATTERNS = compile_patterns(None)
 
 
 # ---------------------------------------------------------------------------
@@ -133,19 +136,19 @@ class TestCheckTelbestandCompleteness:
     def test_consecutive_weeks_no_warning(self):
         r = ValidationResult()
         files = [f"telbestandY2024W{w:02d}.csv" for w in range(1, 10)]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert not r.warnings
 
     def test_small_gap_no_warning(self):
         r = ValidationResult()
         files = ["telbestandY2024W01.csv", "telbestandY2024W03.csv"]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert not r.warnings
 
     def test_large_gap_produces_warning(self):
         r = ValidationResult()
         files = ["telbestandY2024W01.csv", "telbestandY2024W10.csv"]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert len(r.warnings) == 1
         assert "2024" in r.warnings[0]
 
@@ -155,7 +158,7 @@ class TestCheckTelbestandCompleteness:
             "telbestandY2023W01.csv", "telbestandY2023W02.csv",
             "telbestandY2024W01.csv", "telbestandY2024W15.csv",
         ]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert len(r.warnings) == 1
         assert "2024" in r.warnings[0]
 

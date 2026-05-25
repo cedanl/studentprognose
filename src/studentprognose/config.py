@@ -4,6 +4,8 @@ import sys
 from importlib.resources import files
 from types import SimpleNamespace
 
+from studentprognose.utils.telbestand_filenames import _placeholder_to_regex
+
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
 _VALID_TIMESERIES_MODELS = {"sarima", "ets", "theta", "auto_arima"}
@@ -63,6 +65,7 @@ def load_configuration(file_path: str) -> dict:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     _validate_model_config(cfg, file_path)
     _validate_runtime(cfg, file_path)
+    _validate_telbestand_filename_patterns(cfg, file_path)
     return cfg
 
 
@@ -180,6 +183,48 @@ def _validate_model_config(cfg, file_path):
             f"Geldige opties: {sorted(_VALID_CLASSIFIER_MODELS)}."
         )
         sys.exit(1)
+
+
+def _validate_telbestand_filename_patterns(cfg, file_path):
+    """Fail fast op ongeldige telbestand-bestandsnaampatronen.
+
+    Een patroon moet zowel ``{year}`` als ``{week}`` bevatten — anders kan de
+    pipeline geen jaar/week uit de bestandsnaam destilleren. Ontbrekende
+    sleutel, lege lijst, lege string of lijst van geldige strings worden alle
+    geaccepteerd; ``compile_patterns`` valt terug op de default waar nodig.
+    """
+    raw = cfg.get("telbestand_filename_patterns")
+    if raw is None or raw == [] or raw == "":
+        return
+
+    if isinstance(raw, str):
+        candidates = [raw]
+    elif isinstance(raw, list):
+        candidates = raw
+    else:
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'telbestand_filename_patterns' moet een string of lijst van strings zijn, "
+            f"niet {type(raw).__name__}."
+        )
+        sys.exit(1)
+
+    for i, pattern in enumerate(candidates):
+        if not isinstance(pattern, str):
+            print(
+                f"Configuratiefout in {file_path}: "
+                f"'telbestand_filename_patterns[{i}]' moet een string zijn, "
+                f"niet {type(pattern).__name__}."
+            )
+            sys.exit(1)
+        try:
+            _placeholder_to_regex(pattern)
+        except ValueError as exc:
+            print(
+                f"Configuratiefout in {file_path}: {exc} "
+                f"Voorbeeld: \"telbestandY{{year}}W{{week}}\"."
+            )
+            sys.exit(1)
 
 
 def _validate_runtime(cfg, file_path):

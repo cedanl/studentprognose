@@ -35,6 +35,33 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (afgeleid uit telbestand studenten) |
 | `path_ratios` | `data/input/ratiobestand.xlsx` | Ratiobestand (optioneel) |
 
+## `telbestand_filename_patterns` — bestandsnaampatronen voor telbestanden
+
+Standaard: `["telbestandY{year}W{week}"]`
+
+De pipeline herkent telbestanden in `path_raw_telbestanden` aan hun bestandsnaam. Instellingen met afwijkende naamconventies kunnen hier hun eigen patroon opgeven. De ETL en de validatie gebruiken hetzelfde patroon om jaar en weeknummer uit de bestandsnaam te halen.
+
+**Placeholder-syntax:**
+
+- `{year}` — vierdigit collegejaar (bijv. `2024`)
+- `{week}` — weeknummer (1–2 cijfers, gevalideerd op bereik 1–53)
+- Alle andere karakters worden letterlijk gematcht. Punten, streepjes en underscores zijn veilig (`re.escape` op de achtergrond).
+
+**Voorbeelden:**
+
+```json
+{
+    "telbestand_filename_patterns": [
+        "telbestandY{year}W{week}",
+        "VU_telbestand_{year}_W{week}"
+    ]
+}
+```
+
+Met meerdere patronen kan de pipeline bestanden van verschillende leveranciers naast elkaar verwerken — handig tijdens een migratie van oude naar nieuwe naamgeving.
+
+**Foutgedrag:** Een patroon zonder `{year}` of `{week}` leidt tot een configuratiefout en stopt de pipeline direct, met een melding die het probleempatroon noemt.
+
 ## `runtime` — uitvoerparameters
 
 Instellingen die bepalen hoe de pipeline zich gedraagt tijdens uitvoer (los van de modelkeuze).
