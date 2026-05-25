@@ -11,7 +11,7 @@ Plaats hier je ruwe Studielink-exportbestanden:
 
 | Bestand/map | Beschrijving |
 |---|---|
-| `telbestanden/` | Wekelijkse Studielink-telbestanden (`telbestandY<jaar>W<week>.csv`) |
+| `telbestanden/` | Wekelijkse Studielink-telbestanden (default: `telbestandY<jaar>W<week>.csv`, instelbaar via `telbestand_filename_patterns`) |
 | `individuele_aanmelddata.csv` | Individuele vooraanmeldingen per student |
 | `oktober_bestand.xlsx` | Telbestand studenten (eigen levering instelling — voor studentaantallen) |
 
@@ -58,7 +58,9 @@ def run_init():
 Volgende stappen:
 
   1. Plaats je telbestanden in:     data/input_raw/telbestanden/
-                                    (bestandsnamen: telbestandY<jaar>W<week>.csv)
+                                    (default-naam: telbestandY<jaar>W<week>.csv;
+                                     overschrijf via telbestand_filename_patterns
+                                     als je instelling een andere conventie gebruikt)
   2. Plaats je individuele data in: data/input_raw/individuele_aanmelddata.csv
   3. Optioneel — telbestand studenten:
                                     data/input_raw/oktober_bestand.xlsx

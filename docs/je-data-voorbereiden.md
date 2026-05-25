@@ -18,7 +18,7 @@ Zie de [volledige dataflow](https://github.com/cedanl/studentprognose/blob/main/
 ### Studielink telbestanden
 
 Map: `data/input_raw/telbestanden/`
-Bestandsnaampatroon: `telbestandY{jaar}W{week}.csv` (bijv. `telbestandY2024W10.csv`)
+Bestandsnaampatroon: `telbestandY{jaar}W{week}.csv` (bijv. `telbestandY2024W10.csv`) — configureerbaar, zie [Afwijkende bestandsnamen](#afwijkende-bestandsnamen) hieronder.
 Scheidingsteken: `;`
 
 | Kolom | Type | Omschrijving |
@@ -31,6 +31,21 @@ Scheidingsteken: `;`
 | `Status` | str | `V` (verzoek), `I` (inschrijving), `U` (uitgeschreven/gestaakt) of `A` (annulering). Rijen met `A` worden uit de vooraanmelderaggregatie gehouden. |
 | `Herinschrijving` | str | `J` of `N` |
 | `Herkomst` | str | `N` (Nederland), `E` (EER), `R` (rest) |
+
+#### Afwijkende bestandsnamen
+
+Gebruikt jouw instelling een andere conventie dan `telbestandY{jaar}W{week}.csv`? Geef in `configuration.json` één of meer eigen patronen op:
+
+```json
+{
+    "telbestand_filename_patterns": [
+        "telbestandY{year}W{week}",
+        "VU_telbestand_{year}_W{week}"
+    ]
+}
+```
+
+Placeholders zijn `{year}` (vier cijfers) en `{week}` (één of twee cijfers). Andere karakters worden letterlijk gematcht — punten en streepjes zijn veilig. Meerdere patronen tegelijk zijn handig tijdens een migratie van oude naar nieuwe naamgeving. Zie [`telbestand_filename_patterns`](configuratie.md#telbestand_filename_patterns-bestandsnaampatronen-voor-telbestanden) voor de volledige uitleg.
 
 ### Individuele aanmelddata
 
