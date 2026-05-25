@@ -14,89 +14,101 @@ class TestCompilePatterns:
     def test_uses_default_when_config_is_none(self):
         patterns = compile_patterns(None)
         assert len(patterns) == 1
-        assert patterns[0].pattern == DEFAULT_TELBESTAND_PATTERN
+
+    def test_default_matches_studielink_name(self):
+        patterns = compile_patterns(None)
+        assert match_telbestand("telbestandY2024W10.csv", patterns) is not None
 
     def test_uses_default_when_key_missing(self):
         patterns = compile_patterns({})
-        assert len(patterns) == 1
-        assert patterns[0].pattern == DEFAULT_TELBESTAND_PATTERN
+        assert match_telbestand("telbestandY2024W10.csv", patterns) is not None
 
     def test_uses_default_when_value_is_empty_list(self):
         patterns = compile_patterns({"telbestand_filename_patterns": []})
-        assert len(patterns) == 1
-        assert patterns[0].pattern == DEFAULT_TELBESTAND_PATTERN
+        assert match_telbestand("telbestandY2024W10.csv", patterns) is not None
 
     def test_accepts_string_value(self):
-        custom = r"foo_(?P<year>\d{4})_w(?P<week>\d{1,2})"
-        patterns = compile_patterns({"telbestand_filename_patterns": custom})
-        assert len(patterns) == 1
-        assert patterns[0].pattern == custom
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": "foo_{year}_w{week}"}
+        )
+        match = match_telbestand("foo_2024_w10.csv", patterns)
+        assert match.group("year") == "2024"
+        assert match.group("week") == "10"
 
     def test_accepts_list_value(self):
-        a = r"a_(?P<year>\d{4})W(?P<week>\d{1,2})"
-        b = r"b_(?P<year>\d{4})W(?P<week>\d{1,2})"
-        patterns = compile_patterns({"telbestand_filename_patterns": [a, b]})
-        assert [p.pattern for p in patterns] == [a, b]
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": ["a_{year}_{week}", "b_{year}_{week}"]}
+        )
+        assert match_telbestand("a_2024_10.csv", patterns) is not None
+        assert match_telbestand("b_2024_10.csv", patterns) is not None
 
-    def test_invalid_regex_raises_with_message(self):
-        with pytest.raises(ValueError, match="Ongeldig regex-patroon"):
-            compile_patterns({"telbestand_filename_patterns": ["[invalid"]})
+    def test_missing_placeholders_raises(self):
+        with pytest.raises(ValueError, match="placeholders"):
+            compile_patterns({"telbestand_filename_patterns": ["telbestandY2024W10"]})
 
-    def test_missing_named_groups_raises(self):
-        with pytest.raises(ValueError, match="mist de named groups"):
-            compile_patterns({"telbestand_filename_patterns": [r"telbestandY\d{4}W\d+"]})
+    def test_missing_year_placeholder_raises(self):
+        with pytest.raises(ValueError, match="placeholders"):
+            compile_patterns({"telbestand_filename_patterns": ["foo_W{week}"]})
 
-    def test_missing_year_group_only_raises(self):
-        with pytest.raises(ValueError, match="mist de named groups"):
-            compile_patterns(
-                {"telbestand_filename_patterns": [r"foo_(?P<week>\d{1,2})"]}
-            )
+    def test_missing_week_placeholder_raises(self):
+        with pytest.raises(ValueError, match="placeholders"):
+            compile_patterns({"telbestand_filename_patterns": ["foo_Y{year}"]})
+
+    def test_literal_chars_are_escaped(self):
+        """Punten en andere regex-metakarakters moeten letterlijk worden gematcht."""
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": ["tel.{year}.{week}"]}
+        )
+        assert match_telbestand("tel.2024.10.csv", patterns) is not None
+        assert match_telbestand("telX2024X10.csv", patterns) is None
 
 
 class TestMatchTelbestand:
-    def test_default_pattern_matches_studielink_name(self):
+    def test_default_pattern_extracts_year_and_week(self):
         patterns = compile_patterns(None)
         match = match_telbestand("telbestandY2024W10.csv", patterns)
-        assert match is not None
         assert match.group("year") == "2024"
         assert match.group("week") == "10"
+
+    def test_default_pattern_handles_single_digit_week(self):
+        patterns = compile_patterns(None)
+        match = match_telbestand("telbestandY2024W5.csv", patterns)
+        assert match.group("week") == "5"
 
     def test_returns_none_for_non_matching_name(self):
         patterns = compile_patterns(None)
         assert match_telbestand("random.csv", patterns) is None
 
     def test_custom_pattern_matches_vu_name(self):
-        config = {
-            "telbestand_filename_patterns": [
-                r"VU_telbestand_(?P<year>\d{4})_W(?P<week>\d{1,2})"
-            ]
-        }
-        patterns = compile_patterns(config)
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": ["VU_telbestand_{year}_W{week}"]}
+        )
         match = match_telbestand("VU_telbestand_2024_W42.csv", patterns)
-        assert match is not None
         assert match.group("year") == "2024"
         assert match.group("week") == "42"
 
     def test_first_matching_pattern_wins(self):
-        config = {
-            "telbestand_filename_patterns": [
-                r"telbestandY(?P<year>\d{4})W(?P<week>\d{1,2})",
-                r"foo_(?P<year>\d{4})_(?P<week>\d{1,2})",
-            ]
-        }
-        patterns = compile_patterns(config)
+        patterns = compile_patterns(
+            {
+                "telbestand_filename_patterns": [
+                    "telbestandY{year}W{week}",
+                    "foo_{year}_{week}",
+                ]
+            }
+        )
         match = match_telbestand("telbestandY2024W10.csv", patterns)
         assert match.group("year") == "2024"
         assert match.group("week") == "10"
 
     def test_fallback_to_second_pattern(self):
-        config = {
-            "telbestand_filename_patterns": [
-                r"telbestandY(?P<year>\d{4})W(?P<week>\d{1,2})",
-                r"foo_(?P<year>\d{4})_(?P<week>\d{1,2})",
-            ]
-        }
-        patterns = compile_patterns(config)
+        patterns = compile_patterns(
+            {
+                "telbestand_filename_patterns": [
+                    "telbestandY{year}W{week}",
+                    "foo_{year}_{week}",
+                ]
+            }
+        )
         match = match_telbestand("foo_2024_42.csv", patterns)
         assert match.group("year") == "2024"
         assert match.group("week") == "42"
@@ -112,20 +124,13 @@ class TestValidateTelbestandFilenamePatterns:
             "cfg.json",
         )
 
-    def test_invalid_regex_exits_with_message(self, capsys):
+    def test_missing_placeholders_exits_with_message(self, capsys):
         with pytest.raises(SystemExit) as exc:
             _validate_telbestand_filename_patterns(
-                {"telbestand_filename_patterns": ["[invalid"]}, "cfg.json",
+                {"telbestand_filename_patterns": ["telbestandY2024W10"]},
+                "cfg.json",
             )
         assert exc.value.code == 1
         out = capsys.readouterr().out
         assert "Configuratiefout in cfg.json" in out
         assert "telbestand_filename_patterns" in out
-
-    def test_missing_named_groups_exits(self):
-        with pytest.raises(SystemExit) as exc:
-            _validate_telbestand_filename_patterns(
-                {"telbestand_filename_patterns": [r"foo(\d{4})W(\d+)"]},
-                "cfg.json",
-            )
-        assert exc.value.code == 1

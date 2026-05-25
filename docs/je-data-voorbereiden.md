@@ -40,12 +40,22 @@ aanleveren; de ETL pakt alleen de bovenstaande kolommen op.
 
 #### Afwijkende bestandsnamen
 
-Het standaard naampatroon (`telbestandY{jaar}W{week}.csv`) kan via
+Het standaard naampatroon (`telbestandY{year}W{week}.csv`) kan via
 `configuration.json` worden overschreven met
-`telbestand_filename_patterns`. Geef een lijst regex-patronen op met
-de named groups `(?P<year>...)` en `(?P<week>...)`. Zie
-[Configuratie](configuratie.md#telbestand_filename_patterns) voor
-voorbeelden.
+`telbestand_filename_patterns`. Gebruik `{year}` en `{week}` als
+placeholders voor het jaar en het weeknummer:
+
+```json
+{
+    "telbestand_filename_patterns": [
+        "telbestandY{year}W{week}",
+        "VU_telbestand_{year}_W{week}"
+    ]
+}
+```
+
+Zie [Configuratie](configuratie.md#telbestand_filename_patterns) voor de
+volledige uitleg.
 
 ### Individuele aanmelddata
 

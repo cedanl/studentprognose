@@ -64,9 +64,7 @@ class TestRowbindAndReformat:
         _write_vu_telbestand(tel_dir, "VU_telbestand_2024_W10.csv", week=10)
 
         config = {
-            "telbestand_filename_patterns": [
-                r"VU_telbestand_(?P<year>\d{4})_W(?P<week>\d{1,2})"
-            ]
+            "telbestand_filename_patterns": ["VU_telbestand_{year}_W{week}"]
         }
         output = tmp_path / "cumulatief.csv"
         _rowbind_and_reformat(str(tel_dir), str(output), config)
@@ -82,8 +80,8 @@ class TestRowbindAndReformat:
 
         config = {
             "telbestand_filename_patterns": [
-                r"telbestandY(?P<year>\d{4})W(?P<week>\d{1,2})",
-                r"VU_telbestand_(?P<year>\d{4})_W(?P<week>\d{1,2})",
+                "telbestandY{year}W{week}",
+                "VU_telbestand_{year}_W{week}",
             ]
         }
         output = tmp_path / "cumulatief.csv"
@@ -135,7 +133,7 @@ class TestRowbindAndReformat:
         tel_dir.mkdir()
         _write_vu_telbestand(tel_dir, "telbestandY2024W10.csv", week=10)
         output = tmp_path / "cumulatief.csv"
-        config = {"telbestand_filename_patterns": [r"foo(?P<year>\d{4})"]}
+        config = {"telbestand_filename_patterns": ["foo_{year}_only"]}
 
-        with pytest.raises(ValueError, match="mist de named groups"):
+        with pytest.raises(ValueError, match="placeholders"):
             _rowbind_and_reformat(str(tel_dir), str(output), config)

@@ -42,7 +42,7 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
 | Map bestaat | Hard error | `data/input_raw/telbestanden/` moet bestaan |
-| Bestanden aanwezig | Hard error | Minimaal één bestand dat matcht met `telbestand_filename_patterns` (default: `telbestandY{jaar}W{week}.csv`) |
+| Bestanden aanwezig | Hard error | Minimaal één bestand dat matcht met `telbestand_filename_patterns` (default: `telbestandY{year}W{week}.csv`) |
 | Verplichte kolommen | Hard error | `Studiejaar`, `Isatcode`, `Aantal`, `meercode_V`, `Herinschrijving`, `Hogerejaars`, `Herkomst` (`Groepeernaam` is optioneel — de ETL valt terug op `Isatcode`) |
 | Weeknummer in bestandsnaam | Hard error | Weeknummer moet tussen 1 en 53 liggen |
 | Collegejaar bereik | Soft error | `Studiejaar` buiten `[huidig jaar − 15, huidig jaar + 2]` |

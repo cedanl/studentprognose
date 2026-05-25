@@ -4,14 +4,20 @@ Instellingen hanteren niet altijd hetzelfde bestandsnaampatroon
 (bijv. ``telbestandY2024W10.csv`` versus eigen Timo- of VU-naamgeving).
 Daarom worden patronen via ``configuration.json`` opgegeven onder de
 sleutel ``telbestand_filename_patterns`` (lijst). Elk patroon is een
-regex met de named groups ``year`` en ``week``.
+gewone string met twee placeholders:
+
+- ``{year}`` — viercijferig jaartal
+- ``{week}`` — week (1 of 2 cijfers)
+
+Andere tekens in het patroon zijn letterlijke tekst die in de
+bestandsnaam moet voorkomen.
 
 Voorbeeldoverride in ``configuration.json``::
 
     {
         "telbestand_filename_patterns": [
-            "telbestandY(?P<year>\\d{4})W(?P<week>\\d{1,2})",
-            "VU_telbestand_(?P<year>\\d{4})_W(?P<week>\\d{1,2})"
+            "telbestandY{year}W{week}",
+            "VU_telbestand_{year}_W{week}"
         ]
     }
 """
@@ -19,7 +25,11 @@ Voorbeeldoverride in ``configuration.json``::
 import re
 from collections.abc import Iterable
 
-DEFAULT_TELBESTAND_PATTERN = r"telbestandY(?P<year>\d{4})W(?P<week>\d{1,2})"
+DEFAULT_TELBESTAND_PATTERN = "telbestandY{year}W{week}"
+
+_YEAR_REGEX = r"(?P<year>\d{4})"
+_WEEK_REGEX = r"(?P<week>\d{1,2})"
+_PLACEHOLDER_TOKEN = re.compile(r"\{(year|week)\}")
 
 
 def _get_pattern_strings(configuration):
@@ -37,27 +47,38 @@ def _get_pattern_strings(configuration):
     return list(raw)
 
 
+def _placeholder_to_regex(pattern):
+    """Vertaal een placeholder-patroon (``telbestandY{year}W{week}``) naar regex.
+
+    De overige tekens worden ge-escaped zodat ze letterlijk worden gematcht.
+    """
+    if "{year}" not in pattern or "{week}" not in pattern:
+        raise ValueError(
+            f"Telbestand-patroon {pattern!r} mist de placeholders "
+            f"{{year}} en/of {{week}}."
+        )
+
+    parts = []
+    last = 0
+    for match in _PLACEHOLDER_TOKEN.finditer(pattern):
+        parts.append(re.escape(pattern[last:match.start()]))
+        parts.append(_YEAR_REGEX if match.group(1) == "year" else _WEEK_REGEX)
+        last = match.end()
+    parts.append(re.escape(pattern[last:]))
+    return "".join(parts)
+
+
 def compile_patterns(configuration):
     """Compile alle telbestand-naampatronen uit de configuratie.
 
-    Onbruikbare patronen (verkeerde syntax of zonder ``year`` en ``week``
-    named groups) leiden tot een ``ValueError`` met een duidelijke melding,
-    zodat de gebruiker dit kan corrigeren in zijn configuratiebestand.
+    Onbruikbare patronen (ontbrekende ``{year}``/``{week}`` placeholders)
+    leiden tot een ``ValueError`` met een duidelijke melding, zodat de
+    gebruiker dit kan corrigeren in zijn configuratiebestand.
     """
     compiled = []
     for raw in _get_pattern_strings(configuration):
-        try:
-            pat = re.compile(raw)
-        except re.error as exc:
-            raise ValueError(
-                f"Ongeldig regex-patroon voor telbestand: {raw!r} ({exc})"
-            ) from exc
-        if "year" not in pat.groupindex or "week" not in pat.groupindex:
-            raise ValueError(
-                f"Telbestand-patroon {raw!r} mist de named groups "
-                f"(?P<year>...) en/of (?P<week>...)."
-            )
-        compiled.append(pat)
+        regex = _placeholder_to_regex(raw)
+        compiled.append(re.compile(regex))
     return compiled
 
 

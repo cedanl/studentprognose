@@ -37,14 +37,21 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 
 ## `telbestand_filename_patterns` — bestandsnaampatronen telbestanden
 
-Lijst regex-patronen waarmee de ETL en de validatie wekelijkse Studielink-telbestanden in `data/input_raw/telbestanden/` herkennen. Elk patroon moet twee named groups bevatten: `(?P<year>...)` voor het jaar en `(?P<week>...)` voor het weeknummer. Bestanden die niet matchen worden overgeslagen.
+Lijst patronen waarmee de ETL en de validatie wekelijkse Studielink-telbestanden in `data/input_raw/telbestanden/` herkennen. Elk patroon is een gewone string met twee placeholders:
+
+| Placeholder | Wat het matcht |
+|-------------|---------------|
+| `{year}` | viercijferig jaartal (bijv. `2024`) |
+| `{week}` | weeknummer van 1 of 2 cijfers (bijv. `5` of `42`) |
+
+De overige tekens in het patroon zijn letterlijke tekst die in de bestandsnaam moet voorkomen. Bestanden die niet matchen worden overgeslagen.
 
 Standaard:
 
 ```json
 {
     "telbestand_filename_patterns": [
-        "telbestandY(?P<year>\\d{4})W(?P<week>\\d{1,2})"
+        "telbestandY{year}W{week}"
     ]
 }
 ```
@@ -54,14 +61,14 @@ Eigen instelling-naamgeving toevoegen — geef alle patronen op die je wilt acce
 ```json
 {
     "telbestand_filename_patterns": [
-        "telbestandY(?P<year>\\d{4})W(?P<week>\\d{1,2})",
-        "VU_telbestand_(?P<year>\\d{4})_W(?P<week>\\d{1,2})",
-        "TIMO_(?P<year>\\d{4})_w(?P<week>\\d{1,2})"
+        "telbestandY{year}W{week}",
+        "VU_telbestand_{year}_W{week}",
+        "TIMO_{year}_w{week}"
     ]
 }
 ```
 
-Patronen worden geprobeerd in de opgegeven volgorde; het eerste dat matcht wint. Ongeldige patronen of patronen zonder de vereiste named groups stoppen de pipeline direct met een duidelijke foutmelding.
+Patronen worden geprobeerd in de opgegeven volgorde; het eerste dat matcht wint. Patronen zonder `{year}` of `{week}` stoppen de pipeline direct met een duidelijke foutmelding.
 
 ## `runtime` — uitvoerparameters
 
