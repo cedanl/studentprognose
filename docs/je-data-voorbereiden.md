@@ -27,7 +27,8 @@ Scheidingsteken: `;`
 | `Isatcode` | str | CROHO-code |
 | `Groepeernaam` | str | Naam van de opleiding |
 | `Aantal` | int | Aantal vooraanmelders |
-| `meercode_V` | int | Weegfactor; mag niet 0 zijn (leidt tot deling door nul in ETL) |
+| `meercode_V` | int | Aantal inschrijfverzoeken/inschrijvingen per student (status V/U/I). Wordt gebruikt als weegfactor in `Gewogen vooraanmelders = Aantal / meercode_V`. Voor status A-rijen is deze waarde 0 — die rijen worden door de ETL uitgefilterd. |
+| `Status` | str | `V` (verzoek), `I` (inschrijving), `U` (uitgeschreven/gestaakt) of `A` (annulering). Rijen met `A` worden uit de vooraanmelderaggregatie gehouden. |
 | `Herinschrijving` | str | `J` of `N` |
 | `Herkomst` | str | `N` (Nederland), `E` (EER), `R` (rest) |
 

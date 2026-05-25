@@ -117,7 +117,7 @@ _DEFAULT_VALIDATION_CFG = {
     "telbestand": {
         "required_columns": [
             "Studiejaar", "Isatcode", "Groepeernaam", "Aantal", "meercode_V",
-            "Herinschrijving", "Hogerejaars", "Herkomst",
+            "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
         ],
         "herkomst_allowed": ["N", "E", "R"],
         "herinschrijving_allowed": ["J", "N"],
@@ -371,16 +371,6 @@ def _validate_telbestanden(cwd, paths, validation_cfg, result, required=True):
             _check_categoricals_per_programme(
                 df.assign(**{col: normalized}),
                 col, allowed, "Groepeernaam", filename, result,
-            )
-
-        meercode_v, _ = _coerce_to_numeric(df["meercode_V"])
-        zero_meercode = df[meercode_v == 0]
-        if not zero_meercode.empty:
-            programmes = zero_meercode["Groepeernaam"].dropna().unique()
-            result.soft_errors.append(
-                f"{filename}: meercode_V = 0 (deling door nul in ETL) voor "
-                f"{len(programmes)} opleiding(en): "
-                + _format_programmes(programmes)
             )
 
         neg_aantal = df[df["Aantal"] < 0]
