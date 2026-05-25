@@ -63,6 +63,7 @@ def load_configuration(file_path: str) -> dict:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     _validate_model_config(cfg, file_path)
     _validate_runtime(cfg, file_path)
+    _validate_telbestand_filename_patterns(cfg, file_path)
     return cfg
 
 
@@ -220,3 +221,16 @@ def _validate_runtime(cfg, file_path):
             f"cores ({available}). Verlaagd naar {available}."
         )
         cfg["runtime"]["cpu_count"] = available
+
+
+def _validate_telbestand_filename_patterns(cfg, file_path):
+    from studentprognose.utils.telbestand_filenames import compile_patterns
+
+    try:
+        compile_patterns(cfg)
+    except (ValueError, TypeError) as exc:
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'telbestand_filename_patterns' is ongeldig. {exc}"
+        )
+        sys.exit(1)

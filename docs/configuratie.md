@@ -14,7 +14,7 @@ De pipeline laadt altijd eerst de **ingebakken standaardwaarden** uit het packag
 - Een ontbrekend veld in jouw bestand valt automatisch terug op de standaardwaarde.
 - Als het configuratiebestand helemaal niet bestaat, worden de standaardwaarden gebruikt en verschijnt er een waarschuwing.
 
-Het bestand heeft de volgende secties: `paths`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
+Het bestand heeft de volgende secties: `paths`, `telbestand_filename_patterns`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
 
 ## `paths` — bestandspaden
 
@@ -34,6 +34,34 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_student_count_first-years` | `data/input/student_count_first-years.xlsx` | Werkelijk aantal eerstejaars (afgeleid uit telbestand studenten) |
 | `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (afgeleid uit telbestand studenten) |
 | `path_ratios` | `data/input/ratiobestand.xlsx` | Ratiobestand (optioneel) |
+
+## `telbestand_filename_patterns` — bestandsnaampatronen telbestanden
+
+Lijst regex-patronen waarmee de ETL en de validatie wekelijkse Studielink-telbestanden in `data/input_raw/telbestanden/` herkennen. Elk patroon moet twee named groups bevatten: `(?P<year>...)` voor het jaar en `(?P<week>...)` voor het weeknummer. Bestanden die niet matchen worden overgeslagen.
+
+Standaard:
+
+```json
+{
+    "telbestand_filename_patterns": [
+        "telbestandY(?P<year>\\d{4})W(?P<week>\\d{1,2})"
+    ]
+}
+```
+
+Eigen instelling-naamgeving toevoegen — geef alle patronen op die je wilt accepteren:
+
+```json
+{
+    "telbestand_filename_patterns": [
+        "telbestandY(?P<year>\\d{4})W(?P<week>\\d{1,2})",
+        "VU_telbestand_(?P<year>\\d{4})_W(?P<week>\\d{1,2})",
+        "TIMO_(?P<year>\\d{4})_w(?P<week>\\d{1,2})"
+    ]
+}
+```
+
+Patronen worden geprobeerd in de opgegeven volgorde; het eerste dat matcht wint. Ongeldige patronen of patronen zonder de vereiste named groups stoppen de pipeline direct met een duidelijke foutmelding.
 
 ## `runtime` — uitvoerparameters
 

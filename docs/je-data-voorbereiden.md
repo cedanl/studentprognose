@@ -25,11 +25,27 @@ Scheidingsteken: `;`
 |-------|------|-------------|
 | `Studiejaar` | int | Collegejaar (bijv. `2024`) |
 | `Isatcode` | str | CROHO-code |
-| `Groepeernaam` | str | Naam van de opleiding |
+| `Groepeernaam` | str | Naam van de opleiding (optioneel — valt terug op `Isatcode`) |
 | `Aantal` | int | Aantal vooraanmelders |
 | `meercode_V` | int | Weegfactor; mag niet 0 zijn (leidt tot deling door nul in ETL) |
 | `Herinschrijving` | str | `J` of `N` |
+| `Hogerejaars` | str | `J` of `N` |
 | `Herkomst` | str | `N` (Nederland), `E` (EER), `R` (rest) |
+
+Extra kolommen worden genegeerd. Instellingen met een afwijkende
+kolomset — bijvoorbeeld VU met `HBO_WO`, `Brin_volgnr`, `Opl_vorm`,
+`Voertaal`, `Fixus`, `Maand`, `Geslacht`, `meercode_A`, `Status`,
+`1cHO_L`, `1cHO_K`, `sw`, `jw` — kunnen hun bestanden direct
+aanleveren; de ETL pakt alleen de bovenstaande kolommen op.
+
+#### Afwijkende bestandsnamen
+
+Het standaard naampatroon (`telbestandY{jaar}W{week}.csv`) kan via
+`configuration.json` worden overschreven met
+`telbestand_filename_patterns`. Geef een lijst regex-patronen op met
+de named groups `(?P<year>...)` en `(?P<week>...)`. Zie
+[Configuratie](configuratie.md#telbestand_filename_patterns) voor
+voorbeelden.
 
 ### Individuele aanmelddata
 

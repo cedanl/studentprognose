@@ -14,6 +14,9 @@
         "path_raw_telbestanden": "data/input_raw/telbestanden",
         "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
     },
+    "telbestand_filename_patterns": [
+        "telbestandY(?P<year>\\d{4})W(?P<week>\\d{1,2})"
+    ],
     "runtime": {
         "cpu_count": null
     },
