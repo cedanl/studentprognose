@@ -14,8 +14,32 @@ De pipeline schrijft de resultaten naar `data/output/`. Er zijn twee typen uitvo
 | `output_prelim_{modus}.xlsx` | Tussenresultaat | Voorlopige voorspellingen vóór ratio-model, ensemble en foutmaten. Nuttig voor debugging. |
 | `output_first-years_{modus}.xlsx` | Eindresultaat | Eerstejaars voorspellingen per opleiding/herkomst/week |
 | `output_volume_{modus}.xlsx` | Eindresultaat | Totaal studentvolume-voorspellingen (alleen bij `-sy v`) |
+| `_totaal_{studentjaar}_{modus}.xlsx` | Audittrail | Doorlopend bestand waar elke run zijn rijen aan toevoegt. Wordt nooit als input ingelezen. Zie [Audittrail](#audittrail-_totaalxlsx). |
 
 `{modus}` is `cumulatief`, `individueel` of `beide`, afhankelijk van de gebruikte `-d` vlag.
+`{studentjaar}` is `first-years`, `higher-years` of `volume`, afhankelijk van `-sy`.
+
+## Audittrail (`_totaal_*.xlsx`)
+
+Naast de week-specifieke `output_*.xlsx`-bestanden — die elke run worden overschreven — onderhoudt de pipeline een doorlopend audittrail per modus. Elke run voegt zijn rijen idempotent toe aan `data/output/_totaal_{studentjaar}_{modus}.xlsx`:
+
+- **Bij eerste run** ontstaat het bestand met de kolommen van de huidige run.
+- **Bij elke vervolgrun** worden de rijen toegevoegd. Bestaande rijen met dezelfde sleutel (`Collegejaar`, `Weeknummer`, `Croho groepeernaam`, `Herkomst`, `Examentype`) worden **overschreven** in plaats van gedupliceerd — opnieuw draaien voor dezelfde week is dus veilig.
+- **Run_date-kolom**: elke geschreven rij krijgt de datum van de run. Handig om te zien wanneer een voorspelling voor een (jaar, week)-combo is gegenereerd, bv. bij modelwijzigingen.
+
+Het bestand wordt **nooit** door de pipeline als input ingelezen — de data loader leest enkel de paden uit `configuration.json`. Daarmee is een circulaire afhankelijkheid structureel uitgesloten.
+
+### Wanneer is de audittrail nuttig?
+
+- **Trends over weken heen** — open één bestand om te zien hoe de voorspelling voor een opleiding zich gedurende het inschrijfseizoen ontwikkelde, zonder dat je zelf wekelijkse exports hoeft te koppelen.
+- **Achteraf reconstrueren** — `Run_date` toont wanneer een voorspelling is gemaakt, wat helpt bij retrospectief onderzoek of audits.
+
+### Bekende limieten
+
+- **Filterwijzigingen tussen runs** worden niet gedetecteerd. Als je in week 10 met `-f base.json` draait en in week 11 met een ander filter, leven beide rijensets naast elkaar in dezelfde audittrail. Geen filterhash; documenteer welke filterconfig hoort bij welke run zelf.
+- **Modelversie-drift**: rijen uit oudere runs kunnen door een andere modelvariant zijn gegenereerd. `Run_date` maakt dit traceerbaar maar is geen vervanging voor versiebeheer van de pipeline zelf.
+- **Numerus-fixusvoorspellingen** worden net als in de week-output afgekapt; de audittrail erft die waarden ongewijzigd.
+- **CI-modus** (`--ci test N`) schrijft géén audittrail — alleen reguliere runs.
 
 ## Kolomdefinities
 

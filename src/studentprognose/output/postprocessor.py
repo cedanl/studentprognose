@@ -1,3 +1,4 @@
+import datetime
 import numpy as np
 import pandas as pd
 import os
@@ -29,13 +30,22 @@ class PostProcessor:
         try:
             open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
             if ci_test_n is None:
-                match student_year_prediction:
-                    case StudentYearPrediction.FIRST_YEARS:
-                        open(f"data/output/output_first-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
-                    case StudentYearPrediction.HIGHER_YEARS:
-                        open(f"data/output/output_higher-years_{mode_suffix}{ci_suffix}.xlsx", "w").close()
-                    case StudentYearPrediction.VOLUME:
-                        open(f"data/output/output_volume_{mode_suffix}{ci_suffix}.xlsx", "w").close()
+                sy_label = {
+                    StudentYearPrediction.FIRST_YEARS: "first-years",
+                    StudentYearPrediction.HIGHER_YEARS: "higher-years",
+                    StudentYearPrediction.VOLUME: "volume",
+                }.get(student_year_prediction)
+                if sy_label is not None:
+                    open(f"data/output/output_{sy_label}_{mode_suffix}{ci_suffix}.xlsx", "w").close()
+                    # _totaal mag NIET worden getrunceerd: het bevat de
+                    # historie van eerdere runs. "a" opent zonder leeg te
+                    # maken en faalt alsnog als Excel het bestand
+                    # vergrendelt — exact wat we hier willen detecteren.
+                    totaal_path = os.path.join(
+                        output_dir, f"_totaal_{sy_label}_{mode_suffix}.xlsx"
+                    )
+                    if os.path.exists(totaal_path):
+                        open(totaal_path, "a").close()
         except IOError:
             print(
                 "Fout: outputbestand kan niet geopend worden, waarschijnlijk staat het nog open in Excel. "
@@ -448,3 +458,65 @@ class PostProcessor:
         )
 
         self.data.to_excel(output_path, index=False)
+
+    _TOTAAL_KEY_COLS = [
+        "Collegejaar",
+        "Weeknummer",
+        "Croho groepeernaam",
+        "Herkomst",
+        "Examentype",
+    ]
+
+    def save_totaal_audit_trail(self, student_year_prediction):
+        """Append de huidige run aan een doorlopend `_totaal_<sy>_<do>.xlsx`.
+
+        Idempotent per (Collegejaar, Weeknummer, Croho groepeernaam, Herkomst,
+        Examentype): rijen voor dezelfde sleutelcombo worden overschreven, niet
+        gedupliceerd. Voegt een `Run_date`-kolom toe zodat traceerbaar blijft
+        wanneer een rij is gegenereerd. Het bestand wordt nooit als input door
+        de pipeline gelezen (de loader leest enkel paden uit
+        `configuration.json`), dus het is structureel veilig om naast de
+        reguliere outputs te bestaan.
+        """
+        if self.data is None:
+            return
+
+        sy_label = {
+            StudentYearPrediction.FIRST_YEARS: "first-years",
+            StudentYearPrediction.HIGHER_YEARS: "higher-years",
+            StudentYearPrediction.VOLUME: "volume",
+        }.get(student_year_prediction)
+        if sy_label is None:
+            return
+
+        filename = f"_totaal_{sy_label}_{self.data_option.filename_suffix}.xlsx"
+        path = os.path.join(self.CWD, "data", "output", filename)
+
+        new_rows = self.data.copy()
+        new_rows["Run_date"] = datetime.date.today().isoformat()
+
+        if os.path.exists(path):
+            try:
+                existing = pd.read_excel(path)
+            except Exception as e:
+                # Corrupte of door Excel vergrendelde file: vroege check
+                # ving dat normaal al af. Hier alsnog defensief: log en sla
+                # over zodat de hoofdpipeline-output niet verloren gaat.
+                print(
+                    f"Waarschuwing: kon bestaande audittrail niet lezen ({path}): {e}. "
+                    "Audittrail wordt deze run niet bijgewerkt."
+                )
+                return
+            combined = pd.concat([existing, new_rows], ignore_index=True)
+        else:
+            combined = new_rows
+
+        # keep="last": de nieuwe run staat altijd achteraan in de concat,
+        # dus zijn waarden winnen bij gelijke sleutel. Dit realiseert het
+        # "overschrijven per week"-gedrag zonder rij-duplicatie.
+        combined = combined.drop_duplicates(subset=self._TOTAAL_KEY_COLS, keep="last")
+        combined = combined.sort_values(
+            by=["Croho groepeernaam", "Examentype", "Collegejaar", "Weeknummer", "Herkomst"],
+            ignore_index=True,
+        )
+        combined.to_excel(path, index=False)

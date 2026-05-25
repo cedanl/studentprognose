@@ -47,6 +47,9 @@ uv run studentprognose init > /dev/null
 [ -f configuration/configuration.json ]   || { echo "FOUT: configuration.json ontbreekt"; exit 1; }
 [ -f configuration/filtering/base.json ]  || { echo "FOUT: filtering/base.json ontbreekt"; exit 1; }
 [ -d data/input_raw/telbestanden ]        || { echo "FOUT: data/input_raw/telbestanden ontbreekt"; exit 1; }
+[ -d data/output ]                        || { echo "FOUT: data/output ontbreekt"; exit 1; }
+# Audittrail mag NIET als lege placeholder bestaan: hij ontstaat lui bij eerste run.
+[ ! -f data/output/_totaal_first-years_beide.xlsx ] || { echo "FOUT: _totaal_*.xlsx bestaat al na init"; exit 1; }
 echo "OK"
 
 echo ""
@@ -56,7 +59,9 @@ cp    "$REPO_ROOT/data/input_raw/individuele_aanmelddata.csv" data/input_raw/
 cp    "$REPO_ROOT/data/input_raw/oktober_bestand.xlsx"   data/input_raw/
 uv run studentprognose -w 6 -y 2020 --yes > /dev/null
 [ -f data/output/output_first-years_beide.xlsx ] || { echo "FOUT: output ontbreekt"; exit 1; }
-echo "OK"
+[ -f data/output/_totaal_first-years_beide.xlsx ] || { echo "FOUT: _totaal_*.xlsx ontbreekt na eerste run"; exit 1; }
+ROWS_AFTER_RUN1=$(uv run python -c "import pandas as pd; print(len(pd.read_excel('data/output/_totaal_first-years_beide.xlsx')))")
+echo "OK (_totaal_first-years_beide.xlsx: $ROWS_AFTER_RUN1 rijen)"
 
 echo ""
 echo "=== [5] --noetl --yes combinatie ==="
@@ -64,6 +69,9 @@ echo "=== [5] --noetl --yes combinatie ==="
 # --noetl slaat ETL en validatie over; de pipeline moet slagen op de bestaande data.
 uv run studentprognose -w 6 -y 2020 --noetl --yes > /dev/null
 [ -f data/output/output_first-years_beide.xlsx ] || { echo "FOUT: output ontbreekt na --noetl run"; exit 1; }
+# Identieke run mag de audittrail NIET dupliceren — idempotentie per (jaar, week).
+ROWS_AFTER_RUN2=$(uv run python -c "import pandas as pd; print(len(pd.read_excel('data/output/_totaal_first-years_beide.xlsx')))")
+[ "$ROWS_AFTER_RUN1" = "$ROWS_AFTER_RUN2" ] || { echo "FOUT: audittrail-dupliceerde rijen ($ROWS_AFTER_RUN1 → $ROWS_AFTER_RUN2)"; exit 1; }
 echo "OK"
 
 echo ""
