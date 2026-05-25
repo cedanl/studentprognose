@@ -30,6 +30,11 @@
     "numerus_fixus": {
         "B Opleiding": 0
     },
+    "preprocessing": {
+        "individual": {
+            "valid_ingangsdatums": ["01-09", "01-10"]
+        }
+    },
     "excluded_data_points": [],
     "ensemble_override_cumulative": [
         "B Geneeskunde",

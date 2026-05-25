@@ -14,7 +14,7 @@ De pipeline laadt altijd eerst de **ingebakken standaardwaarden** uit het packag
 - Een ontbrekend veld in jouw bestand valt automatisch terug op de standaardwaarde.
 - Als het configuratiebestand helemaal niet bestaat, worden de standaardwaarden gebruikt en verschijnt er een waarschuwing.
 
-Het bestand heeft de volgende secties: `paths`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
+Het bestand heeft de volgende secties: `paths`, `runtime`, `model_config`, `numerus_fixus`, `preprocessing`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
 
 ## `paths` — bestandspaden
 
@@ -123,6 +123,31 @@ Een object met opleidingsnamen als sleutels en het maximale inschrijvingsaantal 
 ```
 
 Als de gesommeerde voorspelling over herkomstgroepen het maximum overschrijdt, wordt het overschot afgetrokken van de NL-herkomstgroep. Opleidingen die hier niet staan worden niet gecapped.
+
+## `preprocessing` — preprocessing-instellingen
+
+### `individual.valid_ingangsdatums`
+
+Standaard: `["01-09", "01-10"]`
+
+Bepaalt welke ingangsdatums in de individuele aanmelddata worden meegenomen. Rijen waarvan `Ingangsdatum` niet begint met een van deze dag-maand-prefixen worden uit de trainings- en voorspelset gefilterd.
+
+Elke waarde is een dag-maand-prefix in het formaat `"DD-MM"` — de pipeline filtert op `Ingangsdatum` die begint met `"DD-MM-"`. De standaardwaarden (`01-09` en `01-10`) zijn de gangbare academische startdatums op Nederlandse instellingen.
+
+```json
+{
+    "preprocessing": {
+        "individual": {
+            "valid_ingangsdatums": ["01-09", "01-10", "01-02"]
+        }
+    }
+}
+```
+
+Pas dit aan als je instelling afwijkende startdatums hanteert — bijvoorbeeld een februari-instroom voor Master-opleidingen (`"01-02"`) of een semestermoment dat afwijkt van september en oktober. Als je deze instelling weglaat, gelden de standaardwaarden.
+
+!!! warning "Filtert rijen die niet aan de prefix voldoen"
+    Rijen met een `Ingangsdatum` die niet matcht worden stilzwijgend uit de pipeline verwijderd. Controleer voor je deze lijst inkort dat je geen geldige instroommomenten mist.
 
 ## `excluded_data_points` — anomaliejaren uitsluiten van trainingsdata
 

@@ -60,10 +60,16 @@ def preprocess_individual_data(data: pd.DataFrame, numerus_fixus_list: list[str]
 
     data[c.origin] = data.apply(lambda x: get_herkomst(x["Nationaliteit"], x["EER"]), axis=1)
 
-    data = data[
-        data["Ingangsdatum"].str.contains("01-09-")
-        | data["Ingangsdatum"].str.contains("01-10-")
-    ]
+    valid_ingangsdatums = (
+        config.get("preprocessing", {})
+        .get("individual", {})
+        .get("valid_ingangsdatums", ["01-09", "01-10"])
+    )
+    ingangsdatum = data["Ingangsdatum"].astype(str)
+    mask = pd.Series(False, index=data.index)
+    for prefix in valid_ingangsdatums:
+        mask |= ingangsdatum.str.startswith(f"{prefix}-")
+    data = data[mask]
 
     data["is_numerus_fixus"] = (
         data[c.programme].isin(numerus_fixus_list)
