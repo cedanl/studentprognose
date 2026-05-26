@@ -128,7 +128,7 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 
 | Bestand | Beschrijving |
 |---------|-------------|
-| **individual** | Individuele (voor)aanmeldingen per student. Wordt gebruikt voor de SARIMA_individual voorspelling. |
+| **individual** | Individuele (voor)aanmeldingen per student. Voedt het [individueel model](https://cedanl.github.io/studentprognose/methodologie/individueel/) (XGBoost classifier + SARIMA) en levert de `SARIMA_individual` voorspelling. |
 | **cumulative** | Aantal aanmeldingen per opleiding, herkomst, jaar, week en herinschrijving. Wordt gebruikt voor de SARIMA_cumulative voorspelling. Verkregen via Studielink. |
 | **latest** | Per opleiding, herkomst, jaar en week: aanmeldingen, voorspellingen en foutwaarden (MAE/MAPE). |
 | **student_count_first-years** | Werkelijk aantal eerstejaars studenten per jaar, opleiding en herkomst. |
@@ -173,7 +173,7 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 | 12 | Ratio model | — | `ratio` | `ratio` |
 | 13 | Postprocessing + Opslaan | `postprocessor` | `postprocessor` | `postprocessor` |
 
-Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de architectuur.
+Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de architectuur. Voor een end-to-end uitleg van het individueel spoor (inclusief Mermaid-flow), zie [Individueel model](https://cedanl.github.io/studentprognose/methodologie/individueel/) in de methodologische documentatie.
 
 ---
 

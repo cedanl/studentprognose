@@ -114,6 +114,7 @@ Gebruik de onderstaande mapping om te bepalen welke pagina('s) bijgewerkt moeten
 | `models/sarima.py` / SARIMA-parameters | `docs/methodologie/sarima.md` |
 | `models/xgboost_*.py` / XGBoost-features of -parameters | `docs/methodologie/xgboost.md` |
 | `models/ratio.py` / ratio-logica | `docs/methodologie/ratio-model.md` |
+| `strategies/individual.py` / individueel-pipeline / filterregels | `docs/methodologie/individueel.md` |
 | Ensemble-logica / gewichten / postprocessor | `docs/methodologie/ensemble.md` |
 | Architectuur / pipeline-volgorde | `docs/methodologie/index.md` |
 
