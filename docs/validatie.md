@@ -42,13 +42,12 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
 | Map bestaat | Hard error | `data/input_raw/telbestanden/` moet bestaan |
-| Bestanden aanwezig | Hard error | Minimaal één bestand met patroon `telbestandY{jaar}W{week}.csv` |
-| Verplichte kolommen | Hard error | `Studiejaar`, `Isatcode`, `Groepeernaam`, `Aantal`, `meercode_V`, `Herinschrijving`, `Herkomst` |
+| Bestanden aanwezig | Hard error | Minimaal één bestand dat matcht met `telbestand_filename_patterns` (default: `telbestandY{jaar}W{week}.csv`) |
+| Verplichte kolommen | Hard error | `Studiejaar`, `Isatcode`, `Groepeernaam`, `Aantal`, `meercode_V`, `Status`, `Herinschrijving`, `Herkomst` |
 | Weeknummer in bestandsnaam | Hard error | Weeknummer moet tussen 1 en 53 liggen |
 | Collegejaar bereik | Soft error | `Studiejaar` buiten `[huidig jaar − 15, huidig jaar + 2]` |
 | Herkomst geldige waarden | Soft error | Elke waarde in `Herkomst` moet `N`, `E` of `R` zijn |
 | Herinschrijving geldige waarden | Soft error | Elke waarde moet `J` of `N` zijn |
-| meercode_V = 0 | Soft error | Leidt tot deling door nul in ETL |
 | Aantal < 0 | Soft error | Negatieve aantallen zijn inhoudelijk onjuist |
 | Ontbrekende waarden `Aantal` | Waarschuwing / Soft error | > 5% ontbrekend → waarschuwing; > 30% → soft error |
 | Gaten tussen weken | Waarschuwing | Gat van > 2 weken binnen een jaar |

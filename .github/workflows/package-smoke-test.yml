@@ -5,8 +5,18 @@ on:
 
 jobs:
   smoke:
-    name: Standalone package smoke test
-    runs-on: ubuntu-latest
+    name: Standalone package smoke test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    defaults:
+      run:
+        # Op Windows-runners draait het smoke-script via Git Bash. Dit
+        # bewaakt structureel issue #197 (joblib spawn-gedrag is fundamenteel
+        # anders op Windows dan fork op Linux) — zie issue #204.
+        shell: bash
     steps:
       - uses: actions/checkout@v4
         with:

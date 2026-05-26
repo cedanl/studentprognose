@@ -1,0 +1,4 @@
+# Smoke-test draait via Git Bash op Windows-runners. CRLF-eindes laten
+# `set -euo pipefail` en grep-matches breken — daarom expliciet LF afdwingen
+# voor alle shell-scripts.
+*.sh text eol=lf

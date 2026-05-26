@@ -21,7 +21,10 @@ from studentprognose.data.validation import (
     _DEFAULT_VALIDATION_CFG,
     validate_raw_data,
 )
+from studentprognose.utils.telbestand_filenames import compile_patterns
 from studentprognose.utils.weeks import DataOption
+
+_DEFAULT_PATTERNS = compile_patterns(None)
 
 
 # ---------------------------------------------------------------------------
@@ -133,19 +136,19 @@ class TestCheckTelbestandCompleteness:
     def test_consecutive_weeks_no_warning(self):
         r = ValidationResult()
         files = [f"telbestandY2024W{w:02d}.csv" for w in range(1, 10)]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert not r.warnings
 
     def test_small_gap_no_warning(self):
         r = ValidationResult()
         files = ["telbestandY2024W01.csv", "telbestandY2024W03.csv"]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert not r.warnings
 
     def test_large_gap_produces_warning(self):
         r = ValidationResult()
         files = ["telbestandY2024W01.csv", "telbestandY2024W10.csv"]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert len(r.warnings) == 1
         assert "2024" in r.warnings[0]
 
@@ -155,7 +158,7 @@ class TestCheckTelbestandCompleteness:
             "telbestandY2023W01.csv", "telbestandY2023W02.csv",
             "telbestandY2024W01.csv", "telbestandY2024W15.csv",
         ]
-        _check_telbestand_completeness(files, {}, r)
+        _check_telbestand_completeness(files, {}, _DEFAULT_PATTERNS, r)
         assert len(r.warnings) == 1
         assert "2024" in r.warnings[0]
 
@@ -335,6 +338,7 @@ def _make_valid_telbestand(path, year=2024, week=1):
         "Groepeernaam": ["B Opleiding"],
         "Aantal": [10],
         "meercode_V": [2],
+        "Status": ["V"],
         "Herinschrijving": ["N"],
         "Hogerejaars": ["N"],
         "Herkomst": ["N"],
@@ -405,24 +409,6 @@ class TestValidateRawDataIntegration:
         with pytest.raises(SystemExit):
             validate_raw_data(cfg, yes=True)
 
-    def test_zero_meercode_triggers_soft_error_yes_passes(self, tmp_path, monkeypatch):
-        telbestanden_dir = tmp_path / "telbestanden"
-        telbestanden_dir.mkdir()
-        df = pd.DataFrame({
-            "Studiejaar": [2024],
-            "Isatcode": ["12345"],
-            "Groepeernaam": ["B Opleiding"],
-            "Aantal": [10],
-            "meercode_V": [0],
-            "Herinschrijving": ["N"],
-            "Hogerejaars": ["N"],
-            "Herkomst": ["N"],
-        })
-        df.to_csv(telbestanden_dir / "telbestandY2024W01.csv", sep=";", index=False)
-        cfg = _make_configuration(tmp_path, telbestanden_dir)
-        monkeypatch.chdir(tmp_path)
-        validate_raw_data(cfg, yes=True, data_option=DataOption.CUMULATIVE)
-
     def test_invalid_herkomst_prompts_and_n_exits(self, tmp_path, monkeypatch):
         telbestanden_dir = tmp_path / "telbestanden"
         telbestanden_dir.mkdir()
@@ -432,6 +418,7 @@ class TestValidateRawDataIntegration:
             "Groepeernaam": ["B Opleiding"],
             "Aantal": [10],
             "meercode_V": [2],
+            "Status": ["V"],
             "Herinschrijving": ["N"],
             "Hogerejaars": ["N"],
             "Herkomst": ["ONBEKEND"],
@@ -452,6 +439,7 @@ class TestValidateRawDataIntegration:
             "Groepeernaam": ["B Opleiding"],
             "Aantal": [10],
             "meercode_V": [2],
+            "Status": ["V"],
             "Herinschrijving": ["N"],
             "Hogerejaars": ["N"],
             "Herkomst": ["ONBEKEND"],
@@ -470,6 +458,7 @@ class TestValidateRawDataIntegration:
             "Groepeernaam": ["B Opleiding"],
             "Aantal": [10],
             "meercode_V": [2],
+            "Status": ["V"],
             "Herinschrijving": ["N"],
             "Hogerejaars": ["N"],
             "Herkomst": ["N "],  # trailing whitespace
@@ -488,6 +477,7 @@ class TestValidateRawDataIntegration:
             "Groepeernaam": ["B Opleiding"],
             "Aantal": [10],
             "meercode_V": [2],
+            "Status": ["V"],
             "Herinschrijving": ["N"],
             "Hogerejaars": ["N"],
             "Herkomst": ["N"],

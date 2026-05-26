@@ -1,10 +1,15 @@
 import os
-import re
 import shutil
 
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+
+from studentprognose.utils.telbestand_filenames import (
+    compile_patterns,
+    match_telbestand,
+)
+
 
 def run_etl(configuration):
     """Run the full ETL pipeline: raw external data → data/input/ files."""
@@ -59,15 +64,16 @@ def run_etl(configuration):
 def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
     """Merge weekly Studielink CSVs into one cumulative file."""
     dataframes = []
+    patterns = compile_patterns(configuration)
 
     for filename in sorted(os.listdir(telbestanden_dir)):
-        match = re.search(r"telbestandY(\d{4})W(\d+)", filename)
+        match = match_telbestand(filename, patterns)
         if not match:
             continue
 
         filepath = os.path.join(telbestanden_dir, filename)
         data = pd.read_csv(filepath, sep=";", low_memory=False)
-        data["Weeknummer"] = int(match.group(2))
+        data["Weeknummer"] = int(match.group("week"))
         dataframes.append(data)
 
     if not dataframes:
@@ -75,6 +81,10 @@ def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
         return
 
     data = pd.concat(dataframes, ignore_index=True)
+
+    # Status A = annulering (Studielink PvL §5.12). Voor die rijen is meercode_V
+    # per definitie 0 en horen aantallen semantisch niet bij vooraanmelders.
+    data = data[data["Status"] != "A"].copy()
 
     data["Gewogen vooraanmelders"] = data["Aantal"] / data["meercode_V"]
 

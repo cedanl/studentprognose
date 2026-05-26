@@ -12,6 +12,10 @@
 #      ETL en validatie worden overgeslagen
 #   6. -sk (skipyears) vlag — pipeline slaagt met skip_years > 0
 #   7. Exitcode 1 bij harde validatiefout — kapot telbestand triggert sys.exit(1)
+#   8. Crash-injectie — STUDENTPROGNOSE_TEST_FORCE_WORKER_CRASH=1 forceert een
+#      TerminatedWorkerError in de parallel-helper; de fallback uit PR #198 moet
+#      kicken en de pipeline moet doorlopen tot outputbestand. Bewaakt issue #197
+#      structureel, ook op Windows-runners.
 #
 # Gebruik: bash scripts/test_package.sh [--skip-build]
 
@@ -78,7 +82,7 @@ echo "=== [7] Exitcode 1 bij harde validatiefout ==="
 # Maak een kapot telbestand aan zonder de vereiste kolommen.
 # De validatie moet een hard error geven en afsluiten met exitcode 1.
 BROKEN_DIR="$(mktemp -d)"
-trap 'rm -rf "$BROKEN_DIR"' EXIT
+trap 'rm -rf "$WORK_DIR" "$BROKEN_DIR"' EXIT
 mkdir -p "$BROKEN_DIR/data/input_raw/telbestanden"
 echo "col1;col2" > "$BROKEN_DIR/data/input_raw/telbestanden/telbestandY2024W10.csv"
 echo "a;b"       >> "$BROKEN_DIR/data/input_raw/telbestanden/telbestandY2024W10.csv"
@@ -86,6 +90,39 @@ if (cd "$BROKEN_DIR" && uv run --with "$WHEEL" studentprognose -w 10 -y 2024 --y
     echo "FOUT: exitcode 0 verwacht bij harde validatiefout, maar pipeline slaagde"
     exit 1
 fi
+echo "OK"
+
+echo ""
+echo "=== [8] Crash-injectie: fallback fires bij geforceerde worker-crash ==="
+# Bewaakt issue #197/PR #198 structureel: STUDENTPROGNOSE_TEST_FORCE_WORKER_CRASH=1
+# forceert een TerminatedWorkerError op de eerste joblib-poging in de SARIMA-stap.
+# De fallback (n_jobs=2) moet kicken, de fallback-waarschuwing moet zichtbaar zijn
+# in stdout, en de pipeline moet doorlopen tot een outputbestand.
+#
+# We zetten 'runtime.cpu_count' expliciet op 4 zodat n_jobs > FALLBACK_N_JOBS (=2),
+# anders re-raised de helper de geforceerde crash (overeenkomstig echt OOM-gedrag).
+uv run python - <<'PYEOF'
+import json, pathlib
+p = pathlib.Path("configuration/configuration.json")
+c = json.loads(p.read_text(encoding="utf-8"))
+c.setdefault("runtime", {})["cpu_count"] = 4
+p.write_text(json.dumps(c, indent=2), encoding="utf-8")
+PYEOF
+
+CRASH_LOG="$WORK_DIR/crash-injection.log"
+# Verwijder de output van eerdere stappen zodat de aanwezigheid-check
+# bewijst dat deze run zelf schreef.
+rm -f data/output/output_first-years_beide.xlsx
+if ! STUDENTPROGNOSE_TEST_FORCE_WORKER_CRASH=1 \
+        uv run studentprognose -w 6 -y 2020 --noetl --yes > "$CRASH_LOG" 2>&1; then
+    echo "FOUT: pipeline crashte bij geforceerde worker-crash — fallback fired niet"
+    tail -n 30 "$CRASH_LOG"
+    exit 1
+fi
+[ -f data/output/output_first-years_beide.xlsx ] \
+    || { echo "FOUT: output ontbreekt na crash-injectie run"; exit 1; }
+grep -q "Opnieuw proberen met n_jobs=2" "$CRASH_LOG" \
+    || { echo "FOUT: fallback-waarschuwing niet gevonden in log — fallback fired niet"; tail -n 30 "$CRASH_LOG"; exit 1; }
 echo "OK"
 
 echo ""
