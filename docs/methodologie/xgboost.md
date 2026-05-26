@@ -9,6 +9,9 @@ XGBoost wordt op twee plekken ingezet in de pipeline, met fundamenteel verschill
 
 ## XGBoost Classifier (individueel spoor)
 
+!!! tip "End-to-end uitleg van het individueel spoor"
+    Deze sectie beschrijft de classifier zelf. Voor de volledige pipeline (preprocessing → classifier → aggregatie → SARIMA-extrapolatie) en de filterregels die bepalen welke aanmeldingen meedoen, zie [Individueel model](individueel.md).
+
 ### Wat doet het?
 
 De classifier voorspelt per individuele student de **kans dat deze zich uiteindelijk inschrijft**, gegeven persoonskenmerken en het moment van vooraanmelding. De uitkomsten per student worden gesommeerd tot een verwacht cohortaantal.

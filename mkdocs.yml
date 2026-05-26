@@ -87,6 +87,7 @@ nav:
   - Output begrijpen: output-begrijpen.md
   - Methodologie:
     - methodologie/index.md
+    - Individueel model: methodologie/individueel.md
     - SARIMA: methodologie/sarima.md
     - XGBoost: methodologie/xgboost.md
     - Ratio-model: methodologie/ratio-model.md

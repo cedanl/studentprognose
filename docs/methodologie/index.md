@@ -15,6 +15,7 @@ Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt
 
 | Model | Pagina | Rol in de pipeline |
 |-------|--------|--------------------|
+| Individueel model (classifier + SARIMA) | [Individueel model](individueel.md) | End-to-end spoor: kans per student → geaggregeerde curve → extrapolatie naar week 38 |
 | SARIMA / ETS / Theta / AutoARIMA | [Tijdreeksmodellen](sarima.md) | Tijdreeksextrapolatie op basis van historische aanmeldpatronen |
 | XGBoost classifier | [XGBoost](xgboost.md) | Kans per individuele student dat deze zich inschrijft |
 | XGBoost / Ridge / Random Forest | [Regressiemodellen](xgboost.md) | Vertaling van vooraanmelders naar verwachte inschrijvingen |
@@ -33,7 +34,17 @@ flowchart LR
     CUM & IND --> ENS["Ensemble\n(-d b)"]
 ```
 
-De twee sporen zijn bewust onafhankelijk van elkaar ontworpen zodat instellingen die geen toegang hebben tot individuele aanmelddata toch een voorspelling kunnen maken via het cumulatieve spoor.
+De twee sporen zijn bewust onafhankelijk van elkaar ontworpen zodat instellingen die geen toegang hebben tot individuele aanmelddata toch een voorspelling kunnen maken via het cumulatieve spoor. Een end-to-end uitleg van het individueel spoor staat op [Individueel model](individueel.md).
+
+### Welk model draait per modus?
+
+| Modus | SARIMA | XGBoost regr. | Ratio | Ensemble-samenvoeging |
+|-------|:------:|:-------------:|:-----:|:---------------------:|
+| `-d c` | ✅ | ✅ | ✅ | ❌ (twee losse kolommen) |
+| `-d i` | ✅ | ✅ (classifier) | ❌ | ❌ |
+| `-d b` | ✅ | ✅ | ✅ | ✅ |
+
+Alleen in `-d b` worden `SARIMA_individual` en `SARIMA_cumulative` samengevoegd tot één `Ensemble_prediction`; in `-d c` blijven het twee losse outputkolommen en in `-d i` is er maar één spoor en dus niets om te combineren. Zie [Ensemble](ensemble.md) voor de gewichtenlogica.
 
 <iframe src="../assets/plots/pipeline_cumulative.html" width="100%" height="1020" frameborder="0" style="border-radius: 8px;"></iframe>
 
