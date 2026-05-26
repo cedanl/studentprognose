@@ -36,6 +36,16 @@ flowchart LR
 
 De twee sporen zijn bewust onafhankelijk van elkaar ontworpen zodat instellingen die geen toegang hebben tot individuele aanmelddata toch een voorspelling kunnen maken via het cumulatieve spoor. Een end-to-end uitleg van het individueel spoor staat op [Individueel model](individueel.md).
 
+### Welk model draait per modus?
+
+| Modus | SARIMA | XGBoost regr. | Ratio | Ensemble-samenvoeging |
+|-------|:------:|:-------------:|:-----:|:---------------------:|
+| `-d c` | ✅ | ✅ | ✅ | ❌ (twee losse kolommen) |
+| `-d i` | ✅ | ✅ (classifier) | ❌ | ❌ |
+| `-d b` | ✅ | ✅ | ✅ | ✅ |
+
+Alleen in `-d b` worden `SARIMA_individual` en `SARIMA_cumulative` samengevoegd tot één `Ensemble_prediction`; in `-d c` blijven het twee losse outputkolommen en in `-d i` is er maar één spoor en dus niets om te combineren. Zie [Ensemble](ensemble.md) voor de gewichtenlogica.
+
 <iframe src="../assets/plots/pipeline_cumulative.html" width="100%" height="1020" frameborder="0" style="border-radius: 8px;"></iframe>
 
 *Cumulatief spoor: wekelijkse telbestanden → SARIMA-extrapolatie → XGBoost regressor → voorspelde studenten (demodata)*
