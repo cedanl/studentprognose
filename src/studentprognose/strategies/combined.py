@@ -3,6 +3,7 @@ import joblib
 import math
 
 from studentprognose.config import get_cpu_count
+from studentprognose.utils.parallel import run_parallel_with_fallback
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy, _add_engineered_features
@@ -138,10 +139,13 @@ class CombinedStrategy(PredictionStrategy):
         ]
 
         print("Start parallel predicting...")
-        self.predicted_data = joblib.Parallel(n_jobs=nr_CPU_cores)(
-            joblib.delayed(self._predict_sarima_both)(row)
-            for chunk in chunks
-            for _, row in chunk.iterrows()
+        self.predicted_data = run_parallel_with_fallback(
+            (
+                joblib.delayed(self._predict_sarima_both)(row)
+                for chunk in chunks
+                for _, row in chunk.iterrows()
+            ),
+            n_jobs=nr_CPU_cores,
         )
 
         # Extract endpoint (week-38 prediction) from each individual forecast array

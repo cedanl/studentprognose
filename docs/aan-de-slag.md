@@ -303,6 +303,18 @@ result = run_pipeline_from_dataframes(
 
     Je draait Python buiten de omgeving waarin studentprognose is geïnstalleerd. Gebruik `uv run studentprognose ...` om de juiste Python-omgeving te kiezen.
 
+??? failure "`TerminatedWorkerError` tijdens SARIMA (Windows)"
+
+    Een worker-proces is op signaal-niveau gestopt — meestal door geheugendruk wanneer er veel parallelle workers tegelijk draaien op een laptop met beperkt RAM, soms door een crash in onderliggende C-code.
+
+    De pipeline probeert vanaf nu automatisch opnieuw met 2 workers. Werkt dat ook niet, zet dan handmatig in `configuration/configuration.json`:
+
+    ```json
+    "runtime": { "cpu_count": 1 }
+    ```
+
+    `cpu_count: 1` schakelt parallelisatie helemaal uit. Trager, maar zonder worker-spawns en daarmee zonder deze klasse fouten.
+
 ## Andere installatiemethoden
 
 ??? note "Installeren met pip in een virtual environment"
