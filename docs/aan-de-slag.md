@@ -112,9 +112,9 @@ Welke bestanden je dan precies in `data/input/` nodig hebt — en in welk formaa
 
 ## Wat voorspelt `-w 16 -y 2025`?
 
-Voor `studentprognose` is `-w` de **peilweek** (kalenderweek 1–52) en `-y` het **collegejaar** waarvoor je een prognose wilt. Met `-w 16 -y 2025` zeg je dus: *"gebruik alle vooraanmelddata tot en met week 16 van collegejaar 2025 en geef me een prognose voor het eindcohort van datzelfde collegejaar"*.
+Voor `studentprognose` is `-w` de **peilweek** (kalenderweek 1–52) en `-y` het **collegejaar** waarvoor je een prognose wilt. Met `-w 16 -y 2025` zeg je dus: *"gebruik alle vooraanmelddata tot en met week 16 van collegejaar 2025 en geef me een prognose voor het uiteindelijke aantal inschrijvingen voor datzelfde collegejaar"*.
 
-!!! example "Voorbeeld-run · B Psychologie · NL (demodata)"
+!!! example "Voorbeeld-run · B Bedrijfskunde · NL (demodata)"
     **178** vooraanmelders @ wk 16 (peilmoment) &nbsp;→&nbsp; **520** verwacht @ wk 38 &nbsp;→&nbsp; **400** ingeschreven (77% yield)
 
 === "Week voor week"
@@ -127,10 +127,13 @@ Voor `studentprognose` is `-w` de **peilweek** (kalenderweek 1–52) en `-y` het
 
     <iframe src="../assets/plots/whatif_slope.html" width="100%" height="420" frameborder="0" style="border-radius: 8px;"></iframe>
 
-    Drie kerngetallen op één schaal: peilmoment → SARIMA-extrapolatie naar wk 38 → verwacht eindcohort. De badges tussen de punten kwantificeren de overgangen — eerst de groei (×2.92 in vooraanmelders), daarna de yield (77% conversie naar ingeschreven).
+    Drie kerngetallen op één schaal: peilmoment → SARIMA-extrapolatie naar wk 38 → verwachte inschrijvingen. De badges tussen de punten kwantificeren de overgangen — eerst de groei (×2.92 in vooraanmelders), daarna de yield (77% conversie naar ingeschreven).
+
+!!! info "Waarom elke week opnieuw draaien?"
+    Een prognose op één peilweek geeft je het beeld van *dat* moment. Door de pipeline wekelijks te draaien volg je de trends en fluctuaties in vooraanmeldingen mee — bijvoorbeeld het knikpunt rond de 1-mei-deadline of een achterblijvende naloop in de zomer. Zo zie je vroege signalen om je capaciteits- en marketingbeslissingen tijdig bij te sturen, in plaats van pas na het seizoen één eindprognose te hebben.
 
 !!! tip "Andere peilweek of collegejaar?"
-    Vervang `-w 16` door je eigen peilweek (1–52) en `-y 2025` door het collegejaar dat je wilt voorspellen. De pipeline pakt automatisch de data tot en met die week om het eindcohort van datzelfde collegejaar te schatten.
+    Vervang `-w 16` door je eigen peilweek (1–52) en `-y 2025` door het collegejaar dat je wilt voorspellen. De pipeline pakt automatisch de data tot en met die week om het uiteindelijke aantal inschrijvingen voor datzelfde collegejaar te schatten.
 
 ## Eerste run
 
