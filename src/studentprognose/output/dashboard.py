@@ -5,6 +5,7 @@ data/output/visualisations[_ci_test_N{n}]/{individual,cumulative,final}/dashboar
 """
 
 import os
+import traceback
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -3132,16 +3133,75 @@ class DashboardBuilder:
     # ════════════════════════════════════════════════════════════════
 
     def build_and_save(self) -> None:
-        """Generate all applicable dashboard pages."""
+        """Generate all applicable dashboard pages.
+
+        Each page is built independently: a gate-miss or exception in one page
+        no longer silently skips the others. Skips and failures produce a
+        gerichte stdout-melding plus een sectie in ``dashboard_error.log``.
+        """
         print("Generating dashboards...")
+        log_path = os.path.join(self.cwd, "data", "output", "dashboard_error.log")
+        if os.path.exists(log_path):
+            try:
+                os.remove(log_path)
+            except OSError:
+                pass
+        failures: list[str] = []
+        skips: list[str] = []
 
-        if self.data_option in (DataOption.INDIVIDUAL, DataOption.BOTH_DATASETS):
-            if "SARIMA_individual" in self.data.columns:
-                self._save_individual()
+        cumulative_cols = ("SARIMA_cumulative", "Prognose_ratio")
 
-        if self.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS):
-            if any(c in self.data.columns for c in ("SARIMA_cumulative", "Prognose_ratio")):
-                self._save_cumulative()
+        pages = [
+            (
+                "individual",
+                self.data_option in (DataOption.INDIVIDUAL, DataOption.BOTH_DATASETS),
+                "SARIMA_individual" in self.data.columns,
+                (
+                    "kolom 'SARIMA_individual' ontbreekt in de output — "
+                    "het individuele spoor heeft geen prognose geleverd."
+                ),
+                self._save_individual,
+            ),
+            (
+                "cumulative",
+                self.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS),
+                any(c in self.data.columns for c in cumulative_cols),
+                (
+                    f"geen van de kolommen {cumulative_cols} aanwezig in de output — "
+                    "het cumulatieve spoor heeft geen prognose geleverd."
+                ),
+                self._save_cumulative,
+            ),
+            ("final", True, True, "", self._save_final),
+        ]
 
-        self._save_final()
-        print("Dashboards done.")
+        for label, mode_ok, data_ok, skip_reason, fn in pages:
+            if not mode_ok:
+                continue
+            if not data_ok:
+                skips.append(label)
+                print(f"Dashboard '{label}' overgeslagen: {skip_reason}")
+                continue
+            try:
+                fn()
+            except Exception:
+                failures.append(label)
+                self._append_dashboard_error(log_path, label, traceback.format_exc())
+                print(
+                    f"Waarschuwing: dashboard '{label}' niet gegenereerd "
+                    f"(fout opgeslagen in {log_path})."
+                )
+
+        if failures:
+            print(f"Dashboards klaar — fouten in: {', '.join(failures)}.")
+        elif skips:
+            print(f"Dashboards klaar — overgeslagen: {', '.join(skips)}.")
+        else:
+            print("Dashboards done.")
+
+    @staticmethod
+    def _append_dashboard_error(log_path: str, label: str, tb: str) -> None:
+        """Append a per-page traceback section to ``dashboard_error.log``."""
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, "a", encoding="utf-8") as f:
+            f.write(f"=== {label} ===\n{tb}\n")

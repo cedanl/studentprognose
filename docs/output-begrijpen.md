@@ -130,6 +130,10 @@ De dashboards zijn zelfstandige HTML-bestanden (geen server nodig) en kunnen in 
 
     Mocht dashboard-generatie onverhoopt falen, dan loopt de rest van de pipeline gewoon door en wordt de stack trace weggeschreven naar `data/output/dashboard_error.log`. De Excel-output blijft in dat geval beschikbaar.
 
+    **Fout-isolatie per pagina.** Elke dashboard-pagina (individual, cumulative, final) wordt onafhankelijk opgebouwd: een fout in één pagina laat de andere twee gewoon doorlopen. De log bevat in dat geval per pagina een aparte sectie (bijv. `=== cumulative ===`), en stdout toont per pagina een gerichte waarschuwing zoals `Waarschuwing: dashboard 'cumulative' niet gegenereerd (fout opgeslagen in …)`.
+
+    **Expliciete skip-reden.** Ontbreekt de input voor een dashboard-pagina — bijvoorbeeld omdat het cumulatieve spoor geen prognose heeft geleverd en de kolommen `SARIMA_cumulative` en `Prognose_ratio` daardoor afwezig zijn — dan zie je in stdout een melding als `Dashboard 'cumulative' overgeslagen: geen van de kolommen ('SARIMA_cumulative', 'Prognose_ratio') aanwezig in de output …`. Geen stille skip meer.
+
 !!! note "Dashboard toont alleen de laatste week"
     Bij een multi-week run (bijv. `-w 10:20`) toont het dashboard alleen de prognose van de **laatste week** in de reeks. De Excel-output bevat wel alle weken.
 
