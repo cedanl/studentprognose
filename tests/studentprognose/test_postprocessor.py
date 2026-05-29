@@ -12,8 +12,20 @@ import os
 
 import pandas as pd
 
+from studentprognose.config import get_columns, load_defaults
 from studentprognose.output.postprocessor import PostProcessor
 from studentprognose.utils.weeks import DataOption, StudentYearPrediction
+
+# Eén bron van waarheid voor de kolomnamen die de audittrail gebruikt:
+# de gebundelde defaults uit configuration.json. Zowel de PostProcessor-
+# configuratie als de test-DataFrames lezen hieruit, zodat een rename in
+# column_roles geen tweede hardcoded lijst hier laat achterblijven.
+_DEFAULTS = load_defaults()
+_COLS = get_columns(_DEFAULTS)
+
+
+def _audittrail_configuration():
+    return {"numerus_fixus": {}, "column_roles": _DEFAULTS["column_roles"]}
 
 
 def _make_postprocessor(tmp_path, data_studentcount):
@@ -142,13 +154,13 @@ class TestStudentcountMergeWithFaculteit:
 def _make_run_data(year=2024, week=10, sarima_cumulative=(100.0, 50.0)):
     """Bouw een minimale prognose-DataFrame met de standaard sleutelkolommen."""
     return pd.DataFrame({
-        "Collegejaar":        [year, year],
-        "Weeknummer":         [week, week],
-        "Croho groepeernaam": ["B Bedrijfskunde", "B Bedrijfskunde"],
-        "Herkomst":           ["NL", "EER"],
-        "Examentype":         ["Bachelor", "Bachelor"],
-        "Faculteit":          ["FdM", "FdM"],
-        "SARIMA_cumulative":  list(sarima_cumulative),
+        _COLS.academic_year: [year, year],
+        _COLS.week:          [week, week],
+        _COLS.programme:     ["B Bedrijfskunde", "B Bedrijfskunde"],
+        _COLS.origin:        ["NL", "EER"],
+        _COLS.exam_type:     ["Bachelor", "Bachelor"],
+        "Faculteit":         ["FdM", "FdM"],
+        "SARIMA_cumulative": list(sarima_cumulative),
         "Voorspelde vooraanmelders": [120.0, 60.0],
     })
 
@@ -156,7 +168,7 @@ def _make_run_data(year=2024, week=10, sarima_cumulative=(100.0, 50.0)):
 def _audittrail_postprocessor(tmp_path):
     os.makedirs(tmp_path / "data" / "output", exist_ok=True)
     return PostProcessor(
-        configuration={"numerus_fixus": {}},
+        configuration=_audittrail_configuration(),
         data_latest=None,
         ensemble_weights=None,
         data_studentcount=None,
@@ -214,19 +226,19 @@ class TestSaveTotaalAuditTrail:
 
         result = pd.read_excel(self._path(tmp_path))
         assert len(result) == 4  # 2 rijen w11 + 2 rijen w12
-        assert set(result["Weeknummer"]) == {11, 12}
+        assert set(result[_COLS.week]) == {11, 12}
 
     def test_schema_drift_crasht_niet(self, tmp_path):
         # Bootst een eerdere run na met een kleiner kolomschema.
         os.makedirs(tmp_path / "data" / "output", exist_ok=True)
         path = self._path(tmp_path)
         pd.DataFrame({
-            "Collegejaar":        [2024],
-            "Weeknummer":         [10],
-            "Croho groepeernaam": ["B Bedrijfskunde"],
-            "Herkomst":           ["NL"],
-            "Examentype":         ["Bachelor"],
-            "SARIMA_cumulative":  [100.0],
+            _COLS.academic_year: [2024],
+            _COLS.week:          [10],
+            _COLS.programme:     ["B Bedrijfskunde"],
+            _COLS.origin:        ["NL"],
+            _COLS.exam_type:     ["Bachelor"],
+            "SARIMA_cumulative": [100.0],
             # geen Faculteit, geen Run_date — kolomschema is bewust kleiner
         }).to_excel(path, index=False)
 
@@ -248,7 +260,7 @@ class TestSaveTotaalAuditTrail:
     def test_bestandsnaam_volgt_modus_en_studentjaar(self, tmp_path):
         os.makedirs(tmp_path / "data" / "output", exist_ok=True)
         pp = PostProcessor(
-            configuration={"numerus_fixus": {}},
+            configuration=_audittrail_configuration(),
             data_latest=None,
             ensemble_weights=None,
             data_studentcount=None,
@@ -261,3 +273,67 @@ class TestSaveTotaalAuditTrail:
 
         expected = tmp_path / "data" / "output" / "_totaal_volume_beide.xlsx"
         assert expected.exists()
+
+    def test_alternatieve_column_roles_worden_gerespecteerd(self, tmp_path):
+        # Bewaakt dat de audittrail-upsert ook werkt met een institutionele
+        # kolom-rename: de configuratie is de bron van waarheid, niet een
+        # hardgecodeerde lijst.
+        os.makedirs(tmp_path / "data" / "output", exist_ok=True)
+        alt_roles = {
+            "academic_year": "Year",
+            "week":          "Week",
+            "programme":     "Programme",
+            "origin":        "Origin",
+            "exam_type":     "ExamType",
+        }
+        pp = PostProcessor(
+            configuration={"numerus_fixus": {}, "column_roles": alt_roles},
+            data_latest=None,
+            ensemble_weights=None,
+            data_studentcount=None,
+            cwd=str(tmp_path),
+            data_option=DataOption.CUMULATIVE,
+            ci_test_n=None,
+        )
+        # Run 1 — week 12.
+        pp.data = pd.DataFrame({
+            "Year": [2024], "Week": [12], "Programme": ["B Foo"],
+            "Origin": ["NL"], "ExamType": ["Bachelor"], "SARIMA_cumulative": [100.0],
+        })
+        pp.save_totaal_audit_trail(StudentYearPrediction.FIRST_YEARS)
+        # Run 2 — zelfde sleutel, andere waarde: moet overschrijven.
+        pp.data = pd.DataFrame({
+            "Year": [2024], "Week": [12], "Programme": ["B Foo"],
+            "Origin": ["NL"], "ExamType": ["Bachelor"], "SARIMA_cumulative": [999.0],
+        })
+        pp.save_totaal_audit_trail(StudentYearPrediction.FIRST_YEARS)
+
+        result = pd.read_excel(tmp_path / "data" / "output" / "_totaal_first-years_cumulatief.xlsx")
+        assert len(result) == 1
+        assert result["SARIMA_cumulative"].iloc[0] == 999.0
+
+    def test_missende_column_role_geeft_duidelijke_fout(self, tmp_path):
+        import pytest
+
+        os.makedirs(tmp_path / "data" / "output", exist_ok=True)
+        # Mist 'origin' — moet een duidelijke RuntimeError opleveren bij
+        # de eerste audittrail-schrijfpoging, niet een KeyError diep in
+        # pandas.
+        incomplete_roles = {
+            "academic_year": "Collegejaar",
+            "week":          "Weeknummer",
+            "programme":     "Croho groepeernaam",
+            "exam_type":     "Examentype",
+        }
+        pp = PostProcessor(
+            configuration={"numerus_fixus": {}, "column_roles": incomplete_roles},
+            data_latest=None,
+            ensemble_weights=None,
+            data_studentcount=None,
+            cwd=str(tmp_path),
+            data_option=DataOption.CUMULATIVE,
+            ci_test_n=None,
+        )
+        pp.data = _make_run_data()
+        with pytest.raises(RuntimeError, match="column_roles.*origin"):
+            pp.save_totaal_audit_trail(StudentYearPrediction.FIRST_YEARS)

@@ -20,6 +20,12 @@ class PostProcessor:
     from the new src/ modules.
     """
 
+    _SY_LABELS = {
+        StudentYearPrediction.FIRST_YEARS: "first-years",
+        StudentYearPrediction.HIGHER_YEARS: "higher-years",
+        StudentYearPrediction.VOLUME: "volume",
+    }
+
     @staticmethod
     def check_output_writable(data_option, student_year_prediction, ci_test_n):
         """Verify output files can be written (not locked by Excel)."""
@@ -30,11 +36,7 @@ class PostProcessor:
         try:
             open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
             if ci_test_n is None:
-                sy_label = {
-                    StudentYearPrediction.FIRST_YEARS: "first-years",
-                    StudentYearPrediction.HIGHER_YEARS: "higher-years",
-                    StudentYearPrediction.VOLUME: "volume",
-                }.get(student_year_prediction)
+                sy_label = PostProcessor._SY_LABELS.get(student_year_prediction)
                 if sy_label is not None:
                     open(f"data/output/output_{sy_label}_{mode_suffix}{ci_suffix}.xlsx", "w").close()
                     # _totaal mag NIET worden getrunceerd: het bevat de
@@ -66,6 +68,7 @@ class PostProcessor:
             "week_35_37":        {"individual": 0.5, "cumulative": 0.5},
             "default":           {"individual": 0.5, "cumulative": 0.5},
         })
+        self._column_roles = configuration.get("column_roles", {})
         self.CWD = cwd
         self.data_option = data_option
         self.ci_test_n = ci_test_n
@@ -437,17 +440,9 @@ class PostProcessor:
         self.data_latest = self.data
 
     def save_output(self, student_year_prediction):
-        output_filename = "output_"
-
-        if student_year_prediction == StudentYearPrediction.FIRST_YEARS:
-            output_filename += "first-years"
-        elif student_year_prediction == StudentYearPrediction.HIGHER_YEARS:
-            output_filename += "higher-years"
-        elif student_year_prediction == StudentYearPrediction.VOLUME:
-            output_filename += "volume"
-
+        sy_label = self._SY_LABELS.get(student_year_prediction, "")
         ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
-        output_filename += f"_{self.data_option.filename_suffix}{ci_suffix}.xlsx"
+        output_filename = f"output_{sy_label}_{self.data_option.filename_suffix}{ci_suffix}.xlsx"
 
         output_path = os.path.join(self.CWD, "data", "output", output_filename)
 
@@ -459,35 +454,39 @@ class PostProcessor:
 
         self.data.to_excel(output_path, index=False)
 
-    _TOTAAL_KEY_COLS = [
-        "Collegejaar",
-        "Weeknummer",
-        "Croho groepeernaam",
-        "Herkomst",
-        "Examentype",
-    ]
+    # Sleutel- en sorteer-volgorde van de audittrail, uitgedrukt in
+    # column_roles. De concrete kolomnamen verschillen per instelling
+    # (Radboud vs. CEDA-default) maar de rolinvulling is universeel:
+    # één rij = uniek (jaar, week, opleiding, herkomst, examentype).
+    _TOTAAL_KEY_ROLES = ("academic_year", "week", "programme", "origin", "exam_type")
+    _TOTAAL_SORT_ROLES = ("programme", "exam_type", "academic_year", "week", "origin")
 
     def save_totaal_audit_trail(self, student_year_prediction):
         """Append de huidige run aan een doorlopend `_totaal_<sy>_<do>.xlsx`.
 
-        Idempotent per (Collegejaar, Weeknummer, Croho groepeernaam, Herkomst,
-        Examentype): rijen voor dezelfde sleutelcombo worden overschreven, niet
-        gedupliceerd. Voegt een `Run_date`-kolom toe zodat traceerbaar blijft
-        wanneer een rij is gegenereerd. Het bestand wordt nooit als input door
-        de pipeline gelezen (de loader leest enkel paden uit
-        `configuration.json`), dus het is structureel veilig om naast de
-        reguliere outputs te bestaan.
+        Idempotent per sleutelcombo uit ``column_roles`` (jaar, week,
+        opleiding, herkomst, examentype): rijen voor dezelfde combo worden
+        overschreven, niet gedupliceerd. Voegt een ``Run_date``-kolom toe
+        zodat traceerbaar blijft wanneer een rij is gegenereerd. Het
+        bestand wordt nooit als input door de pipeline gelezen (de loader
+        leest enkel paden uit ``configuration.json``), dus het is
+        structureel veilig om naast de reguliere outputs te bestaan.
         """
         if self.data is None:
             return
 
-        sy_label = {
-            StudentYearPrediction.FIRST_YEARS: "first-years",
-            StudentYearPrediction.HIGHER_YEARS: "higher-years",
-            StudentYearPrediction.VOLUME: "volume",
-        }.get(student_year_prediction)
+        sy_label = self._SY_LABELS.get(student_year_prediction)
         if sy_label is None:
             return
+
+        try:
+            key_cols = [self._column_roles[r] for r in self._TOTAAL_KEY_ROLES]
+            sort_cols = [self._column_roles[r] for r in self._TOTAAL_SORT_ROLES]
+        except KeyError as missing:
+            raise RuntimeError(
+                f"configuratie mist column_roles[{missing.args[0]!r}] — "
+                "vereist voor de _totaal-audittrail."
+            ) from missing
 
         filename = f"_totaal_{sy_label}_{self.data_option.filename_suffix}.xlsx"
         path = os.path.join(self.CWD, "data", "output", filename)
@@ -514,9 +513,6 @@ class PostProcessor:
         # keep="last": de nieuwe run staat altijd achteraan in de concat,
         # dus zijn waarden winnen bij gelijke sleutel. Dit realiseert het
         # "overschrijven per week"-gedrag zonder rij-duplicatie.
-        combined = combined.drop_duplicates(subset=self._TOTAAL_KEY_COLS, keep="last")
-        combined = combined.sort_values(
-            by=["Croho groepeernaam", "Examentype", "Collegejaar", "Weeknummer", "Herkomst"],
-            ignore_index=True,
-        )
+        combined = combined.drop_duplicates(subset=key_cols, keep="last")
+        combined = combined.sort_values(by=sort_cols, ignore_index=True)
         combined.to_excel(path, index=False)
