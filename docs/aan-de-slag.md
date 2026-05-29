@@ -73,6 +73,7 @@ Dit schrijft:
 - `configuration/filtering/base.json` — lege filtering (geen opleiding- of herkomstfilter)
 - `data/input_raw/telbestanden/` — map voor je Studielink-telbestanden
 - `data/input_raw/README.md` — beschrijving van welke bestanden hier horen
+- `data/output/` — map waarin de wekelijkse outputs én de doorlopende audittrail (`_totaal_*.xlsx`) worden opgeslagen
 
 Bestaat een bestand al, dan wordt het overgeslagen. Je kunt `init` dus veilig opnieuw uitvoeren.
 

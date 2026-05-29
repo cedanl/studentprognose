@@ -469,6 +469,7 @@ def _save_results(strategy, cfg):
         if strategy.postprocessor.data is not None:
             print("Saving output...")
             strategy.postprocessor.save_output(cfg.student_year_prediction)
+            strategy.postprocessor.save_totaal_audit_trail(cfg.student_year_prediction)
 
             if cfg.dashboard:
                 _try_build_dashboard(strategy, cfg)

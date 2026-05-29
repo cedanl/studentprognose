@@ -26,6 +26,7 @@ def run_init():
         os.path.join(cwd, "configuration", "filtering"),
         os.path.join(cwd, "data", "input"),
         os.path.join(cwd, "data", "input_raw", "telbestanden"),
+        os.path.join(cwd, "data", "output"),
     ]
     for d in dirs:
         os.makedirs(d, exist_ok=True)

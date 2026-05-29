@@ -86,6 +86,7 @@ def test_save_results_skips_dashboard_by_default(monkeypatch):
     postprocessor = SimpleNamespace(
         data=pd.DataFrame({"x": [1]}),
         save_output=lambda _pred: None,
+        save_totaal_audit_trail=lambda _pred: None,
     )
     strategy = SimpleNamespace(postprocessor=postprocessor)
     cfg = PipelineConfig(weeks=[10], years=[2024])  # dashboard=False (default)
@@ -107,6 +108,7 @@ def test_save_results_runs_dashboard_when_enabled(monkeypatch):
     postprocessor = SimpleNamespace(
         data=pd.DataFrame({"x": [1]}),
         save_output=lambda _pred: None,
+        save_totaal_audit_trail=lambda _pred: None,
     )
     strategy = SimpleNamespace(postprocessor=postprocessor)
     cfg = PipelineConfig(weeks=[10], years=[2024], dashboard=True)
