@@ -21,16 +21,27 @@ Map: `data/input_raw/telbestanden/`
 Bestandsnaampatroon: `telbestandY{jaar}W{week}.csv` (bijv. `telbestandY2024W10.csv`) — configureerbaar, zie [Afwijkende bestandsnamen](#afwijkende-bestandsnamen) hieronder.
 Scheidingsteken: `;`
 
-| Kolom | Type | Omschrijving |
-|-------|------|-------------|
-| `Studiejaar` | int | Collegejaar (bijv. `2024`) |
-| `Isatcode` | str | CROHO-code |
-| `Groepeernaam` | str | Naam van de opleiding |
-| `Aantal` | int | Aantal vooraanmelders |
-| `meercode_V` | int | Aantal inschrijfverzoeken/inschrijvingen per student (status V/U/I). Wordt gebruikt als weegfactor in `Gewogen vooraanmelders = Aantal / meercode_V`. Voor status A-rijen is deze waarde 0 — die rijen worden door de ETL uitgefilterd. |
-| `Status` | str | `V` (verzoek), `I` (inschrijving), `U` (uitgeschreven/gestaakt) of `A` (annulering). Rijen met `A` worden uit de vooraanmelderaggregatie gehouden. |
-| `Herinschrijving` | str | `J` of `N` |
-| `Herkomst` | str | `N` (Nederland), `E` (EER), `R` (rest) |
+!!! info "Officiële Studielink-specificatie"
+    Studielink levert de telbestanden volgens het *Programma van Levering Telbestand Studielink* (Stichting Studielink, versie Definitief 2.8, 3 november 2022). Dat document beschrijft alle velden, codetabellen en leveringskalender. PDF: [pvl telbestand studielink.pdf](https://www.tignl.eu/downloads/studielink/pvl%20telbestand%20studielink.pdf).
+
+    De §-verwijzingen in de tabel hieronder verwijzen naar paragrafen in dit document. De pipeline gebruikt een **subset** van de PvL-velden (zie [#206](https://github.com/cedanl/studentprognose/issues/206) voor de status van demo-data t.o.v. de volledige PvL).
+
+De velden hieronder zijn de kolommen die de demo-telbestanden bevatten en die de ETL daadwerkelijk inleest:
+
+| Kolom | Type | PvL § | Omschrijving |
+|-------|------|-------|-------------|
+| `Brincode` | str | §5.2 | BRIN-code van de instelling. ETL hernoemt naar `Korte naam instelling`. |
+| `Studiejaar` | int | §5.7 | Collegejaar (bijv. `2024`). ETL hernoemt naar `Collegejaar`. |
+| `Type_HO` | str | §5.5 | Type hoger onderwijs (`B` = Bachelor, `M` = Master, etc.). ETL hernoemt naar `Type hoger onderwijs`. |
+| `Isatcode` | str | §5.4 | CROHO-code van de opleiding. ETL hernoemt naar `Croho`. |
+| `Groepeernaam` | str | — | Naam van de opleiding (afgeleid/verrijkt veld, niet in PvL). ETL kopieert naar `Groepeernaam Croho` én `Naam Croho opleiding Nederlands`. |
+| `Faculteit` | str | — | Faculteit van de opleiding (afgeleid/verrijkt veld, niet in PvL). Wordt door de ETL leeg gezet als de kolom ontbreekt. |
+| `Herkomst` | str | §5.10 | `N` (Nederland), `E` (EER), `R` (rest). ETL hertaalt naar `NL` / `EER` / `Niet-EER`. |
+| `Hogerejaars` | str | §5.14 | `J` of `N`. ETL hertaalt naar `Ja` / `Nee`. |
+| `Herinschrijving` | str | §5.15 | `J` of `N`. ETL hertaalt naar `Ja` / `Nee`. |
+| `Aantal` | int | §5.17 | Aantal (voor)aanmeldingen. ETL hernoemt naar `Ongewogen vooraanmelders`. |
+| `meercode_V` | int | §5.12 | Gemiddeld aantal aanmeldingen per student met status V/U/I. Wordt door de ETL als deler gebruikt: `Gewogen vooraanmelders = Aantal / meercode_V`. Voor status A-rijen is deze waarde 0 — die rijen worden door de ETL uitgefilterd. |
+| `Status` | str | §5.13 | `V` (verzoek), `I` (inschrijving), `U` (uitgeschreven/gestaakt) of `A` (annulering). Rijen met `A` worden uit de vooraanmelderaggregatie gehouden. |
 
 #### Afwijkende bestandsnamen
 
@@ -50,27 +61,45 @@ Placeholders zijn `{year}` (vier cijfers) en `{week}` (één of twee cijfers). A
 ### Individuele aanmelddata
 
 Pad: `data/input_raw/individuele_aanmelddata.csv`
-Bron: Osiris / Usis
+Bron: Osiris / Usis (Studenten Informatie Systeem of datawarehouse van jouw instelling)
 Scheidingsteken: `;`
 
-Verplichte kolommen (kanonieke namen — pas aan via `configuration.json` als jouw instelling andere namen gebruikt):
+Volledige kolommenlijst (kanonieke namen — pas aan via `configuration.json` als jouw instelling andere namen gebruikt). De *Rol* geeft aan hoe de pipeline het veld gebruikt: **sleutel** = unieke identifier per aanmelding; **basis** = gebruikt door alle individuele stappen (filtering, deadlinebepaling, output-aggregatie); **classifier** = feature in het XGBoost classifier-model voor inschrijfkans; **info** = wel ingelezen, niet door modellen gebruikt.
 
-| Canonieke naam | Omschrijving |
-|----------------|-------------|
-| `Sleutel` | Unieke studentidentifier |
-| `Datum Verzoek Inschr` | Datum van vooraanmelding |
-| `Ingangsdatum` | Ingangsdatum inschrijving |
-| `Collegejaar` | Collegejaar |
-| `Datum intrekking vooraanmelding` | Weeknummer van intrekking (leeg als niet ingetrokken) |
-| `Inschrijfstatus` | Zie `status_mapping` in configuratie |
-| `Faculteit` | Faculteit |
-| `Examentype` | `Bachelor` of `Master` |
-| `Croho` | CROHO-code |
-| `Croho groepeernaam` | Naam van de opleiding |
-| `Nationaliteit` | Nationaliteit student |
-| `EER` | EER-indicator |
-| `Geslacht` | Geslacht |
-| `Type vooropleiding` | Type vooropleiding |
+| Canonieke naam | Rol | Omschrijving |
+|----------------|------|-------------|
+| `Sleutel` | sleutel | Unieke studentidentifier |
+| `Datum Verzoek Inschr` | basis | Datum van vooraanmelding (bepaalt aanmeldweek) |
+| `Ingangsdatum` | basis | Ingangsdatum inschrijving |
+| `Collegejaar` | basis, classifier | Collegejaar |
+| `Datum intrekking vooraanmelding` | basis | Weeknummer van intrekking (leeg als niet ingetrokken) |
+| `Inschrijfstatus` | basis | Zie `status_mapping` in configuratie |
+| `Faculteit` | classifier | Faculteit |
+| `Examentype` | basis, classifier | `Bachelor` of `Master` |
+| `Croho` | basis | CROHO-code |
+| `Croho groepeernaam` | basis, classifier | Naam van de opleiding |
+| `Opleiding` | classifier | Specifieke opleidingsnaam (variant binnen CROHO-groep) |
+| `Hoofdopleiding` | info | Markering hoofdopleiding bij duale studies |
+| `Eerstejaars croho jaar` | basis | Jaar waarin student eerstejaars is in deze CROHO |
+| `Is eerstejaars croho opleiding` | basis | Indicator eerstejaars binnen deze CROHO-opleiding |
+| `Is hogerejaars` | basis | Indicator of student hogerejaars is (`Ja` / `Nee`) |
+| `BBC ontvangen` | info | Indicator BBC (Bewijs van Betaald Collegegeld) ontvangen |
+| `Type vooropleiding` | classifier | Type vooropleiding |
+| `Nationaliteit` | classifier | Nationaliteit student |
+| `EER` | classifier | EER-indicator |
+| `Geslacht` | classifier | Geslacht |
+| `Geverifieerd adres postcode` | classifier | Geverifieerde postcode woonadres |
+| `Geverifieerd adres plaats` | classifier | Geverifieerde plaats woonadres |
+| `Geverifieerd adres land` | classifier | Geverifieerd land woonadres |
+| `Studieadres postcode` | classifier | Postcode studieadres |
+| `Studieadres land` | classifier | Land studieadres |
+| `School code eerste vooropleiding` | classifier | School-code eerste vooropleiding |
+| `School eerste vooropleiding` | classifier | Naam school eerste vooropleiding |
+| `Plaats code eerste vooropleiding` | classifier | Plaats-code eerste vooropleiding |
+| `Land code eerste vooropleiding` | classifier | Land-code eerste vooropleiding |
+| `Aantal studenten` | basis | Tellerveld (meestal `1` per rij) |
+
+De classifier-features (`numeric`/`categorical`) zijn instelbaar in `configuration.json` onder `model_features.classifier` — zie [Configuratie](configuratie.md#columns-kolomnamen-mapping). Velden met rol *info* mogen leeg of ontbrekend zijn zonder dat het model breekt.
 
 ### Telbestand studenten
 

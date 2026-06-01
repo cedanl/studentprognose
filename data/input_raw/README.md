@@ -12,6 +12,12 @@ De meegeleverde bestanden bevatten **synthetische demodata**.
 | `oktober_bestand.xlsx` | Eigen levering instelling (telbestand studenten) | Werkelijke inschrijvingen per opleiding/herkomst/jaar (ground truth) |
 | `individuele_aanmelddata.csv` | SIS / datawarehouse instelling | Per-student aanmeldingen met persoonskenmerken |
 
+## Kolomspecificaties
+
+- **Volledige kolomdefinities per bestand** — zie [`data/metadata/data_dictionary.csv`](../metadata/data_dictionary.csv).
+- **Studielink telbestanden** volgen het officiële *Programma van Levering Telbestand Studielink* (Stichting Studielink, versie Definitief 2.8, 3 november 2022). PDF: <https://www.tignl.eu/downloads/studielink/pvl%20telbestand%20studielink.pdf>. Alle veldverwijzingen (`§5.x`) in de data dictionary verwijzen naar paragrafen in dit document.
+- **Korte versie voor analisten** — zie [`docs/je-data-voorbereiden.md`](../../docs/je-data-voorbereiden.md).
+
 ## Dataflow
 
 ```
