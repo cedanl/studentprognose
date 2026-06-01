@@ -43,3 +43,54 @@ MAPE ensemble,Mean Absolute Percentage Error van ensemble: gemiddelde percentage
 MAPE ratio,Mean Absolute Percentage Error van ratio: gemiddelde percentage afwijking.,Gemiddelde(|Voorspelling - Werkelijk| / Werkelijk × 100%),11.8%,Evaluatie,output,output_first-years.xlsx,Float,Percentage (0-100+)
 MAPE sarima cumulative,Mean Absolute Percentage Error van SARIMA cumulative: gemiddelde percentage afwijking.,Gemiddelde(|Voorspelling - Werkelijk| / Werkelijk × 100%),18.3%,Evaluatie,output,output_first-years.xlsx,Float,Percentage (0-100+)
 MAPE sarima individual,Mean Absolute Percentage Error van SARIMA individual: gemiddelde percentage afwijking.,Gemiddelde(|Voorspelling - Werkelijk| / Werkelijk × 100%),,Evaluatie,output,output_first-years.xlsx,Float,Percentage (0-100+) or NaN
+,,,,,,,,
+Brincode,"BRIN-code van de instelling (PvL §5.2). ETL hernoemt naar 'Korte naam instelling'.",-,21PD,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String,4-digit BRIN
+Studiejaar,"Collegejaar waarop de telling betrekking heeft (PvL §5.7). ETL hernoemt naar 'Collegejaar'.",-,2024,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),Integer,YYYY
+Type_HO,"Type hoger onderwijs (PvL §5.5). ETL hernoemt naar 'Type hoger onderwijs'.",-,B,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String (Categorical),B | M | etc.
+Isatcode,"CROHO-code van de opleiding (PvL §5.4). ETL hernoemt naar 'Croho'.",-,56826,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String,6-digit code
+Groepeernaam,Naam van de opleiding (afgeleid/verrijkt veld - niet in PvL). ETL kopieert naar 'Groepeernaam Croho' en 'Naam Croho opleiding Nederlands'.,-,B Bedrijfskunde,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String,Text
+Faculteit,Faculteit van de opleiding (afgeleid/verrijkt veld - niet in PvL). Wordt door de ETL leeg gezet als de kolom ontbreekt.,-,FdM,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String,Alphanumeric code
+Herkomst,"Herkomst student (PvL §5.10). ETL hertaalt naar 'NL' / 'EER' / 'Niet-EER'.",-,N,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String (Categorical),N | E | R
+Hogerejaars,"Indicator hogerejaars (PvL §5.14). ETL hertaalt naar 'Ja' / 'Nee'.",-,N,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String (Boolean),J | N
+Herinschrijving,"Indicator herinschrijving (PvL §5.15). ETL hertaalt naar 'Ja' / 'Nee'.",-,N,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String (Boolean),J | N
+Aantal,"Aantal (voor)aanmeldingen voor deze combinatie van velden (PvL §5.17). ETL hernoemt naar 'Ongewogen vooraanmelders'.",-,25,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),Integer,Non-negative integer
+meercode_V,"Gemiddeld aantal aanmeldingen per student met status V/U/I (PvL §5.12). Gebruikt als deler in Gewogen vooraanmelders = Aantal / meercode_V. Voor status A is deze waarde 0; die rijen worden door de ETL gefilterd.",-,1.29,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),Float,Positive decimal ≥ 1 (of 0 voor status A)
+Status,"Status van de aanmelding (PvL §5.13). Rijen met 'A' worden uit de aggregatie gefilterd.",-,V,Verleden/Heden,input_raw,telbestandY{jaar}W{week}.csv (Studielink),String (Categorical),V | I | U | A
+,,,,,,,,
+Sleutel,Unieke studentidentifier per aanmelding,-,STUD-12345,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Alphanumeric
+Datum Verzoek Inschr,Datum van vooraanmelding (bepaalt de aanmeldweek),-,2024-03-15,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),Date,YYYY-MM-DD
+Ingangsdatum,Ingangsdatum van de inschrijving,-,2024-09-01,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),Date,YYYY-MM-DD
+Collegejaar,Collegejaar van de aanmelding,-,2024,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),Integer,YYYY
+Datum intrekking vooraanmelding,Weeknummer van intrekking (leeg als niet ingetrokken),-,18,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),Integer or empty,1-52
+Inschrijfstatus,Inschrijfstatus; mapping naar 0/1 via configuration.json status_mapping,-,Ingeschreven,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Categorical),Zie status_mapping
+Faculteit,Faculteit van de opleiding,-,FdM,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Alphanumeric code
+Examentype,Type examen,-,Bachelor,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Categorical),Bachelor | Master | Pre-master
+Croho,CROHO-code van de opleiding,-,56826,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,6-digit code
+Croho groepeernaam,Gegroepeerde opleidingsnaam volgens CROHO-indeling,-,B Bedrijfskunde,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+Opleiding,Specifieke opleidingsnaam (variant binnen CROHO-groep),-,Bachelor Bedrijfskunde,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+Hoofdopleiding,Markering hoofdopleiding bij duale studies,-,Ja,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Boolean),Ja | Nee
+Eerstejaars croho jaar,Jaar waarin student eerstejaars is in deze CROHO,-,2024,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),Integer,YYYY
+Is eerstejaars croho opleiding,Indicator eerstejaars binnen deze CROHO-opleiding,-,Ja,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Boolean),Ja | Nee
+Is hogerejaars,Indicator hogerejaars,-,Nee,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Boolean),Ja | Nee
+BBC ontvangen,Indicator BBC (Bewijs van Betaald Collegegeld) ontvangen,-,Ja,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Boolean),Ja | Nee
+Type vooropleiding,Type vooropleiding,-,VWO,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+Nationaliteit,Nationaliteit student,-,Nederlandse,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+EER,EER-indicator,-,Ja,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Boolean),Ja | Nee
+Geslacht,Geslacht student,-,V,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String (Categorical),M | V | O
+Geverifieerd adres postcode,Geverifieerde postcode van het woonadres,-,6525XZ,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Postcode
+Geverifieerd adres plaats,Geverifieerde plaats van het woonadres,-,Nijmegen,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+Geverifieerd adres land,Geverifieerd land van het woonadres,-,Nederland,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+Studieadres postcode,Postcode van het studieadres,-,6525XZ,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Postcode
+Studieadres land,Land van het studieadres,-,Nederland,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+School code eerste vooropleiding,School-code eerste vooropleiding,-,12AB,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Alphanumeric
+School eerste vooropleiding,Naam school eerste vooropleiding,-,Stedelijk Gymnasium,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Text
+Plaats code eerste vooropleiding,Plaats-code eerste vooropleiding,-,NIJ,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,Alphanumeric
+Land code eerste vooropleiding,Land-code eerste vooropleiding,-,NL,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),String,2-letter ISO
+Aantal studenten,Tellerveld (meestal 1 per rij),-,1,Verleden/Heden,input_raw,individuele_aanmelddata.csv (Osiris/Usis),Integer,Non-negative integer
+,,,,,,,,
+Collegejaar,Collegejaar waarop de inschrijving betrekking heeft,-,2024,Verleden,input_raw,oktober_bestand.xlsx (eigen levering instelling),Integer,YYYY
+Groepeernaam Croho,Naam van de opleiding,-,B Bedrijfskunde,Verleden,input_raw,oktober_bestand.xlsx (eigen levering instelling),String,Text
+Aantal eerstejaars croho,Aantal eerstejaars in deze CROHO-opleiding,-,87,Verleden,input_raw,oktober_bestand.xlsx (eigen levering instelling),Integer,Non-negative integer
+EER-NL-nietEER,"Herkomstgroep: NL, EER of Niet-EER",-,NL,Verleden,input_raw,oktober_bestand.xlsx (eigen levering instelling),String (Categorical),NL | EER | Niet-EER
+Examentype code,"Type examen: B (Bachelor) of M (Master)",-,B,Verleden,input_raw,oktober_bestand.xlsx (eigen levering instelling),String (Categorical),B | M
+Aantal Hoofdinschrijvingen,Aantal hoofdinschrijvingen,-,85,Verleden,input_raw,oktober_bestand.xlsx (eigen levering instelling),Integer,Non-negative integer
