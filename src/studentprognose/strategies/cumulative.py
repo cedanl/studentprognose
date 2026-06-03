@@ -219,6 +219,8 @@ class CumulativeStrategy(PredictionStrategy):
         if len(data_to_predict) == 0:
             return None
 
+        data_to_predict = data_to_predict.copy()
+
         nr_CPU_cores = get_cpu_count(self.configuration)
         chunk_size = math.ceil(len(data_to_predict) / nr_CPU_cores)
         chunks = [
