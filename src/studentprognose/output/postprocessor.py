@@ -400,6 +400,9 @@ class PostProcessor:
         )
 
     def _create_error_columns(self):
+        if "Aantal_studenten" not in self.data.columns:
+            return
+
         if self.data_option == DataOption.BOTH_DATASETS:
             predictions = [
                 "Weighted_ensemble_prediction",
@@ -418,6 +421,8 @@ class PostProcessor:
                 "Prognose_ratio",
                 "SARIMA_cumulative",
             ]
+
+        predictions = [p for p in predictions if p in self.data.columns]
 
         mae_columns = [f"MAE_{pred}" for pred in predictions]
         mape_columns = [f"MAPE_{pred}" for pred in predictions]
