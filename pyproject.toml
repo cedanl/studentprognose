@@ -7,12 +7,11 @@ name = "studentprognose"
 dynamic = ["version"]
 description = "Studentprognose tool voor het voorspellen van eerstejaars instroom in het hoger onderwijs"
 readme = "README.md"
-# Vastgezet op Python 3.12.x. Bewuste keuze: de pipeline wordt op één
-# Python-versie ontwikkeld en getest. Nieuwere minor-versies (3.13, 3.14)
-# moeten expliciet worden vrijgegeven na een ronde testen — onder andere
-# omdat statsforecast voor sommige minors nog geen Windows-wheels publiceert
-# (op het moment van schrijven ontbraken cp314-wheels).
-requires-python = ">=3.12,<3.13"
+# Vastgezet op Python 3.11.x voor de UvA-implementatie. De UvA draait
+# deze pipeline op Microsoft Fabric Runtime 1.3, dat Python 3.11 levert.
+# De main-branch staat op 3.12; deze branch loopt bewust een minor achter
+# zodat de code zonder runtime-upgrade op Fabric kan draaien.
+requires-python = ">=3.11,<3.12"
 license = {text = "MIT"}
 authors = [
     {name = "CEDA", email = "info@cedanl.nl"},
@@ -24,7 +23,7 @@ classifiers = [
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.11",
     "Topic :: Scientific/Engineering",
     "Topic :: Education",
 ]
