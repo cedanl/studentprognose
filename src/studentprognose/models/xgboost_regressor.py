@@ -24,7 +24,7 @@ def predict_with_xgboost(
         importance_dict is None als het model geen feature importances ondersteunt.
     """
     if data_studentcount is None:
-        return np.nan, None
+        return np.full(len(test), np.nan), None
 
     c = get_columns(config if config is not None else load_defaults())
     merge_cols = [c.programme, c.academic_year, c.origin, c.exam_type]
