@@ -43,6 +43,10 @@ De velden hieronder zijn de kolommen die de demo-telbestanden bevatten en die de
 | `meercode_V` | int | §5.12 | Gemiddeld aantal aanmeldingen per student met status V/U/I. Wordt door de ETL als deler gebruikt: `Gewogen vooraanmelders = Aantal / meercode_V`. Voor status A-rijen is deze waarde 0 — die rijen worden door de ETL uitgefilterd. |
 | `Status` | str | §5.13 | `V` (verzoek), `I` (inschrijving), `U` (uitgeschreven/gestaakt) of `A` (annulering). Rijen met `A` worden uit de vooraanmelderaggregatie gehouden. |
 
+#### Meerdere instellingen in de teldata
+
+De volledige Studielink-teldata bevat rijen van **alle instellingen**, elk herkenbaar aan de `Brincode` (ná de ETL: `Korte naam instelling`). Wil je maar één instelling — meestal je eigen — modelleren, zet dan `institution_filter` in je configuratie. Laat je dat leeg terwijl er meerdere instellingen in de data zitten, dan worden hun cijfers per opleiding bij elkaar opgeteld; de pipeline waarschuwt hiervoor. Zie [`institution_filter`](configuratie.md#institution_filter-filteren-op-instelling).
+
 #### Afwijkende bestandsnamen
 
 Gebruikt jouw instelling een andere conventie dan `telbestandY{jaar}W{week}.csv`? Geef in `configuration.json` één of meer eigen patronen op:

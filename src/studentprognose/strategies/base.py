@@ -16,6 +16,14 @@ class PredictionStrategy(ABC):
         self.min_training_year = configuration.get("model_config", {}).get("min_training_year", 2016)
         self.excluded_data_points = configuration.get("excluded_data_points", [])
 
+        # Instellingsfilter: beperkt de teldata tot één of meer instellingen.
+        # Leeg = alle instellingen. De kolomnaam is configureerbaar omdat het
+        # Radboud-formaat "Korte naam instelling" gebruikt en Studielink "Brincode".
+        self.institution_filter = configuration.get("institution_filter", [])
+        self.institution_column = configuration.get("column_roles", {}).get(
+            "institution", "Korte naam instelling"
+        )
+
         self.postprocessor = PostProcessor(
             configuration, data_latest, ensemble_weights,
             data_studentcount, cwd, data_option, ci_test_n,

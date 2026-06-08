@@ -14,7 +14,7 @@ De pipeline laadt altijd eerst de **ingebakken standaardwaarden** uit het packag
 - Een ontbrekend veld in jouw bestand valt automatisch terug op de standaardwaarde.
 - Als het configuratiebestand helemaal niet bestaat, worden de standaardwaarden gebruikt en verschijnt er een waarschuwing.
 
-Het bestand heeft de volgende secties: `paths`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
+Het bestand heeft de volgende secties: `paths`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `institution_filter`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
 
 ## `paths` — bestandspaden
 
@@ -191,6 +191,45 @@ Een lege lijst (`[]`) schakelt uitsluiting volledig uit — dit is de standaard.
 
 !!! warning "Gebruik dit bewust"
     Elk uitgesloten datapunt verkleint de trainingsset. Bij kleine opleidingen kan dat de modelkwaliteit ernstig verslechteren. Beperk uitsluiting tot jaren waarvan je kunt aantonen dat de data structureel fout of onvergelijkbaar is.
+
+## `institution_filter` — filteren op instelling
+
+De teldata (Studielink-telbestanden of de cumulatieve teldata) kan rijen van **meerdere instellingen** bevatten, elk herkenbaar aan een instellingscode (BRIN). Met `institution_filter` beperk je de pipeline tot één of meer instellingen.
+
+```json
+{
+    "institution_filter": ["21PB"]
+}
+```
+
+| Waarde | Gedrag |
+|--------|--------|
+| `[]` (standaard) | **Alle instellingen** in de teldata worden meegenomen |
+| `["21PB"]` | Alleen instelling `21PB` (bv. Radboud) |
+| `["21PB", "21AB"]` | Meerdere instellingen tegelijk |
+
+### Standaardgedrag
+
+De standaard is een **lege lijst** (`[]`): er wordt niet gefilterd. Dit is bewust gekozen zodat bestaande configuraties met data van één instelling ongewijzigd blijven werken.
+
+!!! warning "Meerdere instellingen zonder filter worden samengeteld"
+    De cumulatieve voorbewerking aggregeert per opleiding **zonder** de instellingskolom. Bevat je teldata meer dan één instelling en laat je `institution_filter` leeg, dan worden de cijfers van dezelfde opleiding (bv. "B Psychologie") van verschillende instellingen **bij elkaar opgeteld** tot een betekenisloos totaal. De pipeline geeft in dat geval een waarschuwing. Zet `institution_filter` op je eigen instellingscode(s) om alleen je eigen instelling te modelleren.
+
+Een onbekende code (die in geen enkele rij voorkomt) levert een duidelijke foutmelding op met de wél beschikbare instellingen, zodat je de code direct kunt corrigeren.
+
+### Instellingskolom aanpassen
+
+De kolom die de instelling identificeert heet standaard `Korte naam instelling` (het Radboud-formaat ná de ETL). Gebruik je de ruwe Studielink-teldata, dan heet die kolom `Brincode`. Stel de kolomnaam in via de rol `institution` onder `column_roles`:
+
+```json
+{
+    "column_roles": {
+        "institution": "Brincode"
+    }
+}
+```
+
+Werk je met de cumulatieve teldata ná de ETL, dan klopt de standaard (`Korte naam instelling`) en hoef je deze rol niet aan te passen.
 
 ## `ensemble_override_cumulative` — ensemble-uitzondering per opleiding
 

@@ -63,6 +63,8 @@ def load_configuration(file_path: str) -> dict:
 
     if "excluded_data_points" in cfg:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
+    if "institution_filter" in cfg:
+        _validate_institution_filter(cfg["institution_filter"], file_path)
     _validate_model_config(cfg, file_path)
     _validate_runtime(cfg, file_path)
     _validate_telbestand_filename_patterns(cfg, file_path)
@@ -152,6 +154,30 @@ def _validate_excluded_data_points(rules, file_path):
                     f"De combinatie sluit nooit rijen uit."
                 )
                 sys.exit(1)
+
+
+def _validate_institution_filter(value, file_path):
+    """Valideer 'institution_filter': een lijst met instellingscodes (strings).
+
+    Een lege lijst (of ontbrekende sleutel) is geldig en betekent "alle
+    instellingen". Faalt fast bij een verkeerd type, zodat een configuratiefout
+    niet pas diep in de preprocessing als KeyError opduikt.
+    """
+    if not isinstance(value, list):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'institution_filter' moet een lijst zijn, niet {type(value).__name__}."
+        )
+        sys.exit(1)
+
+    for i, item in enumerate(value):
+        if not isinstance(item, str):
+            print(
+                f"Configuratiefout in {file_path}: "
+                f"'institution_filter[{i}]' moet een string zijn (instellingscode), "
+                f"niet {type(item).__name__}."
+            )
+            sys.exit(1)
 
 
 def _validate_model_config(cfg, file_path):

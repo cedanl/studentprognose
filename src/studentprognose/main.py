@@ -393,6 +393,9 @@ def _print_summary(datasets, cfg, strategy):
 
     print(f"\n{'=' * 40}")
     print(f"  Dataset:       {cfg.data_option.filename_suffix}")
+    institution_filter = getattr(strategy, "institution_filter", [])
+    if institution_filter:
+        print(f"  Instelling(en): {', '.join(str(i) for i in institution_filter)}")
     print(f"  Trainingsdata: jaren {train_year_str}")
     print(f"  Voorspelling:  jaar {cfg.years}, vanaf week {cfg.weeks}")
     for i, detail in enumerate(pred_details):
