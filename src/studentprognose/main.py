@@ -256,7 +256,7 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output
     _print_summary(datasets, cfg, strategy)
     for year in cfg.years:
         for week in cfg.weeks:
-            _predict_and_postprocess(strategy, cfg, data_cumulative, year, week)
+            _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_output)
 
     # Step 7: Save output
     if save_output:
@@ -422,7 +422,7 @@ def _preprocess(strategy, student_year_prediction):
         return None
 
 
-def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
+def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_output: bool = True):
     if cfg.student_year_prediction in (
         StudentYearPrediction.FIRST_YEARS,
         StudentYearPrediction.VOLUME,
@@ -446,6 +446,8 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
                 data_cumulative,
                 cfg.skip_years,
             )
+            if save_output:
+                strategy.postprocessor.save_output_prelim()
             if cfg.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS):
                 strategy.postprocessor.predict_with_ratio(data_cumulative, year)
                 strategy.postprocessor.add_applicant_data(data_cumulative, year, week)
