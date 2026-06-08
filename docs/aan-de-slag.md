@@ -280,6 +280,27 @@ result = run_pipeline_from_dataframes(
 )
 ```
 
+!!! warning "`year`/`week` moeten binnen je trainingsdata vallen"
+    `run_pipeline_from_dataframes` controleert — net als de CLI — of `year` en `week`
+    voorkomen in de meegegeven DataFrames. Valt een van beide buiten bereik, dan krijg je
+    een heldere `ValueError` met de wél beschikbare range, in plaats van een stille `None`
+    of een onverwachte kernel-crash in een notebook.
+
+    ```python
+    # Stel: je data loopt t/m 2025
+    run_pipeline_from_dataframes(
+        year=2030,            # buiten bereik
+        week=10,
+        data_cumulative=df_cum,
+        dataset=DataOption.CUMULATIVE,
+    )
+    # ValueError: year=2030 valt buiten de beschikbare trainingsdata.
+    #   Beschikbare data: jaren 2018-2025, weken 1-52.
+    #   Pas year/week aan binnen deze range, of voeg trainingsdata toe.
+    ```
+
+    Pas `year`/`week` aan binnen de range, of voeg aanvullende trainingsdata toe.
+
 ## Bekende valkuil: stille modus-downgrade
 
 !!! warning "Let op bij `-d b`"
