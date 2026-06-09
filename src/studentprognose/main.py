@@ -1,7 +1,7 @@
 import os
 import sys
 import traceback
-from typing import NamedTuple, Optional
+from typing import Optional
 
 import pandas as pd
 
@@ -9,6 +9,11 @@ from studentprognose.cli import PipelineConfig, parse_args
 from studentprognose.config import load_configuration, load_defaults_filtering, load_filtering
 from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
+from studentprognose.data.range_check import (
+    detect_data_range_mismatch,
+    format_api_range_error,
+    format_cli_range_warning,
+)
 from studentprognose.utils.ci_subset import apply_ci_test_subset
 from studentprognose.output.postprocessor import PostProcessor
 from studentprognose.output.dashboard import DashboardBuilder
@@ -185,11 +190,11 @@ def run_pipeline_from_dataframes(
     # buiten de range van de meegegeven data valt, in plaats van een stille None of een
     # kernel-crash verderop in de pipeline. Draait vóór config-werk (fail fast); de
     # 2-tuple wordt door de detector via `*_` afgehandeld.
-    mismatch = _detect_data_range_mismatch(
+    mismatch = detect_data_range_mismatch(
         (data_individual, data_cumulative), [year], [week]
     )
     if mismatch is not None:
-        raise ValueError(_format_api_range_error(year, week, mismatch))
+        raise ValueError(format_api_range_error(year, week, mismatch))
 
     if configuration is None:
         configuration = load_defaults()
@@ -316,110 +321,14 @@ def _apply_auto_defaults(datasets, cfg):
         print("Geef -w en -y mee om een andere combinatie te gebruiken.")
 
 
-class DataRangeMismatch(NamedTuple):
-    """Resultaat van de range-detectie: welke jaren/weken ontbreken en wat wél beschikbaar is."""
-
-    year_range: str  # "2018-2025" of "2025"
-    week_range: str  # "1-52", "10", of "n.v.t." (individueel: geen Weeknummer-kolom)
-    missing_years: list[int]
-    missing_weeks: list[int]
-
-
-def _detect_data_range_mismatch(datasets, years, weeks) -> Optional[DataRangeMismatch]:
-    """Detecteer of gevraagde jaren/weken buiten de beschikbare trainingsdata vallen.
-
-    Pure functie: schrijft niets, beëindigt niets, gooit niets. Geeft ``None`` terug
-    wanneer alles binnen bereik valt (of er geen bruikbare data is), anders een
-    ``DataRangeMismatch`` met de beschikbare range en de ontbrekende waarden. Zowel het
-    CLI-pad (``_check_data_range``) als het API-pad (``run_pipeline_from_dataframes``)
-    bouwen hun eigen melding bovenop dit resultaat.
-
-    Args:
-        datasets: Tuple waarvan de eerste twee elementen ``data_individual`` en
-            ``data_cumulative`` zijn (langere tuples worden via ``*_`` genegeerd).
-        years: Gevraagde jaren.
-        weeks: Gevraagde weken.
-    """
-    data_individual, data_cumulative, *_ = datasets
-
-    # Pick whichever dataset is loaded based on the chosen mode
-    data = data_cumulative if data_cumulative is not None else data_individual
-    if data is None:
-        return None
-
-    available_years = sorted(int(y) for y in data["Collegejaar"].dropna().unique())
-    if not available_years:
-        return None
-
-    missing_years = [y for y in years if y not in available_years]
-
-    # Individual dataset has no Weeknummer column before preprocessing
-    if "Weeknummer" in data.columns:
-        available_weeks = sorted(int(w) for w in data["Weeknummer"].dropna().unique())
-        missing_weeks = [w for w in weeks if w not in available_weeks]
-    else:
-        available_weeks = []
-        missing_weeks = []
-
-    if not (missing_years or missing_weeks):
-        return None
-
-    year_range = _format_range(available_years)
-    # "n.v.t." voorkomt een IndexError op available_weeks[0] wanneer er (nog) geen
-    # weken bekend zijn (individuele dataset vóór preprocessing).
-    week_range = _format_range(available_weeks) if available_weeks else "n.v.t."
-
-    return DataRangeMismatch(year_range, week_range, missing_years, missing_weeks)
-
-
-def _format_range(values) -> str:
-    """Formatteer een gesorteerde lijst als ``"min-max"`` (of ``"x"`` bij één waarde)."""
-    return f"{values[0]}-{values[-1]}" if len(values) > 1 else str(values[0])
-
-
-def _format_available(mismatch) -> str:
-    """Beschrijf de beschikbare data; laat weken weg als die niet bepaald kunnen worden."""
-    if mismatch.week_range == "n.v.t.":
-        return f"jaren {mismatch.year_range}"
-    return f"jaren {mismatch.year_range}, weken {mismatch.week_range}"
-
-
 def _check_data_range(datasets, cfg):
     """Check if requested years/weeks exist in the loaded data and exit (CLI-pad) if not."""
-    mismatch = _detect_data_range_mismatch(datasets, cfg.years, cfg.weeks)
+    mismatch = detect_data_range_mismatch(datasets, cfg.years, cfg.weeks)
     if mismatch is None:
         return
 
-    print(
-        "\nWaarschuwing: de gevraagde combinatie is niet (volledig) beschikbaar in de data."
-    )
-    print(f"  Beschikbare data: {_format_available(mismatch)}.")
-    if mismatch.week_range == "n.v.t.":
-        print(f"  Pas je flags aan tussen -y {mismatch.year_range},")
-    else:
-        print(
-            f"  Pas je flags aan tussen -y {mismatch.year_range} en -w {mismatch.week_range},"
-        )
-    print(
-        "  of voeg nieuwe trainingsdata toe in data/input_raw/ om je gewenste tijdstip te voorspellen."
-    )
+    print(format_cli_range_warning(mismatch))
     sys.exit(1)
-
-
-def _format_api_range_error(year, week, mismatch) -> str:
-    """Bouw de ValueError-tekst voor het API-pad uit een ``DataRangeMismatch``."""
-    if mismatch.missing_years and mismatch.missing_weeks:
-        subject = f"year={year} en week={week} vallen buiten de beschikbare trainingsdata."
-    elif mismatch.missing_years:
-        subject = f"year={year} valt buiten de beschikbare trainingsdata."
-    else:
-        subject = f"week={week} valt buiten de beschikbare trainingsdata."
-
-    return (
-        f"{subject}\n"
-        f"  Beschikbare data: {_format_available(mismatch)}.\n"
-        "  Pas year/week aan binnen deze range, of voeg trainingsdata toe."
-    )
 
 
 def _print_summary(datasets, cfg, strategy):
