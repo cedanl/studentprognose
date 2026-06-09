@@ -79,6 +79,9 @@ Vóór elke modelrun voert de pipeline drie aanvullende checks uit op de **cumul
 !!! note "Alleen actief als cumulatieve data beschikbaar is"
     De pre-prediction checks worden overgeslagen als de pipeline zonder cumulatieve data draait (individueel-enkel modus, `-d i`). In dat geval is er geen `Gewogen vooraanmelders`-kolom om te valideren.
 
+!!! warning "Teldata met meerdere instellingen"
+    Bevat je cumulatieve teldata rijen van meer dan één instelling (`Korte naam instelling` / `Brincode`) en heb je `institution_filter` leeg gelaten, dan geeft de voorbewerking een waarschuwing. De cijfers van verschillende instellingen worden dan namelijk per opleiding samengeteld — zelden bedoeld. Filter op je eigen instelling via [`institution_filter`](configuratie.md#institution_filter-filteren-op-instelling).
+
 | Check | Type | Wat wordt gecheckt |
 |-------|------|-------------------|
 | Decimaalintegriteit | Hard stop | `Gewogen vooraanmelders` bevat strings met komma's of niet-numerieke waarden |

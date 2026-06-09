@@ -14,6 +14,7 @@ from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_t
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
 from studentprognose.data.transforms import TRANSFORM_GROUP_COLS
 from studentprognose.data.preprocessing.excluded_data_points import apply_excluded_data_points
+from studentprognose.data.preprocessing.institution_filter import apply_institution_filter
 
 _EPS = 1e-8
 _LAGS = [2, 5]
@@ -149,6 +150,13 @@ class CumulativeStrategy(PredictionStrategy):
 
         data.loc[(data["Examentype"] == "Pre-master"), "Hogerejaars"] = "Nee"
         data = data[data["Hogerejaars"] == "Nee"]
+
+        # Filter op instelling vóór de aggregatie: de groupby hieronder groepeert
+        # per opleiding zónder de instellingskolom, dus na deze stap is niet meer
+        # te onderscheiden van welke instelling een rij kwam.
+        data = apply_institution_filter(
+            data, self.institution_filter, self.institution_column
+        )
 
         data = (
             data.groupby([

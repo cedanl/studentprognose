@@ -33,6 +33,7 @@
     },
     "numerus_fixus": {},
     "excluded_data_points": [],
+    "institution_filter": [],
     "ensemble_override_cumulative": [],
     "exclude_from_combined": [],
     "ensemble_weights": {
@@ -57,7 +58,8 @@
         "enrollments": "Inschrijvingen",
         "higher_education_type": "Type hoger onderwijs",
         "croho_source": "Groepeernaam Croho",
-        "higher_years": "Hogerejaars"
+        "higher_years": "Hogerejaars",
+        "institution": "Korte naam instelling"
     },
     "model_features": {
         "classifier": {
