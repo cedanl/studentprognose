@@ -5,6 +5,7 @@ data/output/visualisations[_ci_test_N{n}]/{individual,cumulative,final}/dashboar
 """
 
 import os
+import traceback
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
@@ -87,6 +88,23 @@ ACADEMIC_WEEKS = [str(w) for w in list(range(39, 53)) + list(range(1, 39))]
 def _sort_weeks_series(s: pd.Series) -> pd.Series:
     """Pandas key function for sorting a Weeknummer series."""
     return s.apply(lambda w: week_sort_key(int(w)))
+
+
+def append_dashboard_error(log_path: str, label: str, tb: str) -> None:
+    """Append a labelled traceback section to ``dashboard_error.log``.
+
+    The log is shared between :meth:`DashboardBuilder.build_and_save` (per-page
+    sections) and the pipeline's outer catch-all (a ``fatal`` section). Both
+    write in append mode so a late failure never overwrites earlier diagnostics.
+
+    Args:
+        log_path: Absolute path of the dashboard error log.
+        label: Section header, e.g. ``cumulative`` or ``fatal``.
+        tb: Formatted traceback text to record under the header.
+    """
+    os.makedirs(os.path.dirname(log_path), exist_ok=True)
+    with open(log_path, "a", encoding="utf-8") as f:
+        f.write(f"=== {label} ===\n{tb}\n")
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -3131,17 +3149,97 @@ class DashboardBuilder:
     # Entry point
     # ════════════════════════════════════════════════════════════════
 
+    def _has_prognosis(self, columns: tuple[str, ...]) -> bool:
+        """Whether a track delivered a real prognosis for the prediction year.
+
+        Column presence alone is not enough: the individual track stubs
+        ``SARIMA_cumulative`` to NaN (``strategies/individual.py``), so in a
+        ``-d both`` run that column always exists. A presence-only gate would
+        therefore be a false-positive and let ``_save_cumulative`` run on empty
+        data. We instead require at least one non-NaN value in the
+        prediction-year rows.
+
+        Args:
+            columns: Candidate prognosis column names to check.
+
+        Returns:
+            True if any column carries a non-NaN value for ``prediction_year``,
+            otherwise False.
+        """
+        if "Collegejaar" in self.data.columns:
+            rows = self.data[self.data["Collegejaar"] == self.prediction_year]
+        else:
+            rows = self.data
+        return any(col in rows.columns and rows[col].notna().any() for col in columns)
+
     def build_and_save(self) -> None:
-        """Generate all applicable dashboard pages."""
+        """Generate all applicable dashboard pages.
+
+        Each page is built independently: a gate-miss or exception in one page
+        no longer silently skips the others. Skips and failures produce a
+        gerichte stdout-melding plus een sectie in ``dashboard_error.log``.
+
+        The per-page gate checks for an *actual* (non-NaN) prognosis for the
+        prediction year via :meth:`_has_prognosis`, not mere column presence —
+        otherwise the cumulative page would always pass in a ``-d both`` run
+        (see :meth:`_has_prognosis`) and silently render an empty dashboard.
+        """
         print("Generating dashboards...")
+        log_path = os.path.join(self.cwd, "data", "output", "dashboard_error.log")
+        if os.path.exists(log_path):
+            try:
+                os.remove(log_path)
+            except OSError:
+                pass
+        failures: list[str] = []
+        skips: list[str] = []
 
-        if self.data_option in (DataOption.INDIVIDUAL, DataOption.BOTH_DATASETS):
-            if "SARIMA_individual" in self.data.columns:
-                self._save_individual()
+        cumulative_cols = ("SARIMA_cumulative", "Prognose_ratio")
 
-        if self.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS):
-            if any(c in self.data.columns for c in ("SARIMA_cumulative", "Prognose_ratio")):
-                self._save_cumulative()
+        pages = [
+            (
+                "individual",
+                self.data_option in (DataOption.INDIVIDUAL, DataOption.BOTH_DATASETS),
+                self._has_prognosis(("SARIMA_individual",)),
+                (
+                    f"het individuele spoor heeft geen prognose voor {self.prediction_year} "
+                    "geleverd — kolom 'SARIMA_individual' bevat geen waarden."
+                ),
+                self._save_individual,
+            ),
+            (
+                "cumulative",
+                self.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS),
+                self._has_prognosis(cumulative_cols),
+                (
+                    f"het cumulatieve spoor heeft geen prognose voor {self.prediction_year} "
+                    f"geleverd — geen waarden in {cumulative_cols}."
+                ),
+                self._save_cumulative,
+            ),
+            ("final", True, True, "", self._save_final),
+        ]
 
-        self._save_final()
-        print("Dashboards done.")
+        for label, mode_ok, data_ok, skip_reason, fn in pages:
+            if not mode_ok:
+                continue
+            if not data_ok:
+                skips.append(label)
+                print(f"Dashboard '{label}' overgeslagen: {skip_reason}")
+                continue
+            try:
+                fn()
+            except Exception:
+                failures.append(label)
+                append_dashboard_error(log_path, label, traceback.format_exc())
+                print(
+                    f"Waarschuwing: dashboard '{label}' niet gegenereerd "
+                    f"(fout opgeslagen in {log_path})."
+                )
+
+        if failures:
+            print(f"Dashboards klaar — fouten in: {', '.join(failures)}.")
+        elif skips:
+            print(f"Dashboards klaar — overgeslagen: {', '.join(skips)}.")
+        else:
+            print("Dashboards done.")
