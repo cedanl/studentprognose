@@ -11,7 +11,7 @@ from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.utils.ci_subset import apply_ci_test_subset
 from studentprognose.output.postprocessor import PostProcessor
-from studentprognose.output.dashboard import DashboardBuilder
+from studentprognose.output.dashboard import DashboardBuilder, append_dashboard_error
 from studentprognose.output.validator import run_post_prediction_checks
 from studentprognose.strategies import create_strategy
 from studentprognose.utils.weeks import (
@@ -483,6 +483,18 @@ def _try_build_dashboard(strategy, cfg):
             f"Let op: het dashboard toont alleen de prognose voor week {cfg.weeks[-1]} (laatste week in de reeks)."
         )
 
+    log_path = os.path.join(os.getcwd(), "data", "output", "dashboard_error.log")
+    # Begin met een schone log. build_and_save en de vangnet-handler hieronder
+    # schrijven beide in append-modus (append_dashboard_error), zodat een fout
+    # in een latere stap de per-pagina secties niet overschrijft. Het opruimen
+    # hier dekt ook het geval waarin de constructor crasht en build_and_save —
+    # die zelf ook opruimt — nooit draait.
+    if os.path.exists(log_path):
+        try:
+            os.remove(log_path)
+        except OSError:
+            pass
+
     try:
         dd = strategy.get_dashboard_data()
         dashboard = DashboardBuilder(
@@ -501,10 +513,7 @@ def _try_build_dashboard(strategy, cfg):
         )
         dashboard.build_and_save()
     except Exception:
-        log_path = os.path.join(os.getcwd(), "data", "output", "dashboard_error.log")
-        os.makedirs(os.path.dirname(log_path), exist_ok=True)
-        with open(log_path, "w", encoding="utf-8") as f:
-            f.write(traceback.format_exc())
+        append_dashboard_error(log_path, "fatal", traceback.format_exc())
         print(
             f"Waarschuwing: dashboard niet gegenereerd. Zie {log_path} voor details."
         )
