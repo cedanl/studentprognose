@@ -254,7 +254,7 @@ result = run_pipeline_from_dataframes(
     week=10,
     data_cumulative=df_cum,
     dataset=DataOption.CUMULATIVE,
-    save_output=False,  # geen lokale uitvoerbestanden aanmaken
+    save_output=False,  # geen lokale uitvoerbestanden aanmaken (ook geen tussenresultaat)
 )
 
 if result is not None:
