@@ -1,6 +1,8 @@
 """Tests for the public Python API exported from studentprognose.__init__."""
 
 import importlib
+
+import pandas as pd
 import pytest
 
 
@@ -80,3 +82,159 @@ def test_all_exports_present():
             f"'{name}' is listed in __all__ but cannot be imported from studentprognose"
         )
         assert hasattr(importlib.import_module("studentprognose"), name)
+
+
+# --- Range-validatie van year/week in run_pipeline_from_dataframes (issue #218) ---
+
+
+def _cumulative_frame(years=(2024, 2025), weeks=range(1, 53)):
+    """Minimale cumulatieve trainingsdata: alleen de kolommen die de range-check leest.
+
+    De range-check draait vóór ``_run_pipeline_core``, dus meer kolommen zijn niet nodig.
+    """
+    rows = [(year, week) for year in years for week in weeks]
+    return pd.DataFrame(rows, columns=["Collegejaar", "Weeknummer"])
+
+
+def test_rejects_year_before_training_data():
+    from studentprognose import DataOption, run_pipeline_from_dataframes
+
+    with pytest.raises(ValueError) as exc:
+        run_pipeline_from_dataframes(
+            year=2000,
+            week=10,
+            data_cumulative=_cumulative_frame(),
+            dataset=DataOption.CUMULATIVE,
+            save_output=False,
+        )
+    message = str(exc.value)
+    assert "year=2000" in message
+    assert "2024-2025" in message
+
+
+def test_rejects_year_after_training_data():
+    from studentprognose import DataOption, run_pipeline_from_dataframes
+
+    with pytest.raises(ValueError) as exc:
+        run_pipeline_from_dataframes(
+            year=2030,
+            week=10,
+            data_cumulative=_cumulative_frame(),
+            dataset=DataOption.CUMULATIVE,
+            save_output=False,
+        )
+    message = str(exc.value)
+    assert "year=2030" in message
+    assert "2024-2025" in message
+
+
+def test_rejects_week_below_range():
+    from studentprognose import DataOption, run_pipeline_from_dataframes
+
+    # week=0 passeert de FINAL_ACADEMIC_WEEK (38) guard en moet door de range-check vallen.
+    with pytest.raises(ValueError) as exc:
+        run_pipeline_from_dataframes(
+            year=2025,
+            week=0,
+            data_cumulative=_cumulative_frame(),
+            dataset=DataOption.CUMULATIVE,
+            save_output=False,
+        )
+    message = str(exc.value)
+    assert "week=0" in message
+    assert "1-52" in message
+
+
+def test_rejects_week_above_range():
+    from studentprognose import DataOption, run_pipeline_from_dataframes
+
+    with pytest.raises(ValueError) as exc:
+        run_pipeline_from_dataframes(
+            year=2025,
+            week=53,
+            data_cumulative=_cumulative_frame(),
+            dataset=DataOption.CUMULATIVE,
+            save_output=False,
+        )
+    message = str(exc.value)
+    assert "week=53" in message
+    assert "1-52" in message
+
+
+def test_detector_individual_only_missing_year_no_indexerror():
+    from studentprognose.data.range_check import (
+        detect_data_range_mismatch,
+        format_api_range_error,
+    )
+
+    # Individuele dataset heeft geen Weeknummer-kolom; een ontbrekend jaar mag geen
+    # IndexError geven (regressie op de oude available_weeks[0]).
+    data_individual = pd.DataFrame(
+        {"Collegejaar": [2024, 2025], "Croho groepeernaam": ["B Foo", "B Foo"]}
+    )
+    mismatch = detect_data_range_mismatch((data_individual, None), [2030], [10])
+
+    assert mismatch is not None
+    assert mismatch.week_range == "n.v.t."
+    assert mismatch.missing_weeks == []
+    assert mismatch.missing_years == [2030]
+    # De API-melding noemt alleen het jaar — geen verwarrend "n.v.t." voor weken.
+    assert "n.v.t." not in format_api_range_error(2030, 10, mismatch)
+
+
+def test_detector_in_range_returns_none():
+    from studentprognose.data.range_check import detect_data_range_mismatch
+
+    data_cumulative = pd.DataFrame({"Collegejaar": [2025], "Weeknummer": [10]})
+    assert detect_data_range_mismatch((None, data_cumulative), [2025], [10]) is None
+
+
+def test_format_cli_range_warning_with_weeks_full_string():
+    from studentprognose.data.range_check import DataRangeMismatch, format_cli_range_warning
+
+    mismatch = DataRangeMismatch(
+        year_range="2024-2025", week_range="1-52", missing_years=[2030], missing_weeks=[]
+    )
+    # Volledige string-assert: bewaakt zowel de regelopbouw als de byte-identieke output
+    # die de CLI verwacht (zie ook test_cli_check_data_range_exits).
+    assert format_cli_range_warning(mismatch) == (
+        "\nWaarschuwing: de gevraagde combinatie is niet (volledig) beschikbaar in de data."
+        "\n  Beschikbare data: jaren 2024-2025, weken 1-52."
+        "\n  Pas je flags aan tussen -y 2024-2025 en -w 1-52,"
+        "\n  of voeg nieuwe trainingsdata toe in data/input_raw/ om je gewenste tijdstip te voorspellen."
+    )
+
+
+def test_format_cli_range_warning_nvt_branch_omits_week_flag():
+    from studentprognose.data.range_check import DataRangeMismatch, format_cli_range_warning
+
+    # Individuele dataset zonder Weeknummer-kolom -> week_range "n.v.t.".
+    # Deze tak werd voorheen door geen enkele test geraakt.
+    mismatch = DataRangeMismatch(
+        year_range="2024-2025", week_range="n.v.t.", missing_years=[2030], missing_weeks=[]
+    )
+    warning = format_cli_range_warning(mismatch)
+    assert "  Pas je flags aan tussen -y 2024-2025," in warning
+    assert "-w" not in warning  # geen weekvlag wanneer weken onbekend zijn
+    assert "n.v.t." not in warning  # geen verwarrend "n.v.t." in de gebruikerstekst
+    assert "  Beschikbare data: jaren 2024-2025." in warning
+
+
+def test_cli_check_data_range_exits(capsys):
+    from studentprognose import PipelineConfig
+    from studentprognose.main import _check_data_range
+
+    data_cumulative = pd.DataFrame({"Collegejaar": [2024, 2025], "Weeknummer": [10, 11]})
+    cfg = PipelineConfig(
+        years=[2030], weeks=[10], years_specified=True, weeks_specified=True
+    )
+
+    with pytest.raises(SystemExit) as exc:
+        _check_data_range((None, data_cumulative), cfg)
+    assert exc.value.code == 1
+    out = capsys.readouterr().out
+    assert (
+        "Waarschuwing: de gevraagde combinatie is niet (volledig) beschikbaar in de data."
+        in out
+    )
+    assert "jaren 2024-2025" in out
