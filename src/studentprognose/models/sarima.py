@@ -95,6 +95,13 @@ def predict_with_sarima_cumulative(
 
     ts_data = create_time_series(data, pred_len)
 
+    if ts_data.size == 0 or not np.any(ts_data):
+        print(
+            f"Cumulative SARIMA skipped (geen historische ts-waarden): "
+            f"{programme}, {herkomst}"
+        )
+        return []
+
     try:
         factory = forecaster_factory or _default_forecaster_factory
         model = factory()
@@ -189,7 +196,11 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
         else:
             exogenous_train_1 = None
 
-        if ts_data.size == 0:
+        if ts_data.size == 0 or not np.any(ts_data):
+            print(
+                f"Individual SARIMA skipped (geen historische aanmeldingen): "
+                f"{programme}, {herkomst}, {examentype}"
+            )
             return []
 
         try:

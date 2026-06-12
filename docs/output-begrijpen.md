@@ -57,6 +57,8 @@ Elke rij in de output beschrijft een combinatie van **opleiding × herkomst × e
 
 Als `-d b` is gebruikt maar individuele data ontbreekt, zijn `SARIMA_individual` en `Ensemble_prediction` leeg — zie [bekende valkuil](aan-de-slag.md#bekende-valkuil-stille-modus-downgrade).
 
+`SARIMA_individual` en `SARIMA_cumulative` kunnen ook leeg (`NaN`) zijn voor een specifieke opleiding × herkomst × examentype-combinatie zonder enige historische aanmelding in het trainingsvenster. De pipeline slaat SARIMA dan over en logt een regel `Individual SARIMA skipped (...)` of `Cumulative SARIMA skipped (...)`. Dit voorkomt misleidende `0`-waarden die door de aard van de tijdreeksfit niet te onderscheiden zouden zijn van een geldige nulvoorspelling.
+
 ### Actuele aanmeldcijfers in de output
 
 De output bevat naast voorspellingen ook de actuele Studielink-cijfers voor het voorspelmoment:

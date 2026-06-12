@@ -51,6 +51,7 @@ In het individuele spoor kan een deadlineweek-variabele als exogene regresssor w
 - Jaar na een uitzonderlijk jaar (bijv. post-COVID)
 - Opleiding met sterke interjaarse variatie in aanmeldpatroon
 - Vroeg in het jaar (weinig datapunten beschikbaar; de voorspelling is dan een lange extrapolatie)
+- Combinatie (opleiding × herkomst × examentype) zonder enige historische aanmelding in het trainingsvenster — SARIMA wordt overgeslagen en de output is `NaN` (geen voorspelling), nooit `0`. Een `0`-output uit SARIMA betekent altijd: model gefit op niet-nul historie en gaf 0 als verwachte eindstand.
 
 ## Bekende hardgecodeerde uitzondering: 2021
 

@@ -1,13 +1,19 @@
 import numpy as np
+import pandas as pd
 import pytest
 
 from studentprognose.models.base import BaseForecaster
-from studentprognose.models.sarima import SARIMAForecaster
+from studentprognose.models.sarima import (
+    SARIMAForecaster,
+    predict_with_sarima_cumulative,
+    predict_with_sarima_individual,
+)
 from studentprognose.models.forecasters import (
     ETSForecaster,
     ThetaForecaster,
     AutoARIMAForecaster,
 )
+from studentprognose.utils.weeks import get_all_weeks_ordered
 
 
 def _seasonal_series(n_years: int = 5, season_length: int = 52) -> np.ndarray:
@@ -79,3 +85,66 @@ def test_forecaster_predictions_reasonable():
 
     assert np.mean(pred) > 50
     assert np.mean(pred) < 500
+
+
+def _empty_individual_wide_frame(programme: str, herkomst: str, examentype: str) -> pd.DataFrame:
+    """Bouw een minimale wide-format frame met alle weekkolommen op 0.
+
+    Bootst de output van ``IndividualStrategy._transform_data_individual`` na voor een
+    (programme × herkomst × examentype)-combinatie zonder enige historische aanmelding.
+    """
+    group_cols = {
+        "Collegejaar": [2024],
+        "Faculteit": ["FSW"],
+        "Herkomst": [herkomst],
+        "Examentype": [examentype],
+        "Croho groepeernaam": [programme],
+    }
+    week_cols = {w: [0.0] for w in get_all_weeks_ordered()}
+    return pd.DataFrame({**group_cols, **week_cols})
+
+
+def test_predict_individual_returns_empty_for_all_zero_history(capsys):
+    """SARIMA mag geen 0 retourneren voor combinaties zonder historische aanmeldingen.
+
+    Regressie voor issue #196: een all-zero training-tijdreeks leidde stil tot een
+    forecast-vector van nullen, waardoor ``SARIMA_individual = 0`` in de output stond
+    in plaats van expliciet ``NaN``.
+    """
+    programme, herkomst, examentype = "B Sociologie", "Niet-EER", "Bachelor"
+    frame = _empty_individual_wide_frame(programme, herkomst, examentype)
+    row = {"Croho groepeernaam": programme, "Herkomst": herkomst, "Examentype": examentype}
+
+    result = predict_with_sarima_individual(
+        frame, row,
+        predict_year=2024, predict_week=12, max_year=2024,
+        numerus_fixus_list=[], already_printed=True,
+    )
+
+    assert result == []
+    assert "Individual SARIMA skipped" in capsys.readouterr().out
+
+
+def test_predict_cumulative_returns_empty_for_all_zero_history(capsys):
+    """Cumulatieve variant moet dezelfde guard hebben — geen silent 0-voorspellingen."""
+    programme, herkomst, examentype = "B Sociologie", "Niet-EER", "Bachelor"
+    weeks = [int(w) for w in get_all_weeks_ordered()]
+    long_frame = pd.DataFrame({
+        "Collegejaar": [2024] * len(weeks),
+        "Faculteit": ["FSW"] * len(weeks),
+        "Herkomst": [herkomst] * len(weeks),
+        "Examentype": [examentype] * len(weeks),
+        "Croho groepeernaam": [programme] * len(weeks),
+        "Weeknummer": weeks,
+        "ts": [0.0] * len(weeks),
+    })
+    row = {"Croho groepeernaam": programme, "Herkomst": herkomst, "Examentype": examentype}
+
+    result = predict_with_sarima_cumulative(
+        long_frame, row,
+        predict_year=2024, predict_week=12, pred_len=26,
+        already_printed=True, min_training_year=2016,
+    )
+
+    assert result == []
+    assert "Cumulative SARIMA skipped" in capsys.readouterr().out
