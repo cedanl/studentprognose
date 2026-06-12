@@ -58,6 +58,44 @@ Gebruikt jouw instelling een andere conventie dan `telbestandY{jaar}W{week}.csv`
 
 Placeholders zijn `{year}` (vier cijfers) en `{week}` (één of twee cijfers). Andere karakters worden letterlijk gematcht — punten en streepjes zijn veilig. Meerdere patronen tegelijk zijn handig tijdens een migratie van oude naar nieuwe naamgeving. Zie [`telbestand_filename_patterns`](configuratie.md#telbestand_filename_patterns-bestandsnaampatronen-voor-telbestanden) voor de volledige uitleg.
 
+### UvA SQL-telbestand (fijnmazig Studielink-formaat)
+
+Map: `data/input_raw/uva_telbestanden/`
+Bestandsnaampatroon: `telbestand_sl_{leverdatum}_v{volgnummer}_{studiejaar}.csv` (bijv. `telbestand_sl_20260525_v34_2026.csv`)
+Scheidingsteken: `,` (komma — let op: het legacy-instellingsformaat hierboven gebruikt `;`)
+
+De UvA levert de wekelijkse Studielink-telbestanden aan als **SQL-export met 22 kolommen**. Dit is een fijnmaziger, minder voorbewerkte variant van hetzelfde bronmateriaal: het bevat extra dimensies (`Geslacht`, `Opl_vorm`, `Voertaal`, `Fixus`, `1cHO_L`/`1cHO_K`) en mist de verrijkte velden `Groepeernaam` en `Faculteit`. De ETL zet dit formaat om naar **exact dezelfde 16 kolommen** als het legacy-formaat, zodat de modellen ongewijzigd blijven.
+
+De omzetting is volledig **config-gedreven** via het `cumulative_input`-blok in `configuration.json` (separator, waardevertalingen, aggregatie); zie [`cumulative_input`](configuratie.md#cumulative_input-uva-sql-telbestand-omzetten).
+
+| Kolom | Type | Omschrijving |
+|-------|------|-------------|
+| `Brincode` | str | BRIN-code instelling → `Korte naam instelling`. Het bestand is **multi-instelling**: één levering bevat alle instellingen waar een student zich aanmeldde. |
+| `Isatcode` | str | CROHO-code opleiding → `Croho`. Wordt óók als placeholder voor `Groepeernaam Croho`/`Naam Croho opleiding Nederlands` gebruikt (zie hieronder). |
+| `Type_HO` | str | `B`/`P` → Bachelor, `M` → Master, **`A` → Associate degree** (nieuw t.o.v. de 2016–2024 historie), `O` → Onbekend. |
+| `Studiejaar` | int | Collegejaar → `Collegejaar`. |
+| `Herkomst` | str | `N`/`E`/`R`(/`O`) → `NL`/`EER`/`Niet-EER`/`Onbekend`. |
+| `Hogerejaars`, `Herinschrijving` | str | `J`/`N` → `Ja`/`Nee`. |
+| `Status` | str | `V`/`I`/`U`/`A`. Rijen met `A` (annulering) worden uitgefilterd; voor die rijen is `meercode_V == 0`. |
+| `meercode_V` | int | Deler voor `Gewogen vooraanmelders = Aantal / meercode_V`. Na het `Status != "A"`-filter komt geen `meercode_V == 0` meer voor (deel-door-nul kan niet optreden). |
+| `Aantal` | int | (Voor)aanmeldingen → `Ongewogen vooraanmelders`. |
+| `etl_is_deleted` | int | Soft-delete vlag; rijen met `1` worden uitgefilterd. |
+| `Voertaal`, `Geslacht`, `Opl_vorm`, `Fixus`, `1cHO_L`, `1cHO_K` | — | Extra split-dimensies. Staan niet in de 16-koloms output; de ETL **aggregeert** ze weg (zie ETL-stappen). |
+
+!!! info "Snapshot-semantiek (cumulatief, geen delta)"
+    Elke wekelijkse levering is een **volledige cumulatieve momentopname**: `Aantal` is een lopend totaal vanaf de openstelling, geen wekelijkse aanwas. Per seizoen stijgt het monotoon en het reset rond de jaarwisseling van de Studielink-cyclus. **Tel daarom nooit over meerdere weekleveringen heen op** — dat zou overtellen.
+
+!!! warning "Weeknummer uit de leverdatum, niet uit de data"
+    De week zit niet in de SQL-kolommen. De ETL leidt het weeknummer af uit de **leverdatum** in de bestandsnaam (`telbestand_sl_20260525_...` → ISO-kalenderweek **22**), niet uit het Studielink-volgnummer. Zo sluit het aan op de ISO-week-indexering van het bestaande `vooraanmeldingen_cumulatief.csv`.
+
+!!! note "Ontbrekende `Groepeernaam` en `Faculteit` (placeholder)"
+    De SQL-levering bevat geen leesbare opleidingsnaam of faculteit en die zijn er niet uit af te leiden. Voorlopig vult de ETL `Groepeernaam Croho`/`Naam Croho opleiding Nederlands` met de **`Isatcode`** en `Faculteit` met een vaste placeholder (`"Onbekend"`). Een niet-lege placeholder is noodzakelijk: een lege (NaN) `Faculteit` zou in de cumulatieve `groupby`/pivot alle UvA-rijen laten vallen. Gevolg zolang de echte mapping ontbreekt: de join met `student_count_first-years.xlsx` (op leesbare naam) matcht niet, dus het ratio-model degradeert. De echte CROHO/UvA-mapping is belegd in [#232](https://github.com/cedanl/studentprognose/issues/232).
+
+!!! note "Andere academische-jaargrens (week 36)"
+    De UvA-aanmeldfase eindigt structureel rond **week 36**; er zijn geen leveringen in de weken 37–39. Het legacy-formaat loopt tot week 38. Daarom staat voor het UvA-formaat `model_config.final_academic_week` op `36` (zie [configuratie](configuratie.md#final_academic_week)). Dit raakt het cumulatieve spoor; het individuele spoor is hier niet op van toepassing (UvA is cumulatief-only).
+
+    **Bekende beperking:** het Plotly-dashboard ordent de week-as nog volgens de vaste week 39→38-kalender. De voorspellingen en outputbestanden kloppen, maar bij een UvA-configuratie kan de week-as van het dashboard cosmetisch afwijken (weken 37/38 leeg aan het eind). Het meeschalen van het dashboard met `final_academic_week` is een aparte follow-up.
+
 ### Individuele aanmelddata
 
 Pad: `data/input_raw/individuele_aanmelddata.csv`
@@ -126,7 +164,7 @@ De ETL draait automatisch bij elke run (tenzij `--noetl` is opgegeven). De stapp
 
 | Stap | Actie | Input | Output |
 |------|-------|-------|--------|
-| 1 | Rowbind + reformat | `telbestanden/*.csv` | Samengevoegd cumulatief bestand |
+| 1 | Rowbind + reformat (config-gedreven via [`cumulative_input`](configuratie.md#cumulative_input-uva-sql-telbestand-omzetten): separator, waardevertalingen, aggregatie naar de grain) | `path_raw_telbestanden/*.csv` (`telbestanden/` of `uva_telbestanden/`) | Samengevoegd cumulatief bestand |
 | 2 | Interpolatie ontbrekende weken | Samengevoegd bestand | `vooraanmeldingen_cumulatief.csv` |
 | 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` (telbestand studenten) | `student_count_*.xlsx`, `student_volume.xlsx` |
 | 4 | Kopiëren individuele data | `individuele_aanmelddata.csv` | `vooraanmeldingen_individueel.csv` |

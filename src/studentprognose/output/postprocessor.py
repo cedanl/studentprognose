@@ -61,6 +61,9 @@ class PostProcessor:
         self.ensemble_weights = ensemble_weights
         self.data_studentcount = data_studentcount
         self.numerus_fixus_list = configuration["numerus_fixus"]
+        self.final_academic_week = configuration.get("model_config", {}).get(
+            "final_academic_week", FINAL_ACADEMIC_WEEK
+        )
         self.ensemble_override_cumulative = configuration.get("ensemble_override_cumulative", [])
         self.ensemble_weights_config = configuration.get("ensemble_weights", {
             "master_week_17_23": {"individual": 0.5, "cumulative": 0.5},
@@ -347,8 +350,8 @@ class PostProcessor:
         override = prog.isin(self.ensemble_override_cumulative)
         master_17_23 = ~override & wk.between(17, 23) & (ex == "Master")
         week_30_34 = ~override & ~master_17_23 & wk.between(30, 34)
-        week_35_37 = ~override & ~master_17_23 & ~week_30_34 & wk.between(35, FINAL_ACADEMIC_WEEK - 1)
-        week_final = ~override & ~master_17_23 & ~week_30_34 & ~week_35_37 & (wk == FINAL_ACADEMIC_WEEK)
+        week_35_37 = ~override & ~master_17_23 & ~week_30_34 & wk.between(35, self.final_academic_week - 1)
+        week_final = ~override & ~master_17_23 & ~week_30_34 & ~week_35_37 & (wk == self.final_academic_week)
 
         conditions = [override, master_17_23, week_30_34, week_35_37, week_final]
         choices = [

@@ -18,6 +18,7 @@ from studentprognose.data.validation import (
     _print_file_overview,
     _required_files_for,
     _resolve_column,
+    _validate_telbestanden,
     _DEFAULT_VALIDATION_CFG,
     validate_raw_data,
 )
@@ -787,3 +788,79 @@ class TestPrintFileOverview:
         _print_file_overview(str(tmp_path), paths)
         out = capsys.readouterr().out
         assert "\033[" not in out
+
+
+class TestValidateUvaSqlTelbestand:
+    """Validatie van het UvA SQL-formaat: komma-gescheiden, geen Groepeernaam,
+    programme_column valt terug op Isatcode (issue #231)."""
+
+    _UVA_COLUMNS = [
+        "HBO_WO", "Brincode", "Brin_volgnr", "Isatcode", "Type_HO", "Opl_vorm",
+        "Voertaal", "Studiejaar", "Fixus", "Maand", "Herkomst", "Geslacht",
+        "meercode_V", "meercode_A", "Status", "Hogerejaars", "Herinschrijving",
+        "1cHO_L", "1cHO_K", "Aantal", "etl_ingestion_timestamp", "etl_is_deleted",
+    ]
+
+    def _uva_validation_cfg(self):
+        return {
+            **_DEFAULT_VALIDATION_CFG,
+            "telbestand": {
+                **_DEFAULT_VALIDATION_CFG["telbestand"],
+                "separator": ",",
+                "programme_column": "Isatcode",
+                "required_columns": [
+                    "Studiejaar", "Isatcode", "Aantal", "meercode_V",
+                    "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
+                ],
+                "herkomst_allowed": ["N", "E", "R", "O"],
+            },
+        }
+
+    def _write(self, tel_dir):
+        rows = [
+            {
+                "HBO_WO": "W", "Brincode": "21PE", "Brin_volgnr": 0, "Isatcode": 30029,
+                "Type_HO": "B", "Opl_vorm": 1, "Voertaal": 2, "Studiejaar": 2026,
+                "Fixus": "N", "Maand": 9, "Herkomst": "N", "Geslacht": "M",
+                "meercode_V": 2, "meercode_A": 0, "Status": "V", "Hogerejaars": "N",
+                "Herinschrijving": "N", "1cHO_L": 1, "1cHO_K": 1, "Aantal": 40,
+                "etl_ingestion_timestamp": "2026-06-10", "etl_is_deleted": 0,
+            }
+        ]
+        pd.DataFrame(rows, columns=self._UVA_COLUMNS).to_csv(
+            tel_dir / "telbestand_sl_20260525_v34_2026.csv", sep=",", index=False
+        )
+
+    def test_uva_format_validates_without_hard_errors(self, tmp_path):
+        tel_dir = tmp_path / "uva_telbestanden"
+        tel_dir.mkdir()
+        self._write(tel_dir)
+
+        paths = {"path_raw_telbestanden": str(tel_dir)}
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": ["telbestand_sl_{date}_v{volgnummer}_{year}"]}
+        )
+        result = ValidationResult()
+        _validate_telbestanden(
+            str(tmp_path), paths, self._uva_validation_cfg(), patterns, result, required=True
+        )
+        # Geen "kan bestand niet lezen" of "ontbrekende kolommen: Groepeernaam".
+        assert result.hard_errors == []
+
+    def test_default_separator_misparses_uva_and_errors(self, tmp_path):
+        """Met de legacy ';'-separator misparse't het komma-bestand → harde fout.
+        Bewijst dat de configureerbare separator load-bearing is."""
+        tel_dir = tmp_path / "uva_telbestanden"
+        tel_dir.mkdir()
+        self._write(tel_dir)
+
+        paths = {"path_raw_telbestanden": str(tel_dir)}
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": ["telbestand_sl_{date}_v{volgnummer}_{year}"]}
+        )
+        result = ValidationResult()
+        # Default validation cfg gebruikt separator ';' en eist Groepeernaam.
+        _validate_telbestanden(
+            str(tmp_path), paths, dict(_DEFAULT_VALIDATION_CFG), patterns, result, required=True
+        )
+        assert result.hard_errors  # ontbrekende kolommen, want ';' splitst niet

@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from studentprognose.strategies.individual import IndividualStrategy
+from studentprognose.strategies.cumulative import CumulativeStrategy
 from studentprognose.utils.weeks import DataOption
 
 
@@ -70,3 +71,51 @@ class TestIndividualStrategyPreprocess:
         )
         strategy.preprocess()
         assert strategy.data_individual_backup is not None
+
+
+def _cfg_cumulative():
+    cfg = _cfg()
+    cfg["model_config"] = {
+        "min_training_year": 2016,
+        "cumulative_timeseries": "sarima",
+        "cumulative_regressor": "xgboost",
+    }
+    return cfg
+
+
+def _minimal_cumulative_df(programme=30029):
+    """16-koloms format zoals de loader levert; Groepeernaam Croho als int (UvA-Isatcode)."""
+    return pd.DataFrame({
+        "Korte naam instelling": ["21PE", "21PE"],
+        "Collegejaar": [2023, 2024],
+        "Weeknummer rapportage": [10, 10],
+        "Weeknummer": [10, 10],
+        "Faculteit": ["Onbekend", "Onbekend"],
+        "Type hoger onderwijs": ["Bachelor", "Bachelor"],
+        "Groepeernaam Croho": [programme, programme],
+        "Naam Croho opleiding Nederlands": [programme, programme],
+        "Croho": [programme, programme],
+        "Herinschrijving": ["Nee", "Nee"],
+        "Hogerejaars": ["Nee", "Nee"],
+        "Herkomst": ["NL", "NL"],
+        "Gewogen vooraanmelders": [20.0, 25.0],
+        "Ongewogen vooraanmelders": [40, 50],
+        "Aantal aanmelders met 1 aanmelding": [None, None],
+        "Inschrijvingen": [None, None],
+    })
+
+
+class TestCumulativeStrategyPreprocess:
+    def test_croho_groepeernaam_cast_to_str(self):
+        # Regressie: de UvA-Isatcode (int) merge't anders op int-vs-str met
+        # data_studentcount in het ratio-model (ratio.py) → ValueError-crash.
+        # preprocess moet Croho groepeernaam naar string casten.
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(programme=30029), None, _cfg_cumulative(),
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        result = strategy.preprocess()
+        # Waarde-niveau (robuust voor object- vs StringDtype-representatie): elke
+        # waarde is een str, zodat de merge met data_studentcount niet int-vs-str botst.
+        assert all(isinstance(v, str) for v in result["Croho groepeernaam"])
+        assert set(result["Croho groepeernaam"]) == {"30029"}

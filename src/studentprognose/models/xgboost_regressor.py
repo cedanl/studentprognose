@@ -1,6 +1,6 @@
 import numpy as np
 
-from studentprognose.config import get_columns, load_defaults
+from studentprognose.config import get_columns, get_final_academic_week, load_defaults
 from studentprognose.models.importance import extract_grouped_importance
 from studentprognose.models.regressors import (
     BaseRegressor,
@@ -26,7 +26,9 @@ def predict_with_xgboost(
     if data_studentcount is None:
         return np.full(len(test), np.nan), None
 
-    c = get_columns(config if config is not None else load_defaults())
+    resolved_config = config if config is not None else load_defaults()
+    c = get_columns(resolved_config)
+    final_week = get_final_academic_week(resolved_config)
     merge_cols = [c.programme, c.academic_year, c.origin, c.exam_type]
 
     train = train.merge(
@@ -51,7 +53,9 @@ def predict_with_xgboost(
                 f"aangeroepen vóór predict_with_xgboost."
             )
 
-    preprocessor, numeric_cols, categorical_cols = build_preprocessor(extra_numeric_cols)
+    preprocessor, numeric_cols, categorical_cols = build_preprocessor(
+        extra_numeric_cols, final_week=final_week
+    )
 
     X_train_transformed = preprocessor.fit_transform(X_train)
     test_transformed = preprocessor.transform(test)

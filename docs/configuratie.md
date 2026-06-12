@@ -43,9 +43,13 @@ De pipeline herkent telbestanden in `path_raw_telbestanden` aan hun bestandsnaam
 
 **Placeholder-syntax:**
 
-- `{year}` — vierdigit collegejaar (bijv. `2024`)
+- `{year}` — vierdigit collegejaar (bijv. `2024`); **verplicht**
 - `{week}` — weeknummer (1–2 cijfers, gevalideerd op bereik 1–53)
+- `{date}` — leverdatum `YYYYMMDD` (8 cijfers); de week wordt afgeleid als **ISO-kalenderweek** van die datum (gebruikt door het UvA SQL-telbestand)
+- `{volgnummer}` — Studielink-volgnummer (genegeerd voor de week-afleiding, maar mag in het patroon staan)
 - Alle andere karakters worden letterlijk gematcht. Punten, streepjes en underscores zijn veilig (`re.escape` op de achtergrond).
+
+Een patroon moet `{year}` bevatten én een week kunnen opleveren: dus `{week}` **of** `{date}`.
 
 **Voorbeelden:**
 
@@ -53,14 +57,15 @@ De pipeline herkent telbestanden in `path_raw_telbestanden` aan hun bestandsnaam
 {
     "telbestand_filename_patterns": [
         "telbestandY{year}W{week}",
-        "VU_telbestand_{year}_W{week}"
+        "VU_telbestand_{year}_W{week}",
+        "telbestand_sl_{date}_v{volgnummer}_{year}"
     ]
 }
 ```
 
-Met meerdere patronen kan de pipeline bestanden van verschillende leveranciers naast elkaar verwerken — handig tijdens een migratie van oude naar nieuwe naamgeving.
+Met meerdere patronen kan de pipeline bestanden van verschillende leveranciers naast elkaar verwerken — handig tijdens een migratie van oude naar nieuwe naamgeving. Het laatste voorbeeld is het UvA SQL-formaat: `telbestand_sl_20260525_v34_2026.csv` levert ISO-week 22 (uit leverdatum `20260525`).
 
-**Foutgedrag:** Een patroon zonder `{year}` of `{week}` leidt tot een configuratiefout en stopt de pipeline direct, met een melding die het probleempatroon noemt.
+**Foutgedrag:** Een patroon zonder `{year}`, of zonder zowel `{week}` als `{date}`, leidt tot een configuratiefout en stopt de pipeline direct, met een melding die het probleempatroon noemt.
 
 ## `runtime` — uitvoerparameters
 
@@ -135,6 +140,48 @@ Het regressiemodel dat vooraanmelderscijfers vertaalt naar verwachte inschrijvin
 | `xgboost` | XGBoost Regressor | Standaard — gradient boosting, krachtig bij voldoende data |
 | `ridge` | Ridge Regression | L2-regularisatie, stabiel bij weinig trainingsdata en multicollineariteit |
 | `random_forest` | Random Forest | Robuust bij kleine datasets, ingebouwde feature importance |
+
+### `final_academic_week`
+
+Standaard: `38`
+
+De **laatste week van het academisch jaar** in de Studielink-cyclus. Bepaalt de seizoensvolgorde van de weken (het jaar loopt van week `final_academic_week + 1` via week 52 door naar `final_academic_week`), de voorspelhorizon (`pred_len`) en de reset-week-injectie in het cumulatieve spoor.
+
+- Het legacy instellingsformaat loopt tot **week 38** (eind september) — dit is de standaard.
+- Het UvA SQL-telbestand levert de aanmeldfase tot **week 36**; er zijn geen leveringen in de weken 37–39. Zet daarvoor `final_academic_week` op `36`.
+
+Een verkeerde waarde laat de cumulatieve voorspelling crashen (de pipeline slicet kolommen tot deze week) of geeft een onjuiste voorspelhorizon. De waarde geldt voor het **cumulatieve spoor**; het individuele spoor gebruikt de vaste Studielink-kalender.
+
+## `cumulative_input` — UvA SQL-telbestand omzetten
+
+Optioneel. Stuurt hoe de ETL-rowbind (`_rowbind_and_reformat`) de ruwe telbestanden uit `path_raw_telbestanden` omzet naar de 16-koloms `vooraanmeldingen_cumulatief.csv`. Zonder dit blok gebruikt de ETL de legacy-defaults (instellingsformaat, `;`-gescheiden). Voor het UvA SQL-formaat (zie [Je data voorbereiden](je-data-voorbereiden.md#uva-sql-telbestand-fijnmazig-studielink-formaat)):
+
+```json
+{
+    "cumulative_input": {
+        "separator": ",",
+        "value_maps": {
+            "Type hoger onderwijs": {"P": "Bachelor", "B": "Bachelor", "M": "Master", "A": "Associate degree", "O": "Onbekend"},
+            "Herkomst": {"N": "NL", "E": "EER", "R": "Niet-EER", "O": "Onbekend"}
+        },
+        "faculteit_sentinel": "Onbekend",
+        "aggregate": true,
+        "drop_deleted": true
+    }
+}
+```
+
+| Sleutel | Default | Betekenis |
+|---------|---------|-----------|
+| `separator` | `";"` | Scheidingsteken van de ruwe telbestanden (UvA SQL: `","`). |
+| `rename` | legacy-map | Bronkolom → canonieke kolomnaam. De UvA-bronkolommen (`Brincode`, `Studiejaar`, `Type_HO`, `Isatcode`, `Aantal`) zijn gelijk aan legacy, dus meestal niet nodig. |
+| `value_maps` | legacy-vertalingen | Waardevertalingen per canonieke kolom. Per kolom volledig overschrijfbaar; niet-genoemde kolommen (bijv. `Herinschrijving`/`Hogerejaars`) houden hun default. Niet-gemapte waarden gaan onveranderd door (met een waarschuwing). |
+| `faculteit_sentinel` | `null` | Vulwaarde voor een ontbrekende `Faculteit`. **Moet niet-leeg zijn** als de kolom in de bron ontbreekt: een lege (NaN) Faculteit laat de cumulatieve `groupby`/pivot de rijen vallen. |
+| `programme_name_source` | `"Groepeernaam"` | Bronkolom voor de leesbare opleidingsnaam; valt terug op `Croho` (Isatcode) als de kolom ontbreekt. |
+| `aggregate` | `false` | Tel de fijnmazige rijen op naar de canonieke grain (verplicht voor UvA: bereken `Gewogen` per rij, sommeer daarna; anders crasht de pivot op dubbele indexrijen). |
+| `drop_deleted` | `false` | Filter rijen met `etl_is_deleted != 0` (UvA SQL soft-delete vlag). |
+
+De canonieke output is altijd `;`-gescheiden, ongeacht de input-separator.
 
 ## `numerus_fixus`
 
@@ -245,13 +292,13 @@ Bepaalt per weekperiode hoe zwaar het individuele en het cumulatieve SARIMA-mode
 |---------|----------------------|
 | `master_week_17_23` | Examentype = Master én weeknummer 17–23 |
 | `week_30_34` | Weeknummer 30–34 |
-| `week_35_37` | Weeknummer 35–37 |
+| `week_35_37` | Weeknummer 35 t/m `final_academic_week - 1` |
 | `default` | Alle overige gevallen |
 
-Week 38 is altijd 100% individueel en wordt niet door deze instelling beïnvloed. Zie [Ensemble](methodologie/ensemble.md) voor achtergrond bij de keuze van gewichten.
+De einddeadline (`final_academic_week`, standaard week 38; UvA week 36) is altijd 100% individueel en wordt niet door deze instelling beïnvloed. Zie [Ensemble](methodologie/ensemble.md) voor achtergrond bij de keuze van gewichten.
 
-!!! note "Weekgrenzen zijn niet configureerbaar"
-    De sleutelnamen (zoals `week_30_34`) beschrijven de weekperiode waarop een gewicht van toepassing is, maar de weekgrenzen zelf zijn in de code vastgelegd. Alleen de **gewichten** zijn instelbaar via dit blok. Wil je de weekgrenzen aanpassen, dan vereist dat een codewijziging in `output/postprocessor.py`.
+!!! note "Weekgrenzen volgen `final_academic_week`"
+    De sleutelnamen (zoals `week_30_34`) beschrijven de weekperiode waarop een gewicht van toepassing is; de **gewichten** zijn instelbaar via dit blok. De bovengrens van `week_35_37` en de 100%-individueel-eindweek schalen mee met [`model_config.final_academic_week`](#final_academic_week) (bij week 36 loopt `week_35_37` dus alleen over week 35). De overige weekgrenzen (17–23, 30–34) liggen vast in `output/postprocessor.py` en vereisen een codewijziging om aan te passen.
 
 ## `columns` — kolomnamen mapping
 
@@ -297,6 +344,24 @@ Optionele sectie. Hoeft niet in je configuratiebestand te staan. Voeg alleen toe
 | `collegejaar_min_offset` | `15` | Collegejaren ouder dan `huidig jaar - 15` geven een fout |
 | `collegejaar_max_offset` | `2` | Collegejaren na `huidig jaar + 2` geven een fout |
 | `telbestand.herkomst_allowed` | `["N","E","R"]` | Toegestane herkomstwaarden in telbestanden |
+| `telbestand.required_columns` | legacy-lijst | Vereiste ruwe kolommen. Het UvA SQL-formaat mist `Groepeernaam`, dus zet hier een lijst zonder die kolom. |
+| `telbestand.separator` | `";"` | Scheidingsteken waarmee de validatie de telbestanden inleest. Zet op `","` voor het UvA SQL-formaat (gelijk aan `cumulative_input.separator`). |
+| `telbestand.programme_column` | `"Groepeernaam"` | Kolom waarop categorale fouten worden gegroepeerd. Zet op `"Isatcode"` als `Groepeernaam` ontbreekt (UvA). |
+
+Voor het UvA SQL-formaat horen de `validation`-overrides en het [`cumulative_input`](#cumulative_input-uva-sql-telbestand-omzetten)-blok samen; ze beschrijven hetzelfde ruwe formaat voor respectievelijk de validatie en de ETL:
+
+```json
+{
+    "validation": {
+        "telbestand": {
+            "separator": ",",
+            "programme_column": "Isatcode",
+            "required_columns": ["Studiejaar", "Isatcode", "Aantal", "meercode_V", "Status", "Herinschrijving", "Hogerejaars", "Herkomst"],
+            "herkomst_allowed": ["N", "E", "R", "O"]
+        }
+    }
+}
+```
 
 Zie [Validatie](validatie.md) voor een volledig overzicht van alle controles.
 

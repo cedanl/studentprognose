@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 from studentprognose.utils.weeks import get_max_week
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 from studentprognose.output.postprocessor import PostProcessor
 
 
@@ -14,6 +15,9 @@ class PredictionStrategy(ABC):
         self.configuration = configuration
         self.numerus_fixus_list = configuration["numerus_fixus"]
         self.min_training_year = configuration.get("model_config", {}).get("min_training_year", 2016)
+        self.final_academic_week = configuration.get("model_config", {}).get(
+            "final_academic_week", FINAL_ACADEMIC_WEEK
+        )
         self.excluded_data_points = configuration.get("excluded_data_points", [])
 
         self.postprocessor = PostProcessor(
@@ -38,7 +42,9 @@ class PredictionStrategy(ABC):
         self.predict_week = predict_week
 
         self.max_year = data["Collegejaar"].max()
-        self.max_week = get_max_week(self.predict_year, self.max_year, data, "Collegejaar")
+        self.max_week = get_max_week(
+            self.predict_year, self.max_year, data, "Collegejaar", self.final_academic_week
+        )
 
     def set_filtering(self, programme_filtering, herkomst_filtering, examentype_filtering):
         self.programme_filtering = programme_filtering

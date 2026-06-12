@@ -52,6 +52,20 @@ In het individuele spoor kan een deadlineweek-variabele als exogene regresssor w
 - Opleiding met sterke interjaarse variatie in aanmeldpatroon
 - Vroeg in het jaar (weinig datapunten beschikbaar; de voorspelling is dan een lange extrapolatie)
 
+## Academische-jaargrens (`final_academic_week`)
+
+Het cumulatieve spoor modelleert één academisch jaar als een vaste week-volgorde die loopt van de reset-week (`final_academic_week + 1`) via week 52 door naar `final_academic_week` van het jaar erop. Deze grens bepaalt de voorspelhorizon (`pred_len`), de seizoensvolgorde van de kolommen en de reset-week die als nulpunt wordt geïnjecteerd.
+
+Standaard is dit **week 38** (eind september, de inschrijfdeadline van het legacy Studielink-instellingsformaat). De grens is configureerbaar via `model_config.final_academic_week` omdat niet elke leverancier dezelfde kalender hanteert:
+
+- **Legacy instellingsformaat:** leveringen lopen tot week 38 → `final_academic_week = 38`.
+- **UvA SQL-telbestand:** de aanmeldfase eindigt rond week 36; er zijn geen leveringen in de weken 37–39 (de Studielink-cyclus reset daar). Met de standaard 38 zou het model proberen te voorspellen tot een week die niet in de data bestaat. Daarom `final_academic_week = 36`.
+
+**Aanname:** de waarde moet overeenkomen met de week tot waar de aanmeldfase daadwerkelijk gegevens levert. Een te hoge waarde laat de voorspelling crashen of extrapoleert naar niet-bestaande weken; een te lage waarde kapt de voorspelhorizon onnodig af. De grens geldt voor het cumulatieve spoor; het individuele spoor gebruikt de vaste Studielink-kalender (week 38).
+
+!!! warning "52-weeks model en ISO-week 53"
+    Het seizoen telt vast **52 weken**. In lange ISO-jaren (bijv. een leverdatum eind december 2020 of 2026) levert de afleiding uit de leverdatum **ISO-week 53** op. Zulke weeksnapshots blijven wél in `vooraanmeldingen_cumulatief.csv` staan, maar vallen **buiten het seizoensvenster** dat het cumulatieve model gebruikt — ze worden niet meegetraind (de ETL geeft hierover een waarschuwing). Voor de jaaroverzichten betekent dit dat de allerlaatste decembersnapshot van een lang ISO-jaar niet apart wordt gemodelleerd; de eerstvolgende januarisnapshot (week 1) vangt de cumulatieve stand weer op. Volledige ondersteuning van week 53 zou een variabele seizoenslengte vereisen en is bewust niet in deze stap meegenomen.
+
 ## Bekende hardgecodeerde uitzondering: 2021
 
 In `utils/weeks.py` staat een expliciete uitzondering voor collegejaar 2021:

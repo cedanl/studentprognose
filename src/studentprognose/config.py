@@ -5,6 +5,7 @@ from importlib.resources import files
 from types import SimpleNamespace
 
 from studentprognose.utils.telbestand_filenames import _placeholder_to_regex
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
@@ -82,6 +83,17 @@ def get_columns(config: dict) -> SimpleNamespace:
 def get_model_features(config: dict) -> dict:
     """Get model feature lists (numeric / categorical) from configuration."""
     return config.get("model_features", {})
+
+
+def get_final_academic_week(config: dict) -> int:
+    """Laatste week van het academisch jaar uit de configuratie.
+
+    Default :data:`FINAL_ACADEMIC_WEEK` (38, het Radboud/Studielink-instellings-
+    formaat). Het UvA SQL-telbestand levert de aanmeldfase tot ~week 36 (geen
+    leveringen week 37–39), dus ``model_config.final_academic_week`` staat daar
+    op 36. Bepaalt de seizoensvensters in weeks/sarima/cumulative/postprocessor.
+    """
+    return config.get("model_config", {}).get("final_academic_week", FINAL_ACADEMIC_WEEK)
 
 
 def get_cpu_count(config: dict) -> int:

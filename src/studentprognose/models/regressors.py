@@ -5,6 +5,7 @@ from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
 from studentprognose.utils.weeks import get_weeks_list
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
 
 _DEFAULT_CATEGORICAL_COLS = ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]
@@ -122,6 +123,7 @@ def build_preprocessor(
     extra_numeric_cols: list[str] | None = None,
     categorical_cols: list[str] | None = None,
     year_col: str = "Collegejaar",
+    final_week: int = FINAL_ACADEMIC_WEEK,
 ) -> tuple[ColumnTransformer, list[str], list[str]]:
     """Bouw de gedeelde preprocessing pipeline voor alle regressors.
 
@@ -131,6 +133,9 @@ def build_preprocessor(
             Standaard uit ``_DEFAULT_CATEGORICAL_COLS``; configureerbaar via
             ``config["model_features"]["regressor"]["categorical"]``.
         year_col: Naam van de jaar-kolom (standaard ``"Collegejaar"``).
+        final_week: Laatste week van het academisch jaar (default 38; UvA 36).
+            Bepaalt welke weekkolommen als numerieke features worden gebruikt,
+            zodat ze aansluiten op de wide-format van ``transform_data``.
 
     Returns:
         (preprocessor, numeric_cols, categorical_cols)
@@ -140,7 +145,7 @@ def build_preprocessor(
 
     numeric_cols = (
         [year_col]
-        + [str(x) for x in get_weeks_list(38)]
+        + [str(x) for x in get_weeks_list(final_week, final_week)]
         + (extra_numeric_cols or [])
     )
 

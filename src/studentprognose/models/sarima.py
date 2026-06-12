@@ -3,7 +3,7 @@ from numpy import linalg as LA
 from statsforecast.models import ARIMA
 
 from studentprognose.models.base import BaseForecaster
-from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len
+from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len, academic_start_week
 from studentprognose.utils.constants import (
     FINAL_ACADEMIC_WEEK,
     SARIMA_ORDER, SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
@@ -39,8 +39,8 @@ class SARIMAForecaster(BaseForecaster):
         return result["mean"]
 
 
-def create_time_series(data, pred_len):
-    ts_data = data.loc[:, get_all_weeks_valid(data.columns)].values.flatten()
+def create_time_series(data, pred_len, final_week: int = FINAL_ACADEMIC_WEEK):
+    ts_data = data.loc[:, get_all_weeks_valid(data.columns, final_week)].values.flatten()
     ts_data = ts_data[:-pred_len]
     return np.array(ts_data)
 
@@ -59,6 +59,7 @@ def predict_with_sarima_cumulative(
     already_printed=False,
     min_training_year: int = 2016,
     forecaster_factory: "callable | None" = None,
+    final_week: int = FINAL_ACADEMIC_WEEK,
 ) -> list:
     """Voorspelt vooraanmeldingen per programme/herkomst/week voor cumulatieve data.
 
@@ -66,6 +67,8 @@ def predict_with_sarima_cumulative(
         forecaster_factory: Callable die een vers BaseForecaster-object retourneert.
             Wordt per aanroep gecalld zodat joblib-parallellisatie veilig werkt.
             Default: SARIMAForecaster met standaard ordes.
+        final_week: Laatste week van het academisch jaar (default 38; UvA 36).
+            Bepaalt de seizoensvolgorde en de reset-week-injectie.
 
     Returns:
         list: predictions per toekomstige week, of lege lijst bij fout.
@@ -82,7 +85,7 @@ def predict_with_sarima_cumulative(
     data_cumulative = data_cumulative.astype(
         {"Weeknummer": "int32", "Collegejaar": "int32"}
     )
-    data = _get_transformed_data(data_cumulative.copy(deep=True), min_training_year)
+    data = _get_transformed_data(data_cumulative.copy(deep=True), min_training_year, final_week)
 
     data = data[
         (data["Herkomst"] == herkomst)
@@ -91,9 +94,9 @@ def predict_with_sarima_cumulative(
         & (data["Examentype"] == examentype)
     ]
 
-    data["39"] = 0
+    data[str(academic_start_week(final_week))] = 0
 
-    ts_data = create_time_series(data, pred_len)
+    ts_data = create_time_series(data, pred_len, final_week)
 
     try:
         factory = forecaster_factory or _default_forecaster_factory
@@ -216,17 +219,18 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
         return []
 
 
-def _get_transformed_data(data, min_training_year: int = 2016):
+def _get_transformed_data(data, min_training_year: int = 2016, final_week: int = FINAL_ACADEMIC_WEEK):
     """Helper to transform cumulative data for SARIMA.
 
     Args:
         data: Cumulative pre-application data.
         min_training_year: Earliest academic year included in training. Should be
             read from ``model_config.min_training_year`` in the caller's configuration.
+        final_week: Laatste week van het academisch jaar (default 38; UvA 36).
     """
     from studentprognose.data.transforms import transform_data
 
     data = data.drop_duplicates()
     data = data[data["Collegejaar"] >= min_training_year]
-    data = transform_data(data, "ts")
+    data = transform_data(data, "ts", final_week)
     return data
