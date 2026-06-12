@@ -8,6 +8,7 @@ from studentprognose.models.forecasters import (
     ThetaForecaster,
     AutoARIMAForecaster,
 )
+from studentprognose.utils.constants import SARIMA_ORDER, SARIMA_SEASONAL_ORDER
 
 
 def _seasonal_series(n_years: int = 5, season_length: int = 52) -> np.ndarray:
@@ -79,3 +80,32 @@ def test_forecaster_predictions_reasonable():
 
     assert np.mean(pred) > 50
     assert np.mean(pred) < 500
+
+
+def test_sarima_short_series_falls_back_to_nonseasonal():
+    """Regressie (#231): de native statsforecast-backend crasht het PROCES
+    (SIGSEGV/SIGABRT door heap-corruptie) bij ARIMA(1,1,1)x52 op een reeks korter
+    dan twee volledige seizoenen. SARIMAForecaster valt dan terug op een niet-
+    seizoensmodel. Zonder die guard haalt deze test het pytest-proces onderuit
+    (exitcode 134)."""
+    rng = np.random.default_rng(0)
+    n = 93  # < 2 * 52: precies in het empirische crash-bereik
+    ts = (np.cumsum(np.abs(rng.standard_normal(n))) + np.arange(n)).astype(np.float64)
+
+    model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
+    model.fit(ts)
+
+    assert model._model.season_length == 1  # seizoenscomponent uitgeschakeld
+    pred = model.forecast(steps=10)
+    assert len(pred) == 10
+    assert np.all(np.isfinite(pred))
+
+
+def test_sarima_long_series_keeps_seasonal_model():
+    """Lange reeksen (>= 2 seizoenen) houden het volledige seizoensmodel intact."""
+    ts = _seasonal_series(n_years=5)  # 260 >= 2 * 52
+
+    model = SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
+    model.fit(ts)
+
+    assert model._model.season_length == SARIMA_SEASONAL_ORDER[3]  # 52 behouden

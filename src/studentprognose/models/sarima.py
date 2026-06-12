@@ -24,10 +24,26 @@ class SARIMAForecaster(BaseForecaster):
         self._model = None
 
     def fit(self, ts_data, exog=None):
+        season_length = self.season_length
+        seasonal_order = self.seasonal_order
+
+        # Seizoens-ARIMA op te weinig data: de native statsforecast/numba-backend
+        # crasht (SIGSEGV/SIGABRT door heap-corruptie) zodra een seizoens-
+        # differentiatie/-AR/-MA wordt geschat op een reeks die korter is dan
+        # twee volledige seizoenen. Empirisch precies bij ``len < 2*season_length``
+        # (bijv. <104 weken bij season_length=52). Een seizoenscomponent met
+        # periode ``season_length`` is uit <2 seizoenen ook statistisch niet te
+        # schatten, dus val terug op een niet-seizoensmodel. Dit raakt korte
+        # reeksen (bijv. nieuwe/kleine opleidingen, of fijnmazige CI-test-subsets);
+        # lange reeksen (legacy-historie) houden het volledige seizoensmodel.
+        if season_length > 1 and any(seasonal_order) and len(ts_data) < 2 * season_length:
+            season_length = 1
+            seasonal_order = (0, 0, 0)
+
         self._model = ARIMA(
             order=self.order,
-            season_length=self.season_length,
-            seasonal_order=self.seasonal_order,
+            season_length=season_length,
+            seasonal_order=seasonal_order,
         )
         X = exog.reshape(-1, 1) if exog is not None else None
         self._model.fit(y=ts_data.astype(np.float64), X=X)
