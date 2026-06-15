@@ -22,7 +22,7 @@ Aanmelddata heeft een sterk seizoenspatroon (jaarlijkse cyclus, wekelijkse granu
 
 $$SARIMA(p, d, q)(P, D, Q)_{52}$$
 
-De seizoenslengte is altijd **52 weken**. De overige parameters zijn **vaste waarden** — er wordt geen automatische parameter-selectie toegepast. De keuze hangt af van het spoor en het moment in het jaar:
+De nominale seizoenslengte is **52 weken** (één jaar). In het cumulatieve spoor wordt deze automatisch verkleind naar het werkelijke aantal gevulde weken per jaar wanneer dat lager ligt — zie [Seizoenslengte: afgeleid uit de data](#seizoenslengte-afgeleid-uit-de-data). De overige parameters zijn **vaste waarden** — er wordt geen automatische parameter-selectie toegepast. De keuze hangt af van het spoor en het moment in het jaar:
 
 | Situatie | Order `(p,d,q)` | Seizoensorder `(P,D,Q)` |
 |----------|----------------|------------------------|
@@ -64,7 +64,19 @@ Standaard is dit **week 38** (eind september, de inschrijfdeadline van het legac
 **Aanname:** de waarde moet overeenkomen met de week tot waar de aanmeldfase daadwerkelijk gegevens levert. Een te hoge waarde laat de voorspelling crashen of extrapoleert naar niet-bestaande weken; een te lage waarde kapt de voorspelhorizon onnodig af. De grens geldt voor het cumulatieve spoor; het individuele spoor gebruikt de vaste Studielink-kalender (week 38).
 
 !!! warning "52-weeks model en ISO-week 53"
-    Het seizoen telt vast **52 weken**. In lange ISO-jaren (bijv. een leverdatum eind december 2020 of 2026) levert de afleiding uit de leverdatum **ISO-week 53** op. Zulke weeksnapshots blijven wél in `vooraanmeldingen_cumulatief.csv` staan, maar vallen **buiten het seizoensvenster** dat het cumulatieve model gebruikt — ze worden niet meegetraind (de ETL geeft hierover een waarschuwing). Voor de jaaroverzichten betekent dit dat de allerlaatste decembersnapshot van een lang ISO-jaar niet apart wordt gemodelleerd; de eerstvolgende januarisnapshot (week 1) vangt de cumulatieve stand weer op. Volledige ondersteuning van week 53 zou een variabele seizoenslengte vereisen en is bewust niet in deze stap meegenomen.
+    Het seizoensvenster omvat maximaal **52 weken**. In lange ISO-jaren (bijv. een leverdatum eind december 2020 of 2026) levert de afleiding uit de leverdatum **ISO-week 53** op. Zulke weeksnapshots blijven wél in `vooraanmeldingen_cumulatief.csv` staan, maar vallen **buiten het seizoensvenster** dat het cumulatieve model gebruikt — ze worden niet meegetraind (de ETL geeft hierover een waarschuwing). Voor de jaaroverzichten betekent dit dat de allerlaatste decembersnapshot van een lang ISO-jaar niet apart wordt gemodelleerd; de eerstvolgende januarisnapshot (week 1) vangt de cumulatieve stand weer op. Volledige ondersteuning van week 53 zou een variabele seizoenslengte vereisen en is bewust niet in deze stap meegenomen.
+
+## Seizoenslengte: afgeleid uit de data
+
+De seizoenslag bepaalt naar welk punt in het verleden het model kijkt om "dezelfde week vorig jaar" te vinden. Nominaal is dat **52 weken**. Het cumulatieve spoor zet een reeks echter in elkaar door de trainingsjaren achter elkaar te plakken over precies de weekkolommen die ná het pivotteren bestaan — de **union van gevulde weken** over alle jaren en opleidingen, plus de geïnjecteerde reset-week. Lege start- en eindweken (vóór de openbaarmakingsdrempel van de telleverancier — bij UvA `Aantal ≥ 21` — en nadat de aanmeldingen weer onder die drempel zakken) bestaan niet als kolom. Die union telt daardoor **minder dan 52 weken** (op de huidige UvA-demodata empirisch ruwweg 43–45). Dat aantal is de werkelijke jaarblok-lengte ("stride") van de afgevlakte reeks.
+
+Staat de seizoenslag vast op 52 terwijl de stride korter is, dan wijst de lag naar de **verkeerde week-in-het-jaar**: de jaarcyclus staat uit fase en het model kan de seizoensvorm niet reproduceren. Het netto-effect op de prognose is datagedreven — op de UvA-funneldata uit dit zich concreet als een prognose die ná de piek **omhoog drijft in plaats van mee te dalen** met de werkelijke (teruglopende) openstaande vooraanmeldingen.
+
+Daarom stelt het cumulatieve spoor de seizoenslengte gelijk aan deze stride (`len(get_all_weeks_valid(...))`, inclusief de reset-week). De aanpassing **verkleint alleen**: een volledig gevulde cyclus (stride == 52) houdt `season_length = 52`, dus correct gevulde reeksen blijven ongemoeid. Dezelfde afleiding wordt toegepast in de [benchmark](benchmarks.md), zodat modelselectie hetzelfde model meet als productie.
+
+**Aanname:** de set gevulde weken is over de jaren heen stabiel genoeg dat de union een goede benadering is van de cyclus per jaar. Wisselt de weekdekking sterk per jaar, dan wordt de seizoensuitlijning minder scherp.
+
+**Wanneer vertrouw je het niet?** Bij leveranciers of opleidingen waar de set gevulde weken sterk wisselt tussen jaren, of bij een gemengde dataset waarin cohorten een uiteenlopende weekdekking hebben.
 
 ## Bekende hardgecodeerde uitzondering: 2021
 
@@ -89,7 +101,7 @@ Naast SARIMA zijn drie alternatieve tijdreeksmodellen beschikbaar, configureerba
 | **Theta** (AutoTheta) | `theta` | Zeer simpel model dat competitief is bij korte tijdreeksen (winnaar M3-competitie). Goede robuuste baseline. |
 | **AutoARIMA** | `auto_arima` | Automatische selectie van ARIMA-ordes via AICc-minimalisatie. Flexibeler dan de vaste ordes van SARIMA, maar trager door de zoekprocedure. |
 
-Alle modellen gebruiken dezelfde `BaseForecaster`-interface en dezelfde seizoenslengte van 52 weken. ETS en Theta ondersteunen geen exogene variabelen (relevant voor het individuele spoor).
+Alle modellen gebruiken dezelfde `BaseForecaster`-interface en dezelfde nominale seizoenslengte van 52 weken (in het cumulatieve spoor verkleind naar de werkelijke periode, zie [Seizoenslengte: afgeleid uit de data](#seizoenslengte-afgeleid-uit-de-data)). ETS en Theta ondersteunen geen exogene variabelen (relevant voor het individuele spoor).
 
 Gebruik `studentprognose benchmark -w <week>` om te vergelijken welk model het best presteert op jouw data voordat je de keuze in de configuratie wijzigt.
 

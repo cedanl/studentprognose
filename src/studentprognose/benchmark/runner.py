@@ -6,7 +6,7 @@ from studentprognose.benchmark.evaluate_ts import evaluate_timeseries_model
 from studentprognose.benchmark.evaluate_regressor import evaluate_regressor_model
 from studentprognose.benchmark.evaluate_classifier import evaluate_classifier_model
 from studentprognose.benchmark.report import generate_cumulative_report, generate_individual_report
-from studentprognose.config import load_configuration, get_columns
+from studentprognose.config import load_configuration, get_columns, get_final_academic_week
 from studentprognose.data.loader import load_data
 from studentprognose.models import (
     FORECASTER_REGISTRY,
@@ -16,7 +16,7 @@ from studentprognose.models import (
 from studentprognose.models.sarima import _get_transformed_data
 from studentprognose.strategies.cumulative import _add_engineered_features
 from studentprognose.strategies.individual import preprocess_individual_data
-from studentprognose.utils.weeks import DataOption
+from studentprognose.utils.weeks import DataOption, academic_start_week
 
 
 def main(
@@ -70,8 +70,11 @@ def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_di
     # --- Stap 2: regressiemodellen ---
     print("\nStap 2: Regressiemodellen evalueren")
 
-    full_data = _get_transformed_data(data_cumulative.copy(), min_year)
-    full_data["39"] = 0
+    # Zelfde academische-jaargrens als productie (cumulative.py): zo wordt de
+    # regressor-feature-matrix op dezelfde manier gepivot/gereset als in productie.
+    final_week = get_final_academic_week(config)
+    full_data = _get_transformed_data(data_cumulative.copy(), min_year, final_week)
+    full_data[str(academic_start_week(final_week))] = 0
     full_data = _add_engineered_features(full_data, data_cumulative, predict_week)
 
     reg_results = []

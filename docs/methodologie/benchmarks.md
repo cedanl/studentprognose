@@ -32,7 +32,7 @@ De benchmark gebruikt **leave-last-year-out** splits:
 - **Test:** jaar N
 - **Minimaal 3 trainingsjaren** per fold
 
-Dit bootst de productiescenario na: het model traint op historische data en voorspelt het lopende jaar.
+Dit bootst de productiescenario na: het model traint op historische data en voorspelt het lopende jaar. De benchmark gebruikt dezelfde academische-jaargrens (`model_config.final_academic_week`) en dezelfde uit-de-data-afgeleide seizoenslengte als productie (zie [SARIMA → Seizoenslengte: afgeleid uit de data](sarima.md#seizoenslengte-afgeleid-uit-de-data)), zodat de gemeten modellen overeenkomen met wat productie draait.
 
 ### Leakage-preventie
 

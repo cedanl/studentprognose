@@ -5,9 +5,9 @@ import pandas as pd
 
 from studentprognose.benchmark.metrics import mape, mae, rmse
 from studentprognose.benchmark.splitter import time_series_split
-from studentprognose.config import get_columns
-from studentprognose.models.sarima import _get_transformed_data
-from studentprognose.utils.weeks import compute_pred_len, get_all_weeks_valid
+from studentprognose.config import get_columns, get_final_academic_week
+from studentprognose.models.sarima import _get_transformed_data, shrink_season_length_to_period
+from studentprognose.utils.weeks import compute_pred_len, get_all_weeks_valid, academic_start_week
 
 
 def evaluate_timeseries_model(
@@ -36,7 +36,11 @@ def evaluate_timeseries_model(
         de metrics MAPE, MAE, RMSE en trainingstijd.
     """
     c = get_columns(config)
-    pred_len = compute_pred_len(predict_week)
+    # Zelfde academische-jaargrens als productie (UvA 36, legacy 38), zodat de
+    # seizoensvolgorde, reset-week, voorspelhorizon én seizoenslengte hieronder
+    # de productie-pipeline spiegelen.
+    final_week = get_final_academic_week(config)
+    pred_len = compute_pred_len(predict_week, final_week)
 
     group_keys = data_cumulative.groupby(
         [c.programme, c.origin, c.exam_type]
@@ -44,21 +48,29 @@ def evaluate_timeseries_model(
 
     results = []
 
+    # Pivot de HELE dataset één keer en filter dán per groep op rij — net als
+    # productie (models/sarima.py: _get_transformed_data over de volledige data,
+    # daarna pas de rij-filter). Zo zijn de weekkolommen de cross-groep-union en
+    # leidt shrink_season_length_to_period dezelfde seizoenslengte af als productie.
+    # Per-groep pivotten zou season_length uit één groep halen en bij heterogene
+    # weekdekking afwijken van wat productie meet.
+    wide_all = _get_transformed_data(data_cumulative.copy(), min_training_year, final_week)
+    if wide_all.empty:
+        return pd.DataFrame(results)
+    wide_all[str(academic_start_week(final_week))] = 0
+
     for _, group_row in group_keys.iterrows():
         programme = group_row[c.programme]
         herkomst = group_row[c.origin]
         examentype = group_row[c.exam_type]
 
-        subset = data_cumulative[
-            (data_cumulative[c.programme] == programme)
-            & (data_cumulative[c.origin] == herkomst)
-            & (data_cumulative[c.exam_type] == examentype)
+        wide = wide_all[
+            (wide_all[c.programme] == programme)
+            & (wide_all[c.origin] == herkomst)
+            & (wide_all[c.exam_type] == examentype)
         ]
-
-        wide = _get_transformed_data(subset.copy(), min_training_year)
         if wide.empty:
             continue
-        wide["39"] = 0
 
         splits = time_series_split(wide, min_training_year, min_train_years, year_col=c.academic_year)
 
@@ -67,7 +79,7 @@ def evaluate_timeseries_model(
 
             train_for_ts = pd.concat([train_wide, test_wide])
             ts_data = train_for_ts.loc[
-                :, get_all_weeks_valid(train_for_ts.columns)
+                :, get_all_weeks_valid(train_for_ts.columns, final_week)
             ].values.flatten()
 
             if len(ts_data) <= pred_len:
@@ -78,7 +90,9 @@ def evaluate_timeseries_model(
 
             t0 = time.perf_counter()
             try:
-                model = forecaster_factory()
+                model = shrink_season_length_to_period(
+                    forecaster_factory(), train_for_ts.columns, final_week
+                )
                 model.fit(np.array(ts_train))
                 pred = model.forecast(steps=pred_len)
                 elapsed = time.perf_counter() - t0

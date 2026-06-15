@@ -2354,6 +2354,14 @@ class DashboardBuilder:
                 .sort_values("Weeknummer", key=_sort_weeks_series)
             )
 
+            # Heeft deze opleiding geen data in het voorspeljaar, dan is full_agg leeg.
+            # Booleaanse indexering met een lengte-0 masker (full_agg[mask]) geeft in
+            # pandas een KOLOMLOZE DataFrame terug, waarna full_agg["Weeknummer"]
+            # crasht met KeyError. Sla de prediction-year-traces dan over; de
+            # historische lijnen voor deze opleiding zijn hierboven al toegevoegd.
+            if full_agg.empty:
+                continue
+
             if self.predict_week is not None:
                 pw_key = week_sort_key(self.predict_week)
                 before_pw = full_agg[full_agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
@@ -2554,15 +2562,26 @@ class DashboardBuilder:
                 vis[trace_idx] = "legendonly" if default_vis == "legendonly" else True
             buttons.append(dict(label=prog, method="update", args=[{"visible": vis}]))
 
-        # Activate first programme
+        # Default-zichtbare opleiding: niet de alfabetisch eerste (vaak een kleine
+        # opleiding waarvan de data pas ná de voorspelweek begint -> lege grafiek),
+        # maar de GROOTSTE in het voorspeljaar, zodat de actueel-lijn + SARIMA-
+        # prognose meteen zichtbaar zijn. De dropdown-'active' wijst naar dezelfde.
+        active_idx = 0
         if programmes:
-            for trace_idx, default_vis in prog_traces[programmes[0]]:
+            py_totals = (
+                dc[dc["Collegejaar"] == self.prediction_year]
+                .groupby("Croho groepeernaam")["Gewogen vooraanmelders"].sum()
+            )
+            py_totals = py_totals[py_totals.index.isin(programmes)]
+            default_prog = py_totals.idxmax() if not py_totals.empty else programmes[0]
+            active_idx = programmes.index(default_prog)
+            for trace_idx, default_vis in prog_traces[default_prog]:
                 fig.data[trace_idx].visible = "legendonly" if default_vis == "legendonly" else True
 
         fig.update_layout(
             title="Verloop per opleiding — alle jaren",
             xaxis_title="Weeknummer", yaxis_title="Gewogen vooraanmelders", height=_chart_height(5, min_h=550),
-            updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
+            updatemenus=[dict(active=active_idx, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
         )
         self._add_predict_week_line(fig)
         return fig

@@ -65,6 +65,35 @@ def _default_forecaster_factory() -> BaseForecaster:
     return SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
 
 
+def shrink_season_length_to_period(model, columns, final_week: int = FINAL_ACADEMIC_WEEK):
+    """Stem de seizoenslengte van ``model`` af op de werkelijke jaar-periode.
+
+    ``create_time_series`` plakt de trainingsjaren achter elkaar over precies de
+    weekkolommen uit ``get_all_weeks_valid`` (de gevulde-week-kolommen van de
+    gepivote data — de kruisjaarse/kruisopleiding-union — plus de geïnjecteerde
+    reset-week). Dát aantal, niet de nominale 52, is de jaarblok-stride van de
+    afgevlakte reeks. De seizoenslag moet daaraan gelijk zijn; staat hij vast op
+    52 terwijl de stride korter is, dan wijst de lag naar de verkeerde
+    week-in-het-jaar en staat de jaarcyclus uit fase. Het model kan de
+    seizoensvorm dan niet reproduceren — op de UvA-funneldata uit zich dat als
+    een prognose die ná de piek omhoog drijft i.p.v. de daling te volgen.
+
+    Verkleint alleen: een volledig gevuld jaar (``periode == season_length``) en
+    modellen zonder ``season_length`` blijven ongemoeid. Geldt voor elk model met
+    een ``season_length`` (SARIMA, ETS, Theta, AutoARIMA). De toewijzing is
+    defensief: een forecaster met een alleen-lezen ``season_length`` wordt
+    overgeslagen i.p.v. te crashen. Wordt op exact dezelfde wijze toegepast in de
+    benchmark (``evaluate_ts.py``) zodat die hetzelfde model meet als productie.
+    """
+    period = len(get_all_weeks_valid(columns, final_week))
+    if hasattr(model, "season_length") and 1 < period < model.season_length:
+        try:
+            model.season_length = period
+        except AttributeError:
+            pass
+    return model
+
+
 def predict_with_sarima_cumulative(
     data_cumulative,
     row,
@@ -116,7 +145,9 @@ def predict_with_sarima_cumulative(
 
     try:
         factory = forecaster_factory or _default_forecaster_factory
-        model = factory()
+        # Seizoenslengte afstemmen op de werkelijke jaar-periode (gevulde-week-
+        # kolommen), niet de vaste 52 — zie shrink_season_length_to_period.
+        model = shrink_season_length_to_period(factory(), data.columns, final_week)
         model.fit(ts_data)
         pred = model.forecast(steps=pred_len)
         return pred

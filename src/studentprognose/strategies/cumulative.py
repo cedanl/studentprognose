@@ -8,7 +8,9 @@ import warnings
 from studentprognose.config import get_cpu_count
 from studentprognose.utils.parallel import run_parallel_with_fallback
 from studentprognose.strategies.base import PredictionStrategy
-from studentprognose.utils.weeks import increment_week, compute_pred_len, academic_start_week
+from studentprognose.utils.weeks import (
+    increment_week, compute_pred_len, academic_start_week, get_all_weeks_ordered,
+)
 from studentprognose.models import create_forecaster, create_regressor
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
@@ -295,13 +297,28 @@ class CumulativeStrategy(PredictionStrategy):
                 break
 
             if self.predict_week != self.final_academic_week and len(predictions[i]) > 0:
-                data.loc[
+                mask = (
                     (data["Collegejaar"] == self.predict_year - self.skip_years)
                     & (data["Croho groepeernaam"] == programme)
                     & (data["Herkomst"] == herkomst)
-                    & (data["Examentype"] == examentype),
-                    index:str(self.final_academic_week),
-                ] = predictions[i]
+                    & (data["Examentype"] == examentype)
+                )
+                # Vul de voorspelde weken (index .. final_week, academische volgorde)
+                # in. Robuust tegen ontbrekende eind-weekkolommen: bij een dalende
+                # reeks valt de final_academic_week-kolom soms weg (combinaties zakken
+                # onder de openbaarmakingsdrempel). Een vaste label-slice index:"36"
+                # crasht dan op een non-monotone index; daarom alleen bestaande
+                # weekkolommen vullen, uitgelijnd op de voorspelvolgorde.
+                ordered = get_all_weeks_ordered(self.final_academic_week)
+                if index in ordered:
+                    target_weeks = ordered[ordered.index(index):]
+                    cols, vals = [], []
+                    for k, wk in enumerate(target_weeks):
+                        if k < len(predictions[i]) and wk in data.columns:
+                            cols.append(wk)
+                            vals.append(predictions[i][k])
+                    if cols:
+                        data.loc[mask, cols] = vals
             i += 1
 
             if programme in self.numerus_fixus_list:
