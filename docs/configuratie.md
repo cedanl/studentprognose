@@ -312,9 +312,9 @@ Volledige lijst van kanonieke kolomnamen die gemapped kunnen worden:
 
 ### `oktober` — telbestand studenten
 
-`Collegejaar`, `Groepeernaam Croho`, `Aantal eerstejaars croho`, `EER-NL-nietEER`, `Examentype code`, `Aantal Hoofdinschrijvingen`
+`Collegejaar`, `Isatcode`, `Groepeernaam Croho`, `Aantal eerstejaars croho`, `EER-NL-nietEER`, `Examentype code`, `Aantal Hoofdinschrijvingen`
 
-De sleutel heet `oktober` om historische redenen — zie [Je data voorbereiden](je-data-voorbereiden.md#telbestand-studenten).
+De sleutel heet `oktober` om historische redenen — zie [Je data voorbereiden](je-data-voorbereiden.md#telbestand-studenten). `Isatcode` is de **joinsleutel** met de vooraanmeldingen (de studentaantallen worden hierop gekoppeld, niet op `Groepeernaam Croho`); zorg dat de codes overeenkomen met die in je telbestanden.
 
 ### `cumulative` — Studielink cumulatieve data
 

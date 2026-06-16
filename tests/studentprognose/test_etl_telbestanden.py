@@ -4,7 +4,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from studentprognose.data.etl import _rowbind_and_reformat
+from studentprognose.data.etl import _rowbind_and_reformat, _calculate_student_counts
+from studentprognose.data.loader import _normalize_programme_code
 
 
 def _write_telbestand(path, week):
@@ -258,3 +259,58 @@ class TestRowbindUvaSqlFormat:
         out = capsys.readouterr().out
         assert "niet-gemapte waarde" in out
         assert (result["Type hoger onderwijs"] == "X").all()
+
+
+# Identity-mapping (canoniek == instellingskolom) voor de oktober-kolommen.
+_OKTOBER_COLS = {
+    "Collegejaar": "Collegejaar", "Isatcode": "Isatcode",
+    "Groepeernaam Croho": "Groepeernaam Croho",
+    "Aantal eerstejaars croho": "Aantal eerstejaars croho",
+    "EER-NL-nietEER": "EER-NL-nietEER", "Examentype code": "Examentype code",
+    "Aantal Hoofdinschrijvingen": "Aantal Hoofdinschrijvingen",
+}
+
+
+class TestStudentCountKeyedOnIsatcode:
+    """Regressie (#231/#232): het label (student_count) wordt op de landelijke
+    Isatcode gekeyd i.p.v. op de instellingsspecifieke opleidingsnaam, zodat het
+    op exact dezelfde sleutel als de cumulatieve features joint."""
+
+    def _make_oktober(self, path, isatcode=56604, naam="B Psychologie", enrolled=120):
+        rows = [{
+            "Collegejaar": 2024, "Isatcode": isatcode, "Groepeernaam Croho": naam,
+            "EER-NL-nietEER": "NL", "Examentype code": "Bachelor eerstejaars",
+            "Aantal eerstejaars croho": 1, "Aantal Hoofdinschrijvingen": enrolled,
+        }]
+        pd.DataFrame(rows).to_excel(path, index=False)
+
+    def _run_etl(self, tmp_path):
+        (tmp_path / "data" / "input").mkdir(parents=True)
+        okt = tmp_path / "oktober_bestand.xlsx"
+        self._make_oktober(okt)
+        _calculate_student_counts(str(okt), str(tmp_path), _OKTOBER_COLS)
+        return pd.read_excel(tmp_path / "data" / "input" / "student_count_first-years.xlsx")
+
+    def test_programme_key_is_isatcode_not_name(self, tmp_path):
+        out = self._run_etl(tmp_path)
+        codes = set(out["Croho groepeernaam"].astype(str))
+        assert codes == {"56604"}                       # de Isatcode, niet de naam
+        assert "B Psychologie" not in codes
+        assert out["Examentype"].iloc[0] == "Bachelor"  # "Bachelor eerstejaars" → "Bachelor"
+        assert out["Aantal_studenten"].iloc[0] == 120
+
+    def test_label_joins_with_cumulative_features_on_isatcode(self, tmp_path):
+        """Kern van de fix: na string-normalisatie (zoals loader + cumulative.py)
+        joint het label met een feature-rij die de Isatcode als sleutel draagt."""
+        label = self._run_etl(tmp_path)
+        _normalize_programme_code(label, "Croho groepeernaam")  # numeriek → "56604"
+
+        # Feature-zijde: cumulatieve sleutel is de Isatcode als string (UvA-formaat).
+        features = pd.DataFrame([{
+            "Croho groepeernaam": "56604", "Collegejaar": 2024,
+            "Herkomst": "NL", "Examentype": "Bachelor",
+        }])
+        keys = ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"]
+        merged = features.merge(label, on=keys, how="inner")
+        assert len(merged) == 1
+        assert merged["Aantal_studenten"].iloc[0] == 120

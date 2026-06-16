@@ -124,6 +124,7 @@ def build_preprocessor(
     categorical_cols: list[str] | None = None,
     year_col: str = "Collegejaar",
     final_week: int = FINAL_ACADEMIC_WEEK,
+    available_cols: list[str] | None = None,
 ) -> tuple[ColumnTransformer, list[str], list[str]]:
     """Bouw de gedeelde preprocessing pipeline voor alle regressors.
 
@@ -143,9 +144,14 @@ def build_preprocessor(
     if categorical_cols is None:
         categorical_cols = list(_DEFAULT_CATEGORICAL_COLS)
 
+    week_cols = [str(x) for x in get_weeks_list(final_week, final_week)]
+    if available_cols is not None:
+        avail = set(available_cols)
+        week_cols = [w for w in week_cols if w in avail]
+
     numeric_cols = (
         [year_col]
-        + [str(x) for x in get_weeks_list(final_week, final_week)]
+        + week_cols
         + (extra_numeric_cols or [])
     )
 

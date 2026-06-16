@@ -1,0 +1,9 @@
+HBO_WO,Brincode,Brin_volgnr,Isatcode,Type_HO,Opl_vorm,Voertaal,Studiejaar,Fixus,Maand,Herkomst,Geslacht,meercode_V,meercode_A,Status,Hogerejaars,Herinschrijving,1cHO_L,1cHO_K,Aantal,etl_ingestion_timestamp,etl_is_deleted
+W,21PE,0,50645,B,1,1,2022,N,9,N,M,1,0,V,N,N,1,1,23,2022-08-15,0
+H,22OJ,0,34402,B,1,1,2022,N,9,N,M,1,0,V,N,N,1,1,21,2022-08-15,0
+H,25JX,13,34411,B,1,,2022,N,9,N,V,1,0,I,J,J,6,6,32,2022-08-15,0
+W,21PF,0,56956,B,1,2,2022,N,9,E,M,0,1,A,N,N,1,1,36,2022-08-15,0
+W,21PF,0,56956,B,1,2,2022,N,9,R,M,0,1,A,N,N,1,1,28,2022-08-15,0
+W,21PJ,0,50393,B,1,,2022,N,9,E,V,1,0,V,J,J,6,6,25,2022-08-15,0
+H,28DN,0,39205,B,1,1,2022,N,9,N,V,1,0,V,N,N,1,1,21,2022-08-15,0
+H,31FR,0,34411,B,1,2,2022,N,9,N,V,1,0,I,J,J,6,6,24,2022-08-15,0

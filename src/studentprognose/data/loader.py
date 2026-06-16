@@ -4,6 +4,22 @@ from studentprognose.utils.weeks import DataOption
 from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
 
 
+def _normalize_programme_code(df, column):
+    """Cast de programmesleutel naar een nette string ("34808", niet 34808.0).
+
+    Sinds de isatcode-migratie is de programmesleutel een (numerieke) CROHO-code.
+    Die moet als ééN dtype (string) door de hele pipeline lopen, anders falen de
+    merges en de CI-subset-``isin`` op int-vs-str. Voor het legacy-formaat
+    (leesbare namen) is dit een no-op.
+    """
+    if df is None or column not in df.columns:
+        return
+    col = df[column]
+    if pd.api.types.is_numeric_dtype(col):
+        col = col.astype("Int64")
+    df[column] = col.astype(str)
+
+
 def _merge_new_cumulative_data(data_cumulative, src_path, dst_path):
     """Merge a new cumulative CSV into the canonical cumulative dataset.
 
@@ -98,6 +114,13 @@ def load_data(configuration, data_option):
         else None
     )
 
+    # Normaliseer de programmesleutel (CROHO-code) in het label naar string.
+    # Sinds de isatcode-migratie is de sleutel numeriek; hij moet als ééN dtype
+    # door de pipeline lopen, anders falen de student_count-merges en de
+    # CI-subset-isin op int-vs-str. Voor legacy (leesbare namen) = no-op.
+    _roles = configuration.get("column_roles", {})
+    _normalize_programme_code(data_student_numbers_first_years, _roles.get("programme"))
+
     if data_individual is not None:
         columns_i = configuration["columns"]["individual"]
         data_individual = data_individual.rename(
@@ -159,6 +182,11 @@ def load_data(configuration, data_option):
                 columns_c["Inschrijvingen"]: "Inschrijvingen",
             }
         )
+
+        # Zelfde normalisatie als bij het label: de cumulatieve programmesleutel
+        # (croho_source) moet string zijn vóór de CI-subset (die selected_set hieruit
+        # bouwt) en vóór de strategie-merges met student_count.
+        _normalize_programme_code(data_cumulative, _roles.get("croho_source"))
 
     return (
         data_individual,

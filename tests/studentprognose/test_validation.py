@@ -227,6 +227,7 @@ def _make_valid_oktober(path, year=2024, col_map=None):
     col_map = col_map or {}
     cols = {
         "Collegejaar": year,
+        "Isatcode": "56789",
         "Groepeernaam Croho": "B Opleiding",
         "Aantal eerstejaars croho": 1,
         "EER-NL-nietEER": "NL",
@@ -245,6 +246,7 @@ class TestValidateOktober:
             "validation": {},
             "columns": {"oktober": col_map or {
                 "Collegejaar": "Collegejaar",
+                "Isatcode": "Isatcode",
                 "Groepeernaam Croho": "Groepeernaam Croho",
                 "Aantal eerstejaars croho": "Aantal eerstejaars croho",
                 "EER-NL-nietEER": "EER-NL-nietEER",
@@ -313,6 +315,7 @@ class TestValidateOktober:
         monkeypatch.chdir(tmp_path)
         col_map = {
             "Collegejaar": "Academic Year",
+            "Isatcode": "CROHO code",
             "Groepeernaam Croho": "Programme",
             "Aantal eerstejaars croho": "First Year Count",
             "EER-NL-nietEER": "Origin",

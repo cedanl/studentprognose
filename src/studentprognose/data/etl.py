@@ -411,7 +411,13 @@ def _calculate_student_count(data, volume):
         "Examentype": [],
     }
 
-    programme_key = "Groepeernaam Croho"
+    # Joinsleutel = de landelijke Isatcode (CROHO-code), niet de
+    # instellingsspecifieke opleidingsnaam. De code is stabiel en identiek aan
+    # de Isatcode in de telbestanden, zodat het label (student_count) op exact
+    # dezelfde sleutel als de features (vooraanmeldingen_cumulatief) joint.
+    # De code wordt weggeschreven in de kolom "Croho groepeernaam" (#232:
+    # voor de UvA-bron is dat sowieso al de code, geen leesbare naam).
+    programme_key = "Isatcode"
     herkomst_key = "EER-NL-nietEER"
     year_key = "Collegejaar"
     examtype_key = "Examentype code"

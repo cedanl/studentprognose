@@ -60,7 +60,7 @@ Placeholders zijn `{year}` (vier cijfers) en `{week}` (één of twee cijfers). A
 
 ### UvA SQL-telbestand (fijnmazig Studielink-formaat)
 
-Map: `data/input_raw/uva_telbestanden/`
+Map: `data/input_raw/telbestanden/`
 Bestandsnaampatroon: `telbestand_sl_{leverdatum}_v{volgnummer}_{studiejaar}.csv` (bijv. `telbestand_sl_20260525_v34_2026.csv`)
 Scheidingsteken: `,` (komma — let op: het legacy-instellingsformaat hierboven gebruikt `;`)
 
@@ -89,7 +89,9 @@ De omzetting is volledig **config-gedreven** via het `cumulative_input`-blok in 
     De week zit niet in de SQL-kolommen. De ETL leidt het weeknummer af uit de **leverdatum** in de bestandsnaam (`telbestand_sl_20260525_...` → ISO-kalenderweek **22**), niet uit het Studielink-volgnummer. Zo sluit het aan op de ISO-week-indexering van het bestaande `vooraanmeldingen_cumulatief.csv`.
 
 !!! note "Ontbrekende `Groepeernaam` en `Faculteit` (placeholder)"
-    De SQL-levering bevat geen leesbare opleidingsnaam of faculteit en die zijn er niet uit af te leiden. Voorlopig vult de ETL `Groepeernaam Croho`/`Naam Croho opleiding Nederlands` met de **`Isatcode`** en `Faculteit` met een vaste placeholder (`"Onbekend"`). Een niet-lege placeholder is noodzakelijk: een lege (NaN) `Faculteit` zou in de cumulatieve `groupby`/pivot alle UvA-rijen laten vallen. Gevolg zolang de echte mapping ontbreekt: de join met `student_count_first-years.xlsx` (op leesbare naam) matcht niet, dus het ratio-model degradeert. De echte CROHO/UvA-mapping is belegd in [#232](https://github.com/cedanl/studentprognose/issues/232).
+    De SQL-levering bevat geen leesbare opleidingsnaam of faculteit en die zijn er niet uit af te leiden. De ETL vult `Groepeernaam Croho`/`Naam Croho opleiding Nederlands` met de **`Isatcode`** en `Faculteit` met een vaste placeholder (`"Onbekend"`). Een niet-lege placeholder is noodzakelijk: een lege (NaN) `Faculteit` zou in de cumulatieve `groupby`/pivot alle UvA-rijen laten vallen.
+
+    **De join met het label is opgelost door op de `Isatcode` te koppelen i.p.v. op de leesbare naam.** Omdat de `Isatcode` een landelijke, stabiele CROHO-code is (en niet instellingsspecifiek zoals een opleidingsnaam), keyt zowel de feature-kant (`vooraanmeldingen_cumulatief.csv`) als het label (`student_count_first-years.xlsx`, afgeleid uit `oktober_bestand.xlsx`) op deze code. Daarvoor moet `oktober_bestand.xlsx` een `Isatcode`-kolom bevatten (zie [Telbestand studenten](#telbestand-studenten)). Een leesbare opleidingsnaam blijft wenselijk voor de dashboard-weergave; die mapping is belegd in [#232](https://github.com/cedanl/studentprognose/issues/232).
 
 !!! note "Andere academische-jaargrens (week 36)"
     De UvA-aanmeldfase eindigt structureel rond **week 36**; er zijn geen leveringen in de weken 37–39. Het legacy-formaat loopt tot week 38. Daarom staat voor het UvA-formaat `model_config.final_academic_week` op `36` (zie [configuratie](configuratie.md#final_academic_week)). Dit raakt het cumulatieve spoor; het individuele spoor is hier niet op van toepassing (UvA is cumulatief-only).
@@ -152,11 +154,15 @@ Dit bestand bevat de werkelijke inschrijvingen per opleiding, herkomst en colleg
 | Canonieke naam | Omschrijving |
 |----------------|-------------|
 | `Collegejaar` | Collegejaar |
-| `Groepeernaam Croho` | Naam van de opleiding |
+| `Isatcode` | **CROHO-code van de opleiding — de joinsleutel met de features.** Moet dezelfde code zijn als de `Isatcode` in de telbestanden. |
+| `Groepeernaam Croho` | Naam van de opleiding (optioneel, voor leesbaarheid; niet langer de joinsleutel) |
 | `Aantal eerstejaars croho` | Aantal eerstejaars |
 | `EER-NL-nietEER` | Herkomstgroep |
 | `Examentype code` | `B` (Bachelor) of `M` (Master) |
 | `Aantal Hoofdinschrijvingen` | Aantal hoofdinschrijvingen |
+
+!!! warning "`Isatcode` is verplicht en moet matchen met de telbestanden"
+    De studentaantallen worden op de **`Isatcode`** gekoppeld aan de vooraanmeldingen, niet op de opleidingsnaam (die per instelling verschilt). Zorg dat de codes in `oktober_bestand.xlsx` exact overeenkomen met die in je telbestanden, anders blijft de koppeling leeg en traint het cumulatieve model zonder labels.
 
 ## ETL-stappen
 
@@ -164,7 +170,7 @@ De ETL draait automatisch bij elke run (tenzij `--noetl` is opgegeven). De stapp
 
 | Stap | Actie | Input | Output |
 |------|-------|-------|--------|
-| 1 | Rowbind + reformat (config-gedreven via [`cumulative_input`](configuratie.md#cumulative_input-uva-sql-telbestand-omzetten): separator, waardevertalingen, aggregatie naar de grain) | `path_raw_telbestanden/*.csv` (`telbestanden/` of `uva_telbestanden/`) | Samengevoegd cumulatief bestand |
+| 1 | Rowbind + reformat (config-gedreven via [`cumulative_input`](configuratie.md#cumulative_input-uva-sql-telbestand-omzetten): separator, waardevertalingen, aggregatie naar de grain) | `path_raw_telbestanden/*.csv` (`telbestanden/`) | Samengevoegd cumulatief bestand |
 | 2 | Interpolatie ontbrekende weken | Samengevoegd bestand | `vooraanmeldingen_cumulatief.csv` |
 | 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` (telbestand studenten) | `student_count_*.xlsx`, `student_volume.xlsx` |
 | 4 | Kopiëren individuele data | `individuele_aanmelddata.csv` | `vooraanmeldingen_individueel.csv` |

@@ -54,7 +54,7 @@ def predict_with_xgboost(
             )
 
     preprocessor, numeric_cols, categorical_cols = build_preprocessor(
-        extra_numeric_cols, final_week=final_week
+        extra_numeric_cols, final_week=final_week, available_cols=list(X_train.columns)
     )
 
     X_train_transformed = preprocessor.fit_transform(X_train)

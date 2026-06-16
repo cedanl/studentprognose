@@ -140,8 +140,10 @@ _DEFAULT_VALIDATION_CFG = {
         "critical_columns": ["Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr"],
     },
     "oktober": {
+        # Joinsleutel is sinds de isatcode-migratie de Isatcode (CROHO-code), niet
+        # de instellingsspecifieke "Groepeernaam Croho" — die is niet langer vereist.
         "critical_columns": [
-            "Collegejaar", "Groepeernaam Croho", "Aantal eerstejaars croho",
+            "Collegejaar", "Isatcode", "Aantal eerstejaars croho",
             "EER-NL-nietEER", "Examentype code", "Aantal Hoofdinschrijvingen",
         ],
     },

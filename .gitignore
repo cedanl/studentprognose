@@ -20,6 +20,10 @@ data/output/*
 
 !data/input_raw
 
+# Echte UvA-levering + PvL-spec: nooit committen (de synthetische demo-set wel).
+data/input_raw/telbestanden/telbestand_sl_20260525_v34_2026.csv
+data/input_raw/telbestanden/20260219 PvL Telbestand Studielink v2.9.pdf
+
 
 
 # Jupyter notebook checkpoints
