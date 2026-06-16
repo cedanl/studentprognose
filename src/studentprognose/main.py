@@ -505,6 +505,7 @@ def _try_build_dashboard(strategy, cfg):
             data_xgboost_curve=dd["xgboost_curve"],
             xgb_classifier_importance=dd["xgb_classifier_importance"],
             xgb_regressor_importance=dd["xgb_regressor_importance"],
+            final_academic_week=strategy.final_academic_week,
         )
         dashboard.build_and_save()
     except Exception:
