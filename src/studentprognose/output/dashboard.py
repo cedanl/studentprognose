@@ -80,8 +80,11 @@ HERKOMST_COLOURS = {"NL": "#4472C4", "EER": "#ED7D31", "Niet-EER": "#A5A5A5"}
 
 
 # ── Academic week helpers ───────────────────────────────────────────
-# School year runs week 39 → 52, then 1 → 38 (week 38 = end of academic year).
-ACADEMIC_WEEKS = [str(w) for w in list(range(39, 53)) + list(range(1, 39))]
+# School year runs week 39 → 52 → 53 → 1 → 38 (week 38 = end of academic year).
+# ISO-week 53 (long ISO years) sits between 52 and 1 — matching week_sort_key,
+# which gives it the slot between 52 and 1 (zonder de injectie staat 53 buiten
+# de categoryarray en plaatst Plotly hem op de verkeerde plek op de x-as).
+ACADEMIC_WEEKS = [str(w) for w in list(range(39, 53)) + [53] + list(range(1, 39))]
 
 
 def _sort_weeks_series(s: pd.Series) -> pd.Series:
