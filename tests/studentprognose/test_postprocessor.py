@@ -151,6 +151,42 @@ class TestStudentcountMergeWithFaculteit:
         assert pp.data["Faculteit"].iloc[0] == "FdM"
 
 
+class TestOutputPrelimWriteIsGated:
+    """Bewaakt de compute/I-O-splitsing van het voorlopige tussenresultaat (issue #219).
+
+    ``prepare_data_for_output_prelim`` is puur compute en mag niets wegschrijven; het
+    wegschrijven gebeurt expliciet via ``save_output_prelim``. Zo blijft een
+    ``save_output=False``-run vrij van disk-writes.
+    """
+
+    def _output_dir(self, tmp_path):
+        return tmp_path / "data" / "output"
+
+    def test_prepare_does_not_write_any_file(self, tmp_path):
+        pp = _make_postprocessor(tmp_path, data_studentcount=None)
+        pp.prepare_data_for_output_prelim(_make_input_data(), year=2024, week=10)
+
+        # Compute is uitgevoerd...
+        assert pp.data is not None
+        # ...maar er is niets weggeschreven.
+        assert list(self._output_dir(tmp_path).glob("*")) == []
+
+    def test_save_output_prelim_writes_file(self, tmp_path):
+        pp = _make_postprocessor(tmp_path, data_studentcount=None)
+        pp.prepare_data_for_output_prelim(_make_input_data(), year=2024, week=10)
+        pp.save_output_prelim()
+
+        expected = self._output_dir(tmp_path) / "output_prelim_cumulatief.xlsx"
+        assert expected.exists()
+
+    def test_save_output_prelim_without_data_is_noop(self, tmp_path):
+        pp = _make_postprocessor(tmp_path, data_studentcount=None)
+        pp.data = None
+        pp.save_output_prelim()
+
+        assert list(self._output_dir(tmp_path).glob("*")) == []
+
+
 def _make_run_data(year=2024, week=10, sarima_cumulative=(100.0, 50.0)):
     """Bouw een minimale prognose-DataFrame met de standaard sleutelkolommen."""
     return pd.DataFrame({

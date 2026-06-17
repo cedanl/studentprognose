@@ -168,6 +168,14 @@ class PostProcessor:
         return data
 
     def prepare_data_for_output_prelim(self, data, year, week, data_cumulative=None, skip_years=0):
+        """Bereken het voorlopige tussenresultaat in ``self.data`` (numerus-fixus-cap,
+        kolomselectie en merges met studentaantallen/cumulatieve aanmelddata).
+
+        Deze methode is puur compute: ze schrijft niets naar schijf. Het wegschrijven
+        gebeurt in :meth:`save_output_prelim`, die de pipeline alleen aanroept wanneer
+        ``save_output=True``. Zo blijft een puur in-memory run (bijv. cloud-pipelines
+        met een read-only bestandssysteem) vrij van disk-writes.
+        """
         self.data = data
         self.data = self._numerus_fixus_cap(self.data, year, week)
 
@@ -213,8 +221,25 @@ class PostProcessor:
                 how="left",
             )
 
+    def save_output_prelim(self):
+        """Schrijf het voorlopige tussenresultaat naar
+        ``data/output/output_prelim_<modus>.xlsx``.
+
+        Gescheiden van :meth:`prepare_data_for_output_prelim` zodat de berekening
+        (numerus-fixus-cap + merges) los staat van de I/O. De pipeline roept deze
+        methode alleen aan wanneer ``save_output=True``; bij een puur in-memory run
+        (``save_output=False``) wordt er niets geschreven — net zoals bij de overige
+        outputs (:meth:`save_output`, :meth:`save_totaal_audit_trail`, dashboard).
+        """
+        if self.data is None:
+            return
         ci_suffix = f"_ci_test_N{self.ci_test_n}" if self.ci_test_n is not None else ""
-        output_path = os.path.join(self.CWD, "data", "output", f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx")
+        output_path = os.path.join(
+            self.CWD,
+            "data",
+            "output",
+            f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx",
+        )
         self.data.to_excel(output_path, index=False)
 
     def predict_with_ratio(self, data_cumulative, predict_year):

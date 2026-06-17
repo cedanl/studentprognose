@@ -11,6 +11,11 @@ from studentprognose.config import (
 )
 from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
+from studentprognose.data.range_check import (
+    detect_data_range_mismatch,
+    format_api_range_error,
+    format_cli_range_warning,
+)
 from studentprognose.utils.ci_subset import apply_ci_test_subset
 from studentprognose.output.postprocessor import PostProcessor
 from studentprognose.output.dashboard import DashboardBuilder
@@ -153,6 +158,12 @@ def run_pipeline_from_dataframes(
         Het gepostprocessde voorspellings-DataFrame, of ``None`` als geen rijen
         overeenkwamen met de filters of voorspellingscriteria.
 
+    Raises:
+        ValueError: Als ``week`` gelijk is aan ``FINAL_ACADEMIC_WEEK`` (laatste week
+            van het academisch jaar), of als ``year``/``week`` buiten de range van de
+            meegegeven trainingsdata valt. De melding toont de wél beschikbare jaren
+            en weken, zodat je year/week kunt bijstellen of trainingsdata kunt toevoegen.
+
     Example::
 
         import pandas as pd
@@ -170,6 +181,16 @@ def run_pipeline_from_dataframes(
         )
     """
     from studentprognose.config import load_defaults, _validate_runtime
+
+    # Zelfde vangnet als de CLI: faal direct met een heldere melding wanneer year/week
+    # buiten de range van de meegegeven data valt, in plaats van een stille None of een
+    # kernel-crash verderop in de pipeline. Draait vóór config-werk (fail fast); de
+    # 2-tuple wordt door de detector via `*_` afgehandeld.
+    mismatch = detect_data_range_mismatch(
+        (data_individual, data_cumulative), [year], [week]
+    )
+    if mismatch is not None:
+        raise ValueError(format_api_range_error(year, week, mismatch))
 
     if configuration is None:
         configuration = load_defaults()
@@ -260,7 +281,7 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output
     _print_summary(datasets, cfg, strategy)
     for year in cfg.years:
         for week in cfg.weeks:
-            _predict_and_postprocess(strategy, cfg, data_cumulative, year, week)
+            _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_output)
 
     # Step 7: Save output
     if save_output:
@@ -305,49 +326,13 @@ def _apply_auto_defaults(datasets, cfg, configuration):
 
 
 def _check_data_range(datasets, cfg):
-    """Check if requested years/weeks exist in the loaded data and warn if not."""
-    data_individual, data_cumulative, *_ = datasets
-
-    # Pick whichever dataset is loaded based on the chosen mode
-    data = data_cumulative if data_cumulative is not None else data_individual
-    if data is None:
+    """Check if requested years/weeks exist in the loaded data and exit (CLI-pad) if not."""
+    mismatch = detect_data_range_mismatch(datasets, cfg.years, cfg.weeks)
+    if mismatch is None:
         return
 
-    available_years = sorted(int(y) for y in data["Collegejaar"].dropna().unique())
-
-    if not available_years:
-        return
-
-    missing_years = [y for y in cfg.years if y not in available_years]
-
-    # Individual dataset has no Weeknummer column before preprocessing
-    if "Weeknummer" in data.columns:
-        available_weeks = sorted(int(w) for w in data["Weeknummer"].dropna().unique())
-        missing_weeks = [w for w in cfg.weeks if w not in available_weeks]
-    else:
-        available_weeks = []
-        missing_weeks = []
-
-    if missing_years or missing_weeks:
-        year_range = (
-            f"{available_years[0]}-{available_years[-1]}"
-            if len(available_years) > 1
-            else str(available_years[0])
-        )
-        week_range = (
-            f"{available_weeks[0]}-{available_weeks[-1]}"
-            if len(available_weeks) > 1
-            else str(available_weeks[0])
-        )
-        print(
-            "\nWaarschuwing: de gevraagde combinatie is niet (volledig) beschikbaar in de data."
-        )
-        print(f"  Beschikbare data: jaren {year_range}, weken {week_range}.")
-        print(f"  Pas je flags aan tussen -y {year_range} en -w {week_range},")
-        print(
-            "  of voeg nieuwe trainingsdata toe in data/input_raw/ om je gewenste tijdstip te voorspellen."
-        )
-        sys.exit(1)
+    print(format_cli_range_warning(mismatch))
+    sys.exit(1)
 
 
 def _print_summary(datasets, cfg, strategy):
@@ -427,7 +412,7 @@ def _preprocess(strategy, student_year_prediction):
         return None
 
 
-def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
+def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_output: bool = True):
     if cfg.student_year_prediction in (
         StudentYearPrediction.FIRST_YEARS,
         StudentYearPrediction.VOLUME,
@@ -451,6 +436,8 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week):
                 data_cumulative,
                 cfg.skip_years,
             )
+            if save_output:
+                strategy.postprocessor.save_output_prelim()
             if cfg.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS):
                 strategy.postprocessor.predict_with_ratio(data_cumulative, year)
                 strategy.postprocessor.add_applicant_data(data_cumulative, year, week)
