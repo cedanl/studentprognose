@@ -546,6 +546,14 @@ class PostProcessor:
         # keep="last": de nieuwe run staat altijd achteraan in de concat,
         # dus zijn waarden winnen bij gelijke sleutel. Dit realiseert het
         # "overschrijven per week"-gedrag zonder rij-duplicatie.
-        combined = combined.drop_duplicates(subset=key_cols, keep="last")
+        #
+        # Dedup op een string-genormaliseerde sleutel: een numeriek-ogende
+        # sleutelwaarde (bv. een Isatcode-programmacode) komt na een Excel-
+        # round-trip terug als int, terwijl de in-memory run hem als str
+        # aanlevert. Zonder normalisatie ziet drop_duplicates die als twee
+        # verschillende sleutels en dupliceert de audittrail. We vergelijken
+        # daarom op str, maar behouden de originele (winnende) rij-waarden.
+        norm_key = combined[key_cols].astype(str)
+        combined = combined[~norm_key.duplicated(keep="last")].reset_index(drop=True)
         combined = combined.sort_values(by=sort_cols, ignore_index=True)
         combined.to_excel(path, index=False)

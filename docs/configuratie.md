@@ -37,7 +37,7 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 
 ## `telbestand_filename_patterns` — bestandsnaampatronen voor telbestanden
 
-Standaard: `["telbestandY{year}W{week}"]`
+De meegeleverde (`init`-)config herkent standaard zowel het legacy- als het UvA Studielink SQL-formaat: `["telbestandY{year}W{week}", "telbestand_sl_{date}_v{volgnummer}_{year}"]`. Laat je de sleutel volledig weg, dan valt de code terug op alleen `telbestandY{year}W{week}`.
 
 De pipeline herkent telbestanden in `path_raw_telbestanden` aan hun bestandsnaam. Instellingen met afwijkende naamconventies kunnen hier hun eigen patroon opgeven. De ETL en de validatie gebruiken hetzelfde patroon om jaar en weeknummer uit de bestandsnaam te halen.
 
@@ -154,7 +154,7 @@ Een verkeerde waarde laat de cumulatieve voorspelling crashen (de pipeline slice
 
 ## `cumulative_input` — UvA SQL-telbestand omzetten
 
-Optioneel. Stuurt hoe de ETL-rowbind (`_rowbind_and_reformat`) de ruwe telbestanden uit `path_raw_telbestanden` omzet naar de 16-koloms `vooraanmeldingen_cumulatief.csv`. Zonder dit blok gebruikt de ETL de legacy-defaults (instellingsformaat, `;`-gescheiden). Voor het UvA SQL-formaat (zie [Je data voorbereiden](je-data-voorbereiden.md#uva-sql-telbestand-fijnmazig-studielink-formaat)):
+Stuurt hoe de ETL-rowbind (`_rowbind_and_reformat`) de ruwe telbestanden uit `path_raw_telbestanden` omzet naar de 16-koloms `vooraanmeldingen_cumulatief.csv`. **De meegeleverde (`init`-)config bevat dit blok al, ingesteld op het raw Studielink SQL-formaat** — dat is de standaard-doelgroep. De `Default`-kolom hieronder beschrijft de code-terugval wanneer je het blok (of een sleutel) volledig weglaat; dan vervalt de ETL naar de legacy-defaults (`;`-gescheiden). Voor het UvA SQL-formaat (zie [Je data voorbereiden](je-data-voorbereiden.md#uva-sql-telbestand-fijnmazig-studielink-formaat)):
 
 ```json
 {
@@ -348,7 +348,7 @@ Optionele sectie. Hoeft niet in je configuratiebestand te staan. Voeg alleen toe
 | `telbestand.separator` | `";"` | Scheidingsteken waarmee de validatie de telbestanden inleest. Zet op `","` voor het UvA SQL-formaat (gelijk aan `cumulative_input.separator`). |
 | `telbestand.programme_column` | `"Groepeernaam"` | Kolom waarop categorale fouten worden gegroepeerd. Zet op `"Isatcode"` als `Groepeernaam` ontbreekt (UvA). |
 
-Voor het UvA SQL-formaat horen de `validation`-overrides en het [`cumulative_input`](#cumulative_input-uva-sql-telbestand-omzetten)-blok samen; ze beschrijven hetzelfde ruwe formaat voor respectievelijk de validatie en de ETL:
+Net als bij `cumulative_input` levert de meegeleverde (`init`-)config dit `validation.telbestand`-blok al mee, ingesteld op het raw Studielink SQL-formaat; de `Standaard`-kolom beschrijft de code-terugval als je een sleutel weglaat. De `validation`-overrides en het [`cumulative_input`](#cumulative_input-uva-sql-telbestand-omzetten)-blok horen samen; ze beschrijven hetzelfde ruwe formaat voor respectievelijk de validatie en de ETL:
 
 ```json
 {
