@@ -6,7 +6,9 @@ from typing import Optional
 import pandas as pd
 
 from studentprognose.cli import PipelineConfig, parse_args
-from studentprognose.config import load_configuration, load_defaults_filtering, load_filtering
+from studentprognose.config import (
+    load_configuration, load_defaults_filtering, load_filtering, get_final_academic_week,
+)
 from studentprognose.data.loader import load_data
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.data.range_check import (
@@ -25,7 +27,7 @@ from studentprognose.utils.weeks import (
     HIGHER_YEARS_COLUMNS,
     detect_last_available,
 )
-from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
+from studentprognose.utils.constants import WEEKS_PER_YEAR
 
 
 def main(argv):
@@ -70,7 +72,7 @@ def main(argv):
     if cfg.ci_test_n is not None:
         datasets = apply_ci_test_subset(cfg.ci_test_n, *datasets)
 
-    _apply_auto_defaults(datasets, cfg)
+    _apply_auto_defaults(datasets, cfg, configuration)
     _check_data_range(datasets, cfg)
 
     # Steps 2-7: gemeenschappelijke pipeline-kern
@@ -180,12 +182,6 @@ def run_pipeline_from_dataframes(
     """
     from studentprognose.config import load_defaults, _validate_runtime
 
-    if week == FINAL_ACADEMIC_WEEK:
-        raise ValueError(
-            f"week {FINAL_ACADEMIC_WEEK} is de laatste week van het academisch jaar. "
-            f"Kies een eerdere week, bijvoorbeeld week {FINAL_ACADEMIC_WEEK - 1}."
-        )
-
     # Zelfde vangnet als de CLI: faal direct met een heldere melding wanneer year/week
     # buiten de range van de meegegeven data valt, in plaats van een stille None of een
     # kernel-crash verderop in de pipeline. Draait vóór config-werk (fail fast); de
@@ -198,6 +194,13 @@ def run_pipeline_from_dataframes(
 
     if configuration is None:
         configuration = load_defaults()
+
+    final_week = get_final_academic_week(configuration)
+    if week == final_week:
+        raise ValueError(
+            f"week {final_week} is de laatste week van het academisch jaar. "
+            f"Kies een eerdere week, bijvoorbeeld week {final_week - 1}."
+        )
 
     # Valideer runtime ook in de in-memory pad: gebruikers die een eigen
     # configuration dict samenstellen (bv. via load_defaults() + handmatige
@@ -260,16 +263,17 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output
     )
 
     # Step 5: Validate prediction horizon
-    invalid_weeks = [w for w in cfg.weeks if w == FINAL_ACADEMIC_WEEK]
+    final_week = get_final_academic_week(configuration)
+    invalid_weeks = [w for w in cfg.weeks if w == final_week]
     if invalid_weeks:
         print(
-            f"\nFout: week {FINAL_ACADEMIC_WEEK} is de laatste week van het academisch jaar."
+            f"\nFout: week {final_week} is de laatste week van het academisch jaar."
         )
         print(
-            f"  Er valt niets meer te voorspellen vanaf week {FINAL_ACADEMIC_WEEK} (pred_len = 0)."
+            f"  Er valt niets meer te voorspellen vanaf week {final_week} (pred_len = 0)."
         )
         print(
-            f"  Kies een eerdere week, bijvoorbeeld -w {FINAL_ACADEMIC_WEEK - 1} of -w 1:{FINAL_ACADEMIC_WEEK - 1}."
+            f"  Kies een eerdere week, bijvoorbeeld -w {final_week - 1} of -w 1:{final_week - 1}."
         )
         sys.exit(1)
 
@@ -286,7 +290,7 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output
     return strategy.postprocessor.data
 
 
-def _apply_auto_defaults(datasets, cfg):
+def _apply_auto_defaults(datasets, cfg, configuration):
     """Override week/jaar defaults met de laatste beschikbare waarden uit de data.
 
     Wordt alleen toegepast als de gebruiker ``-w`` en/of ``-y`` niet heeft opgegeven.
@@ -299,7 +303,7 @@ def _apply_auto_defaults(datasets, cfg):
     if data is None:
         return
 
-    auto_year, auto_week = detect_last_available(data)
+    auto_year, auto_week = detect_last_available(data, get_final_academic_week(configuration))
 
     changed = False
 
@@ -359,17 +363,18 @@ def _print_summary(datasets, cfg, strategy):
                 break
 
     # Prediction details per week
+    final_week = strategy.final_academic_week
     pred_details = []
     for week in cfg.weeks:
         pred_len = (
-            (FINAL_ACADEMIC_WEEK + WEEKS_PER_YEAR - week)
-            if week > FINAL_ACADEMIC_WEEK
-            else (FINAL_ACADEMIC_WEEK - week)
+            (final_week + WEEKS_PER_YEAR - week)
+            if week > final_week
+            else (final_week - week)
         )
-        end_week = FINAL_ACADEMIC_WEEK
+        end_week = final_week
         start_week = (
             week + 1
-            if week < FINAL_ACADEMIC_WEEK
+            if week < final_week
             else (week + 1 if week < WEEKS_PER_YEAR else 1)
         )
         pred_details.append(
@@ -446,6 +451,7 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_ou
                     year,
                     week,
                     strategy.numerus_fixus_list,
+                    strategy.final_academic_week,
                 )
 
     strategy.postprocessor.ready_new_data()
@@ -486,6 +492,7 @@ def _try_build_dashboard(strategy, cfg):
             data_xgboost_curve=dd["xgboost_curve"],
             xgb_classifier_importance=dd["xgb_classifier_importance"],
             xgb_regressor_importance=dd["xgb_regressor_importance"],
+            final_academic_week=strategy.final_academic_week,
         )
         dashboard.build_and_save()
     except Exception:

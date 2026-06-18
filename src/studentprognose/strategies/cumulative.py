@@ -7,8 +7,11 @@ import warnings
 
 from studentprognose.config import get_cpu_count
 from studentprognose.utils.parallel import run_parallel_with_fallback
+from studentprognose.utils.programme_key import normalize_programme_series
 from studentprognose.strategies.base import PredictionStrategy
-from studentprognose.utils.weeks import increment_week, compute_pred_len
+from studentprognose.utils.weeks import (
+    increment_week, compute_pred_len, academic_start_week, get_all_weeks_ordered,
+)
 from studentprognose.models import create_forecaster, create_regressor
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
@@ -147,6 +150,14 @@ class CumulativeStrategy(PredictionStrategy):
             }
         )
 
+        # Croho groepeernaam is in het legacy-formaat een leesbare string ("B
+        # Psychologie"); bij het UvA SQL-formaat is het (voorlopig, #232) de
+        # numerieke Isatcode. Normaliseer naar één canoniek dtype (Int64 voor
+        # isatcodes, string voor namen) zodat downstream-merges op deze sleutel
+        # (ratio-model, student_count, audittrail) en .isin-filters niet op
+        # gemengde types struikelen. Zie utils.programme_key.
+        data["Croho groepeernaam"] = normalize_programme_series(data["Croho groepeernaam"])
+
         data.loc[(data["Examentype"] == "Pre-master"), "Hogerejaars"] = "Nee"
         data = data[data["Hogerejaars"] == "Nee"]
 
@@ -193,8 +204,10 @@ class CumulativeStrategy(PredictionStrategy):
             {"Weeknummer": "int32", "Collegejaar": "int32"}
         )
 
-        full_data = _get_transformed_data(self.data_cumulative.copy(deep=True), self.min_training_year)
-        full_data["39"] = 0
+        full_data = _get_transformed_data(
+            self.data_cumulative.copy(deep=True), self.min_training_year, self.final_academic_week
+        )
+        full_data[str(academic_start_week(self.final_academic_week))] = 0
         full_data = _add_engineered_features(full_data, self.data_cumulative, int(self.predict_week))
 
         self.skip_years = skip_years
@@ -264,13 +277,14 @@ class CumulativeStrategy(PredictionStrategy):
         )
         self.data_cumulative = self.data_cumulative.drop_duplicates()
 
-        self.pred_len = compute_pred_len(int(self.predict_week))
+        self.pred_len = compute_pred_len(int(self.predict_week), self.final_academic_week)
 
     def _predict_sarima(self, row, already_printed=False):
         return predict_with_sarima_cumulative(
             self.data_cumulative, row, self.predict_year, self.predict_week,
             self.pred_len, self.skip_years, already_printed, self.min_training_year,
             forecaster_factory=self._forecaster_factory,
+            final_week=self.final_academic_week,
         )
 
     def _predict_students_with_preapplicants(self, data, predictions, data_to_predict):
@@ -284,14 +298,29 @@ class CumulativeStrategy(PredictionStrategy):
             if i == len(predictions):
                 break
 
-            if self.predict_week != 38 and len(predictions[i]) > 0:
-                data.loc[
+            if self.predict_week != self.final_academic_week and len(predictions[i]) > 0:
+                mask = (
                     (data["Collegejaar"] == self.predict_year - self.skip_years)
                     & (data["Croho groepeernaam"] == programme)
                     & (data["Herkomst"] == herkomst)
-                    & (data["Examentype"] == examentype),
-                    index:"38",
-                ] = predictions[i]
+                    & (data["Examentype"] == examentype)
+                )
+                # Vul de voorspelde weken (index .. final_week, academische volgorde)
+                # in. Robuust tegen ontbrekende eind-weekkolommen: bij een dalende
+                # reeks valt de final_academic_week-kolom soms weg (combinaties zakken
+                # onder de openbaarmakingsdrempel). Een vaste label-slice index:"36"
+                # crasht dan op een non-monotone index; daarom alleen bestaande
+                # weekkolommen vullen, uitgelijnd op de voorspelvolgorde.
+                ordered = get_all_weeks_ordered(self.final_academic_week)
+                if index in ordered:
+                    target_weeks = ordered[ordered.index(index):]
+                    cols, vals = [], []
+                    for k, wk in enumerate(target_weeks):
+                        if k < len(predictions[i]) and wk in data.columns:
+                            cols.append(wk)
+                            vals.append(predictions[i][k])
+                    if cols:
+                        data.loc[mask, cols] = vals
             i += 1
 
             if programme in self.numerus_fixus_list:

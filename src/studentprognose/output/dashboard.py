@@ -9,7 +9,10 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 
-from studentprognose.utils.weeks import DataOption, StudentYearPrediction, week_sort_key
+from studentprognose.utils.weeks import (
+    DataOption, StudentYearPrediction, week_sort_key, get_all_weeks_ordered,
+)
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
 
 # ── Colour palette ──────────────────────────────────────────────────
@@ -80,13 +83,17 @@ HERKOMST_COLOURS = {"NL": "#4472C4", "EER": "#ED7D31", "Niet-EER": "#A5A5A5"}
 
 
 # ── Academic week helpers ───────────────────────────────────────────
-# School year runs week 39 → 52, then 1 → 38 (week 38 = end of academic year).
-ACADEMIC_WEEKS = [str(w) for w in list(range(39, 53)) + list(range(1, 39))]
+def _academic_weeks(final_week: int = FINAL_ACADEMIC_WEEK) -> list[str]:
+    """Weekvolgorde voor de week-x-as, afgeleid van de academische jaargrens.
 
-
-def _sort_weeks_series(s: pd.Series) -> pd.Series:
-    """Pandas key function for sorting a Weeknummer series."""
-    return s.apply(lambda w: week_sort_key(int(w)))
+    ``get_all_weeks_ordered`` geeft de seizoensvolgorde (UvA 37→36, legacy 39→38);
+    ISO-week 53 (lange ISO-jaren) wordt tussen 52 en 1 ingevoegd — consistent met
+    ``week_sort_key`` — zodat Plotly hem op de juiste plek op de x-as zet i.p.v.
+    als losse categorie achteraan.
+    """
+    weeks = get_all_weeks_ordered(final_week)
+    i = weeks.index("52")
+    return weeks[: i + 1] + ["53"] + weeks[i + 1:]
 
 
 # ════════════════════════════════════════════════════════════════════
@@ -109,19 +116,35 @@ class DashboardBuilder:
         data_xgboost_curve: pd.DataFrame | None = None,
         xgb_classifier_importance: dict[str, float] | None = None,
         xgb_regressor_importance: dict[str, float] | None = None,
+        final_academic_week: int = FINAL_ACADEMIC_WEEK,
     ):
         self.data = data.copy()
         self.data["Weeknummer"] = self.data["Weeknummer"].astype(int)
+        # Het dashboard is een presentatielaag: de programmesleutel dient hier als
+        # tekstlabel (Plotly-dropdowns, titels) én als filtersleutel binnen het
+        # dashboard zelf. We brengen 'm overal naar string zodat numerieke
+        # isatcodes (Int64) niet botsen met Plotly's string-only button-labels en
+        # de interne filters/numerus_fixus-vergelijkingen op één dtype lopen.
+        self.data["Croho groepeernaam"] = self.data["Croho groepeernaam"].astype(str)
         self.data_option = data_option
-        self.numerus_fixus_list = {k: v for k, v in numerus_fixus_list.items() if v > 0}
+        self.numerus_fixus_list = {str(k): v for k, v in numerus_fixus_list.items() if v > 0}
         self.student_year_prediction = student_year_prediction
         self.ci_test_n = ci_test_n
         self.cwd = cwd
         self.predict_week = predict_week
+        # Academische jaargrens (UvA 36, legacy 38) bepaalt de week-x-as-volgorde
+        # en de eindweek-markers; afgeleid i.p.v. hardcoded zodat het dashboard
+        # bij de juiste week begint/eindigt.
+        self.final_academic_week = final_academic_week
+        self.academic_weeks = _academic_weeks(final_academic_week)
         if data_cumulative is not None:
             data_cumulative = data_cumulative.copy()
             data_cumulative["Weeknummer"] = data_cumulative["Weeknummer"].astype(int)
+            data_cumulative["Croho groepeernaam"] = data_cumulative["Croho groepeernaam"].astype(str)
         self.data_cumulative = data_cumulative
+        if data_studentcount is not None and "Croho groepeernaam" in data_studentcount.columns:
+            data_studentcount = data_studentcount.copy()
+            data_studentcount["Croho groepeernaam"] = data_studentcount["Croho groepeernaam"].astype(str)
         self.data_studentcount = data_studentcount
         self.data_xgboost_curve = data_xgboost_curve
         self.xgb_classifier_importance = xgb_classifier_importance
@@ -138,6 +161,11 @@ class DashboardBuilder:
         self.base_dir = os.path.join(cwd, "data", "output", f"visualisations{ci_suffix}")
 
     # ── Data helpers ─────────────────────────────────────────────────
+
+    def _sort_weeks(self, s: pd.Series) -> pd.Series:
+        """Pandas-key voor het sorteren van een Weeknummer-reeks in academische
+        volgorde, met de geconfigureerde jaargrens (``final_academic_week``)."""
+        return s.apply(lambda w: week_sort_key(int(w), self.final_academic_week))
 
     def _hist_data(self) -> pd.DataFrame:
         """Return only rows with Collegejaar < prediction_year (actuals only)."""
@@ -156,7 +184,7 @@ class DashboardBuilder:
         if self.predict_week is not None:
             pw_key = week_sort_key(self.predict_week)
             agg = agg[agg["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
-        return agg.sort_values("Weeknummer", key=_sort_weeks_series)
+        return agg.sort_values("Weeknummer", key=self._sort_weeks)
 
     def _best_prediction_col(self) -> str | None:
         """Pick the best available prediction column by priority."""
@@ -214,11 +242,11 @@ class DashboardBuilder:
 
     def _add_predict_week_line(self, fig: go.Figure) -> None:
         """Add a red dashed vertical line at predict_week and set academic week order."""
-        fig.update_xaxes(categoryorder="array", categoryarray=ACADEMIC_WEEKS)
+        fig.update_xaxes(categoryorder="array", categoryarray=self.academic_weeks)
         if self.predict_week is None:
             return
         pw_str = str(self.predict_week)
-        pw_idx = ACADEMIC_WEEKS.index(pw_str)
+        pw_idx = self.academic_weeks.index(pw_str)
         fig.add_vline(x=pw_idx, line_dash="dash", line_color="red", line_width=1.5)
         fig.add_annotation(
             x=pw_idx, y=1.02, yref="paper", yanchor="bottom",
@@ -953,7 +981,7 @@ class DashboardBuilder:
                 weekly = hist.groupby("Weeknummer")[col].mean().reset_index()
 
             weekly[col] = weekly[col].clip(upper=2.0)
-            weekly = weekly.sort_values("Weeknummer", key=_sort_weeks_series)
+            weekly = weekly.sort_values("Weeknummer", key=self._sort_weeks)
             weekly = weekly.dropna(subset=[col])
             if len(weekly) < 3:
                 continue
@@ -1548,7 +1576,7 @@ class DashboardBuilder:
                 if xgb_val > 0:
                     idx = len(fig.data)
                     fig.add_trace(go.Scatter(
-                        x=["38"], y=[xgb_val],
+                        x=[str(self.final_academic_week)], y=[xgb_val],
                         mode="markers+text",
                         name="XGBoost (voorspelde studenten)",
                         marker=dict(symbol="star", size=16, color="#2ca02c", line=dict(width=1, color="black")),
@@ -1568,7 +1596,7 @@ class DashboardBuilder:
                 if real > 0:
                     idx = len(fig.data)
                     fig.add_trace(go.Scatter(
-                        x=[ACADEMIC_WEEKS[0], ACADEMIC_WEEKS[-1]],
+                        x=[self.academic_weeks[0], self.academic_weeks[-1]],
                         y=[real, real],
                         mode="lines",
                         name=f"Realisatie {prev_year}",
@@ -1700,7 +1728,7 @@ class DashboardBuilder:
                 if real > 0:
                     idx = len(fig.data)
                     fig.add_trace(go.Scatter(
-                        x=[ACADEMIC_WEEKS[0], ACADEMIC_WEEKS[-1]],
+                        x=[self.academic_weeks[0], self.academic_weeks[-1]],
                         y=[real, real],
                         mode="lines", name=f"Realisatie {prev_year}",
                         line=dict(color="#333333", dash="dot", width=1.5),
@@ -2336,7 +2364,7 @@ class DashboardBuilder:
                 yr_agg = (
                     sub[sub["Collegejaar"] == yr]
                     .groupby("Weeknummer")["Gewogen vooraanmelders"].sum().reset_index()
-                    .sort_values("Weeknummer", key=_sort_weeks_series)
+                    .sort_values("Weeknummer", key=self._sort_weeks)
                 )
                 idx = len(fig.data)
                 fig.add_trace(go.Scatter(
@@ -2351,8 +2379,16 @@ class DashboardBuilder:
             full_agg = (
                 sub[sub["Collegejaar"] == self.prediction_year]
                 .groupby("Weeknummer")["Gewogen vooraanmelders"].sum().reset_index()
-                .sort_values("Weeknummer", key=_sort_weeks_series)
+                .sort_values("Weeknummer", key=self._sort_weeks)
             )
+
+            # Heeft deze opleiding geen data in het voorspeljaar, dan is full_agg leeg.
+            # Booleaanse indexering met een lengte-0 masker (full_agg[mask]) geeft in
+            # pandas een KOLOMLOZE DataFrame terug, waarna full_agg["Weeknummer"]
+            # crasht met KeyError. Sla de prediction-year-traces dan over; de
+            # historische lijnen voor deze opleiding zijn hierboven al toegevoegd.
+            if full_agg.empty:
+                continue
 
             if self.predict_week is not None:
                 pw_key = week_sort_key(self.predict_week)
@@ -2414,7 +2450,7 @@ class DashboardBuilder:
                     sarima_sub = sarima_sub[
                         sarima_sub["Weeknummer"].apply(lambda w: week_sort_key(int(w)) > pw_key)
                     ]
-                sarima_sub = sarima_sub.sort_values("Weeknummer", key=_sort_weeks_series)
+                sarima_sub = sarima_sub.sort_values("Weeknummer", key=self._sort_weeks)
 
                 # Bridge point — connect SARIMA to the last known actual point
                 known = before_pw if self.predict_week is not None else full_agg
@@ -2493,7 +2529,7 @@ class DashboardBuilder:
                         is_pred_yr = yr == self.prediction_year
                         idx = len(fig.data)
                         fig.add_trace(go.Scatter(
-                            x=["38"], y=[total], mode="markers+text",
+                            x=[str(self.final_academic_week)], y=[total], mode="markers+text",
                             name="Actuele inschrijvingen" if first_star else f"Realisatie {int(yr)}",
                             marker=dict(
                                 symbol="star", size=14,
@@ -2535,7 +2571,7 @@ class DashboardBuilder:
                     if pd.notna(val) and val > 0:
                         idx = len(fig.data)
                         fig.add_trace(go.Scatter(
-                            x=["38"], y=[val], mode="markers+text",
+                            x=[str(self.final_academic_week)], y=[val], mode="markers+text",
                             name="Voorspelde inschrijvingen",
                             marker=dict(symbol="diamond", size=12, color="#2ca02c"),
                             text=[str(self.prediction_year)],
@@ -2554,15 +2590,26 @@ class DashboardBuilder:
                 vis[trace_idx] = "legendonly" if default_vis == "legendonly" else True
             buttons.append(dict(label=prog, method="update", args=[{"visible": vis}]))
 
-        # Activate first programme
+        # Default-zichtbare opleiding: niet de alfabetisch eerste (vaak een kleine
+        # opleiding waarvan de data pas ná de voorspelweek begint -> lege grafiek),
+        # maar de GROOTSTE in het voorspeljaar, zodat de actueel-lijn + SARIMA-
+        # prognose meteen zichtbaar zijn. De dropdown-'active' wijst naar dezelfde.
+        active_idx = 0
         if programmes:
-            for trace_idx, default_vis in prog_traces[programmes[0]]:
+            py_totals = (
+                dc[dc["Collegejaar"] == self.prediction_year]
+                .groupby("Croho groepeernaam")["Gewogen vooraanmelders"].sum()
+            )
+            py_totals = py_totals[py_totals.index.isin(programmes)]
+            default_prog = py_totals.idxmax() if not py_totals.empty else programmes[0]
+            active_idx = programmes.index(default_prog)
+            for trace_idx, default_vis in prog_traces[default_prog]:
                 fig.data[trace_idx].visible = "legendonly" if default_vis == "legendonly" else True
 
         fig.update_layout(
             title="Verloop per opleiding — alle jaren",
             xaxis_title="Weeknummer", yaxis_title="Gewogen vooraanmelders", height=_chart_height(5, min_h=550),
-            updatemenus=[dict(active=0, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
+            updatemenus=[dict(active=active_idx, buttons=buttons, x=0, y=1.15, xanchor="left", yanchor="top", direction="down")],
         )
         self._add_predict_week_line(fig)
         return fig
@@ -2828,14 +2875,14 @@ class DashboardBuilder:
             cur = cur[cur["Weeknummer"].apply(lambda w: week_sort_key(int(w)) <= pw_key)]
         # Take the value at the maximum week per group
         cur_max = (
-            cur.sort_values("Weeknummer", key=_sort_weeks_series)
+            cur.sort_values("Weeknummer", key=self._sort_weeks)
             .groupby(["Croho groepeernaam", "Herkomst"])["Gewogen vooraanmelders"]
             .last().reset_index()
         )
 
         prev = dc[dc["Collegejaar"] == prev_year]
         prev_max = (
-            prev.sort_values("Weeknummer", key=_sort_weeks_series)
+            prev.sort_values("Weeknummer", key=self._sort_weeks)
             .groupby(["Croho groepeernaam", "Herkomst"])["Gewogen vooraanmelders"]
             .last().reset_index()
         )

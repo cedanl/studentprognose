@@ -3,7 +3,7 @@ from numpy import linalg as LA
 from statsforecast.models import ARIMA
 
 from studentprognose.models.base import BaseForecaster
-from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len
+from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len, academic_start_week
 from studentprognose.utils.constants import (
     FINAL_ACADEMIC_WEEK,
     SARIMA_ORDER, SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
@@ -24,10 +24,26 @@ class SARIMAForecaster(BaseForecaster):
         self._model = None
 
     def fit(self, ts_data, exog=None):
+        season_length = self.season_length
+        seasonal_order = self.seasonal_order
+
+        # Seizoens-ARIMA op te weinig data: de native statsforecast/numba-backend
+        # crasht (SIGSEGV/SIGABRT door heap-corruptie) zodra een seizoens-
+        # differentiatie/-AR/-MA wordt geschat op een reeks die korter is dan
+        # twee volledige seizoenen. Empirisch precies bij ``len < 2*season_length``
+        # (bijv. <104 weken bij season_length=52). Een seizoenscomponent met
+        # periode ``season_length`` is uit <2 seizoenen ook statistisch niet te
+        # schatten, dus val terug op een niet-seizoensmodel. Dit raakt korte
+        # reeksen (bijv. nieuwe/kleine opleidingen, of fijnmazige CI-test-subsets);
+        # lange reeksen (legacy-historie) houden het volledige seizoensmodel.
+        if season_length > 1 and any(seasonal_order) and len(ts_data) < 2 * season_length:
+            season_length = 1
+            seasonal_order = (0, 0, 0)
+
         self._model = ARIMA(
             order=self.order,
-            season_length=self.season_length,
-            seasonal_order=self.seasonal_order,
+            season_length=season_length,
+            seasonal_order=seasonal_order,
         )
         X = exog.reshape(-1, 1) if exog is not None else None
         self._model.fit(y=ts_data.astype(np.float64), X=X)
@@ -39,14 +55,43 @@ class SARIMAForecaster(BaseForecaster):
         return result["mean"]
 
 
-def create_time_series(data, pred_len):
-    ts_data = data.loc[:, get_all_weeks_valid(data.columns)].values.flatten()
+def create_time_series(data, pred_len, final_week: int = FINAL_ACADEMIC_WEEK):
+    ts_data = data.loc[:, get_all_weeks_valid(data.columns, final_week)].values.flatten()
     ts_data = ts_data[:-pred_len]
     return np.array(ts_data)
 
 
 def _default_forecaster_factory() -> BaseForecaster:
     return SARIMAForecaster(order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER)
+
+
+def shrink_season_length_to_period(model, columns, final_week: int = FINAL_ACADEMIC_WEEK):
+    """Stem de seizoenslengte van ``model`` af op de werkelijke jaar-periode.
+
+    ``create_time_series`` plakt de trainingsjaren achter elkaar over precies de
+    weekkolommen uit ``get_all_weeks_valid`` (de gevulde-week-kolommen van de
+    gepivote data — de kruisjaarse/kruisopleiding-union — plus de geïnjecteerde
+    reset-week). Dát aantal, niet de nominale 52, is de jaarblok-stride van de
+    afgevlakte reeks. De seizoenslag moet daaraan gelijk zijn; staat hij vast op
+    52 terwijl de stride korter is, dan wijst de lag naar de verkeerde
+    week-in-het-jaar en staat de jaarcyclus uit fase. Het model kan de
+    seizoensvorm dan niet reproduceren — op de UvA-funneldata uit zich dat als
+    een prognose die ná de piek omhoog drijft i.p.v. de daling te volgen.
+
+    Verkleint alleen: een volledig gevuld jaar (``periode == season_length``) en
+    modellen zonder ``season_length`` blijven ongemoeid. Geldt voor elk model met
+    een ``season_length`` (SARIMA, ETS, Theta, AutoARIMA). De toewijzing is
+    defensief: een forecaster met een alleen-lezen ``season_length`` wordt
+    overgeslagen i.p.v. te crashen. Wordt op exact dezelfde wijze toegepast in de
+    benchmark (``evaluate_ts.py``) zodat die hetzelfde model meet als productie.
+    """
+    period = len(get_all_weeks_valid(columns, final_week))
+    if hasattr(model, "season_length") and 1 < period < model.season_length:
+        try:
+            model.season_length = period
+        except AttributeError:
+            pass
+    return model
 
 
 def predict_with_sarima_cumulative(
@@ -59,6 +104,7 @@ def predict_with_sarima_cumulative(
     already_printed=False,
     min_training_year: int = 2016,
     forecaster_factory: "callable | None" = None,
+    final_week: int = FINAL_ACADEMIC_WEEK,
 ) -> list:
     """Voorspelt vooraanmeldingen per programme/herkomst/week voor cumulatieve data.
 
@@ -66,6 +112,8 @@ def predict_with_sarima_cumulative(
         forecaster_factory: Callable die een vers BaseForecaster-object retourneert.
             Wordt per aanroep gecalld zodat joblib-parallellisatie veilig werkt.
             Default: SARIMAForecaster met standaard ordes.
+        final_week: Laatste week van het academisch jaar (default 38; UvA 36).
+            Bepaalt de seizoensvolgorde en de reset-week-injectie.
 
     Returns:
         list: predictions per toekomstige week, of lege lijst bij fout.
@@ -82,7 +130,7 @@ def predict_with_sarima_cumulative(
     data_cumulative = data_cumulative.astype(
         {"Weeknummer": "int32", "Collegejaar": "int32"}
     )
-    data = _get_transformed_data(data_cumulative.copy(deep=True), min_training_year)
+    data = _get_transformed_data(data_cumulative.copy(deep=True), min_training_year, final_week)
 
     data = data[
         (data["Herkomst"] == herkomst)
@@ -91,13 +139,15 @@ def predict_with_sarima_cumulative(
         & (data["Examentype"] == examentype)
     ]
 
-    data["39"] = 0
+    data[str(academic_start_week(final_week))] = 0
 
-    ts_data = create_time_series(data, pred_len)
+    ts_data = create_time_series(data, pred_len, final_week)
 
     try:
         factory = forecaster_factory or _default_forecaster_factory
-        model = factory()
+        # Seizoenslengte afstemmen op de werkelijke jaar-periode (gevulde-week-
+        # kolommen), niet de vaste 52 — zie shrink_season_length_to_period.
+        model = shrink_season_length_to_period(factory(), data.columns, final_week)
         model.fit(ts_data)
         pred = model.forecast(steps=pred_len)
         return pred
@@ -216,17 +266,18 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
         return []
 
 
-def _get_transformed_data(data, min_training_year: int = 2016):
+def _get_transformed_data(data, min_training_year: int = 2016, final_week: int = FINAL_ACADEMIC_WEEK):
     """Helper to transform cumulative data for SARIMA.
 
     Args:
         data: Cumulative pre-application data.
         min_training_year: Earliest academic year included in training. Should be
             read from ``model_config.min_training_year`` in the caller's configuration.
+        final_week: Laatste week van het academisch jaar (default 38; UvA 36).
     """
     from studentprognose.data.transforms import transform_data
 
     data = data.drop_duplicates()
     data = data[data["Collegejaar"] >= min_training_year]
-    data = transform_data(data, "ts")
+    data = transform_data(data, "ts", final_week)
     return data

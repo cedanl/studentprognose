@@ -1,7 +1,23 @@
 import pandas as pd
 import os
 from studentprognose.utils.weeks import DataOption
+from studentprognose.utils.programme_key import normalize_programme_series
 from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
+
+
+def _normalize_programme_code(df, column):
+    """Normaliseer de programmesleutel naar één canoniek dtype, in place.
+
+    Sinds de isatcode-migratie is de programmesleutel een (numerieke) CROHO-code.
+    Die moet als ééN dtype door de hele pipeline lopen, anders falen de merges en
+    de CI-subset-``isin`` op gemengde types. Numerieke sleutels worden ``Int64``
+    (NaN-veilig, geen float-``.0``-staart); voor het legacy-formaat (leesbare
+    namen) blijft het string. No-op als de kolom ontbreekt. Zie
+    :mod:`studentprognose.utils.programme_key`.
+    """
+    if df is None or column not in df.columns:
+        return
+    df[column] = normalize_programme_series(df[column])
 
 
 def _merge_new_cumulative_data(data_cumulative, src_path, dst_path):
@@ -98,6 +114,16 @@ def load_data(configuration, data_option):
         else None
     )
 
+    # Normaliseer de programmesleutel (CROHO-code) in het label. Sinds de
+    # isatcode-migratie is de sleutel numeriek (-> Int64); hij moet als ééN dtype
+    # door de pipeline lopen, anders falen de student_count-merges en de
+    # CI-subset-isin op gemengde types. Voor legacy (leesbare namen) = no-op.
+    _roles = configuration.get("column_roles", {})
+    _normalize_programme_code(data_student_numbers_first_years, _roles.get("programme"))
+    # De ensemble-gewichten dragen de programmesleutel in de kolom "Programme";
+    # normaliseer mee zodat de merge in de postprocessor op gelijk dtype joint.
+    _normalize_programme_code(data_weighted_ensemble, "Programme")
+
     if data_individual is not None:
         columns_i = configuration["columns"]["individual"]
         data_individual = data_individual.rename(
@@ -159,6 +185,12 @@ def load_data(configuration, data_option):
                 columns_c["Inschrijvingen"]: "Inschrijvingen",
             }
         )
+
+        # Zelfde normalisatie als bij het label: de cumulatieve programmesleutel
+        # (croho_source) moet hetzelfde dtype (Int64 voor isatcodes) hebben vóór de
+        # CI-subset (die selected_set hieruit bouwt) en vóór de strategie-merges
+        # met student_count.
+        _normalize_programme_code(data_cumulative, _roles.get("croho_source"))
 
     return (
         data_individual,

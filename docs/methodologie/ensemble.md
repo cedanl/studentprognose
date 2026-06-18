@@ -60,9 +60,9 @@ De gewichten gelden voor specifieke weekperiodes en examentypes:
 |---------|----------|
 | `master_week_17_23` | Master-opleidingen in weken 17–23 (vlak voor HBO-inschrijfdeadline) |
 | `week_30_34` | Weken 30–34 (zomerperiode, cumulatief minder betrouwbaar) |
-| `week_35_37` | Weken 35–37 (vlak voor einddeadline) |
+| `week_35_37` | Weken 35 t/m `final_academic_week - 1` (vlak voor de einddeadline) |
 | `default` | Alle overige situaties |
 
-Week 38 (einddeadline) gebruikt altijd 100% het individuele SARIMA-model en is niet configureerbaar.
+De **einddeadline** (`final_academic_week`) gebruikt altijd 100% het individuele SARIMA-model. De bovengrens van de `week_35_37`-band en deze eindweek **schalen mee met** [`model_config.final_academic_week`](../configuratie.md#final_academic_week) (standaard week 38; voor het UvA SQL-telbestand week 36). Bij `final_academic_week = 36` loopt de `week_35_37`-band dus alleen over week 35 en is week 36 de 100%-individueel-week. De gewichten zelf zijn configureerbaar; de weekgrenzen volgen `final_academic_week`.
 
 Pas de gewichten aan op basis van validatieresultaten voor jouw instelling. Zie [Configuratie](../configuratie.md) voor de volledige optiedocumentatie.

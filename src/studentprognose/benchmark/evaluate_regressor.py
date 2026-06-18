@@ -5,9 +5,10 @@ import pandas as pd
 
 from studentprognose.benchmark.metrics import mape, mae, rmse
 from studentprognose.benchmark.splitter import time_series_split
-from studentprognose.config import get_columns, get_model_features
+from studentprognose.config import get_columns, get_model_features, get_final_academic_week
 from studentprognose.models.regressors import build_preprocessor
 from studentprognose.strategies.cumulative import ENGINEERED_FEATURE_COLS
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
 
 def evaluate_regressor_model(
@@ -36,6 +37,7 @@ def evaluate_regressor_model(
     c = get_columns(config)
     mf = get_model_features(config)
     reg_categorical = mf.get("regressor", {}).get("categorical")
+    final_week = get_final_academic_week(config)
 
     if numerus_fixus_list is None:
         numerus_fixus_list = []
@@ -78,6 +80,7 @@ def evaluate_regressor_model(
                 target_col=c.student_count,
                 year_col=c.academic_year,
                 reg_categorical=reg_categorical,
+                final_week=final_week,
             )
             if result:
                 results.append(result)
@@ -97,6 +100,7 @@ def evaluate_regressor_model(
                 target_col=c.student_count,
                 year_col=c.academic_year,
                 reg_categorical=reg_categorical,
+                final_week=final_week,
             )
             if result:
                 results.append(result)
@@ -108,7 +112,7 @@ def _evaluate_single(
     train_df, test_df, regressor_factory,
     examentype, test_year, is_numerus_fixus, programme=None,
     target_col="Aantal_studenten", year_col="Collegejaar",
-    reg_categorical=None,
+    reg_categorical=None, final_week=FINAL_ACADEMIC_WEEK,
 ):
     """Evalueer een regressor op een enkele train/test split."""
     y_train = train_df[target_col].values
@@ -120,6 +124,7 @@ def _evaluate_single(
         ENGINEERED_FEATURE_COLS,
         categorical_cols=reg_categorical,
         year_col=year_col,
+        final_week=final_week,
     )
 
     try:

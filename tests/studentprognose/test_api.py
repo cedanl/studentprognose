@@ -100,6 +100,7 @@ def _install_fake_strategy(monkeypatch, data_option):
     import studentprognose.main as main_mod
     from studentprognose.config import load_defaults
     from studentprognose.output.postprocessor import PostProcessor
+    from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
     class _FakeStrategy:
         def __init__(self, cwd, opt):
@@ -114,6 +115,9 @@ def _install_fake_strategy(monkeypatch, data_option):
                 ci_test_n=None,
             )
             self.numerus_fixus_list = configuration["numerus_fixus"]
+            self.final_academic_week = configuration.get("model_config", {}).get(
+                "final_academic_week", FINAL_ACADEMIC_WEEK
+            )
             self.programme_filtering = []
 
         def preprocess(self):

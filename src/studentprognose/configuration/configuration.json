@@ -14,7 +14,28 @@
         "path_raw_telbestanden": "data/input_raw/telbestanden",
         "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
     },
-    "telbestand_filename_patterns": ["telbestandY{year}W{week}"],
+    "telbestand_filename_patterns": [
+        "telbestandY{year}W{week}",
+        "telbestand_sl_{date}_v{volgnummer}_{year}"
+    ],
+    "cumulative_input": {
+        "separator": ",",
+        "value_maps": {
+            "Type hoger onderwijs": {"P": "Bachelor", "B": "Bachelor", "M": "Master", "A": "Associate degree", "O": "Onbekend"},
+            "Herkomst": {"N": "NL", "E": "EER", "R": "Niet-EER", "O": "Onbekend"}
+        },
+        "faculteit_sentinel": "Onbekend",
+        "aggregate": true,
+        "drop_deleted": true
+    },
+    "validation": {
+        "telbestand": {
+            "separator": ",",
+            "programme_column": "Isatcode",
+            "required_columns": ["Studiejaar", "Isatcode", "Aantal", "meercode_V", "Status", "Herinschrijving", "Hogerejaars", "Herkomst"],
+            "herkomst_allowed": ["N", "E", "R", "O"]
+        }
+    },
     "runtime": {
         "cpu_count": null
     },
@@ -124,6 +145,7 @@
         },
         "oktober": {
             "Collegejaar": "Collegejaar",
+            "Isatcode": "Isatcode",
             "Groepeernaam Croho": "Groepeernaam Croho",
             "Aantal eerstejaars croho": "Aantal eerstejaars croho",
             "EER-NL-nietEER": "EER-NL-nietEER",

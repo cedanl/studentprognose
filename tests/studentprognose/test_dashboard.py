@@ -21,6 +21,7 @@ def _make_strategy_stub():
     )
     return SimpleNamespace(
         postprocessor=postprocessor,
+        final_academic_week=38,
         get_dashboard_data=lambda: {
             "data_cumulative": None,
             "xgboost_curve": None,

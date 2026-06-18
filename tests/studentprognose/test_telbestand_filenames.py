@@ -8,7 +8,42 @@ from studentprognose.utils.telbestand_filenames import (
     TelbestandPattern,
     compile_patterns,
     match_telbestand,
+    week_from_match,
 )
+
+
+class TestDatePlaceholder:
+    """Het UvA SQL-telbestand levert de week via de leverdatum ({date}), niet {week}."""
+
+    def test_date_placeholder_derives_iso_week(self):
+        # Echt UvA-anker: leverdatum 2026-05-25 (volgnummer V34) = ISO-week 22.
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": ["telbestand_sl_{date}_v{volgnummer}_{year}"]}
+        )
+        match = match_telbestand("telbestand_sl_20260525_v34_2026.csv", patterns)
+        assert match is not None
+        assert week_from_match(match) == 22
+        assert match.group("year") == "2026"
+        assert match.group("volgnummer") == "34"
+
+    def test_week_placeholder_returns_literal_week(self):
+        # Legacy {week} blijft het letterlijke weeknummer opleveren.
+        match = match_telbestand("telbestandY2024W10.csv", compile_patterns(None))
+        assert week_from_match(match) == 10
+
+    def test_date_only_pattern_is_valid(self):
+        # {date} zonder {week} is geldig: de week wordt uit de datum afgeleid.
+        patterns = compile_patterns({"telbestand_filename_patterns": ["tel_{date}_{year}"]})
+        match = match_telbestand("tel_20260525_2026.csv", patterns)
+        assert week_from_match(match) == 22
+
+    def test_pattern_without_week_or_date_raises(self):
+        with pytest.raises(ValueError, match="placeholders"):
+            compile_patterns({"telbestand_filename_patterns": ["foo_{year}_only"]})
+
+    def test_pattern_without_year_raises(self):
+        with pytest.raises(ValueError, match="placeholders"):
+            compile_patterns({"telbestand_filename_patterns": ["foo_W{week}"]})
 
 
 class TestCompilePatterns:

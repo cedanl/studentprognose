@@ -1,4 +1,5 @@
 from studentprognose.utils.weeks import get_all_weeks_valid
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
 import pandas as pd
 
@@ -12,8 +13,14 @@ TRANSFORM_GROUP_COLS = [
 ]
 
 
-def transform_data(data_input: pd.DataFrame, targ_col: str) -> pd.DataFrame:
-    """Makes a certain pivot_wider where it transforms the data from long to wide."""
+def transform_data(
+    data_input: pd.DataFrame, targ_col: str, final_week: int = FINAL_ACADEMIC_WEEK
+) -> pd.DataFrame:
+    """Makes a certain pivot_wider where it transforms the data from long to wide.
+
+    ``final_week`` bepaalt de laatste week van het academisch jaar en daarmee de
+    seizoensvolgorde van de weekkolommen (default 38; UvA-aanmeldfase 36).
+    """
     group_cols = TRANSFORM_GROUP_COLS
 
     data = data_input[group_cols + [targ_col, "Weeknummer"]]
@@ -24,7 +31,7 @@ def transform_data(data_input: pd.DataFrame, targ_col: str) -> pd.DataFrame:
 
     data.columns = map(str, data.columns)
 
-    colnames = group_cols + get_all_weeks_valid(data.columns)
+    colnames = group_cols + get_all_weeks_valid(data.columns, final_week)
 
     data = data[colnames]
 

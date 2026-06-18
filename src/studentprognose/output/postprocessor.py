@@ -9,6 +9,7 @@ from studentprognose.utils.weeks import (
     DataOption, StudentYearPrediction, increment_week,
 )
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, LOOKBACK_YEARS
+from studentprognose.utils.programme_key import merge_on_programme_key
 from studentprognose.models.ratio import predict_with_ratio as _predict_with_ratio
 from studentprognose.data.transforms import replace_latest_data
 
@@ -61,6 +62,9 @@ class PostProcessor:
         self.ensemble_weights = ensemble_weights
         self.data_studentcount = data_studentcount
         self.numerus_fixus_list = configuration["numerus_fixus"]
+        self.final_academic_week = configuration.get("model_config", {}).get(
+            "final_academic_week", FINAL_ACADEMIC_WEEK
+        )
         self.ensemble_override_cumulative = configuration.get("ensemble_override_cumulative", [])
         self.ensemble_weights_config = configuration.get("ensemble_weights", {
             "master_week_17_23": {"individual": 0.5, "cumulative": 0.5},
@@ -201,12 +205,16 @@ class PostProcessor:
             studentcount = self.data_studentcount.drop(columns="Faculteit", errors="ignore")
             join_cols = ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"]
             studentcount = studentcount.groupby(join_cols, as_index=False)["Aantal_studenten"].sum()
-            self.data = self.data.merge(studentcount, on=join_cols, how="left")
+            # dtype-veilig: in het individuele spoor keyt self.data op namen en
+            # het label op isatcode-Int64 (cross-track, 0-match); in het
+            # cumulatieve spoor zijn beide Int64 en matcht de join echt.
+            self.data = merge_on_programme_key(self.data, studentcount, on=join_cols, how="left")
 
         if data_cumulative is not None:
             data_cumulative = data_cumulative.drop(columns="Faculteit", errors="ignore")
 
-            self.data = self.data.merge(
+            self.data = merge_on_programme_key(
+                self.data,
                 data_cumulative,
                 on=[
                     "Croho groepeernaam",
@@ -372,8 +380,8 @@ class PostProcessor:
         override = prog.isin(self.ensemble_override_cumulative)
         master_17_23 = ~override & wk.between(17, 23) & (ex == "Master")
         week_30_34 = ~override & ~master_17_23 & wk.between(30, 34)
-        week_35_37 = ~override & ~master_17_23 & ~week_30_34 & wk.between(35, FINAL_ACADEMIC_WEEK - 1)
-        week_final = ~override & ~master_17_23 & ~week_30_34 & ~week_35_37 & (wk == FINAL_ACADEMIC_WEEK)
+        week_35_37 = ~override & ~master_17_23 & ~week_30_34 & wk.between(35, self.final_academic_week - 1)
+        week_final = ~override & ~master_17_23 & ~week_30_34 & ~week_35_37 & (wk == self.final_academic_week)
 
         conditions = [override, master_17_23, week_30_34, week_35_37, week_final]
         choices = [
@@ -395,7 +403,8 @@ class PostProcessor:
                 columns={"Average_ensemble_prediction": "Average_ensemble_prediction_weight"}
             )
 
-        self.data = self.data.merge(
+        self.data = merge_on_programme_key(
+            self.data,
             weights,
             on=["Collegejaar", "Croho groepeernaam", "Examentype", "Herkomst"],
             how="left",
@@ -543,6 +552,14 @@ class PostProcessor:
         # keep="last": de nieuwe run staat altijd achteraan in de concat,
         # dus zijn waarden winnen bij gelijke sleutel. Dit realiseert het
         # "overschrijven per week"-gedrag zonder rij-duplicatie.
-        combined = combined.drop_duplicates(subset=key_cols, keep="last")
+        #
+        # Dedup op een string-genormaliseerde sleutel: een numeriek-ogende
+        # sleutelwaarde (bv. een Isatcode-programmacode) komt na een Excel-
+        # round-trip terug als int, terwijl de in-memory run hem als str
+        # aanlevert. Zonder normalisatie ziet drop_duplicates die als twee
+        # verschillende sleutels en dupliceert de audittrail. We vergelijken
+        # daarom op str, maar behouden de originele (winnende) rij-waarden.
+        norm_key = combined[key_cols].astype(str)
+        combined = combined[~norm_key.duplicated(keep="last")].reset_index(drop=True)
         combined = combined.sort_values(by=sort_cols, ignore_index=True)
         combined.to_excel(path, index=False)

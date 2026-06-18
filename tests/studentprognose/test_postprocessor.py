@@ -251,6 +251,40 @@ class TestSaveTotaalAuditTrail:
         assert set(result["SARIMA_cumulative"]) == {999.0, 888.0}
         assert 100.0 not in result["SARIMA_cumulative"].values
 
+    def test_numerieke_programmasleutel_dupliceert_niet_na_excel_roundtrip(self, tmp_path):
+        # Regressie: een numeriek-ogende programmasleutel (bv. een Isatcode)
+        # komt na een Excel-round-trip terug als int, terwijl de in-memory run
+        # hem als str aanlevert. Zonder genormaliseerde dedup ziet de upsert
+        # die als twee verschillende sleutels en dupliceert de audittrail.
+        def _data(value):
+            return pd.DataFrame({
+                _COLS.academic_year: [2020],
+                _COLS.week:          [6],
+                _COLS.programme:     ["30009"],  # str, zoals de cumulatieve strategie levert
+                _COLS.origin:        ["NL"],
+                _COLS.exam_type:     ["Bachelor"],
+                "Faculteit":         ["FdM"],
+                "SARIMA_cumulative": [value],
+                "Voorspelde vooraanmelders": [value],
+            })
+
+        pp1 = _audittrail_postprocessor(tmp_path)
+        pp1.data = _data(100.0)
+        pp1.save_totaal_audit_trail(StudentYearPrediction.FIRST_YEARS)
+
+        # Sanity: Excel leest de string-code terug als geheeltal — dat is de
+        # bron van de dtype-mismatch die de dedup moet overleven.
+        roundtrip = pd.read_excel(self._path(tmp_path))
+        assert roundtrip[_COLS.programme].dtype.kind in ("i", "u")
+
+        pp2 = _audittrail_postprocessor(tmp_path)
+        pp2.data = _data(999.0)
+        pp2.save_totaal_audit_trail(StudentYearPrediction.FIRST_YEARS)
+
+        result = pd.read_excel(self._path(tmp_path))
+        assert len(result) == 1  # geen rij-duplicatie ondanks int/str-mismatch
+        assert result["SARIMA_cumulative"].iloc[0] == 999.0
+
     def test_andere_week_wordt_toegevoegd(self, tmp_path):
         pp1 = _audittrail_postprocessor(tmp_path)
         pp1.data = _make_run_data(week=11)

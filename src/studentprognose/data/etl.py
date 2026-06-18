@@ -8,7 +8,70 @@ from scipy.interpolate import interp1d
 from studentprognose.utils.telbestand_filenames import (
     compile_patterns,
     match_telbestand,
+    week_from_match,
 )
+
+# De 16 canonieke kolommen van vooraanmeldingen_cumulatief.csv (downstream-contract).
+_OUTPUT_COLUMNS = [
+    "Korte naam instelling",
+    "Collegejaar",
+    "Weeknummer rapportage",
+    "Weeknummer",
+    "Faculteit",
+    "Type hoger onderwijs",
+    "Groepeernaam Croho",
+    "Naam Croho opleiding Nederlands",
+    "Croho",
+    "Herinschrijving",
+    "Hogerejaars",
+    "Herkomst",
+    "Gewogen vooraanmelders",
+    "Ongewogen vooraanmelders",
+    "Aantal aanmelders met 1 aanmelding",
+    "Inschrijvingen",
+]
+
+# Identiteitskolommen voor aggregatie: de 12 niet-numerieke van _OUTPUT_COLUMNS.
+# De fijnmazige SQL-dimensies (Geslacht, Opl_vorm, Voertaal, Fixus, 1cHO_*,
+# meercode_V) collapsen hierop door optelling van de twee maatkolommen.
+_AGG_SUM_COLUMNS = ["Gewogen vooraanmelders", "Ongewogen vooraanmelders"]
+_AGG_IDENTITY_COLUMNS = [c for c in _OUTPUT_COLUMNS if c not in _AGG_SUM_COLUMNS
+                         and c not in ("Aantal aanmelders met 1 aanmelding", "Inschrijvingen")]
+
+# De canonieke output is altijd ;-gescheiden (downstream leest met sep=";").
+# De input-separator is configureerbaar: legacy instellingsformaat is ;, het
+# UvA SQL-telbestand is ,-gescheiden.
+_OUTPUT_SEPARATOR = ";"
+
+# Defaults reproduceren het legacy instellingsformaat exact, zodat een lege
+# config (en de packaged default) ongewijzigd blijft werken. Het UvA SQL-formaat
+# overschrijft deze via configuration["cumulative_input"] (zie configuratie.md).
+_DEFAULT_CUMULATIVE_INPUT = {
+    "separator": ";",
+    "rename": {
+        "Brincode": "Korte naam instelling",
+        "Studiejaar": "Collegejaar",
+        "Type_HO": "Type hoger onderwijs",
+        "Isatcode": "Croho",
+        "Aantal": "Ongewogen vooraanmelders",
+    },
+    "value_maps": {
+        "Type hoger onderwijs": {"P": "Bachelor", "B": "Bachelor", "M": "Master"},
+        "Herinschrijving": {"J": "Ja", "N": "Nee"},
+        "Hogerejaars": {"J": "Ja", "N": "Nee"},
+        "Herkomst": {"N": "NL", "E": "EER", "R": "Niet-EER"},
+    },
+    # Bronkolom voor de leesbare opleidingsnaam; valt terug op Croho (Isatcode)
+    # als de kolom ontbreekt (UvA SQL levert geen Groepeernaam — zie #232).
+    "programme_name_source": "Groepeernaam",
+    # Niet-lege sentinel voor een ontbrekende Faculteit. MOET niet-leeg zijn:
+    # de cumulatieve groupby/pivot droppen rijen met een NaN-sleutel (#232).
+    "faculteit_sentinel": None,
+    # Aggregeer fijnmazige rijen naar de canonieke grain (UvA SQL is fijnmaziger).
+    "aggregate": False,
+    # Filter etl_is_deleted == 0 (UvA SQL soft-delete vlag; afwezig in legacy).
+    "drop_deleted": False,
+}
 
 
 def run_etl(configuration):
@@ -62,18 +125,27 @@ def run_etl(configuration):
 
 
 def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
-    """Merge weekly Studielink CSVs into one cumulative file."""
-    dataframes = []
+    """Voeg wekelijkse telbestand-snapshots samen tot één cumulatief bestand.
+
+    Config-gedreven via ``configuration["cumulative_input"]`` (separator, kolom-
+    rename, waardevertalingen, aggregatie). De defaults reproduceren het legacy
+    Studielink instellingsformaat; het UvA SQL-formaat zet dezelfde bronkolommen
+    om naar identieke 16-koloms output. Zie :data:`_DEFAULT_CUMULATIVE_INPUT` en
+    docs/configuratie.md.
+    """
+    cfg = {**_DEFAULT_CUMULATIVE_INPUT, **(configuration or {}).get("cumulative_input", {})}
+    value_maps = {**_DEFAULT_CUMULATIVE_INPUT["value_maps"], **cfg.get("value_maps", {})}
     patterns = compile_patterns(configuration)
 
+    dataframes = []
     for filename in sorted(os.listdir(telbestanden_dir)):
         match = match_telbestand(filename, patterns)
         if not match:
             continue
 
         filepath = os.path.join(telbestanden_dir, filename)
-        data = pd.read_csv(filepath, sep=";", low_memory=False)
-        data["Weeknummer"] = int(match.group("week"))
+        data = pd.read_csv(filepath, sep=cfg["separator"], low_memory=False)
+        data["Weeknummer"] = week_from_match(match)
         dataframes.append(data)
 
     if not dataframes:
@@ -82,61 +154,93 @@ def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
 
     data = pd.concat(dataframes, ignore_index=True)
 
+    # ISO-week 53 komt voor in lange ISO-jaren (bijv. leverdatum eind dec 2020/2026).
+    # Deze snapshots blijven in de output staan, maar het 52-weeks SARIMA-seizoens-
+    # model (get_all_weeks_ordered) modelleert ze niet. Maak dat expliciet i.p.v. stil.
+    if (data["Weeknummer"] == 53).any():
+        print(
+            "  Warning: ISO-week 53 aangetroffen (lange ISO-jaren). Deze weeksnapshots "
+            "blijven in vooraanmeldingen_cumulatief.csv staan, maar vallen buiten het "
+            "52-weeks seizoensmodel van het cumulatieve spoor."
+        )
+
+    # UvA SQL soft-delete vlag (afwezig in legacy): verwijder verwijderde rijen.
+    if cfg["drop_deleted"] and "etl_is_deleted" in data.columns:
+        data = data[data["etl_is_deleted"] == 0]
+
     # Status A = annulering (Studielink PvL §5.12). Voor die rijen is meercode_V
     # per definitie 0 en horen aantallen semantisch niet bij vooraanmelders.
+    # Geverifieerd op het echte UvA-anker: na deze filter blijft geen meercode_V
+    # == 0 over, dus de deling hieronder kan niet door nul gaan.
     data = data[data["Status"] != "A"].copy()
 
     data["Gewogen vooraanmelders"] = data["Aantal"] / data["meercode_V"]
 
-    data.rename(
-        columns={
-            "Brincode": "Korte naam instelling",
-            "Studiejaar": "Collegejaar",
-            "Type_HO": "Type hoger onderwijs",
-            "Isatcode": "Croho",
-            "Aantal": "Ongewogen vooraanmelders",
-        },
-        inplace=True,
-    )
+    data.rename(columns=cfg["rename"], inplace=True)
 
     data["Weeknummer rapportage"] = data["Weeknummer"]
-    data["Groepeernaam Croho"] = data.get("Groepeernaam", data["Croho"])
-    data["Naam Croho opleiding Nederlands"] = data.get("Groepeernaam", data["Croho"])
+
+    # Leesbare opleidingsnaam uit de bronkolom indien aanwezig, anders Croho
+    # (Isatcode) als placeholder — de UvA SQL levert geen Groepeernaam (#232).
+    programme_name = data.get(cfg["programme_name_source"], data["Croho"])
+    data["Groepeernaam Croho"] = programme_name
+    data["Naam Croho opleiding Nederlands"] = programme_name
+
     data["Aantal aanmelders met 1 aanmelding"] = None
     data["Inschrijvingen"] = None
 
+    # Faculteit ontbreekt in de UvA SQL → niet-lege sentinel zodat de cumulatieve
+    # groupby/pivot de rijen niet als NaN-sleutel droppen (echte mapping: #232).
     if "Faculteit" not in data.columns:
-        data["Faculteit"] = None
+        data["Faculteit"] = cfg["faculteit_sentinel"]
 
-    data["Type hoger onderwijs"] = data["Type hoger onderwijs"].replace(
-        {"P": "Bachelor", "B": "Bachelor", "M": "Master"}
+    for col, mapping in value_maps.items():
+        if col in data.columns:
+            _warn_unmapped_values(data[col], mapping, col)
+            data[col] = data[col].replace(mapping)
+
+    # De UvA SQL is fijnmaziger dan de canonieke grain → optellen, anders
+    # crasht de pivot in transform_data op een dubbele index (no-op voor legacy).
+    if cfg["aggregate"]:
+        data = _aggregate_to_grain(data)
+
+    data = data[_OUTPUT_COLUMNS]
+    data.to_csv(output_path, sep=_OUTPUT_SEPARATOR, index=False)
+
+
+def _aggregate_to_grain(data):
+    """Tel fijnmazige rijen op naar de canonieke 16-koloms grain.
+
+    De UvA SQL-levering splitst elke canonieke combinatie nog op Geslacht,
+    Opl_vorm, Voertaal, Fixus en 1cHO. Die dimensies staan niet in de output;
+    ``Gewogen``/``Ongewogen vooraanmelders`` worden per grain-combinatie
+    gesommeerd (``Gewogen`` is al per rij berekend vóór de optelling).
+
+    ``dropna=False`` houdt rijen met een niet-NaN-maar-sentinel sleutel
+    (bijv. Faculteit) intact.
+    """
+    aggregated = (
+        data.groupby(_AGG_IDENTITY_COLUMNS, dropna=False, as_index=False)[_AGG_SUM_COLUMNS]
+        .sum()
     )
-    data["Herinschrijving"] = data["Herinschrijving"].replace({"J": "Ja", "N": "Nee"})
-    data["Hogerejaars"] = data["Hogerejaars"].replace({"J": "Ja", "N": "Nee"})
-    data["Herkomst"] = data["Herkomst"].replace({"N": "NL", "E": "EER", "R": "Niet-EER"})
+    aggregated["Aantal aanmelders met 1 aanmelding"] = None
+    aggregated["Inschrijvingen"] = None
+    return aggregated
 
-    data = data[
-        [
-            "Korte naam instelling",
-            "Collegejaar",
-            "Weeknummer rapportage",
-            "Weeknummer",
-            "Faculteit",
-            "Type hoger onderwijs",
-            "Groepeernaam Croho",
-            "Naam Croho opleiding Nederlands",
-            "Croho",
-            "Herinschrijving",
-            "Hogerejaars",
-            "Herkomst",
-            "Gewogen vooraanmelders",
-            "Ongewogen vooraanmelders",
-            "Aantal aanmelders met 1 aanmelding",
-            "Inschrijvingen",
-        ]
-    ]
 
-    data.to_csv(output_path, sep=";", index=False)
+def _warn_unmapped_values(series, mapping, column):
+    """Print een waarschuwing voor waarden buiten de configureerbare mapping.
+
+    ``Series.replace`` laat niet-gemapte waarden ongewijzigd door; dit maakt
+    nieuwe/onverwachte codes (bijv. een toekomstige Herkomst- of Type_HO-waarde)
+    zichtbaar i.p.v. dat ze stil door de pipeline glippen.
+    """
+    unmapped = set(series.dropna().unique()) - set(mapping)
+    if unmapped:
+        print(
+            f"  Warning: kolom '{column}' bevat niet-gemapte waarde(n) "
+            f"{sorted(map(str, unmapped))} — onveranderd doorgegeven."
+        )
 
 
 def _interpolate_missing_weeks(csv_path):
@@ -307,7 +411,13 @@ def _calculate_student_count(data, volume):
         "Examentype": [],
     }
 
-    programme_key = "Groepeernaam Croho"
+    # Joinsleutel = de landelijke Isatcode (CROHO-code), niet de
+    # instellingsspecifieke opleidingsnaam. De code is stabiel en identiek aan
+    # de Isatcode in de telbestanden, zodat het label (student_count) op exact
+    # dezelfde sleutel als de features (vooraanmeldingen_cumulatief) joint.
+    # De code wordt weggeschreven in de kolom "Croho groepeernaam" (#232:
+    # voor de UvA-bron is dat sowieso al de code, geen leesbare naam).
+    programme_key = "Isatcode"
     herkomst_key = "EER-NL-nietEER"
     year_key = "Collegejaar"
     examtype_key = "Examentype code"

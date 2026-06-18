@@ -5,6 +5,8 @@ from importlib.resources import files
 from types import SimpleNamespace
 
 from studentprognose.utils.telbestand_filenames import _placeholder_to_regex
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
+from studentprognose.utils.programme_key import normalize_programme_keys
 
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
@@ -66,6 +68,12 @@ def load_configuration(file_path: str) -> dict:
     _validate_model_config(cfg, file_path)
     _validate_runtime(cfg, file_path)
     _validate_telbestand_filename_patterns(cfg, file_path)
+
+    # Normaliseer de numerus_fixus-keys (programmesleutels) naar hetzelfde dtype
+    # als de datakolom: een numerieke Isatcode-key wordt int en matcht zo de
+    # Int64-kolom in .isin/dict-lookups; legacy naam-keys blijven string.
+    if isinstance(cfg.get("numerus_fixus"), dict):
+        cfg["numerus_fixus"] = normalize_programme_keys(cfg["numerus_fixus"])
     return cfg
 
 
@@ -82,6 +90,17 @@ def get_columns(config: dict) -> SimpleNamespace:
 def get_model_features(config: dict) -> dict:
     """Get model feature lists (numeric / categorical) from configuration."""
     return config.get("model_features", {})
+
+
+def get_final_academic_week(config: dict) -> int:
+    """Laatste week van het academisch jaar uit de configuratie.
+
+    Default :data:`FINAL_ACADEMIC_WEEK` (38, het Radboud/Studielink-instellings-
+    formaat). Het UvA SQL-telbestand levert de aanmeldfase tot ~week 36 (geen
+    leveringen week 37–39), dus ``model_config.final_academic_week`` staat daar
+    op 36. Bepaalt de seizoensvensters in weeks/sarima/cumulative/postprocessor.
+    """
+    return config.get("model_config", {}).get("final_academic_week", FINAL_ACADEMIC_WEEK)
 
 
 def get_cpu_count(config: dict) -> int:

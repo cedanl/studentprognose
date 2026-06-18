@@ -25,6 +25,7 @@ def run_post_prediction_checks(
     predict_year: int,
     predict_week: int,
     numerus_fixus_list: dict,
+    final_week: int = FINAL_ACADEMIC_WEEK,
 ) -> None:
     """Run all post-prediction output quality checks. Prints warnings only."""
     if data is None or "Ensemble_prediction" not in data.columns:
@@ -38,7 +39,7 @@ def run_post_prediction_checks(
     if predictions.empty:
         return
 
-    _check_trend_realism(predictions, data, data_cumulative, predict_year, predict_week)
+    _check_trend_realism(predictions, data, data_cumulative, predict_year, predict_week, final_week)
     _check_numerus_fixus_caps(predictions, numerus_fixus_list, predict_year, predict_week)
 
 
@@ -52,6 +53,7 @@ def _check_trend_realism(
     data_cumulative: "pd.DataFrame | None",
     predict_year: int,
     predict_week: int,
+    final_week: int = FINAL_ACADEMIC_WEEK,
 ) -> None:
     group_cols = ["Herkomst", "Croho groepeernaam", "Examentype"]
     if any(c not in predictions.columns for c in group_cols):
@@ -66,13 +68,13 @@ def _check_trend_realism(
         ]
 
     # Week-over-week: compare against predictions from last week in same run.
-    # Exclude week 1 (no prior week) and FINAL_ACADEMIC_WEEK+1 (prior week is
+    # Exclude week 1 (no prior week) and final_week+1 (prior week is
     # end of previous cycle, not previous prediction in this run).
     last_week_data = data[
         (data["Collegejaar"] == predict_year)
         & (data["Weeknummer"] == predict_week - 1)
         & data["Ensemble_prediction"].notna()
-    ] if predict_week > 1 and predict_week != FINAL_ACADEMIC_WEEK + 1 else pd.DataFrame()
+    ] if predict_week > 1 and predict_week != final_week + 1 else pd.DataFrame()
 
     curr_preds = predictions.groupby(group_cols)["Ensemble_prediction"].sum().reset_index()
 

@@ -73,6 +73,7 @@ import pandas as pd
 from studentprognose.utils.telbestand_filenames import (
     compile_patterns,
     match_telbestand,
+    week_from_match,
 )
 
 
@@ -126,6 +127,12 @@ _DEFAULT_VALIDATION_CFG = {
         "herkomst_allowed": ["N", "E", "R"],
         "herinschrijving_allowed": ["J", "N"],
         "hogerejaars_allowed": ["J", "N"],
+        # Separator van de ruwe telbestanden (legacy instellingsformaat = ";",
+        # UvA SQL-telbestand = ","). Overschrijfbaar via configuration.json.
+        "separator": ";",
+        # Kolom waarop categorale fouten worden gegroepeerd. Het UvA SQL-formaat
+        # mist Groepeernaam → val terug op Isatcode via configuration.json.
+        "programme_column": "Groepeernaam",
     },
     # critical_columns zijn kanonieke namen; de werkelijke kolomnamen worden
     # opgezocht via configuration["columns"]["individual"] / ["oktober"].
@@ -133,8 +140,10 @@ _DEFAULT_VALIDATION_CFG = {
         "critical_columns": ["Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr"],
     },
     "oktober": {
+        # Joinsleutel is sinds de isatcode-migratie de Isatcode (CROHO-code), niet
+        # de instellingsspecifieke "Groepeernaam Croho" — die is niet langer vereist.
         "critical_columns": [
-            "Collegejaar", "Groepeernaam Croho", "Aantal eerstejaars croho",
+            "Collegejaar", "Isatcode", "Aantal eerstejaars croho",
             "EER-NL-nietEER", "Examentype code", "Aantal Hoofdinschrijvingen",
         ],
     },
@@ -338,11 +347,13 @@ def _validate_telbestanden(
     herkomst_allowed = telbestand_cfg["herkomst_allowed"]
     herinschrijving_allowed = telbestand_cfg["herinschrijving_allowed"]
     hogerejaars_allowed = telbestand_cfg["hogerejaars_allowed"]
+    separator = telbestand_cfg["separator"]
+    programme_col = telbestand_cfg["programme_column"]
 
     for filename in files:
         filepath = os.path.join(telbestanden_dir, filename)
         try:
-            df = pd.read_csv(filepath, sep=";", low_memory=False)
+            df = pd.read_csv(filepath, sep=separator, low_memory=False)
         except Exception as e:
             result.hard_errors.append(f"{filename}: kan bestand niet lezen ({e})")
             continue
@@ -356,7 +367,7 @@ def _validate_telbestanden(
 
         match = match_telbestand(filename, telbestand_patterns)
         if match:
-            week_nr = int(match.group("week"))
+            week_nr = week_from_match(match)
             if not (weeknummer_min <= week_nr <= weeknummer_max):
                 result.hard_errors.append(
                     f"{filename}: weeknummer {week_nr} valt buiten verwacht bereik "
@@ -389,17 +400,17 @@ def _validate_telbestanden(
                 )
             _check_categoricals_per_programme(
                 df.assign(**{col: normalized}),
-                col, allowed, "Groepeernaam", filename, result,
+                col, allowed, programme_col, filename, result,
             )
 
         neg_aantal = df[df["Aantal"] < 0]
         if not neg_aantal.empty:
-            programmes = neg_aantal["Groepeernaam"].dropna().unique()
-            result.soft_errors.append(
-                f"{filename}: Aantal < 0 voor "
-                f"{len(programmes)} opleiding(en): "
-                + _format_programmes(programmes)
-            )
+            if programme_col in neg_aantal.columns:
+                programmes = neg_aantal[programme_col].dropna().unique()
+                detail = f"{len(programmes)} opleiding(en): " + _format_programmes(programmes)
+            else:
+                detail = f"{len(neg_aantal)} rij(en)"
+            result.soft_errors.append(f"{filename}: Aantal < 0 voor {detail}")
 
         for col in ["Aantal", "meercode_V"]:
             _check_nan_rate(df, col, filename, nan_warn, nan_error, result)
@@ -560,7 +571,7 @@ def _check_telbestand_completeness(files, validation_cfg, telbestand_patterns, r
     for filename in files:
         match = match_telbestand(filename, telbestand_patterns)
         if match:
-            year, week = int(match.group("year")), int(match.group("week"))
+            year, week = int(match.group("year")), week_from_match(match)
             weeks_per_year.setdefault(year, []).append(week)
 
     for year, weeks in sorted(weeks_per_year.items()):

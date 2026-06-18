@@ -227,3 +227,61 @@ class TestBenchmarkValidation:
         assert cfg.command == "benchmark"
         assert cfg.data_option == DataOption.INDIVIDUAL
         assert cfg.dataset_specified is True
+
+
+class TestTimeseriesSeasonLength:
+    """Borgt dat de cumulatieve benchmark (evaluate_timeseries_model) dezelfde
+    uit-de-data-afgeleide seizoenslengte gebruikt als productie: de cross-
+    opleiding-union van gevulde weken, niet de dekking van één opleiding. Een
+    revert van evaluate_ts.py naar per-groep pivotten (de divergentie die de
+    review vond: 29 i.p.v. 39) laat deze test falen."""
+
+    def _mixed_df(self):
+        narrow = list(range(45, 53)) + list(range(1, 21))  # opleiding NARROW: t/m wk20
+        wider = list(range(45, 53)) + list(range(1, 31))   # opleiding WIDE:   t/m wk30
+        rows = []
+        for prog, wks in (("NARROW", narrow), ("WIDE", wider)):
+            for yr in (2019, 2020, 2021, 2022, 2023, 2024):
+                for i, wk in enumerate(wks):
+                    rows.append({
+                        "Collegejaar": yr, "Faculteit": "F", "Herkomst": "NL",
+                        "Examentype": "Bachelor", "Croho groepeernaam": prog,
+                        "ts": 100.0 + 10.0 * i, "Weeknummer": int(wk),
+                    })
+        return pd.DataFrame(rows)
+
+    def test_benchmark_uses_cross_group_union_season_length(self):
+        from studentprognose.benchmark.evaluate_ts import evaluate_timeseries_model
+        from studentprognose.models.base import BaseForecaster
+        from studentprognose.utils.constants import SARIMA_SEASONAL_ORDER
+
+        fitted = []
+
+        class _SeasonRecorder(BaseForecaster):
+            def __init__(self):
+                self.season_length = SARIMA_SEASONAL_ORDER[3]  # = 52, zoals SARIMA
+
+            def fit(self, ts_data, exog=None):
+                fitted.append(self.season_length)
+                return self
+
+            def forecast(self, steps, exog=None):
+                return np.zeros(steps)
+
+        config = {
+            "column_roles": {
+                "programme": "Croho groepeernaam", "origin": "Herkomst",
+                "exam_type": "Examentype", "academic_year": "Collegejaar",
+            },
+            "model_config": {"final_academic_week": 36},
+        }
+
+        evaluate_timeseries_model(
+            self._mixed_df(), lambda: _SeasonRecorder(), predict_week=20,
+            config=config, min_training_year=2016, min_train_years=3,
+        )
+
+        assert fitted, "benchmark heeft geen enkel model gefit"
+        # cross-opleiding-union = wk45-52 (8) + wk1-30 (30, van WIDE) + reset-week 37 = 39,
+        # voor ELKE groep (ook de smalle), identiek aan productie. Per-groep zou 29 geven.
+        assert set(fitted) == {39}

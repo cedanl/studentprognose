@@ -68,7 +68,7 @@ Telbestand met studentaantallen, door de instelling zelf aangeleverd — zie [Je
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
 | Bestand bestaat | — | Wordt getoond in het bestandsoverzicht bij opstart |
-| Verplichte kolommen | Hard error | `Collegejaar`, `Groepeernaam Croho`, `Aantal eerstejaars croho`, `EER-NL-nietEER`, `Examentype code`, `Aantal Hoofdinschrijvingen` |
+| Verplichte kolommen | Hard error | `Collegejaar`, `Isatcode`, `Aantal eerstejaars croho`, `EER-NL-nietEER`, `Examentype code`, `Aantal Hoofdinschrijvingen` (`Isatcode` is de joinsleutel met de vooraanmeldingen; `Groepeernaam Croho` is niet langer verplicht) |
 | Collegejaar bereik | Soft error | Zelfde bereikcontrole als telbestanden |
 | Ontbrekende waarden | Waarschuwing / Soft error | Per verplichte kolom |
 

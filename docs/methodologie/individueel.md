@@ -20,6 +20,11 @@ studentprognose -d b -w 6 -y 2024   # individueel + cumulatief → ensemble
 
 In de `-d b` (both) modus draait dit model parallel aan het cumulatieve spoor; de uitkomsten worden gecombineerd in het [ensemble](ensemble.md).
 
+!!! warning "Sleutelruimte in both-modus: individueel keyt op naam, cumulatief op Isatcode"
+    Sinds de [isatcode-migratie](../je-data-voorbereiden.md) keyt het cumulatieve spoor (en het label) op de numerieke `Isatcode`, terwijl het individuele spoor nog op de **leesbare opleidingsnaam** keyt. Die twee sleutelruimtes overlappen niet, dus de feature-merge tussen beide sporen matcht in de praktijk **0 rijen** op de programmesleutel — de cumulatieve features worden niet daadwerkelijk op de individuele records gejoind. De sporen worden daardoor pas op het **ensemble**-niveau gecombineerd, niet op feature-niveau.
+
+    Dit is gedrag dat losstaat van het sleutel-dtype (ook met de oude string-sleutel matchte de join al niets). De merges zijn dtype-veilig gemaakt zodat ze niet crashen; het structureel uitlijnen van beide sporen op één sleutel wordt opgevolgd in [#238](https://github.com/cedanl/studentprognose/issues/238). Interpreteer de both-uitkomst dus als een **ensemble van twee onafhankelijk geschatte sporen**, niet als een individueel model dat met cumulatieve features is verrijkt.
+
 ## Pipeline op hoofdlijnen
 
 ```mermaid

@@ -4,10 +4,11 @@ import math
 
 from studentprognose.config import get_cpu_count
 from studentprognose.utils.parallel import run_parallel_with_fallback
+from studentprognose.utils.programme_key import normalize_programme_values, merge_on_programme_key
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy, _add_engineered_features
-from studentprognose.utils.weeks import get_weeks_list
+from studentprognose.utils.weeks import get_weeks_list, academic_start_week
 from studentprognose.data.transforms import transform_data
 from studentprognose.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
 
@@ -37,7 +38,9 @@ class CombinedStrategy(PredictionStrategy):
                 f"Selected years {years} not found in individual dataset. Proceeding with cumulative dataset."
             )
         self.years = years
-        self.exclude_from_combined = configuration.get("exclude_from_combined", [])
+        self.exclude_from_combined = normalize_programme_values(
+            configuration.get("exclude_from_combined", [])
+        )
 
     def get_dashboard_data(self) -> dict:
         return {
@@ -61,13 +64,13 @@ class CombinedStrategy(PredictionStrategy):
         self.individual.set_year_week(predict_year, predict_week, self.individual.data_individual)
         self.cumulative.set_year_week(predict_year, predict_week, self.cumulative.data_cumulative)
 
-        self.individual.data_individual = self.individual.data_individual.merge(
+        self.individual.data_individual = merge_on_programme_key(
+            self.individual.data_individual,
             self.cumulative.data_cumulative,
             on=[
                 "Croho groepeernaam", "Collegejaar", "Faculteit",
                 "Examentype", "Weeknummer", "Herkomst",
             ],
-            how="left",
         )
 
         from studentprognose.models.xgboost_classifier import predict_applicant
@@ -90,13 +93,13 @@ class CombinedStrategy(PredictionStrategy):
         temp_data_individual = self.individual.data_individual.copy(deep=True)
         temp_data_individual["Weeknummer"] = self.individual.data_individual["Weeknummer"].astype(int)
 
-        self.data_exog = temp_data_individual.merge(
+        self.data_exog = merge_on_programme_key(
+            temp_data_individual,
             self.cumulative.data_cumulative,
             on=[
                 "Croho groepeernaam", "Collegejaar", "Examentype",
                 "Faculteit", "Weeknummer", "Herkomst",
             ],
-            how="left",
         )
 
         self.individual.set_data_individual(transform_data(
@@ -105,8 +108,11 @@ class CombinedStrategy(PredictionStrategy):
 
         self.cumulative._prepare_data()
 
-        full_data = _get_transformed_data(self.cumulative.data_cumulative.copy(deep=True), self.min_training_year)
-        full_data["39"] = 0
+        full_data = _get_transformed_data(
+            self.cumulative.data_cumulative.copy(deep=True), self.min_training_year,
+            self.cumulative.final_academic_week,
+        )
+        full_data[str(academic_start_week(self.cumulative.final_academic_week))] = 0
         full_data = _add_engineered_features(full_data, self.cumulative.data_cumulative, int(self.predict_week))
 
         self.skip_years = skip_years
@@ -157,7 +163,7 @@ class CombinedStrategy(PredictionStrategy):
 
         cumulative_predictions = [x[1] for x in self.predicted_data]
 
-        if self.predict_week != 38:
+        if self.predict_week != self.cumulative.final_academic_week:
             data_to_predict = self.postprocessor.add_predicted_preregistrations(
                 data_to_predict, cumulative_predictions
             )
@@ -180,7 +186,7 @@ class CombinedStrategy(PredictionStrategy):
             self.individual.data_individual, row, self.predict_year, self.predict_week,
             self.individual.max_year, self.numerus_fixus_list, self.data_exog, already_printed=True,
         )
-        if self.predict_week == 38:
+        if self.predict_week == self.cumulative.final_academic_week:
             return sarima_individual, []
         else:
             predicted_preregistration = predict_with_sarima_cumulative(
@@ -188,6 +194,7 @@ class CombinedStrategy(PredictionStrategy):
                 self.cumulative.pred_len, self.cumulative.skip_years, already_printed=True,
                 min_training_year=self.min_training_year,
                 forecaster_factory=self.cumulative._forecaster_factory,
+                final_week=self.cumulative.final_academic_week,
             )
 
         return sarima_individual, predicted_preregistration

@@ -14,6 +14,27 @@
         "path_raw_telbestanden": "data/input_raw/telbestanden",
         "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
     },
+    "telbestand_filename_patterns": [
+        "telbestand_sl_{date}_v{volgnummer}_{year}"
+    ],
+    "cumulative_input": {
+        "separator": ",",
+        "value_maps": {
+            "Type hoger onderwijs": {"P": "Bachelor", "B": "Bachelor", "M": "Master", "A": "Associate degree", "O": "Onbekend"},
+            "Herkomst": {"N": "NL", "E": "EER", "R": "Niet-EER", "O": "Onbekend"}
+        },
+        "faculteit_sentinel": "Onbekend",
+        "aggregate": true,
+        "drop_deleted": true
+    },
+    "validation": {
+        "telbestand": {
+            "separator": ",",
+            "programme_column": "Isatcode",
+            "required_columns": ["Studiejaar", "Isatcode", "Aantal", "meercode_V", "Status", "Herinschrijving", "Hogerejaars", "Herkomst"],
+            "herkomst_allowed": ["N", "E", "R", "O"]
+        }
+    },
     "model_config": {
         "status_mapping": {
             "Ingeschreven": 1,
@@ -25,7 +46,8 @@
         },
         "min_training_year": 2016,
         "cumulative_timeseries": "sarima",
-        "cumulative_regressor": "xgboost"
+        "cumulative_regressor": "xgboost",
+        "final_academic_week": 36
     },
     "numerus_fixus": {
         "B Opleiding": 0
@@ -128,6 +150,7 @@
         },
         "oktober": {
             "Collegejaar": "Collegejaar",
+            "Isatcode": "Isatcode",
             "Groepeernaam Croho": "Groepeernaam Croho",
             "Aantal eerstejaars croho": "Aantal eerstejaars croho",
             "EER-NL-nietEER": "EER-NL-nietEER",
