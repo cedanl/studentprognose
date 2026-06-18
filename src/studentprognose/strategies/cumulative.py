@@ -7,6 +7,7 @@ import warnings
 
 from studentprognose.config import get_cpu_count
 from studentprognose.utils.parallel import run_parallel_with_fallback
+from studentprognose.utils.programme_key import normalize_programme_series
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import (
     increment_week, compute_pred_len, academic_start_week, get_all_weeks_ordered,
@@ -151,10 +152,11 @@ class CumulativeStrategy(PredictionStrategy):
 
         # Croho groepeernaam is in het legacy-formaat een leesbare string ("B
         # Psychologie"); bij het UvA SQL-formaat is het (voorlopig, #232) de
-        # numerieke Isatcode. Forceer string zodat downstream-merges op deze
-        # sleutel (ratio-model, student_count, audittrail) niet op int-vs-str
-        # struikelen. Voor legacy is dit een no-op.
-        data["Croho groepeernaam"] = data["Croho groepeernaam"].astype(str)
+        # numerieke Isatcode. Normaliseer naar één canoniek dtype (Int64 voor
+        # isatcodes, string voor namen) zodat downstream-merges op deze sleutel
+        # (ratio-model, student_count, audittrail) en .isin-filters niet op
+        # gemengde types struikelen. Zie utils.programme_key.
+        data["Croho groepeernaam"] = normalize_programme_series(data["Croho groepeernaam"])
 
         data.loc[(data["Examentype"] == "Pre-master"), "Hogerejaars"] = "Nee"
         data = data[data["Hogerejaars"] == "Nee"]

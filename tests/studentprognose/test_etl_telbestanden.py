@@ -300,16 +300,22 @@ class TestStudentCountKeyedOnIsatcode:
         assert out["Aantal_studenten"].iloc[0] == 120
 
     def test_label_joins_with_cumulative_features_on_isatcode(self, tmp_path):
-        """Kern van de fix: na string-normalisatie (zoals loader + cumulative.py)
+        """Kern van de fix: na Int64-normalisatie (zoals loader + cumulative.py)
         joint het label met een feature-rij die de Isatcode als sleutel draagt."""
         label = self._run_etl(tmp_path)
-        _normalize_programme_code(label, "Croho groepeernaam")  # numeriek → "56604"
+        _normalize_programme_code(label, "Croho groepeernaam")  # numeriek → Int64 56604
 
-        # Feature-zijde: cumulatieve sleutel is de Isatcode als string (UvA-formaat).
+        # Feature-zijde: cumulatieve sleutel is de Isatcode (UvA-formaat), via
+        # dezelfde normalisatie naar Int64 gebracht als in de echte pipeline.
         features = pd.DataFrame([{
-            "Croho groepeernaam": "56604", "Collegejaar": 2024,
+            "Croho groepeernaam": 56604, "Collegejaar": 2024,
             "Herkomst": "NL", "Examentype": "Bachelor",
         }])
+        _normalize_programme_code(features, "Croho groepeernaam")
+
+        assert str(label["Croho groepeernaam"].dtype) == "Int64"
+        assert str(features["Croho groepeernaam"].dtype) == "Int64"
+
         keys = ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"]
         merged = features.merge(label, on=keys, how="inner")
         assert len(merged) == 1

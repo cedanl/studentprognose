@@ -9,6 +9,7 @@ from studentprognose.utils.weeks import (
     DataOption, StudentYearPrediction, increment_week,
 )
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, LOOKBACK_YEARS
+from studentprognose.utils.programme_key import merge_on_programme_key
 from studentprognose.models.ratio import predict_with_ratio as _predict_with_ratio
 from studentprognose.data.transforms import replace_latest_data
 
@@ -204,12 +205,16 @@ class PostProcessor:
             studentcount = self.data_studentcount.drop(columns="Faculteit", errors="ignore")
             join_cols = ["Croho groepeernaam", "Collegejaar", "Herkomst", "Examentype"]
             studentcount = studentcount.groupby(join_cols, as_index=False)["Aantal_studenten"].sum()
-            self.data = self.data.merge(studentcount, on=join_cols, how="left")
+            # dtype-veilig: in het individuele spoor keyt self.data op namen en
+            # het label op isatcode-Int64 (cross-track, 0-match); in het
+            # cumulatieve spoor zijn beide Int64 en matcht de join echt.
+            self.data = merge_on_programme_key(self.data, studentcount, on=join_cols, how="left")
 
         if data_cumulative is not None:
             data_cumulative = data_cumulative.drop(columns="Faculteit", errors="ignore")
 
-            self.data = self.data.merge(
+            self.data = merge_on_programme_key(
+                self.data,
                 data_cumulative,
                 on=[
                     "Croho groepeernaam",
@@ -398,7 +403,8 @@ class PostProcessor:
                 columns={"Average_ensemble_prediction": "Average_ensemble_prediction_weight"}
             )
 
-        self.data = self.data.merge(
+        self.data = merge_on_programme_key(
+            self.data,
             weights,
             on=["Collegejaar", "Croho groepeernaam", "Examentype", "Herkomst"],
             how="left",

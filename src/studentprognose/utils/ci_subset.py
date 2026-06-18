@@ -39,7 +39,11 @@ def apply_ci_test_subset(
             data_weighted_ensemble,
         )
 
-    sorted_programs = sorted(all_programs)
+    # all_programs kan beide sleutelruimtes bevatten: het individuele spoor keyt
+    # op leesbare namen (str), het cumulatieve op isatcodes (Int64). Sorteer op
+    # stringrepresentatie zodat de mix vergelijkbaar én deterministisch is; de
+    # originele waarden blijven behouden voor de .isin-filters per kolom.
+    sorted_programs = sorted(all_programs, key=str)
     max_programs = len(sorted_programs)
 
     if n_programs < 1 or n_programs > max_programs:
@@ -55,7 +59,7 @@ def apply_ci_test_subset(
     selected_set = set(selected_programs)
 
     print(f"CI test mode: selected {n} programs (seed={CI_SEED}, year>={CI_MIN_YEAR}):")
-    for prog in sorted(selected_programs):
+    for prog in sorted(selected_programs, key=str):
         print(f"  - {prog}")
 
     if data_individual is not None:

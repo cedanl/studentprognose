@@ -106,16 +106,25 @@ def _minimal_cumulative_df(programme=30029):
 
 
 class TestCumulativeStrategyPreprocess:
-    def test_croho_groepeernaam_cast_to_str(self):
-        # Regressie: de UvA-Isatcode (int) merge't anders op int-vs-str met
-        # data_studentcount in het ratio-model (ratio.py) → ValueError-crash.
-        # preprocess moet Croho groepeernaam naar string casten.
+    def test_croho_groepeernaam_normalized_to_int64(self):
+        # Regressie: de UvA-Isatcode moet als één canoniek dtype door de pipeline.
+        # preprocess normaliseert de numerieke Isatcode naar Int64 (NaN-veilig,
+        # geen float-`.0`-staart), zodat de merge met data_studentcount in het
+        # ratio-model (ratio.py) op gelijk dtype joint i.p.v. int-vs-str te botsen.
         strategy = CumulativeStrategy(
             _minimal_cumulative_df(programme=30029), None, _cfg_cumulative(),
             None, None, "/tmp", DataOption.CUMULATIVE, None,
         )
         result = strategy.preprocess()
-        # Waarde-niveau (robuust voor object- vs StringDtype-representatie): elke
-        # waarde is een str, zodat de merge met data_studentcount niet int-vs-str botst.
-        assert all(isinstance(v, str) for v in result["Croho groepeernaam"])
-        assert set(result["Croho groepeernaam"]) == {"30029"}
+        assert str(result["Croho groepeernaam"].dtype) == "Int64"
+        assert set(result["Croho groepeernaam"]) == {30029}
+
+    def test_set_filtering_normalizes_programme_keys(self):
+        # programme_filtering moet hetzelfde dtype krijgen als de Int64-kolom,
+        # anders loopt het .isin-filter in de strategie stil leeg op int-vs-str.
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(programme=30029), None, _cfg_cumulative(),
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        strategy.set_filtering(["30029", "B Tand"], [], [])
+        assert strategy.programme_filtering == [30029, "B Tand"]

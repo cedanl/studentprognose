@@ -120,8 +120,14 @@ class DashboardBuilder:
     ):
         self.data = data.copy()
         self.data["Weeknummer"] = self.data["Weeknummer"].astype(int)
+        # Het dashboard is een presentatielaag: de programmesleutel dient hier als
+        # tekstlabel (Plotly-dropdowns, titels) én als filtersleutel binnen het
+        # dashboard zelf. We brengen 'm overal naar string zodat numerieke
+        # isatcodes (Int64) niet botsen met Plotly's string-only button-labels en
+        # de interne filters/numerus_fixus-vergelijkingen op één dtype lopen.
+        self.data["Croho groepeernaam"] = self.data["Croho groepeernaam"].astype(str)
         self.data_option = data_option
-        self.numerus_fixus_list = {k: v for k, v in numerus_fixus_list.items() if v > 0}
+        self.numerus_fixus_list = {str(k): v for k, v in numerus_fixus_list.items() if v > 0}
         self.student_year_prediction = student_year_prediction
         self.ci_test_n = ci_test_n
         self.cwd = cwd
@@ -134,7 +140,11 @@ class DashboardBuilder:
         if data_cumulative is not None:
             data_cumulative = data_cumulative.copy()
             data_cumulative["Weeknummer"] = data_cumulative["Weeknummer"].astype(int)
+            data_cumulative["Croho groepeernaam"] = data_cumulative["Croho groepeernaam"].astype(str)
         self.data_cumulative = data_cumulative
+        if data_studentcount is not None and "Croho groepeernaam" in data_studentcount.columns:
+            data_studentcount = data_studentcount.copy()
+            data_studentcount["Croho groepeernaam"] = data_studentcount["Croho groepeernaam"].astype(str)
         self.data_studentcount = data_studentcount
         self.data_xgboost_curve = data_xgboost_curve
         self.xgb_classifier_importance = xgb_classifier_importance

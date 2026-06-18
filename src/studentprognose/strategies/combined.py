@@ -4,6 +4,7 @@ import math
 
 from studentprognose.config import get_cpu_count
 from studentprognose.utils.parallel import run_parallel_with_fallback
+from studentprognose.utils.programme_key import normalize_programme_values, merge_on_programme_key
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy, _add_engineered_features
@@ -37,7 +38,9 @@ class CombinedStrategy(PredictionStrategy):
                 f"Selected years {years} not found in individual dataset. Proceeding with cumulative dataset."
             )
         self.years = years
-        self.exclude_from_combined = configuration.get("exclude_from_combined", [])
+        self.exclude_from_combined = normalize_programme_values(
+            configuration.get("exclude_from_combined", [])
+        )
 
     def get_dashboard_data(self) -> dict:
         return {
@@ -61,13 +64,13 @@ class CombinedStrategy(PredictionStrategy):
         self.individual.set_year_week(predict_year, predict_week, self.individual.data_individual)
         self.cumulative.set_year_week(predict_year, predict_week, self.cumulative.data_cumulative)
 
-        self.individual.data_individual = self.individual.data_individual.merge(
+        self.individual.data_individual = merge_on_programme_key(
+            self.individual.data_individual,
             self.cumulative.data_cumulative,
             on=[
                 "Croho groepeernaam", "Collegejaar", "Faculteit",
                 "Examentype", "Weeknummer", "Herkomst",
             ],
-            how="left",
         )
 
         from studentprognose.models.xgboost_classifier import predict_applicant
@@ -90,13 +93,13 @@ class CombinedStrategy(PredictionStrategy):
         temp_data_individual = self.individual.data_individual.copy(deep=True)
         temp_data_individual["Weeknummer"] = self.individual.data_individual["Weeknummer"].astype(int)
 
-        self.data_exog = temp_data_individual.merge(
+        self.data_exog = merge_on_programme_key(
+            temp_data_individual,
             self.cumulative.data_cumulative,
             on=[
                 "Croho groepeernaam", "Collegejaar", "Examentype",
                 "Faculteit", "Weeknummer", "Herkomst",
             ],
-            how="left",
         )
 
         self.individual.set_data_individual(transform_data(
