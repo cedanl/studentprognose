@@ -307,10 +307,11 @@ class PostProcessor:
         # idx[0],idx[1],idx[2]... — self.data kan na eerder filteren een
         # niet-aaneengesloten index hebben waardoor idx[has_value] anders
         # naar de verkeerde rijen zou wijzen.
-        merged = (
-            self.data.loc[idx, key_cols]
-            .reset_index(drop=True)
-            .merge(snapshot, on=key_cols, how="left")
+        merged = merge_on_programme_key(
+            self.data.loc[idx, key_cols].reset_index(drop=True),
+            snapshot,
+            on=key_cols,
+            how="left",
         )
 
         for col in update_cols:

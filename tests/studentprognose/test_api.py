@@ -176,6 +176,48 @@ def test_run_pipeline_respects_save_output(tmp_path, monkeypatch, save_output, e
         )
 
 
+def test_run_pipeline_from_dataframes_normalizes_programme_key(monkeypatch):
+    """Regressie: de in-memory route normaliseert de programmesleutel (object/str
+    -> Int64), net als load_data. Zonder dit lekt een object-sleutel uit de
+    meegegeven DataFrames in self.data en crasht een latere merge op str-vs-Int64
+    (de fout die cloud-/Fabric-gebruikers zagen)."""
+    import studentprognose.main as main_mod
+    from studentprognose import run_pipeline_from_dataframes, DataOption
+    from studentprognose.config import load_defaults
+
+    captured = {}
+
+    def _fake_core(cfg, datasets, configuration, filtering, cwd, save_output=True):
+        captured["datasets"] = datasets
+        return None
+
+    monkeypatch.setattr(main_mod, "_run_pipeline_core", _fake_core)
+
+    # Object/string-sleutel zoals een Fabric-bron levert.
+    df_cum = pd.DataFrame({
+        "Collegejaar": [2024], "Weeknummer": [10],
+        "Groepeernaam Croho": ["56604"],
+    })
+    label = pd.DataFrame({
+        "Collegejaar": [2024], "Herkomst": ["NL"], "Examentype": ["Bachelor"],
+        "Croho groepeernaam": ["56604"], "Aantal_studenten": [120],
+    })
+
+    run_pipeline_from_dataframes(
+        year=2024, week=10,
+        data_cumulative=df_cum, data_student_numbers=label,
+        dataset=DataOption.CUMULATIVE, configuration=load_defaults(),
+        save_output=False,
+    )
+
+    _, cum, lbl, _, _ = captured["datasets"]
+    assert str(cum["Groepeernaam Croho"].dtype) == "Int64"
+    assert str(lbl["Croho groepeernaam"].dtype) == "Int64"
+    # De DataFrames van de aanroeper mogen niet in place gemuteerd zijn.
+    assert str(df_cum["Groepeernaam Croho"].dtype) != "Int64"
+    assert str(label["Croho groepeernaam"].dtype) != "Int64"
+
+
 def test_all_exports_present():
     import studentprognose
 
