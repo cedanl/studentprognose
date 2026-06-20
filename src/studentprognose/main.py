@@ -9,7 +9,7 @@ from studentprognose.cli import PipelineConfig, parse_args
 from studentprognose.config import (
     load_configuration, load_defaults_filtering, load_filtering, get_final_academic_week,
 )
-from studentprognose.data.loader import load_data
+from studentprognose.data.loader import load_data, _normalize_programme_code
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.data.range_check import (
     detect_data_range_mismatch,
@@ -224,6 +224,22 @@ def run_pipeline_from_dataframes(
         noetl=True,
         yes=True,
     )
+
+    # De in-memory route slaat load_data over en mist daarmee de
+    # programmesleutel-normalisatie. Pas die hier alsnog toe (zelfde sleutel-rollen
+    # als load_data) op kopieën — anders lekt een object/string-sleutel uit de
+    # meegegeven DataFrames in self.data en crasht een latere merge op str-vs-Int64.
+    # Kopiëren voorkomt dat we de DataFrames van de aanroeper muteren.
+    _roles = configuration.get("column_roles", {})
+    if data_cumulative is not None:
+        data_cumulative = data_cumulative.copy()
+        _normalize_programme_code(data_cumulative, _roles.get("croho_source"))
+    if data_student_numbers is not None:
+        data_student_numbers = data_student_numbers.copy()
+        _normalize_programme_code(data_student_numbers, _roles.get("programme"))
+    if data_weighted_ensemble is not None:
+        data_weighted_ensemble = data_weighted_ensemble.copy()
+        _normalize_programme_code(data_weighted_ensemble, "Programme")
 
     datasets = (
         data_individual,
