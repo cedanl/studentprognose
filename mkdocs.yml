@@ -80,6 +80,7 @@ extra_javascript:
 
 nav:
   - Home: index.md
+  - Presentatie: presentatie.md
   - Aan de slag: aan-de-slag.md
   - Je data voorbereiden: je-data-voorbereiden.md
   - Configuratie: configuratie.md
