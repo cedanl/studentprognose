@@ -1,31 +1,8 @@
-# Onboarding Presentatie
+# Presentatie
 
-Slidev presentatie voor het onboarden van nieuwe teamleden op het studentprognose project.
+De gepubliceerde Studentprognose-presentatie (HOlink 2026).
 
-## Vereisten
+- `HOlink_studentprognose.pptx` — de slide deck (PowerPoint).
 
-- Node.js (v18+)
-
-## Installatie
-
-```bash
-npm install
-```
-
-## Presentatie starten
-
-```bash
-npm run dev
-```
-
-De presentatie opent automatisch op [http://localhost:3030](http://localhost:3030).
-
-## Exporteren
-
-```bash
-# Build als statische site
-npm run build
-
-# Exporteer als PDF
-npm run export
-```
+Zie ook de [presentatiepagina in de documentatie](https://cedanl.github.io/studentprognose/presentatie/),
+met een inline preview en downloadlink.

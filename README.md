@@ -73,6 +73,15 @@ Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen
 
 ---
 
+## 📊 Presentatie
+
+Een introductie tot Studentprognose (HOlink 2026): waarom instroomprognose lastig is, hoe het model werkt en hoe je ermee aan de slag gaat.
+
+- 📥 [Download de presentatie (PowerPoint)](doc/presentation/HOlink_studentprognose.pptx)
+- 🌐 [Bekijk online in de documentatie](https://cedanl.github.io/studentprognose/presentatie/)
+
+---
+
 ## 🛠️ Aan de slag voor ontwikkelaars
 
 **Via de broncode** (met demodata):
