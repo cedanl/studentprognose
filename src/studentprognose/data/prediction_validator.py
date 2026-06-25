@@ -1,10 +1,13 @@
 """Pre-prediction datakwaliteitschecks.
 
-Drie checks worden uitgevoerd op de cumulatieve data vóór de modellen draaien:
+Vier checks worden uitgevoerd op de cumulatieve data vóór de modellen draaien:
 
   decimaalintegriteit – hard stop als 'Gewogen vooraanmelders' strings met
                         komma's of niet-numerieke waarden bevat.
   lege dataset        – hard stop als er geen data is voor de gevraagde week.
+  trainingshistorie   – hard stop als er geen historische collegejaren
+                        (< voorspeljaar) zijn; zonder historie blijven het
+                        XGBoost-instroommodel en het ratio-model stil all-NaN.
   historisch realisme – vergelijkt de huidige week met dezelfde week een jaar
                         eerder. Hard stop bij extreme afwijking, warning bij
                         matige afwijking. NF-opleidingen worden overgeslagen.
@@ -18,6 +21,8 @@ import sys
 import warnings
 
 import pandas as pd
+
+from studentprognose.utils.constants import LOOKBACK_YEARS
 
 
 def run_pre_prediction_checks(
@@ -39,10 +44,12 @@ def run_pre_prediction_checks(
 
     # Decimal and empty checks are unconditional hard stops: corrupted or missing
     # data means the model cannot run at all — there is no safe value to fall back on.
-    # Historical realism is a domain judgment (e.g. COVID years legitimately differ)
-    # so --yes can demote it to a warning.
+    # Training-history and historical-realism are domain judgments (a brand-new
+    # institution may legitimately have only the current year; COVID years legitimately
+    # differ) so --yes can demote them to a warning.
     _check_decimal_integrity(current, predict_year, predict_week)
     _check_empty_data(current, predict_year, predict_week)
+    _check_training_history(data_cumulative, predict_year, yes)
     _check_historical_realism(current, last_year, numerus_fixus_list, predict_year, predict_week, yes)
 
 
@@ -86,6 +93,51 @@ def _check_empty_data(
             f"Voeg de ontbrekende telbestanden toe via data/input_raw/ en verwerk opnieuw."
         )
         sys.exit(1)
+
+
+def _check_training_history(
+    data_cumulative: pd.DataFrame, predict_year: int, yes: bool = False
+) -> None:
+    """Guard tegen stil falen wanneer historische collegejaren ontbreken.
+
+    Het cumulatieve spoor traint twee modellen op data van vóór het voorspeljaar:
+
+      * de XGBoost-instroomvoorspelling (kolom ``SARIMA_cumulative``) traint op
+        ``Collegejaar < predict_year``;
+      * het ratio-model (kolom ``Prognose_ratio``) middelt de aanmelder/student-ratio
+        over ``Collegejaar`` in ``[predict_year - LOOKBACK_YEARS, predict_year - 1]``.
+
+    Ontbreken die jaren volledig, dan geven beide modellen voor élke opleiding
+    ``NaN`` terug — zonder foutmelding. De SARIMA-vooraanmeldforecast
+    (``Voorspelde vooraanmelders``) heeft geen historie nodig en vult zich wél,
+    waardoor de output compleet *oogt* terwijl er geen bruikbare instroomvoorspelling
+    in zit. Deze check maakt dat expliciet: hard stop, met ``--yes`` gedemoveerd tot
+    waarschuwing (zodat het puur in-memory API-pad, dat ``yes=True`` zet, niet de
+    aanroepende toepassing afbreekt).
+    """
+    if "Collegejaar" not in data_cumulative.columns or data_cumulative.empty:
+        return
+
+    years = pd.to_numeric(data_cumulative["Collegejaar"], errors="coerce").dropna()
+    if (years < predict_year).any():
+        return
+
+    available = sorted({int(y) for y in years.unique()})
+    msg = (
+        f"Geen historische collegejaren (< {predict_year}) in de cumulatieve data "
+        f"(beschikbaar: {available}). Zonder historie kunnen het XGBoost-instroommodel "
+        f"('SARIMA_cumulative') en het ratio-model ('Prognose_ratio') niet trainen: "
+        f"beide blijven voor elke opleiding NaN. 'Voorspelde vooraanmelders' vult zich "
+        f"wél, dus de output oogt compleet maar bevat geen instroomvoorspelling. "
+        f"Voeg historische collegejaren toe aan de cumulatieve data "
+        f"(idealiter de {LOOKBACK_YEARS} jaren vóór {predict_year}) en verwerk opnieuw."
+    )
+
+    if yes:
+        warnings.warn(f"[--yes] {msg}", UserWarning, stacklevel=2)
+        return
+    print(f"\n[HARD STOP] {msg} Gebruik --yes om door te gaan.")
+    sys.exit(1)
 
 
 def _check_historical_realism(

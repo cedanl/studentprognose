@@ -366,6 +366,26 @@ class CumulativeStrategy(PredictionStrategy):
 
         return data_to_predict
 
+    def _warn_no_xgboost_training_data(self):
+        """Waarschuw als het XGBoost-instroommodel geen trainingsdata heeft.
+
+        Vervangt het vroegere stille ``print``: gaat nu via de warning-machinery
+        (zichtbaar in pipeline-/Fabric-runs, filterbaar) en benoemt de echte oorzaak.
+        De upfront-guard ``_check_training_history`` vangt het volledige
+        "geen historie"-geval al af; deze waarschuwing dekt de resterende per-groep
+        gevallen (bijv. een te kleine ``--ci test``-subset of backtesting met
+        ``--skipyears``).
+        """
+        warnings.warn(
+            f"XGBoost-instroomvoorspelling overgeslagen: geen trainingsdata met "
+            f"Collegejaar < {self.predict_year}. Oorzaak: de cumulatieve data bevat "
+            f"geen (voldoende) historische collegejaren — voeg ze toe aan df_cum — of, "
+            f"in --ci test-modus, is de subset te klein (verhoog N). 'SARIMA_cumulative' "
+            f"blijft NaN voor deze groep.",
+            UserWarning,
+            stacklevel=3,
+        )
+
     def _predict_with_xgboost_extra_year(self, train, test, data_to_predict, replace_mask):
         columns_to_match = [
             "Collegejaar", "Faculteit", "Examentype", "Herkomst", "Croho groepeernaam",
@@ -382,10 +402,7 @@ class CumulativeStrategy(PredictionStrategy):
             ][columns_to_match].merge(test2, on=columns_to_match)
             if not test2_merged.empty:
                 if train2.empty:
-                    print(
-                        "WARNING: Skipping XGBoost prediction: no training data "
-                        "available (try increasing --ci test N)."
-                    )
+                    self._warn_no_xgboost_training_data()
                     return data_to_predict
                 test2["Collegejaar"] = test2["Collegejaar"] - self.skip_years
                 ahead_predictions, imp = predict_with_xgboost(train2, test2_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor, config=self.configuration)
@@ -412,10 +429,7 @@ class CumulativeStrategy(PredictionStrategy):
 
             if not test_merged.empty:
                 if train.empty:
-                    print(
-                        "WARNING: Skipping XGBoost prediction: no training data "
-                        "available (try increasing --ci test N)."
-                    )
+                    self._warn_no_xgboost_training_data()
                     return data_to_predict
                 predictions, imp = predict_with_xgboost(train, test_merged, self.data_studentcount, ENGINEERED_FEATURE_COLS, regressor=self._regressor, config=self.configuration)
                 if imp is not None:
