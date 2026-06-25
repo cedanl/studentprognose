@@ -215,11 +215,20 @@ from studentprognose import (
     load_data,                     # laad data vanaf schijf als DataFrames
     run_pipeline_cli,              # volledige CLI-pipeline (accepteert argv-lijst)
     run_pipeline_from_dataframes,  # pipeline met DataFrames in-memory
+    evaluate_predictions,          # output → scalaire evaluatiemetrieken per model
+    pivot_metrics,                 # metrieken → model × jaar/week-matrix (backtest)
+    to_mlflow_metrics,             # metrieken afvlakken voor mlflow.log_metrics (Fabric)
     PipelineConfig,                # configuratie-dataclass voor de pipeline
     DataOption,                    # enum: INDIVIDUAL / CUMULATIVE / BOTH_DATASETS
     StudentYearPrediction,         # enum: FIRST_YEARS / VOLUME
 )
 ```
+
+!!! tip "Het model evalueren"
+    `evaluate_predictions` zet de pipeline-output om in scalaire metrieken (MAE, MAPE,
+    WAPE, RMSE, bias, R²) per model; `pivot_metrics` vat een backtest over meerdere jaren
+    samen tot een model × jaar-matrix; en `to_mlflow_metrics` levert ze klaar voor MLflow
+    in MS Fabric / Databricks. Zie [Output begrijpen → Het model evalueren](output-begrijpen.md#het-model-evalueren-evaluate_predictions).
 
 ### Minimaal werkend voorbeeld (bestandsgebaseerd)
 

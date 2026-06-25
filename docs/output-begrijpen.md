@@ -135,6 +135,94 @@ Zie [Ensemble](methodologie/ensemble.md) voor uitleg over hoe de gewichten tot s
 
 MAE en MAPE worden berekend **exclusief numerus-fixusopleidingen**. Voor deze opleidingen worden de foutkolommen op `NaN` gezet. De reden: bij numerus-fixusopleidingen wordt het voorspelde aantal afgekapt op de capaciteitslimiet, waardoor de modelfouten niet vergelijkbaar zijn met reguliere opleidingen.
 
+## Het model evalueren (`evaluate_predictions`)
+
+De per-rij `MAE_*`/`MAPE_*`-kolommen hierboven zijn handig om één rij te lezen, maar voor **modelevaluatie** wil je geaggregeerde, scalaire metrieken (één getal per model). Daarvoor levert het pakket `evaluate_predictions`:
+
+```python
+from studentprognose import run_pipeline_from_dataframes, evaluate_predictions, DataOption
+
+result = run_pipeline_from_dataframes(
+    year=2023, week=12,
+    data_cumulative=df_cum, data_student_numbers=df_sc,
+    dataset=DataOption.CUMULATIVE, save_output=False,
+)
+
+metrics = evaluate_predictions(result, week=12)
+print(metrics)
+```
+
+De functie vergelijkt elke voorspelkolom met de gerealiseerde `Aantal_studenten` en geeft per model één rij terug met:
+
+| Metriek | Betekenis | Interpretatie |
+|---------|-----------|---------------|
+| `n` | aantal meegetelde (opleiding × herkomst)-rijen | klein `n` → metriek is ruisgevoelig |
+| `mae` | Mean Absolute Error | gemiddelde afwijking in studenten |
+| `mape` | Mean Absolute Percentage Error (fractie) | elke opleiding telt even zwaar — kleine opleidingen domineren |
+| `wape` | Weighted APE = `Σ\|fout\| / Σ\|werkelijk\|` (fractie) | instellingsbrede procentuele fout, robuust tegen kleine opleidingen |
+| `rmse` | Root Mean Squared Error | straft grote uitschieters zwaarder |
+| `bias` | gemiddelde `voorspeld − werkelijk` | positief = structurele overschatting |
+| `r2` | determinatiecoëfficiënt | aandeel verklaarde variantie |
+
+`mape` en `wape` zijn fracties (`0.08` betekent 8%). De metrieken gebruiken dezelfde primitieven en numerus-fixus-uitsluiting als de `MAE_*`-kolommen, dus ze zijn consistent met de rest van de output.
+
+!!! warning "Evalueren kan alleen via een backtest"
+    Een model evalueren betekent voorspellingen vergelijken met de **gerealiseerde** instroom. Voor het lopende, nog niet afgeronde collegejaar bestaat die realisatie nog niet — `Aantal_studenten` is dan leeg en `evaluate_predictions` geeft een foutmelding. Evalueer daarom een **afgerond** collegejaar (bijv. voorspel `year=2023` terwijl je de realisatie van 2023 als `data_student_numbers` meegeeft). De modellen trainen sowieso alleen op jaren vóór het voorspeljaar, dus zo'n backtest lekt geen toekomstinformatie.
+
+!!! tip "Geef altijd `week` mee bij cumulatieve output"
+    In het cumulatieve spoor draagt alleen de **peilweekrij** de `SARIMA_cumulative`-voorspelling; latere weken bevatten enkel de vooraanmeldcurve (met `NaN` als voorspelling). Zonder `week=`-filter mengt `Prognose_ratio` bovendien meerdere weken. Geef de gebruikte peilweek mee (`evaluate_predictions(result, week=12)`) voor een zuivere, één-rij-per-opleiding vergelijking tussen modellen.
+
+Segmenteer met `group_by` (bijv. `group_by="Examentype"` of `group_by=["Examentype", "Herkomst"]`) om te zien waar een model structureel afwijkt.
+
+### Backtesten over meerdere jaren (`pivot_metrics`)
+
+Eén afgerond jaar is **één datapunt**: de instroom schommelt jaar-op-jaar om redenen buiten het model. Voor een eerlijk beeld backtest je daarom meerdere afgeronde jaren op dezelfde peilweek, evalueer je per jaar met `group_by="Collegejaar"`, en draai je het resultaat met `pivot_metrics` tot een model × jaar-matrix:
+
+```python
+import pandas as pd
+from studentprognose import run_pipeline_from_dataframes, evaluate_predictions, pivot_metrics, DataOption
+
+WEEK = 10
+frames = [
+    run_pipeline_from_dataframes(
+        year=jaar, week=WEEK, data_cumulative=df_cum,
+        data_student_numbers=df_sc, dataset=DataOption.CUMULATIVE, save_output=False,
+    )
+    for jaar in (2021, 2022, 2023)            # afgeronde jaren met realisatie
+]
+
+metrics = evaluate_predictions(pd.concat(frames, ignore_index=True),
+                               week=WEEK, group_by="Collegejaar")
+print(pivot_metrics(metrics, value="wape", over="Collegejaar").round(3))
+```
+
+```text
+                    2021   2022   2023   mean    min    max  n_groups
+prediction
+Prognose_ratio     0.078  0.071  0.069  0.073  0.069  0.078         3
+SARIMA_cumulative  0.063  0.058  0.066  0.062  0.058  0.066         3
+```
+
+De `mean`-kolom is het gemiddelde over de jaren; `min`/`max` tonen de spreiding. Ligt de jaar-op-jaar spreiding in dezelfde orde als het verschil tussen modellen, trek dan geen harde conclusie uit één jaar. Kies met `value=` een andere metriek (`"mae"`, `"mape"`, …) en met `over=` een andere as (bijv. `over="Weeknummer"` voor de accuraatheid-over-tijd-curve bij één jaar).
+
+### Metrieken loggen in MS Fabric / Databricks (MLflow)
+
+Beide platforms hebben **MLflow** als ingebouwde experiment-tracker. `to_mlflow_metrics` vlakt het resultaat af tot een dict die je direct kunt loggen, zodat de metrieken in de Fabric/Databricks ML-experiment-UI verschijnen en over runs (jaar/peilweek) vergelijkbaar zijn:
+
+```python
+import mlflow
+from studentprognose import evaluate_predictions, to_mlflow_metrics
+
+metrics = evaluate_predictions(result, week=WEEK)
+
+with mlflow.start_run(run_name=f"prognose_{YEAR}_wk{WEEK}"):
+    mlflow.log_params({"year": YEAR, "week": WEEK, "dataset": "cumulatief"})
+    mlflow.log_metrics(to_mlflow_metrics(metrics))
+    mlflow.log_table(metrics, "metrics.json")  # volledige tabel als artifact
+```
+
+`mlflow` zit standaard in de Fabric- en Databricks-runtime; in een Fabric-notebook worden runs automatisch aan het gekoppelde experiment gehangen. Wil je geen MLflow gebruiken, dan kun je het `metrics`-DataFrame ook gewoon naar een Lakehouse/Delta-tabel wegschrijven voor je eigen monitoring.
+
 ## Interactief dashboard
 
 Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren onder `data/output/visualisaties/`. Per modus (`-d i`, `-d c`, `-d b`) wordt een apart dashboard aangemaakt met daarin:
