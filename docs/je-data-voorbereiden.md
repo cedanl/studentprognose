@@ -185,6 +185,11 @@ studentprognose --noetl -d cumulative -w 12 -y 2025
 
 Zorg ervoor dat de vereiste bestanden in `data/input/` staan voordat je de tool draait. Welke bestanden je nodig hebt hangt af van de gekozen datamodus (`-d`). Zie de tabel hieronder.
 
+!!! warning "De cumulatieve data heeft historische collegejaren nodig"
+    Het cumulatieve spoor traint op data van vóór het voorspeljaar: het XGBoost-instroommodel (`SARIMA_cumulative`) en het ratio-model (`Prognose_ratio`) leiden beide hun voorspelling af uit eerdere collegejaren. Bevat je cumulatieve data (`vooraanmeldingen_cumulatief.csv`, of `df_cum` bij in-memory gebruik via [`run_pipeline_from_dataframes`](api/index.md)) **alleen het voorspeljaar**, dan blijven beide kolommen voor elke opleiding `NaN` — terwijl `Voorspelde vooraanmelders` zich wél vult en de output dus compleet *oogt*.
+
+    Lever daarom altijd minstens één, idealiter de drie, collegejaren vóór het voorspeljaar mee. De [trainingshistorie-check](validatie.md#trainingshistorie-waarom-deze-check-bestaat) stopt de pipeline (of waarschuwt, op het in-memory pad) wanneer die historie ontbreekt. Snelle controle: `sorted(df_cum["Collegejaar"].unique())`.
+
 ## Verwerkte inputbestanden (`data/input/`)
 
 Dit zijn de bestanden die het model direct inleest. Ze worden aangemaakt door de ETL, of je plaatst ze zelf in `data/input/` als je `--noetl` gebruikt.

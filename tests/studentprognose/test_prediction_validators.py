@@ -9,6 +9,7 @@ from studentprognose.data.prediction_validator import (
     run_pre_prediction_checks,
     _check_decimal_integrity,
     _check_empty_data,
+    _check_training_history,
     _check_historical_realism,
 )
 from studentprognose.output.validator import (
@@ -89,6 +90,66 @@ class TestCheckEmptyData:
         df = pd.DataFrame()
         with pytest.raises(SystemExit):
             _check_empty_data(df, 2024, 10)
+
+
+# ---------------------------------------------------------------------------
+# _check_training_history
+# ---------------------------------------------------------------------------
+
+class TestCheckTrainingHistory:
+    def test_with_history_passes_silently(self):
+        data = pd.concat([
+            _make_cumulative(2023, 10),
+            _make_cumulative(2024, 10),
+        ])
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _check_training_history(data, 2024)  # no exception
+        assert not w
+
+    def test_only_predict_year_hard_stops(self):
+        data = _make_cumulative(2024, 10)  # alleen het voorspeljaar
+        with pytest.raises(SystemExit) as exc:
+            _check_training_history(data, 2024)
+        assert exc.value.code == 1
+
+    def test_only_future_years_hard_stops(self):
+        # Geen enkel jaar < voorspeljaar (alle data ligt op of na het voorspeljaar).
+        data = pd.concat([
+            _make_cumulative(2024, 10),
+            _make_cumulative(2025, 10),
+        ])
+        with pytest.raises(SystemExit) as exc:
+            _check_training_history(data, 2024)
+        assert exc.value.code == 1
+
+    def test_only_predict_year_with_yes_warns_instead(self):
+        data = _make_cumulative(2024, 10)
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _check_training_history(data, 2024, yes=True)
+        assert len(w) == 1
+        assert issubclass(w[0].category, UserWarning)
+        message = str(w[0].message)
+        # Boodschap noemt beide getroffen modellen + de oplossing.
+        assert "SARIMA_cumulative" in message
+        assert "Prognose_ratio" in message
+        assert "[--yes]" in message
+
+    def test_missing_collegejaar_column_is_skipped(self):
+        data = pd.DataFrame({"Weeknummer": [10]})
+        _check_training_history(data, 2024)  # no exception
+
+    def test_empty_dataframe_is_skipped(self):
+        # Lege data wordt al door _check_empty_data afgevangen; deze check blijft stil.
+        _check_training_history(pd.DataFrame(), 2024)  # no exception
+
+    def test_propagates_through_run_pre_prediction_checks(self):
+        # Alleen het voorspeljaar aanwezig: hard stop via de orchestrator.
+        data = _make_cumulative(2024, 10)
+        with pytest.raises(SystemExit) as exc:
+            run_pre_prediction_checks(data, 2024, 10, {})
+        assert exc.value.code == 1
 
 
 # ---------------------------------------------------------------------------

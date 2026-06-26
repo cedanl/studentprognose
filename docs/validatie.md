@@ -74,7 +74,7 @@ Telbestand met studentaantallen, door de instelling zelf aangeleverd — zie [Je
 
 ## Pre-prediction checks
 
-Vóór elke modelrun voert de pipeline drie aanvullende checks uit op de **cumulatieve vooraanmelddata**. Ze draaien per `(jaar, week)`-combinatie, na ETL maar vóór de modellen.
+Vóór elke modelrun voert de pipeline vier aanvullende checks uit op de **cumulatieve vooraanmelddata**. Ze draaien per `(jaar, week)`-combinatie, na ETL maar vóór de modellen.
 
 !!! note "Alleen actief als cumulatieve data beschikbaar is"
     De pre-prediction checks worden overgeslagen als de pipeline zonder cumulatieve data draait (individueel-enkel modus, `-d i`). In dat geval is er geen `Gewogen vooraanmelders`-kolom om te valideren.
@@ -83,7 +83,28 @@ Vóór elke modelrun voert de pipeline drie aanvullende checks uit op de **cumul
 |-------|------|-------------------|
 | Decimaalintegriteit | Hard stop | `Gewogen vooraanmelders` bevat strings met komma's of niet-numerieke waarden |
 | Lege dataset | Hard stop | Geen rijen aanwezig voor het gevraagde jaar+week |
+| Trainingshistorie | Hard stop / waarschuwing | Geen historische collegejaren (`Collegejaar < voorspeljaar`) aanwezig om op te trainen |
 | Historisch realisme | Hard stop / waarschuwing | Afwijking t.o.v. dezelfde week vorig jaar per opleiding/herkomst/examentype |
+
+### Trainingshistorie — waarom deze check bestaat
+
+Het cumulatieve spoor leidt twee voorspellingen af uit **historische** collegejaren:
+
+- het XGBoost-instroommodel (kolom `SARIMA_cumulative`) traint op `Collegejaar < voorspeljaar`;
+- het ratio-model (kolom `Prognose_ratio`) middelt de aanmelder/student-ratio over de drie jaren vóór het voorspeljaar.
+
+Bevat de cumulatieve data **alleen het voorspeljaar** (bijv. een `df_cum` die per ongeluk op het huidige jaar is gefilterd), dan hebben beide modellen geen trainingsdata en geven ze voor élke opleiding `NaN` terug. De SARIMA-vooraanmeldforecast (`Voorspelde vooraanmelders`) heeft géén historie nodig en vult zich wél — daardoor *oogt* de output compleet terwijl er geen bruikbare instroomvoorspelling in zit. Dit faalde vroeger stil; de check maakt het nu expliciet.
+
+| Situatie | Gedrag |
+|----------|--------|
+| Geen enkel jaar `< voorspeljaar` aanwezig | Hard stop — pipeline stopt (te omzeilen met `--yes`) |
+| Minstens één historisch jaar aanwezig | Check slaagt stilzwijgend |
+
+!!! tip "Oplossing"
+    Voeg historische collegejaren toe aan de cumulatieve data (idealiter de drie jaren vóór het voorspeljaar) en verwerk opnieuw. Controleer bij in-memory gebruik dat `df_cum` niet op één jaar gefilterd is: `sorted(df_cum["Collegejaar"].unique())`.
+
+!!! note "In-memory API-pad waarschuwt in plaats van te stoppen"
+    [`run_pipeline_from_dataframes`](api/index.md) draait altijd met `--yes` zodat een bibliotheekaanroep de aanroepende toepassing niet afbreekt: bij ontbrekende historie verschijnt daar een waarschuwing in plaats van een hard stop. De cumulatieve kolommen blijven dan `NaN`.
 
 ### Historisch realisme — drempelwaarden
 
@@ -102,7 +123,7 @@ Als er geen vorig-jaar-data beschikbaar is (nieuwe opleiding), wordt de check st
 
 ### Hard stop omzeilen met `--yes`
 
-De decimaalcheck en lege-dataset-check zijn nooit te omzeilen: corrupte of afwezige data heeft geen veilige fallback. De historisch-realismecheck wél — gebruik `--yes` om een extreme afwijking te accepteren en door te gaan:
+De decimaalcheck en lege-dataset-check zijn nooit te omzeilen: corrupte of afwezige data heeft geen veilige fallback. De trainingshistorie- en historisch-realismecheck wél — gebruik `--yes` om een ontbrekende historie of extreme afwijking te accepteren en door te gaan:
 
 ```bash
 uv run studentprognose --yes -y 2024 -w 10
