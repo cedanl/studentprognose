@@ -19,7 +19,7 @@ Dit is bewust anders dan een eenvoudige inverse-MAE weging: de grid search optim
 De optimale gewichten worden opgeslagen in `ensemble_weights.xlsx` en worden per opleiding, examentype en herkomst bepaald.
 
 !!! warning "Gewichten zijn datumgevoelig"
-    De gewichten zijn gebaseerd op historische prestaties. Als de situatie verandert (bijv. na een beleidsingreep of een uitzonderlijk jaar), kunnen verouderde gewichten een slecht presterend model te veel vertrouwen geven. Herbereken de gewichten na elk studiejaar via `archive/calculate_ensemble_weights.py`.
+    De gewichten zijn gebaseerd op historische prestaties. Als de situatie verandert (bijv. na een beleidsingreep of een uitzonderlijk jaar), kunnen verouderde gewichten een slecht presterend model te veel vertrouwen geven. Herbereken de gewichten na elk studiejaar via `scripts/calculate_ensemble_weights.py`.
 
 ## Bij een eerste run
 

@@ -1686,7 +1686,7 @@ Uit [`docs/output-begrijpen.md`](../docs/output-begrijpen.md#wanneer-is-de-basel
 
 ## 6. Productiegewichten herbereken
 
-In productie bepaalt `archive/calculate_ensemble_weights.py` via grid search de
+In productie bepaalt `scripts/calculate_ensemble_weights.py` via grid search de
 optimale gewichten per **(opleiding × examentype × herkomst)** — niet één
 globaal getal zoals in deze illustratie.
 

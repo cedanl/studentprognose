@@ -133,9 +133,9 @@ flowchart TD
     OUT["<b>data/output/</b><br/><br/>output_first-years_*.xlsx<br/><i>output_volume_*.xlsx (bij -sy v)</i>"]:::output
 
     %% ══════════════════════════════════════
-    %% LAAG 6 — Post-processing (archive/)
+    %% LAAG 6 — Post-processing (scripts/)
     %% ══════════════════════════════════════
-    subgraph postproc ["Post-processing scripts (archive/) **"]
+    subgraph postproc ["Post-processing scripts (scripts/) **"]
         direction LR
         PA["A · calculate_ensemble_weights.py<br/><i>optimale gewichten</i>"]:::script
         PB["B · append_studentcount_and_compute_errors.py<br/><i>werkelijke aantallen + fouten</i>"]:::script
@@ -230,8 +230,8 @@ Na een model-run kunnen de volgende scripts worden gedraaid om de input voor de 
 
 | Stap | Script | Input | Output |
 |------|--------|-------|--------|
-| A | `archive/calculate_ensemble_weights.py` | `output_*.xlsx` (model-output) + `ensemble_weights.xlsx` | `ensemble_weights.xlsx` (bijgewerkt) |
-| B | `archive/append_studentcount_and_compute_errors.py` | `output_*.xlsx` (model-output) + `student_count_*.xlsx` | `totaal_*.xlsx` (bijgewerkt met werkelijke aantallen + fouten) |
+| A | `scripts/calculate_ensemble_weights.py` | `output_*.xlsx` (model-output) + `ensemble_weights.xlsx` | `ensemble_weights.xlsx` (bijgewerkt) |
+| B | `scripts/append_studentcount_and_compute_errors.py` | `output_*.xlsx` (model-output) + `student_count_*.xlsx` | `totaal_*.xlsx` (bijgewerkt met werkelijke aantallen + fouten) |
 
 ---
 

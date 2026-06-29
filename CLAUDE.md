@@ -10,30 +10,43 @@ Studentprognose is een open-source CEDA/Npuls tool voor het voorspellen van eers
 
 - **Python 3.12+** met **uv** voor dependency management
 - **pandas / numpy** voor dataverwerking
-- **statsmodels** voor SARIMA (SARIMAX met vaste parameters)
+- **statsforecast** voor SARIMA (`statsforecast.models.ARIMA`, vaste parameters)
+- **scikit-learn** voor preprocessing (one-hot encoding, column transforms) en benchmark-baselines
 - **xgboost** voor classificatie en regressie
-- **Rich** voor CLI-output
+- **argparse** voor de CLI
 - **MkDocs + Material** voor documentatie (gehost via GitHub Pages)
 
 ## Project Structure
 
+> Top-level `main.py` (repo-root) is een dunne shim die delegeert naar
+> `studentprognose.main:main`; het echte entry point is de console-script
+> `studentprognose` (zie `pyproject.toml`).
+
 ```
 src/studentprognose/
 ├── cli.py               # CLI-definitie (argparse)
-├── config.py            # Configuratie laden
-├── main.py              # Pipeline-entry
+├── config.py            # Configuratie laden (+ deep-merge van overrides)
+├── main.py              # Pipeline-orchestratie (cli/main entry point)
+├── init.py              # `studentprognose init` — projectmap scaffolden
+├── configuration/       # Ingebakken default-config + filtering/base.json
 ├── models/
 │   ├── base.py          # BaseForecaster ABC
-│   ├── sarima.py        # SARIMA model
-│   ├── xgboost_classifier.py
-│   ├── xgboost_regressor.py
+│   ├── sarima.py        # SARIMA-model + SARIMA-predictie-orchestratie
+│   ├── forecasters.py   # ETS/Theta/AutoARIMA (benchmark-alternatieven)
+│   ├── classifiers.py   # OOP-classifiers (benchmark-registry)
+│   ├── xgboost_classifier.py  # predict_applicant() — individueel spoor
+│   ├── regressors.py    # OOP-regressors + build_preprocessor (benchmark)
+│   ├── xgboost_regressor.py   # predict_with_xgboost() — cumulatief spoor
+│   ├── importance.py    # Feature-importance-aggregatie
 │   └── ratio.py         # Ratio-model
 ├── strategies/
 │   ├── individual.py    # Individueel spoor preprocessing
 │   ├── cumulative.py    # Cumulatief spoor preprocessing
 │   └── combined.py      # Both-modus
-├── output/              # Output-schrijvers
-└── utils/               # Hulpfuncties
+├── data/                # ETL, loader, validatie, transforms, preprocessing/
+├── output/              # PostProcessor, dashboard, evaluation, validator
+├── benchmark/           # `studentprognose benchmark` — alternatieve modellen vergelijken
+└── utils/               # Week-/parallel-/key-hulpfuncties + constants
 
 docs/                    # MkDocs bronbestanden
 ├── index.md
@@ -114,6 +127,7 @@ Gebruik de onderstaande mapping om te bepalen welke pagina('s) bijgewerkt moeten
 | `models/sarima.py` / SARIMA-parameters | `docs/methodologie/sarima.md` |
 | `models/xgboost_*.py` / XGBoost-features of -parameters | `docs/methodologie/xgboost.md` |
 | `models/ratio.py` / ratio-logica | `docs/methodologie/ratio-model.md` |
+| `benchmark/` / `models/{classifiers,regressors,forecasters}.py` | `docs/methodologie/benchmarks.md` |
 | `strategies/individual.py` / individueel-pipeline / filterregels | `docs/methodologie/individueel.md` |
 | Ensemble-logica / gewichten / postprocessor | `docs/methodologie/ensemble.md` |
 | Architectuur / pipeline-volgorde | `docs/methodologie/index.md` |

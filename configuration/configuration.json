@@ -15,6 +15,7 @@
         "path_raw_individueel": "data/input_raw/individuele_aanmelddata.csv"
     },
     "telbestand_filename_patterns": [
+        "telbestandY{year}W{week}",
         "telbestand_sl_{date}_v{volgnummer}_{year}"
     ],
     "cumulative_input": {
