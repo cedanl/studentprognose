@@ -254,3 +254,51 @@ class TestRegressorParamsValidation:
         f.write_text(json.dumps(cfg))
         result = load_configuration(str(f))
         assert result["model_config"]["tuning_grid"] == {"max_depth": [3, 5]}
+
+
+class TestForecasterParamsValidation:
+    def test_valid_forecaster_params_loads(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": {"sarima": {"order": [1, 0, 1]}}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        result = load_configuration(str(f))
+        assert result["model_config"]["forecaster_params"]["sarima"]["order"] == [1, 0, 1]
+
+    def test_forecaster_params_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": [1, 2]}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_forecaster_params_unknown_forecaster_exits(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": {"prophet": {"order": [1, 0, 1]}}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_forecaster_params_value_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": {"sarima": 5}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_sarima_tuning_grid_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"sarima_tuning_grid": [1, 2]}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_valid_sarima_tuning_grid_loads(self, tmp_path):
+        cfg = {"model_config": {"sarima_tuning_grid": {"order": [[1, 0, 1], [1, 1, 1]]}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        result = load_configuration(str(f))
+        assert result["model_config"]["sarima_tuning_grid"]["order"] == [[1, 0, 1], [1, 1, 1]]

@@ -237,6 +237,40 @@ def _validate_model_config(cfg, file_path):
         )
         sys.exit(1)
 
+    fc_params = model_config.get("forecaster_params")
+    if fc_params is not None:
+        if not isinstance(fc_params, dict):
+            print(
+                f"Configuratiefout in {file_path}: "
+                f"'model_config.forecaster_params' moet een object zijn "
+                f"(forecasternaam → parameters), niet {type(fc_params).__name__}."
+            )
+            sys.exit(1)
+        for fc_name, params in fc_params.items():
+            if fc_name not in _VALID_TIMESERIES_MODELS:
+                print(
+                    f"Configuratiefout in {file_path}: "
+                    f"'model_config.forecaster_params' bevat onbekende forecaster '{fc_name}'. "
+                    f"Geldige opties: {sorted(_VALID_TIMESERIES_MODELS)}."
+                )
+                sys.exit(1)
+            if not isinstance(params, dict):
+                print(
+                    f"Configuratiefout in {file_path}: "
+                    f"'model_config.forecaster_params.{fc_name}' moet een object zijn "
+                    f"(parameternaam → waarde), niet {type(params).__name__}."
+                )
+                sys.exit(1)
+
+    sarima_tuning_grid = model_config.get("sarima_tuning_grid")
+    if sarima_tuning_grid is not None and not isinstance(sarima_tuning_grid, dict):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'model_config.sarima_tuning_grid' moet een object zijn "
+            f"(ordenaam → lijst van waarden), niet {type(sarima_tuning_grid).__name__}."
+        )
+        sys.exit(1)
+
 
 def _validate_telbestand_filename_patterns(cfg, file_path):
     """Fail fast op ongeldige telbestand-bestandsnaampatronen.

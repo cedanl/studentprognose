@@ -34,8 +34,8 @@ De benchmark gebruikt **leave-last-year-out** splits:
 
 Dit bootst de productiescenario na: het model traint op historische data en voorspelt het lopende jaar. De benchmark gebruikt dezelfde academische-jaargrens (`model_config.final_academic_week`) en dezelfde uit-de-data-afgeleide seizoenslengte als productie (zie [SARIMA → Seizoenslengte: afgeleid uit de data](sarima.md#seizoenslengte-afgeleid-uit-de-data)), zodat de gemeten modellen overeenkomen met wat productie draait. De regressor-evaluatie gebruikt bovendien dezelfde week-feature-set als productie: alleen de weekkolommen die de wide-pivot daadwerkelijk bevat (bij `final_academic_week` 36 zijn dat er ~43 in plaats van 52). Zo wordt geen enkele fold stil overgeslagen door ontbrekende kolommen.
 
-!!! info "Hyperparameter tuning bouwt hierop voort"
-    Het commando `studentprognose tune -d c` hergebruikt exact deze tijd-bewuste cross-validatie en MAPE-metriek om de beste hyperparameters voor de cumulatieve regressor te kiezen. Waar de benchmark *modeltypes* vergelijkt, stemt tuning de *parameters* van het gekozen model af. Zie [XGBoost → Hyperparameter tuning](xgboost.md#hyperparameter-tuning).
+!!! info "Tuning bouwt hierop voort"
+    Het commando `studentprognose tune -d c` hergebruikt exact deze tijd-bewuste cross-validatie en MAPE-metriek voor **beide** trappen: `evaluate_regressor_model` voor de regressor-hyperparameters (stap 2) en `evaluate_timeseries_model` voor de SARIMA-ordes (stap 1, via `--tune-target sarima`/`both`). Waar de benchmark *modeltypes* vergelijkt, stemt tuning de *parameters/ordes* van het gekozen model af. Zie [XGBoost → Hyperparameter tuning](xgboost.md#hyperparameter-tuning) en [SARIMA → Orde-selectie](sarima.md#orde-selectie-tuning).
 
 ### Leakage-preventie
 

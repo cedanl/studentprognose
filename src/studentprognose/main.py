@@ -30,6 +30,58 @@ from studentprognose.utils.weeks import (
 from studentprognose.utils.constants import WEEKS_PER_YEAR
 
 
+_TUNE_TARGETS = ("regressor", "sarima")
+
+
+def _resolve_tune_targets(tune) -> dict:
+    """Vertaal de ``tune``-parameter naar een ``{target: grid|None}``-dict.
+
+    Ondersteunde vormen:
+
+    * ``False`` / ``None`` → ``{}`` (niet tunen).
+    * ``True`` → ``{"regressor": None}`` (alleen stap 2; backwards compatibel).
+    * ``"regressor"`` / ``"sarima"`` / ``"both"`` → die trap(pen), default-grid.
+    * ``dict`` met sleutels uit ``{"regressor", "sarima"}`` → die trappen, elke
+      waarde een eigen zoekruimte (of ``None``/niet-dict = default-grid).
+
+    Een falsy waarde (``False``, ``None``, ``{}``) betekent: niet tunen.
+
+    Returns:
+        Dict van target → zoekruimte (``None`` = ingebouwde default-grid).
+
+    Raises:
+        ValueError: Bij een onbekende string, onbekende dict-sleutels, of een
+            type dat geen bool/str/dict is.
+    """
+    if not tune:
+        return {}
+    if tune is True:
+        return {"regressor": None}
+    if isinstance(tune, str):
+        key = tune.lower()
+        if key == "both":
+            return {t: None for t in _TUNE_TARGETS}
+        if key in _TUNE_TARGETS:
+            return {key: None}
+        raise ValueError(
+            f"Onbekende tune-waarde '{tune}'. Kies True, 'regressor', 'sarima', "
+            "'both' of een dict zoals {'regressor': {...}, 'sarima': {...}}."
+        )
+    if isinstance(tune, dict):
+        unknown = set(tune) - set(_TUNE_TARGETS)
+        if unknown:
+            raise ValueError(
+                f"tune-dict bevat onbekende sleutels {sorted(unknown)}. "
+                f"Geldig: {list(_TUNE_TARGETS)}. "
+                "Bijv. tune={'regressor': {...}, 'sarima': {...}}."
+            )
+        # Een niet-dict zoekruimte (bijv. True) betekent: gebruik de default-grid.
+        return {k: (v if isinstance(v, dict) else None) for k, v in tune.items()}
+    raise ValueError(
+        f"tune moet bool, str of dict zijn, niet {type(tune).__name__}."
+    )
+
+
 def main(argv):
     cfg = parse_args(argv)
 
@@ -64,7 +116,7 @@ def main(argv):
             sys.exit(1)
 
         predict_week = cfg.weeks[0] if cfg.weeks else 12
-        run_tuning(cfg.configuration_path, predict_week, cfg.data_option)
+        run_tuning(cfg.configuration_path, predict_week, cfg.data_option, cfg.tune_target)
         return
 
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
@@ -140,7 +192,7 @@ def run_pipeline_from_dataframes(
     filtering: Optional[dict] = None,
     cwd: Optional[str] = None,
     save_output: bool = True,
-    tune: bool | dict = False,
+    tune: bool | str | dict = False,
 ) -> Optional[pd.DataFrame]:
     """Run de voorspellingspipeline met data die al als DataFrames in-memory aanwezig is.
 
@@ -168,14 +220,24 @@ def run_pipeline_from_dataframes(
         save_output: Sla uitvoer op naar schijf. Standaard ``True``. Zet op ``False``
             voor puur in-memory gebruik (bijv. bij cloud-pipelines die het resultaat
             zelf opslaan).
-        tune: Hyperparameter tuning voor het cumulatieve regressiemodel. Standaard
-            ``False`` (gebruikt de parameters uit ``model_config.regressor_params``
-            of de modeldefaults — snel en reproduceerbaar). ``True`` draait éénmalig
-            een tijd-bewuste grid search op de meegegeven data, gebruikt de beste
-            parameters voor de voorspelling en koppelt ze terug in de configuratie
-            zodat je ze kunt vastleggen. Geef een dict mee als eigen zoekruimte
-            (bijv. ``{"max_depth": [3, 5], "n_estimators": [100, 200]}``). Heeft
-            alleen effect op het cumulatieve spoor (``CUMULATIVE``/``BOTH_DATASETS``).
+        tune: Opt-in tuning voor het cumulatieve spoor. Standaard ``False``
+            (gebruikt de waarden uit ``model_config.regressor_params`` /
+            ``forecaster_params`` of de modeldefaults — snel en reproduceerbaar).
+            Kies welke van de twee trappen getuned wordt:
+
+            * ``True`` of ``"regressor"`` — alleen de regressor (stap 2,
+              hyperparameters).
+            * ``"sarima"`` — alleen SARIMA (stap 1, ARIMA-ordes).
+            * ``"both"`` — beide trappen, elk apart gelogd met een eigen ✓-tabel.
+            * ``{"regressor": {...}, "sarima": {...}}`` — beide/één trap met een
+              eigen zoekruimte (een waarde ``None``/weggelaten = ingebouwde grid).
+
+            Elke gekozen trap draait éénmalig een tijd-bewuste grid search op de
+            meegegeven data, voorspelt met de beste waarden en koppelt ze terug in
+            de configuratie zodat je ze kunt vastleggen. Het kandidatenoverzicht
+            (met ✓ op de winnaar) gaat naar de console; de functie retourneert het
+            voorspellings-DataFrame. Heeft alleen effect op het cumulatieve spoor
+            (``CUMULATIVE``/``BOTH_DATASETS``).
 
     Returns:
         Het gepostprocessde voorspellings-DataFrame, of ``None`` als geen rijen
@@ -218,17 +280,17 @@ def run_pipeline_from_dataframes(
     if configuration is None:
         configuration = load_defaults()
 
-    # Opt-in tuning vertaalt naar model_config-vlaggen die de CumulativeStrategy
-    # leest. Diepe kopie zodat we de configuration-dict van de aanroeper niet
-    # muteren (de strategy schrijft de gevonden params terug in deze kopie).
-    if tune:
+    # Opt-in tuning vertaalt naar model_config.tune_targets die de
+    # CumulativeStrategy leest. Diepe kopie zodat we de configuration-dict van de
+    # aanroeper niet muteren (de strategy schrijft de gevonden params terug in
+    # deze kopie).
+    tune_targets = _resolve_tune_targets(tune)
+    if tune_targets:
         import copy
 
         configuration = copy.deepcopy(configuration)
         model_config = configuration.setdefault("model_config", {})
-        model_config["tune_hyperparameters"] = True
-        if isinstance(tune, dict):
-            model_config["tuning_grid"] = tune
+        model_config["tune_targets"] = tune_targets
 
     final_week = get_final_academic_week(configuration)
     if week == final_week:

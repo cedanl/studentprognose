@@ -156,7 +156,7 @@ Optioneel. Een object dat per regressor de hyperparameters vastlegt waarmee het 
 
 De parameters per regressor worden direct doorgegeven aan het onderliggende model (bijv. `XGBRegressor`, `Ridge`, `RandomForestRegressor`). Alleen het model dat in `cumulative_regressor` actief is, gebruikt zijn parameters; vermeldingen voor andere regressors worden genegeerd.
 
-Vul je dit liever niet handmatig in? Het commando `studentprognose tune -d c` zoekt de beste waarden en print een kant-en-klaar snippet om hier te plakken (zie [Hyperparameters vastleggen](#hyperparameters-vastleggen-regressor_params) hieronder en [XGBoost → Hyperparameter tuning](methodologie/xgboost.md#hyperparameter-tuning)).
+Vul je dit liever niet handmatig in? Het commando `studentprognose tune -d c` zoekt de beste waarden en print een kant-en-klaar snippet om hier te plakken (zie [Waarden vastleggen](#waarden-vastleggen) hieronder en [XGBoost → Hyperparameter tuning](methodologie/xgboost.md#hyperparameter-tuning)).
 
 ### `tuning_grid` — eigen zoekruimte voor tuning
 
@@ -171,9 +171,37 @@ Optioneel. Een object dat de zoekruimte voor `studentprognose tune` (en de API-p
 }
 ```
 
-#### Hyperparameters vastleggen (`regressor_params`)
+### `forecaster_params` — SARIMA-ordes vastleggen
 
-De aanbevolen werkwijze: draai `studentprognose tune -d c -w <week>`, kopieer het getoonde `regressor_params`-snippet naar je `configuration.json`, en draai daarna normaal. Zo zijn de getunede parameters expliciet, reproduceerbaar en deelbaar — in plaats van impliciet bij elke run opnieuw gezocht.
+Optioneel. Het tijdreeks-equivalent van `regressor_params`: een object dat per forecaster de instantiatie-parameters vastlegt. Voor SARIMA zijn dat de ARIMA-ordes `order` en `seasonal_order`; voor de overige forecasters bijv. `season_length`. Niet-opgegeven waarden vallen terug op de modeldefaults. Ook dit is het **reproduceerbare** pad.
+
+```json
+"model_config": {
+    "cumulative_timeseries": "sarima",
+    "forecaster_params": {
+        "sarima": { "order": [1, 1, 1], "seasonal_order": [1, 1, 0, 52] }
+    }
+}
+```
+
+De vierde waarde van `seasonal_order` is de seizoenslengte; die wordt bij fit nog afgestemd op de werkelijke jaar-periode van je data (net als in productie). Alleen de forecaster die in `cumulative_timeseries` actief is, gebruikt zijn parameters.
+
+### `sarima_tuning_grid` — eigen zoekruimte voor SARIMA-tuning
+
+Optioneel. Net als `tuning_grid`, maar voor `studentprognose tune --tune-target sarima` (en de API `tune="sarima"`/`"both"`): per orde een lijst van te proberen waarden. Bij afwezigheid wordt de ingebouwde SARIMA-grid gebruikt.
+
+```json
+"model_config": {
+    "sarima_tuning_grid": {
+        "order": [[1, 0, 1], [1, 1, 1], [2, 1, 1]],
+        "seasonal_order": [[1, 1, 0, 52], [1, 1, 1, 52]]
+    }
+}
+```
+
+#### Waarden vastleggen
+
+De aanbevolen werkwijze: draai `studentprognose tune -d c -w <week>` (eventueel met `--tune-target sarima` of `both`), kopieer de getoonde snippets naar je `configuration.json`, en draai daarna normaal. Zo zijn de getunede waarden expliciet, reproduceerbaar en deelbaar — in plaats van impliciet bij elke run opnieuw gezocht.
 
 ### `final_academic_week`
 

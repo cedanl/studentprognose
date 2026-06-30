@@ -127,13 +127,22 @@ class CumulativeStrategy(PredictionStrategy):
         self._forecaster_factory = lambda: create_forecaster(configuration)
         self._regressor = create_regressor(configuration)
 
-        # Opt-in hyperparameter tuning (default uit). Wanneer aangezet wordt de
-        # regressor één keer — bij de eerste predict, zodra de feature-matrix
-        # bestaat — getuned via tijd-bewuste CV; daarna gebruiken alle (jaar ×
-        # week)-combinaties de gevonden parameters. Zie models/tuning.py.
+        # Opt-in tuning (default uit). De API kiest welke trap(pen) van het
+        # cumulatieve spoor getuned worden via ``model_config.tune_targets``
+        # (target → zoekruimte/None): "regressor" (stap 2, hyperparameters) en/of
+        # "sarima" (stap 1, ARIMA-ordes). Tuning gebeurt één keer — bij de eerste
+        # predict, zodra de feature-matrix bestaat — via tijd-bewuste CV; daarna
+        # gebruiken alle (jaar × week)-combinaties de gevonden waarden. Zie
+        # models/tuning.py.
         model_config = configuration.get("model_config", {})
-        self._tune = bool(model_config.get("tune_hyperparameters", False))
-        self._tuning_grid = model_config.get("tuning_grid")
+        tune_targets = dict(model_config.get("tune_targets") or {})
+        # Backward-compat: de oude losse vlaggen mappen op de regressor-target.
+        if model_config.get("tune_hyperparameters") and "regressor" not in tune_targets:
+            tune_targets["regressor"] = model_config.get("tuning_grid")
+        self._tune = "regressor" in tune_targets
+        self._tuning_grid = tune_targets.get("regressor")
+        self._tune_sarima = "sarima" in tune_targets
+        self._sarima_tuning_grid = tune_targets.get("sarima")
         self._tuned = False
 
     def get_dashboard_data(self) -> dict:
@@ -219,8 +228,12 @@ class CumulativeStrategy(PredictionStrategy):
         full_data[str(academic_start_week(self.final_academic_week))] = 0
         full_data = _add_engineered_features(full_data, self.data_cumulative, int(self.predict_week))
 
-        if self._tune and not self._tuned:
-            self._tune_regressor(full_data)
+        if not self._tuned and (self._tune or self._tune_sarima):
+            # Elke trap wordt apart getuned en apart gelogd (eigen ✓-tabel).
+            if self._tune_sarima:
+                self._tune_sarima_orders()
+            if self._tune:
+                self._tune_regressor(full_data)
             self._tuned = True
 
         self.skip_years = skip_years
@@ -319,6 +332,47 @@ class CumulativeStrategy(PredictionStrategy):
         model_config = self.configuration.setdefault("model_config", {})
         model_config.setdefault("regressor_params", {})[name] = best
         self._regressor = REGRESSOR_REGISTRY[name](**best)
+
+    def _tune_sarima_orders(self):
+        """Tune de SARIMA-ordes (stap 1) en vervang ``self._forecaster_factory``.
+
+        Draait een tijd-bewuste grid search over ARIMA-ordes (zie
+        ``models/tuning.py``), met dezelfde curve-MAPE als de benchmark. Bij
+        succes worden de beste ordes teruggekoppeld in
+        ``configuration["model_config"]["forecaster_params"]["sarima"]`` — zodat
+        ze zichtbaar/te-bevriezen zijn — en wordt de tijdreeks-factory ermee
+        herbouwd. Bij te weinig trainingsjaren blijft het standaardmodel staan en
+        volgt een waarschuwing.
+        """
+        from studentprognose.models.sarima import SARIMAForecaster
+        from studentprognose.models.tuning import format_tuning_results, tune_sarima
+
+        result = tune_sarima(
+            self.data_cumulative,
+            int(self.predict_week),
+            self.configuration,
+            grid=self._sarima_tuning_grid,
+            min_training_year=self.min_training_year,
+        )
+
+        # Eigen kandidatenoverzicht (eigen ✓-tabel), los van de regressor-tabel.
+        print(format_tuning_results(result))
+
+        if result["best_params"] is None:
+            warnings.warn(
+                "SARIMA-tuning overgeslagen: te weinig trainingsjaren voor een "
+                "tijdreeks-split. De standaard SARIMA-ordes worden gebruikt.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return
+
+        best = result["best_params"]
+        model_config = self.configuration.setdefault("model_config", {})
+        model_config.setdefault("forecaster_params", {})["sarima"] = best
+        # Default-arg bindt de gevonden ordes; elke parallelle SARIMA-fit krijgt
+        # zo een verse forecaster met dezelfde getunede ordes.
+        self._forecaster_factory = lambda b=best: SARIMAForecaster(**b)
 
     def _prepare_data(self):
         if self.data_studentcount is not None:

@@ -95,15 +95,17 @@ Gebruik `studentprognose benchmark -w <week>` om te vergelijken welk model het b
 
 ## Hyperparameter tuning
 
+Dit betreft **stap 2** van het cumulatieve spoor — de regressor. De tijdreeks-trap (stap 1, SARIMA) heeft zijn eigen [orde-selectie](sarima.md#orde-selectie-tuning); beide trappen delen dezelfde tijd-bewuste cross-validatie en kun je samen tunen met `--tune-target both` / `tune="both"`.
+
 ### Wat doet het?
 
 Tuning zoekt de hyperparameters van de cumulatieve regressor (leersnelheid, aantal bomen, boomdiepte, …) die het beste presteren op de **eigen historie** van een instelling — in plaats van te vertrouwen op vaste standaardwaarden. De zoektocht draait een kleine grid search en kiest de parameterset met de laagste gemiddelde fout.
 
 ```bash
-studentprognose tune -d c -w 12
+studentprognose tune -d c -w 12      # regressor (stap 2); --tune-target both voor beide trappen
 ```
 
-Het commando print een overzicht van alle geteste parametersets met hun MAPE — de best presterende set is gemarkeerd met `✓` — en een kant-en-klaar config-snippet voor `model_config.regressor_params`. Via de Python-API toont `run_pipeline_from_dataframes(..., tune=True)` exact hetzelfde overzicht, voorspelt vervolgens direct met de gevonden parameters, en geeft het voorspellings-DataFrame terug (het tuning-overzicht gaat naar de console).
+Het commando print een overzicht van alle geteste parametersets met hun MAPE — de best presterende set is gemarkeerd met `✓` — en een kant-en-klaar config-snippet voor `model_config.regressor_params`. Via de Python-API toont `run_pipeline_from_dataframes(..., tune=True)` (of `tune="both"`) exact hetzelfde overzicht, voorspelt vervolgens direct met de gevonden parameters, en geeft het voorspellings-DataFrame terug (het tuning-overzicht gaat naar de console).
 
 ### Hoe wordt geëvalueerd?
 

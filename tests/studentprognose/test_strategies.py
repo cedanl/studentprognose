@@ -1,7 +1,6 @@
 """Contract tests for strategy preprocess() return values."""
 
 import pandas as pd
-import pytest
 
 from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy
@@ -218,3 +217,84 @@ class TestCumulativeStrategyTuning:
         assert "regressor_params" not in cfg["model_config"]
         assert strategy._regressor is before
         assert any(issubclass(w.category, UserWarning) for w in recwarn.list)
+
+    def test_tune_targets_select_both_traps(self):
+        cfg = _cfg_cumulative()
+        cfg["model_config"]["tune_targets"] = {
+            "regressor": {"max_depth": [2]},
+            "sarima": {"order": [(1, 0, 1)]},
+        }
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), None, cfg,
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        assert strategy._tune is True
+        assert strategy._tune_sarima is True
+        assert strategy._tuning_grid == {"max_depth": [2]}
+        assert strategy._sarima_tuning_grid == {"order": [(1, 0, 1)]}
+
+    def test_tune_targets_sarima_only(self):
+        cfg = _cfg_cumulative()
+        cfg["model_config"]["tune_targets"] = {"sarima": None}
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), None, cfg,
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        # Alleen SARIMA aan; de regressor-trap blijft uit.
+        assert strategy._tune is False
+        assert strategy._tune_sarima is True
+
+    def test_tune_sarima_injects_best_orders(self):
+        years = [2016, 2017, 2018, 2019, 2020, 2021]
+        cfg = _cfg_cumulative()
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), None, cfg,
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        # Klein grid voor snelheid; lange curve-data en predict_week handmatig zetten
+        # (zoals predict_nr_of_students dat in productie doet vóór de tuning-stap).
+        strategy._sarima_tuning_grid = {"order": [(1, 0, 1), (1, 1, 1)], "seasonal_order": [(1, 1, 0, 52)]}
+        strategy.data_cumulative = _tune_cumulative_long(years)
+        strategy.predict_week = 12
+        before_factory = strategy._forecaster_factory
+        strategy._tune_sarima_orders()
+
+        injected = cfg["model_config"]["forecaster_params"]["sarima"]
+        assert "order" in injected and "seasonal_order" in injected
+        # De factory is vervangen en bouwt een SARIMA met de getunede ordes.
+        assert strategy._forecaster_factory is not before_factory
+        forecaster = strategy._forecaster_factory()
+        assert forecaster.order == tuple(injected["order"])
+
+    def test_tune_sarima_warns_on_too_few_years(self, recwarn):
+        years = [2016, 2017]
+        cfg = _cfg_cumulative()
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), None, cfg,
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        strategy._sarima_tuning_grid = {"order": [(1, 0, 1)], "seasonal_order": [(1, 1, 0, 52)]}
+        strategy.data_cumulative = _tune_cumulative_long(years)
+        strategy.predict_week = 12
+        before_factory = strategy._forecaster_factory
+        strategy._tune_sarima_orders()
+        # Geen ordes geïnjecteerd, factory ongewijzigd, waarschuwing gegeven.
+        assert "forecaster_params" not in cfg["model_config"]
+        assert strategy._forecaster_factory is before_factory
+        assert any(issubclass(w.category, UserWarning) for w in recwarn.list)
+
+
+def _tune_cumulative_long(years):
+    """Lang-format cumulatieve curve (met ``ts``) voor SARIMA-tuning."""
+    weeks = list(range(35, 53)) + list(range(1, 21))
+    rows = []
+    for y in years:
+        for prog in ["A", "B"]:
+            base = 100 + (y - 2016) * 10 + (5 if prog == "B" else 0)
+            for i, wk in enumerate(weeks):
+                rows.append({
+                    "Collegejaar": y, "Faculteit": "F", "Herkomst": "NL",
+                    "Examentype": "Bachelor", "Croho groepeernaam": prog,
+                    "ts": float(base + 5 * i), "Weeknummer": int(wk),
+                })
+    return pd.DataFrame(rows)

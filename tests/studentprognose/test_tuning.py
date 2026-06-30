@@ -1,4 +1,6 @@
-"""Tests voor hyperparameter tuning van de cumulatieve regressor."""
+"""Tests voor tuning van het cumulatieve spoor (regressor stap 2, SARIMA stap 1)."""
+
+import json
 
 import numpy as np
 import pandas as pd
@@ -7,9 +9,12 @@ import pytest
 from studentprognose.config import load_defaults
 from studentprognose.models.tuning import (
     DEFAULT_PARAM_GRIDS,
+    DEFAULT_SARIMA_GRID,
     expand_grid,
     format_tuning_results,
+    sarima_config_snippet,
     tune_regressor,
+    tune_sarima,
 )
 from studentprognose.strategies.cumulative import ENGINEERED_FEATURE_COLS
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
@@ -62,6 +67,42 @@ def _make_studentcount(years):
                 "Aantal_studenten": base,
             })
     return pd.DataFrame(rows)
+
+
+def _make_cumulative_long(years):
+    """Lang-format cumulatieve curve (met ``ts``) zoals tune_sarima die voedt.
+
+    Eén stijgende curve per (programma × jaar) over de gevulde weken; genoeg
+    historie voor meerdere tijdreeks-splits.
+    """
+    weeks = list(range(35, 53)) + list(range(1, 21))
+    rows = []
+    for y in years:
+        for prog in ["A", "B"]:
+            base = 100 + (y - 2016) * 10 + (5 if prog == "B" else 0)
+            for i, wk in enumerate(weeks):
+                rows.append({
+                    "Collegejaar": y,
+                    "Faculteit": "F",
+                    "Herkomst": "NL",
+                    "Examentype": "Bachelor",
+                    "Croho groepeernaam": prog,
+                    "ts": float(base + 5 * i),
+                    "Weeknummer": int(wk),
+                })
+    return pd.DataFrame(rows)
+
+
+def _cfg_sarima():
+    return {
+        "column_roles": {
+            "programme": "Croho groepeernaam",
+            "origin": "Herkomst",
+            "exam_type": "Examentype",
+            "academic_year": "Collegejaar",
+        },
+        "model_config": {"final_academic_week": 36, "cumulative_timeseries": "sarima"},
+    }
 
 
 class TestExpandGrid:
@@ -190,3 +231,79 @@ class TestFormatTuningResults:
         result = self._result(None)
         result["results"] = []
         assert format_tuning_results(result) == "Geen kandidaten geëvalueerd."
+
+    def test_sarima_target_uses_forecaster_params_snippet(self):
+        # Een sarima-resultaat moet het forecaster_params-snippet tonen (niet
+        # regressor_params) en het juiste model-label, met ✓ op de winnaar.
+        result = {
+            "target": "sarima",
+            "model": "sarima",
+            "best_params": {"order": (1, 1, 1), "seasonal_order": (1, 1, 0, 52)},
+            "best_mape": 0.10,
+            "n_candidates": 2,
+            "results": [
+                {"params": {"order": (1, 1, 1), "seasonal_order": (1, 1, 0, 52)},
+                 "mean_mape": 0.10, "n_evals": 6},
+                {"params": {"order": (1, 0, 1), "seasonal_order": (1, 1, 0, 52)},
+                 "mean_mape": 0.13, "n_evals": 6},
+            ],
+        }
+        out = format_tuning_results(result)
+        assert "forecaster_params" in out
+        assert "regressor_params" not in out
+        assert "Beste parameters voor 'sarima'" in out
+        assert out.count("✓") == 1
+        # Orde-arrays blijven op één regel in het snippet.
+        assert '"order": [1, 1, 1]' in out
+
+
+class TestSarimaConfigSnippet:
+    def test_inline_arrays_and_structure(self):
+        snippet = sarima_config_snippet({"order": (1, 0, 1), "seasonal_order": (1, 1, 1, 52)})
+        assert '"order": [1, 0, 1]' in snippet
+        assert '"seasonal_order": [1, 1, 1, 52]' in snippet
+        assert "forecaster_params" in snippet
+        # Geldige JSON na de inleidende tekstregel.
+        body = snippet[snippet.index("{"):]
+        parsed = json.loads(body)
+        assert parsed["model_config"]["forecaster_params"]["sarima"]["order"] == [1, 0, 1]
+
+
+class TestTuneSarima:
+    def test_returns_sarima_result_shape(self):
+        years = [2016, 2017, 2018, 2019, 2020, 2021]
+        grid = {"order": [(1, 0, 1), (1, 1, 1)], "seasonal_order": [(1, 1, 0, 52)]}
+        result = tune_sarima(
+            _make_cumulative_long(years), 12, _cfg_sarima(),
+            grid=grid, min_training_year=2016,
+        )
+        assert result["target"] == "sarima"
+        assert result["model"] == "sarima"
+        assert result["n_candidates"] == 2
+        assert isinstance(result["best_params"], dict)
+        assert "order" in result["best_params"]
+        # Winnaar zit in de gerangschikte resultaten.
+        assert result["best_params"] in [r["params"] for r in result["results"]]
+
+    def test_results_sorted_by_mape(self):
+        years = [2016, 2017, 2018, 2019, 2020, 2021]
+        result = tune_sarima(
+            _make_cumulative_long(years), 12, _cfg_sarima(), min_training_year=2016,
+        )
+        finite = [r["mean_mape"] for r in result["results"] if np.isfinite(r["mean_mape"])]
+        assert finite == sorted(finite)
+
+    def test_default_grid_used_when_none(self):
+        years = [2016, 2017, 2018, 2019, 2020, 2021]
+        result = tune_sarima(
+            _make_cumulative_long(years), 12, _cfg_sarima(), min_training_year=2016,
+        )
+        assert result["n_candidates"] == len(expand_grid(DEFAULT_SARIMA_GRID))
+
+    def test_too_few_years_yields_no_winner(self):
+        years = [2016, 2017]  # < min_train_years → geen splits
+        result = tune_sarima(
+            _make_cumulative_long(years), 12, _cfg_sarima(), min_training_year=2016,
+        )
+        assert result["best_params"] is None
+        assert np.isnan(result["best_mape"])

@@ -383,3 +383,49 @@ def test_cli_check_data_range_exits(capsys):
         in out
     )
     assert "jaren 2024-2025" in out
+
+
+class TestResolveTuneTargets:
+    """Bewaakt de vertaling van de publieke ``tune``-parameter naar targets."""
+
+    def _resolve(self):
+        from studentprognose.main import _resolve_tune_targets
+        return _resolve_tune_targets
+
+    def test_falsy_means_no_tuning(self):
+        r = self._resolve()
+        assert r(False) == {} and r(None) == {} and r({}) == {}
+
+    def test_true_and_regressor_string(self):
+        r = self._resolve()
+        assert r(True) == {"regressor": None}
+        assert r("regressor") == {"regressor": None}
+
+    def test_sarima_and_both(self):
+        r = self._resolve()
+        assert r("sarima") == {"sarima": None}
+        assert r("both") == {"regressor": None, "sarima": None}
+
+    def test_dict_custom_grids(self):
+        r = self._resolve()
+        out = r({"regressor": {"max_depth": [3]}, "sarima": {"order": [(1, 0, 1)]}})
+        assert out == {"regressor": {"max_depth": [3]}, "sarima": {"order": [(1, 0, 1)]}}
+
+    def test_dict_non_dict_value_means_default_grid(self):
+        r = self._resolve()
+        assert r({"regressor": True, "sarima": None}) == {"regressor": None, "sarima": None}
+
+    def test_unknown_string_raises(self):
+        r = self._resolve()
+        with pytest.raises(ValueError, match="Onbekende tune-waarde"):
+            r("xgboost")
+
+    def test_unknown_dict_key_raises(self):
+        r = self._resolve()
+        with pytest.raises(ValueError, match="onbekende sleutels"):
+            r({"ensemble": {}})
+
+    def test_wrong_type_raises(self):
+        r = self._resolve()
+        with pytest.raises(ValueError, match="bool, str of dict"):
+            r(5)

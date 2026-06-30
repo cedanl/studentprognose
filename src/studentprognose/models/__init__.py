@@ -47,14 +47,24 @@ CLASSIFIER_REGISTRY: dict[str, type[BaseClassifier]] = {
 
 
 def create_forecaster(config: dict) -> BaseForecaster:
-    """Maak een tijdreeks-forecaster op basis van model_config."""
-    name = config.get("model_config", {}).get("cumulative_timeseries", "sarima")
+    """Maak een tijdreeks-forecaster op basis van model_config.
+
+    De gekozen forecaster (``model_config.cumulative_timeseries``) wordt
+    geïnstantieerd met de bijbehorende parameters uit
+    ``model_config.forecaster_params[<naam>]`` (leeg = modeldefaults). Voor
+    SARIMA zijn dat ``order`` en ``seasonal_order``. Dit is het reproduceerbare
+    pad: getunede ordes (zie ``models/tuning.py``) worden hier vastgelegd en
+    ingelezen.
+    """
+    model_config = config.get("model_config", {})
+    name = model_config.get("cumulative_timeseries", "sarima")
     if name not in FORECASTER_REGISTRY:
         raise ValueError(
             f"Onbekend tijdreeksmodel: '{name}'. "
             f"Geldige opties: {', '.join(FORECASTER_REGISTRY)}"
         )
-    return FORECASTER_REGISTRY[name]()
+    params = model_config.get("forecaster_params", {}).get(name, {})
+    return FORECASTER_REGISTRY[name](**params)
 
 
 def create_regressor(config: dict) -> BaseRegressor:
