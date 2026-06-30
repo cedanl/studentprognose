@@ -128,3 +128,93 @@ class TestCumulativeStrategyPreprocess:
         )
         strategy.set_filtering(["30029", "B Tand"], [], [])
         assert strategy.programme_filtering == [30029, "B Tand"]
+
+
+def _tune_full_data(years):
+    """Wide-format feature-matrix voor de regressor-tuning (incl. weekkolommen)."""
+    import numpy as np
+
+    from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
+    from studentprognose.utils.weeks import get_weeks_list
+
+    week_cols = [str(w) for w in get_weeks_list(FINAL_ACADEMIC_WEEK, FINAL_ACADEMIC_WEEK)]
+    rng = np.random.default_rng(0)
+    rows = []
+    for y in years:
+        for prog in ["A", "B"]:
+            base = 100 + (y - 2016) * 20 + (10 if prog == "B" else 0)
+            row = {
+                "Collegejaar": y, "Croho groepeernaam": prog, "Herkomst": "NL",
+                "Examentype": "Bachelor", "Faculteit": "F",
+                "Gewogen_t-2": base + rng.normal(0, 2),
+                "Gewogen_t-5": base * 0.8 + rng.normal(0, 2),
+                "Gewogen_acceleration": rng.normal(0, 1),
+                "exclusivity_ratio": 0.5 + rng.normal(0, 0.05),
+            }
+            for i, wk in enumerate(week_cols):
+                row[wk] = base * (i + 1) / len(week_cols) + rng.normal(0, 1)
+            rows.append(row)
+    return pd.DataFrame(rows)
+
+
+def _tune_studentcount(years):
+    rows = []
+    for y in years:
+        for prog in ["A", "B"]:
+            base = 100 + (y - 2016) * 20 + (10 if prog == "B" else 0)
+            rows.append({
+                "Croho groepeernaam": prog, "Collegejaar": y, "Herkomst": "NL",
+                "Examentype": "Bachelor", "Aantal_studenten": base,
+            })
+    return pd.DataFrame(rows)
+
+
+class TestCumulativeStrategyTuning:
+    def test_tune_flags_default_off(self):
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), None, _cfg_cumulative(),
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        assert strategy._tune is False
+        assert strategy._tuned is False
+
+    def test_tune_flags_read_from_config(self):
+        cfg = _cfg_cumulative()
+        cfg["model_config"]["tune_hyperparameters"] = True
+        cfg["model_config"]["tuning_grid"] = {"max_depth": [2, 4]}
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), None, cfg,
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        assert strategy._tune is True
+        assert strategy._tuning_grid == {"max_depth": [2, 4]}
+
+    def test_tune_regressor_injects_best_params(self):
+        years = [2016, 2017, 2018, 2019, 2020, 2021]
+        cfg = _cfg_cumulative()
+        cfg["model_features"] = {"regressor": {"categorical": ["Examentype", "Faculteit", "Croho groepeernaam", "Herkomst"]}}
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), _tune_studentcount(years), cfg,
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        strategy._tuning_grid = {"max_depth": [2, 4]}
+        strategy._tune_regressor(_tune_full_data(years))
+
+        injected = cfg["model_config"]["regressor_params"]["xgboost"]
+        assert injected in [{"max_depth": 2}, {"max_depth": 4}]
+        # De actieve regressor draagt de getunede parameter.
+        assert strategy._regressor._model.get_params()["max_depth"] == injected["max_depth"]
+
+    def test_tune_regressor_warns_on_too_few_years(self, recwarn):
+        years = [2016, 2017]
+        cfg = _cfg_cumulative()
+        strategy = CumulativeStrategy(
+            _minimal_cumulative_df(), _tune_studentcount(years), cfg,
+            None, None, "/tmp", DataOption.CUMULATIVE, None,
+        )
+        before = strategy._regressor
+        strategy._tune_regressor(_tune_full_data(years))
+        # Geen params geïnjecteerd, regressor ongewijzigd, waarschuwing gegeven.
+        assert "regressor_params" not in cfg["model_config"]
+        assert strategy._regressor is before
+        assert any(issubclass(w.category, UserWarning) for w in recwarn.list)

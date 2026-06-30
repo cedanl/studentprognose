@@ -127,6 +127,15 @@ class CumulativeStrategy(PredictionStrategy):
         self._forecaster_factory = lambda: create_forecaster(configuration)
         self._regressor = create_regressor(configuration)
 
+        # Opt-in hyperparameter tuning (default uit). Wanneer aangezet wordt de
+        # regressor één keer — bij de eerste predict, zodra de feature-matrix
+        # bestaat — getuned via tijd-bewuste CV; daarna gebruiken alle (jaar ×
+        # week)-combinaties de gevonden parameters. Zie models/tuning.py.
+        model_config = configuration.get("model_config", {})
+        self._tune = bool(model_config.get("tune_hyperparameters", False))
+        self._tuning_grid = model_config.get("tuning_grid")
+        self._tuned = False
+
     def get_dashboard_data(self) -> dict:
         return {
             "data_cumulative": self.data_cumulative,
@@ -210,6 +219,10 @@ class CumulativeStrategy(PredictionStrategy):
         full_data[str(academic_start_week(self.final_academic_week))] = 0
         full_data = _add_engineered_features(full_data, self.data_cumulative, int(self.predict_week))
 
+        if self._tune and not self._tuned:
+            self._tune_regressor(full_data)
+            self._tuned = True
+
         self.skip_years = skip_years
 
         data_to_predict = self.data_cumulative[
@@ -264,6 +277,48 @@ class CumulativeStrategy(PredictionStrategy):
         )
 
         return data_to_predict
+
+    def _tune_regressor(self, full_data):
+        """Tune de cumulatieve regressor op de feature-matrix en vervang ``self._regressor``.
+
+        Draait een tijd-bewuste grid search (zie ``models/tuning.py``). Bij
+        succes worden de beste parameters teruggekoppeld in
+        ``configuration["model_config"]["regressor_params"]`` — zodat ze
+        zichtbaar/te-bevriezen zijn — en wordt de actieve regressor ermee
+        herbouwd. Bij te weinig trainingsjaren (geen tijdreeks-split mogelijk)
+        wordt een waarschuwing gegeven en blijven de standaardparameters staan.
+        """
+        from studentprognose.models import REGRESSOR_REGISTRY
+        from studentprognose.models.tuning import tune_regressor
+
+        name = self.configuration.get("model_config", {}).get("cumulative_regressor", "xgboost")
+        result = tune_regressor(
+            full_data,
+            self.data_studentcount,
+            self.configuration,
+            regressor_name=name,
+            grid=self._tuning_grid,
+            min_training_year=self.min_training_year,
+            numerus_fixus_list=list(self.numerus_fixus_list),
+        )
+
+        if result["best_params"] is None:
+            warnings.warn(
+                "Hyperparameter tuning overgeslagen: te weinig trainingsjaren voor een "
+                "tijdreeks-split. De standaardparameters van de regressor worden gebruikt.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return
+
+        best = result["best_params"]
+        model_config = self.configuration.setdefault("model_config", {})
+        model_config.setdefault("regressor_params", {})[name] = best
+        self._regressor = REGRESSOR_REGISTRY[name](**best)
+        print(
+            f"Hyperparameter tuning ({name}): beste parameters {best} "
+            f"(MAPE={result['best_mape']:.4f}, {result['n_candidates']} kandidaten getest)."
+        )
 
     def _prepare_data(self):
         if self.data_studentcount is not None:

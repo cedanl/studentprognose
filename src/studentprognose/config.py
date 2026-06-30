@@ -203,6 +203,40 @@ def _validate_model_config(cfg, file_path):
         )
         sys.exit(1)
 
+    reg_params = model_config.get("regressor_params")
+    if reg_params is not None:
+        if not isinstance(reg_params, dict):
+            print(
+                f"Configuratiefout in {file_path}: "
+                f"'model_config.regressor_params' moet een object zijn "
+                f"(regressornaam → parameters), niet {type(reg_params).__name__}."
+            )
+            sys.exit(1)
+        for reg_name, params in reg_params.items():
+            if reg_name not in _VALID_REGRESSOR_MODELS:
+                print(
+                    f"Configuratiefout in {file_path}: "
+                    f"'model_config.regressor_params' bevat onbekende regressor '{reg_name}'. "
+                    f"Geldige opties: {sorted(_VALID_REGRESSOR_MODELS)}."
+                )
+                sys.exit(1)
+            if not isinstance(params, dict):
+                print(
+                    f"Configuratiefout in {file_path}: "
+                    f"'model_config.regressor_params.{reg_name}' moet een object zijn "
+                    f"(parameternaam → waarde), niet {type(params).__name__}."
+                )
+                sys.exit(1)
+
+    tuning_grid = model_config.get("tuning_grid")
+    if tuning_grid is not None and not isinstance(tuning_grid, dict):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'model_config.tuning_grid' moet een object zijn "
+            f"(parameternaam → lijst van waarden), niet {type(tuning_grid).__name__}."
+        )
+        sys.exit(1)
+
 
 def _validate_telbestand_filename_patterns(cfg, file_path):
     """Fail fast op ongeldige telbestand-bestandsnaampatronen.

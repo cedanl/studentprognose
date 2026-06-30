@@ -64,6 +64,17 @@ class TestParseArgs:
         cfg = parse_args(["prog", "init"])
         assert cfg.command == "init"
 
+    def test_tune_command_in_parse_args(self):
+        cfg = parse_args(["prog", "tune", "-d", "c"])
+        assert cfg.command == "tune"
+        assert cfg.data_option == DataOption.CUMULATIVE
+        assert cfg.dataset_specified is True
+
+    def test_tune_command_without_dataset(self):
+        cfg = parse_args(["prog", "tune"])
+        assert cfg.command == "tune"
+        assert cfg.dataset_specified is False
+
     def test_default_command_is_none(self):
         cfg = parse_args(["prog"])
         assert cfg.command is None

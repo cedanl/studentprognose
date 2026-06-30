@@ -177,6 +177,7 @@ studentprognose --help
 |----------|-------------|
 | `init` | Maak een nieuwe projectmap aan met configuratie en mappenstructuur |
 | `benchmark` | Vergelijk alternatieve ML-modellen (`-d c` of `-d i` verplicht, zie [Benchmarks](methodologie/benchmarks.md)) |
+| `tune` | Stem de hyperparameters van het cumulatieve regressiemodel af (`-d c` verplicht, zie [XGBoost → Hyperparameter tuning](methodologie/xgboost.md#hyperparameter-tuning)) |
 
 ### Vlaggen
 
@@ -309,6 +310,55 @@ result = run_pipeline_from_dataframes(
     ```
 
     Pas `year`/`week` aan binnen de range, of voeg aanvullende trainingsdata toe.
+
+## Hyperparameter tuning
+
+De hyperparameters van het cumulatieve regressiemodel (default XGBoost) staan op
+onderbouwde standaardwaarden, maar je kunt ze afstemmen op je eigen data. Tuning
+gebruikt een **tijd-bewuste** zoektocht (geen random k-fold — dat lekt toekomst) en
+laat het operationele voorspelpad standaard onaangeroerd. Zie
+[XGBoost → Hyperparameter tuning](methodologie/xgboost.md#hyperparameter-tuning)
+voor de methodologie.
+
+### Via de CLI — zoeken en vastleggen
+
+```bash
+studentprognose tune -d c -w 12
+```
+
+Dit draait de zoektocht op je geladen data, print een overzicht van alle geteste
+parametersets met hun MAPE, en geeft een kant-en-klaar config-snippet terug. Plak
+dat snippet in `configuration.json` om de gevonden parameters vast te leggen (zie
+[Configuratie → Hyperparameters vastleggen](configuratie.md#hyperparameters-vastleggen-regressor_params)).
+Vastgelegde parameters zijn reproduceerbaar: ze worden bij elke run gebruikt zonder
+opnieuw te tunen.
+
+### Via de Python-API — tunen en voorspellen in één keer
+
+`run_pipeline_from_dataframes` heeft een `tune`-parameter (standaard `False`):
+
+```python
+result = run_pipeline_from_dataframes(
+    year=2025,
+    week=10,
+    data_cumulative=df_cum,
+    data_student_numbers=data_studentcount,
+    dataset=DataOption.CUMULATIVE,
+    tune=True,  # éénmalige tijd-bewuste grid search, daarna voorspellen
+)
+```
+
+`tune=True` draait de zoektocht éénmaal op de meegegeven data, gebruikt de beste
+parameters voor de voorspelling en logt ze (zodat je ze kunt vastleggen). Geef een
+dict mee voor een eigen zoekruimte, bijvoorbeeld
+`tune={"max_depth": [3, 5], "n_estimators": [100, 200]}`. De parameter heeft alleen
+effect op het cumulatieve spoor.
+
+!!! note "Tuning is opt-in"
+    Standaard (`tune=False`) gebruikt de pipeline de parameters uit
+    `model_config.regressor_params` of de modeldefaults — snel en reproduceerbaar.
+    Zet `tune` alleen aan wanneer je bewust wilt afstemmen; het maakt de run langzamer
+    en, bij `tune=True` zonder vastleggen, niet-deterministisch.
 
 ## Bekende valkuil: stille modus-downgrade
 

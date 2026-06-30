@@ -120,11 +120,16 @@ def _evaluate_single(
     X_train = train_df.drop(columns=[target_col])
     X_test = test_df.drop(columns=[target_col])
 
+    # Geef available_cols mee, net als de productie-pijplijn (predict_with_xgboost):
+    # de wide-pivot bevat niet altijd élke weekkolom tot final_week (bijv. UvA met
+    # final_week 36 levert ~43 i.p.v. 52 weken). Zonder deze filter eist de
+    # ColumnTransformer ontbrekende kolommen op en faalt elke fold stil.
     preprocessor, numeric_cols, categorical_cols = build_preprocessor(
         ENGINEERED_FEATURE_COLS,
         categorical_cols=reg_categorical,
         year_col=year_col,
         final_week=final_week,
+        available_cols=list(X_train.columns),
     )
 
     try:

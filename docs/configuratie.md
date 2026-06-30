@@ -141,6 +141,40 @@ Het regressiemodel dat vooraanmelderscijfers vertaalt naar verwachte inschrijvin
 | `ridge` | Ridge Regression | L2-regularisatie, stabiel bij weinig trainingsdata en multicollineariteit |
 | `random_forest` | Random Forest | Robuust bij kleine datasets, ingebouwde feature importance |
 
+### `regressor_params` — hyperparameters vastleggen
+
+Optioneel. Een object dat per regressor de hyperparameters vastlegt waarmee het model wordt geïnstantieerd. Niet-opgegeven parameters vallen terug op de modeldefaults. Dit is het **reproduceerbare** pad: de waarden worden bij elke run gebruikt, zonder opnieuw te tunen.
+
+```json
+"model_config": {
+    "cumulative_regressor": "xgboost",
+    "regressor_params": {
+        "xgboost": { "learning_rate": 0.1, "n_estimators": 200, "max_depth": 5 }
+    }
+}
+```
+
+De parameters per regressor worden direct doorgegeven aan het onderliggende model (bijv. `XGBRegressor`, `Ridge`, `RandomForestRegressor`). Alleen het model dat in `cumulative_regressor` actief is, gebruikt zijn parameters; vermeldingen voor andere regressors worden genegeerd.
+
+Vul je dit liever niet handmatig in? Het commando `studentprognose tune -d c` zoekt de beste waarden en print een kant-en-klaar snippet om hier te plakken (zie [Hyperparameters vastleggen](#hyperparameters-vastleggen-regressor_params) hieronder en [XGBoost → Hyperparameter tuning](methodologie/xgboost.md#hyperparameter-tuning)).
+
+### `tuning_grid` — eigen zoekruimte voor tuning
+
+Optioneel. Een object dat de zoekruimte voor `studentprognose tune` (en de API-parameter `tune`) overschrijft: per hyperparameter een lijst van te proberen waarden. Bij afwezigheid wordt de ingebouwde, regularisatie-gerichte standaardgrid gebruikt.
+
+```json
+"model_config": {
+    "tuning_grid": {
+        "max_depth": [3, 5, 7],
+        "n_estimators": [100, 200, 400]
+    }
+}
+```
+
+#### Hyperparameters vastleggen (`regressor_params`)
+
+De aanbevolen werkwijze: draai `studentprognose tune -d c -w <week>`, kopieer het getoonde `regressor_params`-snippet naar je `configuration.json`, en draai daarna normaal. Zo zijn de getunede parameters expliciet, reproduceerbaar en deelbaar — in plaats van impliciet bij elke run opnieuw gezocht.
+
 ### `final_academic_week`
 
 Standaard: `38`

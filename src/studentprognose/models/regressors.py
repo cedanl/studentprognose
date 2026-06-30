@@ -29,11 +29,19 @@ class BaseRegressor(ABC):
 
 
 class XGBoostRegressor(BaseRegressor):
-    """XGBoost gradient boosting regressor (huidige default)."""
+    """XGBoost gradient boosting regressor (huidige default).
 
-    def __init__(self, learning_rate: float = 0.25):
+    Accepteert willekeurige XGBoost-hyperparameters als keyword-argumenten
+    (bijv. ``n_estimators``, ``max_depth``, ``subsample``). Niet-opgegeven
+    parameters vallen terug op de XGBoost-defaults; ``learning_rate`` heeft
+    een eigen default van ``0.25``. Zo kunnen getunede parameters (zie
+    ``models/tuning.py`` en ``model_config.regressor_params``) ongewijzigd
+    worden doorgegeven.
+    """
+
+    def __init__(self, **params):
         from xgboost import XGBRegressor
-        self._model = XGBRegressor(learning_rate=learning_rate)
+        self._model = XGBRegressor(**{"learning_rate": 0.25, **params})
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "XGBoostRegressor":
         self._model.fit(X, y)
@@ -50,9 +58,9 @@ class XGBoostRegressor(BaseRegressor):
 class RidgeRegressor(BaseRegressor):
     """Ridge (L2) regressie — stabiel bij weinig data en multicollineariteit."""
 
-    def __init__(self, alpha: float = 1.0):
+    def __init__(self, **params):
         from sklearn.linear_model import Ridge
-        self._model = Ridge(alpha=alpha)
+        self._model = Ridge(**{"alpha": 1.0, **params})
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "RidgeRegressor":
         self._model.fit(X, y)
@@ -65,9 +73,9 @@ class RidgeRegressor(BaseRegressor):
 class RandomForestRegressor(BaseRegressor):
     """Random Forest — robuust bij kleine datasets, ingebouwde feature importance."""
 
-    def __init__(self, n_estimators: int = 100, random_state: int = 42):
+    def __init__(self, **params):
         from sklearn.ensemble import RandomForestRegressor as RF
-        self._model = RF(n_estimators=n_estimators, random_state=random_state)
+        self._model = RF(**{"n_estimators": 100, "random_state": 42, **params})
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "RandomForestRegressor":
         self._model.fit(X, y)
@@ -84,9 +92,9 @@ class RandomForestRegressor(BaseRegressor):
 class GradientBoostingRegressor(BaseRegressor):
     """Sklearn Gradient Boosting — geen extra dependency nodig."""
 
-    def __init__(self, n_estimators: int = 100, random_state: int = 42):
+    def __init__(self, **params):
         from sklearn.ensemble import GradientBoostingRegressor as GBR
-        self._model = GBR(n_estimators=n_estimators, random_state=random_state)
+        self._model = GBR(**{"n_estimators": 100, "random_state": 42, **params})
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "GradientBoostingRegressor":
         self._model.fit(X, y)
@@ -103,9 +111,9 @@ class GradientBoostingRegressor(BaseRegressor):
 class ExtraTreesRegressor(BaseRegressor):
     """Extra Trees — variant op Random Forest met random splits, sneller."""
 
-    def __init__(self, n_estimators: int = 100, random_state: int = 42):
+    def __init__(self, **params):
         from sklearn.ensemble import ExtraTreesRegressor as ETR
-        self._model = ETR(n_estimators=n_estimators, random_state=random_state)
+        self._model = ETR(**{"n_estimators": 100, "random_state": 42, **params})
 
     def fit(self, X: np.ndarray, y: np.ndarray) -> "ExtraTreesRegressor":
         self._model.fit(X, y)

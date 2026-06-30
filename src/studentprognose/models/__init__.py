@@ -58,14 +58,23 @@ def create_forecaster(config: dict) -> BaseForecaster:
 
 
 def create_regressor(config: dict) -> BaseRegressor:
-    """Maak een regressor op basis van model_config."""
-    name = config.get("model_config", {}).get("cumulative_regressor", "xgboost")
+    """Maak een regressor op basis van model_config.
+
+    De gekozen regressor (``model_config.cumulative_regressor``) wordt
+    geïnstantieerd met de bijbehorende hyperparameters uit
+    ``model_config.regressor_params[<naam>]`` (leeg = modeldefaults). Dit is
+    het reproduceerbare pad: getunede parameters (zie ``models/tuning.py``)
+    worden hier vastgelegd en ingelezen.
+    """
+    model_config = config.get("model_config", {})
+    name = model_config.get("cumulative_regressor", "xgboost")
     if name not in REGRESSOR_REGISTRY:
         raise ValueError(
             f"Onbekend regressiemodel: '{name}'. "
             f"Geldige opties: {', '.join(REGRESSOR_REGISTRY)}"
         )
-    return REGRESSOR_REGISTRY[name]()
+    params = model_config.get("regressor_params", {}).get(name, {})
+    return REGRESSOR_REGISTRY[name](**params)
 
 
 def create_classifier(config: dict) -> BaseClassifier:

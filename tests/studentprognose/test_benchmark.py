@@ -134,6 +134,35 @@ class TestModelConfig:
         with pytest.raises(ValueError, match="Onbekend regressiemodel"):
             create_regressor({"model_config": {"cumulative_regressor": "nonexistent"}})
 
+    def test_create_regressor_applies_params(self):
+        from studentprognose.models import create_regressor
+
+        r = create_regressor({
+            "model_config": {
+                "cumulative_regressor": "xgboost",
+                "regressor_params": {"xgboost": {"max_depth": 3, "n_estimators": 50}},
+            }
+        })
+        params = r._model.get_params()
+        assert params["max_depth"] == 3
+        assert params["n_estimators"] == 50
+        # learning_rate behoudt de eigen default als niet getuned.
+        assert params["learning_rate"] == 0.25
+
+    def test_create_regressor_params_for_other_model_ignored(self):
+        from studentprognose.models import create_regressor
+        from studentprognose.models.regressors import XGBoostRegressor
+
+        # regressor_params voor een ander model dan het actieve mag niet lekken.
+        r = create_regressor({
+            "model_config": {
+                "cumulative_regressor": "xgboost",
+                "regressor_params": {"ridge": {"alpha": 99.0}},
+            }
+        })
+        assert isinstance(r, XGBoostRegressor)
+        assert r._model.get_params()["max_depth"] is None
+
 
 class TestClassificationMetrics:
     def test_accuracy_known_values(self):

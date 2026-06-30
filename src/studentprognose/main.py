@@ -53,6 +53,20 @@ def main(argv):
         run_benchmark(cfg.configuration_path, predict_week, cfg.data_option)
         return
 
+    if cfg.command == "tune":
+        from studentprognose.tuning_runner import run_tuning
+
+        if not cfg.dataset_specified:
+            print("Geef -d c (cumulatief) mee bij tune.")
+            sys.exit(1)
+        if cfg.data_option != DataOption.CUMULATIVE:
+            print("Tune ondersteunt alleen -d c (cumulatief): het betreft de cumulatieve regressor.")
+            sys.exit(1)
+
+        predict_week = cfg.weeks[0] if cfg.weeks else 12
+        run_tuning(cfg.configuration_path, predict_week, cfg.data_option)
+        return
+
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
     print("Loading configuration...")
     configuration = load_configuration(cfg.configuration_path)
@@ -126,6 +140,7 @@ def run_pipeline_from_dataframes(
     filtering: Optional[dict] = None,
     cwd: Optional[str] = None,
     save_output: bool = True,
+    tune: bool | dict = False,
 ) -> Optional[pd.DataFrame]:
     """Run de voorspellingspipeline met data die al als DataFrames in-memory aanwezig is.
 
@@ -153,6 +168,14 @@ def run_pipeline_from_dataframes(
         save_output: Sla uitvoer op naar schijf. Standaard ``True``. Zet op ``False``
             voor puur in-memory gebruik (bijv. bij cloud-pipelines die het resultaat
             zelf opslaan).
+        tune: Hyperparameter tuning voor het cumulatieve regressiemodel. Standaard
+            ``False`` (gebruikt de parameters uit ``model_config.regressor_params``
+            of de modeldefaults — snel en reproduceerbaar). ``True`` draait éénmalig
+            een tijd-bewuste grid search op de meegegeven data, gebruikt de beste
+            parameters voor de voorspelling en koppelt ze terug in de configuratie
+            zodat je ze kunt vastleggen. Geef een dict mee als eigen zoekruimte
+            (bijv. ``{"max_depth": [3, 5], "n_estimators": [100, 200]}``). Heeft
+            alleen effect op het cumulatieve spoor (``CUMULATIVE``/``BOTH_DATASETS``).
 
     Returns:
         Het gepostprocessde voorspellings-DataFrame, of ``None`` als geen rijen
@@ -194,6 +217,18 @@ def run_pipeline_from_dataframes(
 
     if configuration is None:
         configuration = load_defaults()
+
+    # Opt-in tuning vertaalt naar model_config-vlaggen die de CumulativeStrategy
+    # leest. Diepe kopie zodat we de configuration-dict van de aanroeper niet
+    # muteren (de strategy schrijft de gevonden params terug in deze kopie).
+    if tune:
+        import copy
+
+        configuration = copy.deepcopy(configuration)
+        model_config = configuration.setdefault("model_config", {})
+        model_config["tune_hyperparameters"] = True
+        if isinstance(tune, dict):
+            model_config["tuning_grid"] = tune
 
     final_week = get_final_academic_week(configuration)
     if week == final_week:

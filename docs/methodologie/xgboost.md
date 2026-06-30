@@ -93,6 +93,41 @@ Alle regressors delen dezelfde preprocessing-pipeline (OneHotEncoding voor categ
 
 Gebruik `studentprognose benchmark -w <week>` om te vergelijken welk model het best presteert op jouw data.
 
+## Hyperparameter tuning
+
+### Wat doet het?
+
+Tuning zoekt de hyperparameters van de cumulatieve regressor (leersnelheid, aantal bomen, boomdiepte, …) die het beste presteren op de **eigen historie** van een instelling — in plaats van te vertrouwen op vaste standaardwaarden. De zoektocht draait een kleine grid search en kiest de parameterset met de laagste gemiddelde fout.
+
+```bash
+studentprognose tune -d c -w 12
+```
+
+Het commando print een overzicht van alle geteste parametersets met hun MAPE en een kant-en-klaar config-snippet voor `model_config.regressor_params`. Via de Python-API doet `run_pipeline_from_dataframes(..., tune=True)` hetzelfde in één aanroep en voorspelt direct met de gevonden parameters.
+
+### Hoe wordt geëvalueerd?
+
+Identiek aan de [benchmark](benchmarks.md): **tijd-bewuste cross-validatie** (train op jaren tot en met N−1, valideer op jaar N, minimaal drie trainingsjaren) met MAPE als selectiemetriek. Elke kandidaat-parameterset wordt over alle folds beoordeeld; de laagste gemiddelde MAPE wint. Random k-fold wordt **niet** gebruikt: dat zou toekomstige jaren in de trainingsset lekken en de scores te optimistisch maken.
+
+### Waarom een kleine grid en geen zware optimizer?
+
+De trainingsset is klein — één rij per opleiding × jaar × herkomst × examentype, over een handvol jaren. Bij die omvang kiest een brede zoektocht sneller ruis dan signaal, en voegt een zwaardere optimizer (zoals Optuna) overfitting-risico toe zonder betrouwbare winst. De ingebouwde grid is daarom bewust compact en gericht op **regularisatie** (lagere boomdiepte, meer/minder bomen, lagere leersnelheid), de knoppen die op kleine data het meeste verschil maken.
+
+### Aannames
+
+- Er zijn genoeg historische collegejaren voor minstens één tijdreeks-split (≥ 4 jaren met data). Bij minder valt tuning terug op de standaardparameters en volgt een waarschuwing.
+- De jaar-op-jaar-relatie tussen vooraanmeldpatroon en inschrijvingen is stabiel genoeg dat parameters die op het verleden goed scoren, ook voor het komende jaar gelden.
+
+### Wanneer vertrouw je het niet?
+
+- **Marginale verschillen.** Liggen de MAPE-waarden van de kandidaten dicht bij elkaar, dan is de "winnaar" grotendeels toeval. Wijk dan niet zonder reden af van de robuuste defaults.
+- **Weinig validatiejaren.** Met slechts één of twee testjaren is de score een steekproef van bijna niets; behandel het resultaat als indicatief, niet als bewijs.
+- **Tuning op het productiepad.** Tuning hoort een bewuste, periodieke stap te zijn waarvan je het resultaat *vastlegt* in `regressor_params`. Standaard tunen bij elke voorspelrun zou de uitkomst traag en niet-reproduceerbaar maken; daarom staat `tune` standaard uit.
+
+### Relatie tot het ensemble
+
+Tuning raakt uitsluitend stap 2 van het cumulatieve spoor (vooraanmelders → inschrijvingen). De tijdreeks-extrapolatie (SARIMA), het individuele spoor en de [ensemble-weging](ensemble.md) blijven ongewijzigd. Betere regressorparameters verbeteren dus alleen de cumulatieve component van de uiteindelijke ensemble-voorspelling.
+
 ## Implementatie
 
-Zie `src/studentprognose/models/xgboost_classifier.py`, `src/studentprognose/models/xgboost_regressor.py`, `src/studentprognose/models/regressors.py` en `src/studentprognose/models/importance.py`.
+Zie `src/studentprognose/models/xgboost_classifier.py`, `src/studentprognose/models/xgboost_regressor.py`, `src/studentprognose/models/regressors.py`, `src/studentprognose/models/tuning.py` (hyperparameter tuning) en `src/studentprognose/models/importance.py`.
