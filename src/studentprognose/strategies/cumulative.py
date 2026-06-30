@@ -289,7 +289,7 @@ class CumulativeStrategy(PredictionStrategy):
         wordt een waarschuwing gegeven en blijven de standaardparameters staan.
         """
         from studentprognose.models import REGRESSOR_REGISTRY
-        from studentprognose.models.tuning import tune_regressor
+        from studentprognose.models.tuning import format_tuning_results, tune_regressor
 
         name = self.configuration.get("model_config", {}).get("cumulative_regressor", "xgboost")
         result = tune_regressor(
@@ -301,6 +301,10 @@ class CumulativeStrategy(PredictionStrategy):
             min_training_year=self.min_training_year,
             numerus_fixus_list=list(self.numerus_fixus_list),
         )
+
+        # Print het volledige kandidatenoverzicht (zelfde tabel + snippet als het
+        # `tune`-CLI-commando), zodat tune=True op de API hetzelfde inzicht geeft.
+        print(format_tuning_results(result))
 
         if result["best_params"] is None:
             warnings.warn(
@@ -315,10 +319,6 @@ class CumulativeStrategy(PredictionStrategy):
         model_config = self.configuration.setdefault("model_config", {})
         model_config.setdefault("regressor_params", {})[name] = best
         self._regressor = REGRESSOR_REGISTRY[name](**best)
-        print(
-            f"Hyperparameter tuning ({name}): beste parameters {best} "
-            f"(MAPE={result['best_mape']:.4f}, {result['n_candidates']} kandidaten getest)."
-        )
 
     def _prepare_data(self):
         if self.data_studentcount is not None:

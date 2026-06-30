@@ -327,7 +327,8 @@ studentprognose tune -d c -w 12
 ```
 
 Dit draait de zoektocht op je geladen data, print een overzicht van alle geteste
-parametersets met hun MAPE, en geeft een kant-en-klaar config-snippet terug. Plak
+parametersets met hun MAPE (de best presterende set gemarkeerd met `✓`), en geeft
+een kant-en-klaar config-snippet terug. Plak
 dat snippet in `configuration.json` om de gevonden parameters vast te leggen (zie
 [Configuratie → Hyperparameters vastleggen](configuratie.md#hyperparameters-vastleggen-regressor_params)).
 Vastgelegde parameters zijn reproduceerbaar: ze worden bij elke run gebruikt zonder
@@ -349,8 +350,10 @@ result = run_pipeline_from_dataframes(
 ```
 
 `tune=True` draait de zoektocht éénmaal op de meegegeven data, gebruikt de beste
-parameters voor de voorspelling en logt ze (zodat je ze kunt vastleggen). Geef een
-dict mee voor een eigen zoekruimte, bijvoorbeeld
+parameters voor de voorspelling en print hetzelfde overzicht als het CLI-commando:
+alle geteste parametersets met hun MAPE (de winnaar gemarkeerd met `✓`) plus een
+kant-en-klaar config-snippet om ze vast te leggen. Geef een dict mee voor een eigen
+zoekruimte, bijvoorbeeld
 `tune={"max_depth": [3, 5], "n_estimators": [100, 200]}`. De parameter heeft alleen
 effect op het cumulatieve spoor.
 

@@ -8,6 +8,7 @@ from studentprognose.config import load_defaults
 from studentprognose.models.tuning import (
     DEFAULT_PARAM_GRIDS,
     expand_grid,
+    format_tuning_results,
     tune_regressor,
 )
 from studentprognose.strategies.cumulative import ENGINEERED_FEATURE_COLS
@@ -146,3 +147,46 @@ class TestTuneRegressor:
         )
         assert result["regressor_name"] == "ridge"
         assert result["n_candidates"] == len(expand_grid(DEFAULT_PARAM_GRIDS["ridge"]))
+
+
+class TestFormatTuningResults:
+    """Bewaakt de render-laag die zowel het CLI- als het API-pad gebruiken."""
+
+    def _result(self, best_params):
+        return {
+            "regressor_name": "xgboost",
+            "best_params": best_params,
+            "best_mape": 0.1424 if best_params else float("nan"),
+            "n_candidates": 2,
+            "results": [
+                {"params": {"max_depth": 5}, "mean_mape": 0.1424, "n_evals": 12},
+                {"params": {"max_depth": 3}, "mean_mape": 0.1587, "n_evals": 12},
+            ],
+        }
+
+    def test_marks_best_row_with_checkmark(self):
+        out = format_tuning_results(self._result({"max_depth": 5}))
+        lines = [ln for ln in out.splitlines() if "max_depth" in ln and "regressor_params" not in ln]
+        winner = next(ln for ln in lines if '"max_depth": 5' in ln)
+        loser = next(ln for ln in lines if '"max_depth": 3' in ln)
+        # Precies één ✓, en die staat op de winnaar.
+        assert out.count("✓") == 1
+        assert "✓" in winner
+        assert "✓" not in loser
+
+    def test_includes_config_snippet(self):
+        out = format_tuning_results(self._result({"max_depth": 5}))
+        assert "regressor_params" in out
+        assert '"max_depth": 5' in out
+
+    def test_no_checkmark_when_no_valid_winner(self):
+        result = self._result(None)
+        result["results"] = [{"params": {}, "mean_mape": float("nan"), "n_evals": 0}]
+        out = format_tuning_results(result)
+        assert "✓" not in out
+        assert "Geen geldige resultaten" in out
+
+    def test_empty_results(self):
+        result = self._result(None)
+        result["results"] = []
+        assert format_tuning_results(result) == "Geen kandidaten geëvalueerd."

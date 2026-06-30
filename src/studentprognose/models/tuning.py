@@ -22,6 +22,7 @@ Belangrijke ontwerpkeuzes:
 """
 
 import itertools
+import json
 
 import numpy as np
 import pandas as pd
@@ -170,3 +171,70 @@ def tune_regressor(
         "results": results,
         "n_candidates": len(candidates),
     }
+
+
+def config_snippet(regressor_name: str, best_params: dict) -> str:
+    """Bouw een config-snippet dat de gebruiker in configuration.json kan plakken.
+
+    Args:
+        regressor_name: Naam van de getunede regressor (sleutel in
+            ``regressor_params``).
+        best_params: De gevonden beste hyperparameters.
+
+    Returns:
+        Een ingesprongen JSON-snippet als string, klaar om in
+        ``configuration.json`` te plakken.
+    """
+    snippet = {"model_config": {"regressor_params": {regressor_name: best_params}}}
+    return (
+        "\nPlak dit in je configuration.json om de parameters vast te leggen:\n"
+        + json.dumps(snippet, indent=4)
+    )
+
+
+def format_tuning_results(result: dict) -> str:
+    """Render het volledige kandidatenoverzicht + config-snippet als string.
+
+    Bouwt de tabel (één rij per geteste parameterset, oplopend op MAPE) plus —
+    bij een geldige winnaar — een config-snippet. Wordt gebruikt door zowel het
+    ``tune``-CLI-commando als het API-pad (``run_pipeline_from_dataframes(...,
+    tune=True)``), zodat beide identieke output tonen.
+
+    Args:
+        result: Het resultaat-dict van :func:`tune_regressor`.
+
+    Returns:
+        De geformatteerde, meerregelige tekst (zonder trailing newline).
+    """
+    rows = result["results"]
+    if not rows:
+        return "Geen kandidaten geëvalueerd."
+
+    best_params = result["best_params"]
+    header = f"{'':2} {'MAPE':>10} {'Folds':>7}  Parameters"
+    lines = [f"  {header}", f"  {'─' * len(header)}"]
+    best_marked = False
+    for row in rows:
+        mape = row["mean_mape"]
+        mape_s = f"{mape:.4f}" if pd.notna(mape) else "—"
+        params_s = json.dumps(row["params"]) if row["params"] else "(defaults)"
+        # Eén ✓ voor de winnaar (laagste MAPE); best_marked voorkomt dubbele
+        # markering als twee kandidaten identieke params zouden hebben.
+        is_best = not best_marked and best_params is not None and row["params"] == best_params
+        marker = "✓" if is_best else " "
+        best_marked = best_marked or is_best
+        lines.append(f"  {marker:2} {mape_s:>10} {row['n_evals']:>7}  {params_s}")
+
+    if result["best_params"] is None:
+        lines.append(
+            "\nGeen geldige resultaten: waarschijnlijk te weinig trainingsjaren voor "
+            "een tijdreeks-split. Voeg meer historische collegejaren toe."
+        )
+        return "\n".join(lines)
+
+    lines.append(
+        f"\nBeste parameters voor '{result['regressor_name']}' "
+        f"(MAPE={result['best_mape']:.4f}, {result['n_candidates']} kandidaten):"
+    )
+    lines.append(config_snippet(result["regressor_name"], result["best_params"]))
+    return "\n".join(lines)

@@ -103,7 +103,7 @@ Tuning zoekt de hyperparameters van de cumulatieve regressor (leersnelheid, aant
 studentprognose tune -d c -w 12
 ```
 
-Het commando print een overzicht van alle geteste parametersets met hun MAPE en een kant-en-klaar config-snippet voor `model_config.regressor_params`. Via de Python-API doet `run_pipeline_from_dataframes(..., tune=True)` hetzelfde in één aanroep en voorspelt direct met de gevonden parameters.
+Het commando print een overzicht van alle geteste parametersets met hun MAPE — de best presterende set is gemarkeerd met `✓` — en een kant-en-klaar config-snippet voor `model_config.regressor_params`. Via de Python-API toont `run_pipeline_from_dataframes(..., tune=True)` exact hetzelfde overzicht, voorspelt vervolgens direct met de gevonden parameters, en geeft het voorspellings-DataFrame terug (het tuning-overzicht gaat naar de console).
 
 ### Hoe wordt geëvalueerd?
 

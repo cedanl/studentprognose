@@ -6,12 +6,12 @@ print een resultatenoverzicht plus een kant-en-klaar configuratie-snippet om de
 beste parameters in ``model_config.regressor_params`` vast te leggen.
 """
 
-import json
-
-import pandas as pd
-
 from studentprognose.config import load_configuration, get_final_academic_week
-from studentprognose.models.tuning import DEFAULT_PARAM_GRIDS, tune_regressor
+from studentprognose.models.tuning import (
+    DEFAULT_PARAM_GRIDS,
+    format_tuning_results,
+    tune_regressor,
+)
 from studentprognose.utils.weeks import DataOption, academic_start_week
 
 
@@ -87,38 +87,4 @@ def run_tuning(
 
 def _print_results(result: dict) -> None:
     """Print het kandidatenoverzicht en een config-snippet voor de winnaar."""
-    rows = result["results"]
-    if not rows:
-        print("Geen kandidaten geëvalueerd.")
-        return
-
-    header = f"{'MAPE':>10} {'Folds':>7}  Parameters"
-    print(f"  {header}")
-    print(f"  {'─' * len(header)}")
-    for row in rows:
-        mape = row["mean_mape"]
-        mape_s = f"{mape:.4f}" if pd.notna(mape) else "—"
-        params_s = json.dumps(row["params"]) if row["params"] else "(defaults)"
-        print(f"  {mape_s:>10} {row['n_evals']:>7}  {params_s}")
-
-    if result["best_params"] is None:
-        print(
-            "\nGeen geldige resultaten: waarschijnlijk te weinig trainingsjaren voor "
-            "een tijdreeks-split. Voeg meer historische collegejaren toe."
-        )
-        return
-
-    print(
-        f"\nBeste parameters voor '{result['regressor_name']}' "
-        f"(MAPE={result['best_mape']:.4f}, {result['n_candidates']} kandidaten):"
-    )
-    print(_config_snippet(result["regressor_name"], result["best_params"]))
-
-
-def _config_snippet(regressor_name: str, best_params: dict) -> str:
-    """Bouw een config-snippet dat de gebruiker in configuration.json kan plakken."""
-    snippet = {"model_config": {"regressor_params": {regressor_name: best_params}}}
-    return (
-        "\nPlak dit in je configuration.json om de parameters vast te leggen:\n"
-        + json.dumps(snippet, indent=4)
-    )
+    print(format_tuning_results(result))
