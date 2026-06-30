@@ -185,7 +185,7 @@ studentprognose --help
 | `-w` | weeknummer(s) | laatste week in data | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |
 | `-y` | jaar(en) | laatste jaar in data | Voorspeljaar(en), bijv. `-y 2025` of `-y 2024 2025` |
 | `-d` | `b` / `c` / `i` | `b` | Dataset: `both`, `cumulative`, `individual` |
-| `-sy` | `f` / `v` | `f` | Studentjaar: `first-years` (standaard), `volume` |
+| `-sy` | `f` / `h` / `v` | `f` | Studentjaar: `first-years` (standaard), `higher-years`, `volume` |
 | `-c` | pad | `configuration/configuration.json` | Configuratiebestand |
 | `-f` | pad | `configuration/filtering/base.json` | Filterbestand |
 | `-sk` | getal | `0` | Skip N jaren (backtesting) |

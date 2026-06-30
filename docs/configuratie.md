@@ -14,7 +14,7 @@ De pipeline laadt altijd eerst de **ingebakken standaardwaarden** uit het packag
 - Een ontbrekend veld in jouw bestand valt automatisch terug op de standaardwaarde.
 - Als het configuratiebestand helemaal niet bestaat, worden de standaardwaarden gebruikt en verschijnt er een waarschuwing.
 
-Het bestand heeft de volgende secties: `paths`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights` en `columns`.
+Het bestand heeft de volgende secties: `paths`, `telbestand_filename_patterns`, `cumulative_input`, `validation`, `runtime`, `model_config`, `numerus_fixus`, `excluded_data_points`, `ensemble_override_cumulative`, `exclude_from_combined`, `ensemble_weights`, `column_roles`, `model_features` en `columns`.
 
 ## `paths` — bestandspaden
 
@@ -32,6 +32,7 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_raw_telbestanden` | `data/input_raw/telbestanden` | Map met Studielink telbestanden |
 | `path_raw_individueel` | `data/input_raw/individuele_aanmelddata.csv` | Ruwe individuele aanmelddata |
 | `path_student_count_first-years` | `data/input/student_count_first-years.xlsx` | Werkelijk aantal eerstejaars (afgeleid uit telbestand studenten) |
+| `path_student_count_higher-years` | `data/input/student_count_higher-years.xlsx` | Werkelijk aantal hogerejaars (alleen nodig bij `-sy h`) |
 | `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (afgeleid uit telbestand studenten) |
 | `path_ratios` | `data/input/ratiobestand.xlsx` | Ratiobestand (optioneel) |
 
@@ -321,6 +322,32 @@ De sleutel heet `oktober` om historische redenen — zie [Je data voorbereiden](
 `Korte naam instelling`, `Collegejaar`, `Weeknummer rapportage`, `Weeknummer`, `Faculteit`, `Type hoger onderwijs`, `Groepeernaam Croho`, `Naam Croho opleiding Nederlands`, `Croho`, `Herinschrijving`, `Hogerejaars`, `Herkomst`, `Gewogen vooraanmelders`, `Ongewogen vooraanmelders`, `Aantal aanmelders met 1 aanmelding`, `Inschrijvingen`
 
 Dit zijn de kolommen ná de ETL-transformatie (na het inlezen en hernoemen van de ruwe Studielink-velden). Zie [Studielink telbestanden](je-data-voorbereiden.md#studielink-telbestanden) voor de mapping van ruwe PvL-velden naar deze kanonieke namen.
+
+## `column_roles` — semantische rollen → kanonieke kolomnaam
+
+Waar `columns` instellings-specifieke namen vertaalt naar kanonieke namen, koppelt `column_roles` een **semantische rol** (die de code intern gebruikt) aan de kanonieke kolomnaam. De pipeline benadert kolommen via deze rollen (bijv. `programme`, `academic_year`, `origin`), zodat een hernoeming op één plek volstaat.
+
+| Rol | Standaard kolom | Rol | Standaard kolom |
+|-----|-----------------|-----|-----------------|
+| `academic_year` | `Collegejaar` | `week` | `Weeknummer` |
+| `programme` | `Croho groepeernaam` | `exam_type` | `Examentype` |
+| `origin` | `Herkomst` | `faculty` | `Faculteit` |
+| `enrollment_status` | `Inschrijfstatus` | `cancellation_date` | `Datum intrekking vooraanmelding` |
+| `student_count` | `Aantal_studenten` | `enrollments` | `Inschrijvingen` |
+| `weighted_applicants` | `Gewogen vooraanmelders` | `unweighted_applicants` | `Ongewogen vooraanmelders` |
+| `single_applicants` | `Aantal aanmelders met 1 aanmelding` | `higher_years` | `Hogerejaars` |
+| `croho_source` | `Groepeernaam Croho` | `higher_education_type` | `Type hoger onderwijs` |
+
+Pas dit alleen aan als je de **interne** kanonieke namen wijzigt — in de meeste gevallen gebruik je `columns` (voor je ruwe inputkolommen) en laat je `column_roles` ongemoeid.
+
+## `model_features` — featurelijsten per model
+
+Bepaalt welke kolommen als features in de modellen gaan. Twee subsleutels:
+
+- `classifier` — de individuele XGBoost-classifier, met `numeric` en `categorical` featurelijsten (zie [XGBoost](methodologie/xgboost.md#features)).
+- `regressor` — de cumulatieve XGBoost-regressor, met een `categorical` featurelijst; numerieke features (vooraanmelders, lags, acceleratie) worden afgeleid tijdens feature-engineering.
+
+Voeg of verwijder features hier als je inputdata extra (of minder) kolommen bevat. Verwijderde features mogen niet meer in `columns`/`column_roles` als verplicht gemarkeerd staan.
 
 ## `validation` — validatiedrempels overschrijven
 
