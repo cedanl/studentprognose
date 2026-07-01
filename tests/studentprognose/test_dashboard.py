@@ -117,3 +117,120 @@ def test_save_results_runs_dashboard_when_enabled(monkeypatch):
     main_module._save_results(strategy, cfg)
 
     assert called["n"] == 1, "dashboard moet draaien met --dashboard"
+
+
+# ── build_dashboard_from_dataframes (issue #253) ─────────────────────
+
+
+def _install_dashboard_fake_strategy(monkeypatch, *, result="frame"):
+    """Vervang create_strategy door een lichtgewicht fake met echte PostProcessor.
+
+    Zo testen we de wiring van ``build_dashboard_from_dataframes`` (setup -> strategy
+    -> DashboardBuilder -> HTML) end-to-end, zónder de zware SARIMA/XGBoost-compute
+    (conform de projectconventie dat unit tests de volledige pipeline niet draaien).
+    """
+    import studentprognose.main as main_mod
+    from studentprognose.config import load_defaults
+    from studentprognose.output.postprocessor import PostProcessor
+    from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
+
+    def _frame():
+        return pd.DataFrame({
+            "Croho groepeernaam": ["B Foo"],
+            "Faculteit": ["FdM"],
+            "Examentype": ["Bachelor"],
+            "Collegejaar": [2025],
+            "Herkomst": ["NL"],
+            "Weeknummer": [10],
+            "SARIMA_cumulative": [100.0],
+            "SARIMA_individual": [110.0],
+            "Voorspelde vooraanmelders": [120.0],
+        })
+
+    class _FakeStrategy:
+        def __init__(self, cwd, opt):
+            configuration = load_defaults()
+            self.postprocessor = PostProcessor(
+                configuration=configuration, data_latest=None, ensemble_weights=None,
+                data_studentcount=None, cwd=cwd, data_option=opt, ci_test_n=None,
+            )
+            self.numerus_fixus_list = configuration["numerus_fixus"]
+            self.final_academic_week = configuration.get("model_config", {}).get(
+                "final_academic_week", FINAL_ACADEMIC_WEEK
+            )
+            self.programme_filtering = []
+
+        def preprocess(self):
+            return None
+
+        def set_filtering(self, *args, **kwargs):
+            pass
+
+        def predict_nr_of_students(self, year, week, skip_years=0):
+            if result == "none":
+                return None
+            if result == "empty":
+                return _frame().iloc[0:0]  # zelfde kolommen, geen rijen
+            return _frame()
+
+        def get_dashboard_data(self):
+            return {
+                "data_cumulative": None, "xgboost_curve": None,
+                "xgb_classifier_importance": None, "xgb_regressor_importance": None,
+            }
+
+    monkeypatch.setattr(
+        main_mod, "create_strategy",
+        lambda cfg, datasets, configuration, cwd: _FakeStrategy(cwd, cfg.data_option),
+    )
+
+
+def test_build_dashboard_from_dataframes_importable():
+    from studentprognose import build_dashboard_from_dataframes
+
+    assert callable(build_dashboard_from_dataframes)
+
+
+def test_build_dashboard_from_dataframes_rejects_final_week():
+    """De gedeelde year/week-validatie geldt ook voor de dashboard-route."""
+    from studentprognose import build_dashboard_from_dataframes
+    from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
+
+    with pytest.raises(ValueError, match=str(FINAL_ACADEMIC_WEEK)):
+        build_dashboard_from_dataframes(year=2025, week=FINAL_ACADEMIC_WEEK)
+
+
+def test_build_dashboard_from_dataframes_writes_html(tmp_path, monkeypatch):
+    from studentprognose import DataOption, build_dashboard_from_dataframes
+
+    _install_dashboard_fake_strategy(monkeypatch)
+    monkeypatch.chdir(tmp_path)
+
+    data_individual = pd.DataFrame({"Collegejaar": [2025], "Croho groepeernaam": ["B Foo"]})
+
+    out = build_dashboard_from_dataframes(
+        year=2025, week=10, data_individual=data_individual, dataset=DataOption.INDIVIDUAL,
+    )
+
+    vis = tmp_path / "data" / "output" / "visualisations"
+    assert out == str(vis), "moet de visualisatiemap teruggeven"
+    assert (vis / "final" / "dashboard.html").exists()
+    # save_output wordt intern op False gezet: geen excel-/csv-uitvoer.
+    assert not list((tmp_path / "data" / "output").glob("*.xlsx"))
+
+
+@pytest.mark.parametrize("result", ["none", "empty"])
+def test_build_dashboard_from_dataframes_raises_without_data(tmp_path, monkeypatch, result):
+    """Geen voorspelrijen (None óf lege DataFrame) -> heldere ValueError i.p.v. een
+    leeg/stil dashboard of een cryptische int(NaN)-crash in DashboardBuilder."""
+    from studentprognose import DataOption, build_dashboard_from_dataframes
+
+    _install_dashboard_fake_strategy(monkeypatch, result=result)
+    monkeypatch.chdir(tmp_path)
+
+    data_individual = pd.DataFrame({"Collegejaar": [2025], "Croho groepeernaam": ["B Foo"]})
+
+    with pytest.raises(ValueError, match="Geen data om een dashboard"):
+        build_dashboard_from_dataframes(
+            year=2025, week=10, data_individual=data_individual, dataset=DataOption.INDIVIDUAL,
+        )
