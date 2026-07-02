@@ -186,7 +186,7 @@ studentprognose --help
 | `-w` | weeknummer(s) | laatste week in data | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |
 | `-y` | jaar(en) | laatste jaar in data | Voorspeljaar(en), bijv. `-y 2025` of `-y 2024 2025` |
 | `-d` | `b` / `c` / `i` | `b` | Dataset: `both`, `cumulative`, `individual` |
-| `-sy` | `f` / `v` | `f` | Studentjaar: `first-years` (standaard), `volume` |
+| `-sy` | `f` / `h` / `v` | `f` | Studentjaar: `first-years` (standaard), `higher-years`, `volume` |
 | `-c` | pad | `configuration/configuration.json` | Configuratiebestand |
 | `-f` | pad | `configuration/filtering/base.json` | Filterbestand |
 | `-sk` | getal | `0` | Skip N jaren (backtesting) |
@@ -217,6 +217,7 @@ from studentprognose import (
     load_data,                     # laad data vanaf schijf als DataFrames
     run_pipeline_cli,              # volledige CLI-pipeline (accepteert argv-lijst)
     run_pipeline_from_dataframes,  # pipeline met DataFrames in-memory
+    build_dashboard_from_dataframes,  # interactieve HTML-dashboards uit DataFrames
     evaluate_predictions,          # output → scalaire evaluatiemetrieken per model
     pivot_metrics,                 # metrieken → model × jaar/week-matrix (backtest)
     to_mlflow_metrics,             # metrieken afvlakken voor mlflow.log_metrics (Fabric)
@@ -311,6 +312,37 @@ result = run_pipeline_from_dataframes(
     ```
 
     Pas `year`/`week` aan binnen de range, of voeg aanvullende trainingsdata toe.
+
+### Dashboards genereren vanuit DataFrames
+
+De interactieve Plotly-dashboards (die de CLI met `--dashboard` maakt) kun je vanuit een
+notebook of cloud-run genereren met `build_dashboard_from_dataframes`. Dit is een
+**aparte functie** die je ná (of in plaats van) `run_pipeline_from_dataframes` aanroept,
+met dezelfde in-memory DataFrames. Ze draait de pipeline (zonder iets naar schijf te
+schrijven) en schrijft daarna de dashboards weg naar `<cwd>/data/output/visualisations/`.
+
+```python
+from studentprognose import build_dashboard_from_dataframes, DataOption
+
+output_dir = build_dashboard_from_dataframes(
+    year=2025,
+    week=10,
+    data_cumulative=df_cum,
+    data_student_numbers=sc,   # nodig voor de realisatie-/conversiegrafieken
+    dataset=DataOption.CUMULATIVE,
+    configuration=config,
+)
+print(f"Dashboards geschreven naar {output_dir}")
+# -> <cwd>/data/output/visualisations/{individual,cumulative,final}/dashboard.html
+```
+
+!!! tip "Losse functie, geen extra parameter"
+    Het dashboard is bewust een aparte functie en géén parameter op
+    `run_pipeline_from_dataframes`: zo blijft de voorspelfunctie ongewijzigd en is de
+    dashboard-stap los te draaien en te testen. Gebruik `cwd` om de uitvoermap te sturen.
+    De `year`/`week`-rangecontrole is identiek aan die van `run_pipeline_from_dataframes`;
+    komt geen enkele rij door de filters, dan krijg je een heldere `ValueError` in plaats
+    van een leeg dashboard.
 
 ## Hyperparameter tuning
 

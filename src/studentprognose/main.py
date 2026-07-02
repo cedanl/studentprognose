@@ -265,6 +265,165 @@ def run_pipeline_from_dataframes(
             save_output=False,
         )
     """
+    cfg, datasets, configuration, filtering, cwd = _prepare_in_memory_run(
+        year,
+        week,
+        data_cumulative=data_cumulative,
+        data_individual=data_individual,
+        data_student_numbers=data_student_numbers,
+        data_latest=data_latest,
+        data_weighted_ensemble=data_weighted_ensemble,
+        configuration=configuration,
+        filtering=filtering,
+        cwd=cwd,
+        dataset=dataset,
+        student_year_prediction=student_year_prediction,
+        skip_years=skip_years,
+        tune=tune,
+    )
+
+    return _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output=save_output)
+
+
+def build_dashboard_from_dataframes(
+    year: int,
+    week: int,
+    data_cumulative: Optional[pd.DataFrame] = None,
+    data_individual: Optional[pd.DataFrame] = None,
+    configuration: Optional[dict] = None,
+    data_student_numbers: Optional[pd.DataFrame] = None,
+    data_latest: Optional[pd.DataFrame] = None,
+    data_weighted_ensemble: Optional[pd.DataFrame] = None,
+    dataset: DataOption = DataOption.BOTH_DATASETS,
+    student_year_prediction: StudentYearPrediction = StudentYearPrediction.FIRST_YEARS,
+    skip_years: int = 0,
+    filtering: Optional[dict] = None,
+    cwd: Optional[str] = None,
+) -> str:
+    """Genereer de interactieve Plotly-dashboards vanuit in-memory DataFrames.
+
+    Zelfstandige tegenhanger van :func:`run_pipeline_from_dataframes` voor cloud- en
+    notebook-gebruikers (bijv. Microsoft Fabric) die hun data al als DataFrame in het
+    geheugen hebben. Draait de voorspelpipeline (zonder iets naar schijf te schrijven)
+    en schrijft daarna de HTML-dashboards naar ``<cwd>/data/output/visualisations/``.
+
+    De data-parameters zijn identiek aan die van :func:`run_pipeline_from_dataframes`;
+    roep deze functie ná (of in plaats van) die functie aan met dezelfde argumenten.
+
+    Args:
+        year: Academisch jaar om te voorspellen (bijv. ``2025``).
+        week: ISO-weeknummer waarvandaan voorspeld wordt (bijv. ``10``).
+        data_cumulative: Cumulatief vooraanmeld-DataFrame. Vereist wanneer ``dataset``
+            ``CUMULATIVE`` of ``BOTH_DATASETS`` is.
+        data_individual: Individueel aanmeld-DataFrame. Vereist wanneer ``dataset``
+            ``INDIVIDUAL`` of ``BOTH_DATASETS`` is.
+        configuration: Configuratiedict (zelfde structuur als ``configuration.json``).
+            Bij ``None`` worden de gebundelde package-defaults gebruikt.
+        data_student_numbers: Studentaantallen eerstejaars DataFrame (optioneel, maar
+            nodig voor de realisatie-/conversiegrafieken in het dashboard).
+        data_latest: Laatste output Excel DataFrame voor hogerejaarsvoorspellingen (optioneel).
+        data_weighted_ensemble: Ensemble-gewichten DataFrame (optioneel).
+        dataset: Welke dataset(s) te gebruiken. Standaard ``BOTH_DATASETS``.
+        student_year_prediction: Welke studentcohort te voorspellen. Standaard ``FIRST_YEARS``.
+        skip_years: Aantal meest recente jaren om uit training te sluiten (backtesting).
+        filtering: Filteringdict (zelfde structuur als een filtering-JSON-bestand).
+            Bij ``None`` wordt de gebundelde ``base.json`` gebruikt (geen filters).
+        cwd: Werkmap voor de uitvoer. De dashboards komen in
+            ``<cwd>/data/output/visualisations/``. Standaard ``os.getcwd()``.
+
+    Returns:
+        Het pad naar de map waarin de dashboards zijn geschreven
+        (``<cwd>/data/output/visualisations/``).
+
+    Raises:
+        ValueError: Als ``week`` de laatste academische week is, als ``year``/``week``
+            buiten de range van de meegegeven data valt, of als geen enkele rij
+            overeenkwam met de filters/voorspellingscriteria (dan valt er niets te
+            visualiseren).
+
+    Example::
+
+        from studentprognose import build_dashboard_from_dataframes, DataOption
+
+        output_dir = build_dashboard_from_dataframes(
+            year=2025,
+            week=10,
+            data_cumulative=df_cum,
+            data_student_numbers=sc,
+            dataset=DataOption.CUMULATIVE,
+            configuration=config,
+        )
+        print(f"Dashboards geschreven naar {output_dir}")
+    """
+    cfg, datasets, configuration, filtering, cwd = _prepare_in_memory_run(
+        year,
+        week,
+        data_cumulative=data_cumulative,
+        data_individual=data_individual,
+        data_student_numbers=data_student_numbers,
+        data_latest=data_latest,
+        data_weighted_ensemble=data_weighted_ensemble,
+        configuration=configuration,
+        filtering=filtering,
+        cwd=cwd,
+        dataset=dataset,
+        student_year_prediction=student_year_prediction,
+        skip_years=skip_years,
+    )
+
+    # Draai de pipeline zonder schijf-output; we willen alleen de uitgevoerde
+    # strategy (met voorspellingen én dashboard-data) om er de dashboards uit te bouwen.
+    strategy = _run_pipeline_strategy(
+        cfg, datasets, configuration, filtering, cwd, save_output=False
+    )
+
+    # Zowel None (geen voorspelling) als een lege DataFrame (alle rijen weggefilterd)
+    # afvangen: DashboardBuilder doet o.a. int(data["Collegejaar"].max()) en zou op
+    # leeg met een cryptische int(NaN)-fout crashen i.p.v. deze heldere melding.
+    data = strategy.postprocessor.data
+    if data is None or data.empty:
+        raise ValueError(
+            "Geen data om een dashboard van te bouwen: geen enkele rij kwam overeen met "
+            "de filters of voorspellingscriteria. Controleer year/week, dataset en filtering."
+        )
+
+    # Anders dan de CLI-route (_try_build_dashboard) laten we fouten hier wél
+    # propageren: dit is een expliciete, op zichzelf staande dashboard-actie, dus
+    # stil falen zou de gebruiker misleiden.
+    builder = _make_dashboard_builder(strategy, cfg, cwd)
+    builder.build_and_save()
+    return builder.base_dir
+
+
+def _prepare_in_memory_run(
+    year: int,
+    week: int,
+    *,
+    data_cumulative: Optional[pd.DataFrame],
+    data_individual: Optional[pd.DataFrame],
+    data_student_numbers: Optional[pd.DataFrame],
+    data_latest: Optional[pd.DataFrame],
+    data_weighted_ensemble: Optional[pd.DataFrame],
+    configuration: Optional[dict],
+    filtering: Optional[dict],
+    cwd: Optional[str],
+    dataset: DataOption,
+    student_year_prediction: StudentYearPrediction,
+    skip_years: int,
+    tune: bool | str | dict = False,
+) -> tuple:
+    """Gedeelde setup voor de in-memory routes.
+
+    Zowel :func:`run_pipeline_from_dataframes` als
+    :func:`build_dashboard_from_dataframes` gebruiken dit: rangecontrole,
+    config-/filtering-defaults, opt-in tuning (``tune``), runtime-validatie,
+    programmesleutel-normalisatie en het opbouwen van de :class:`PipelineConfig`.
+    De dashboard-route laat ``tune`` op de default ``False`` (geen tuning).
+
+    Returns:
+        Een tuple ``(cfg, datasets, configuration, filtering, cwd)`` klaar voor de
+        pipeline-kern.
+    """
     from studentprognose.config import load_defaults, _validate_runtime
 
     # Zelfde vangnet als de CLI: faal direct met een heldere melding wanneer year/week
@@ -346,14 +505,27 @@ def run_pipeline_from_dataframes(
         data_weighted_ensemble,
     )
 
-    return _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output=save_output)
+    return cfg, datasets, configuration, filtering, cwd
 
 
 def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output: bool = True):
     """Gemeenschappelijke pipeline-kern: strategy, preprocessing, predict, opslaan.
 
     Zowel ``main()`` (CLI) als ``run_pipeline_from_dataframes()`` (Python API)
-    delegeren hiernaartoe na hun eigen setup-stappen.
+    delegeren hiernaartoe na hun eigen setup-stappen. Geeft het gepostprocessde
+    voorspellings-DataFrame terug (of ``None``).
+    """
+    strategy = _run_pipeline_strategy(cfg, datasets, configuration, filtering, cwd, save_output)
+    return strategy.postprocessor.data
+
+
+def _run_pipeline_strategy(cfg, datasets, configuration, filtering, cwd, save_output: bool = True):
+    """Draai de pipeline-kern en geef de uitgevoerde strategy terug.
+
+    Gescheiden van :func:`_run_pipeline_core` zodat aanroepers die het
+    strategy-object zelf nodig hebben (bijv. :func:`build_dashboard_from_dataframes`
+    voor de dashboard-data) er niet de omweg via ``postprocessor.data`` voor hoeven te
+    maken.
     """
     # Step 2: Initialize strategy (Individual / Cumulative / Combined)
     strategy = create_strategy(cfg, datasets, configuration, cwd)
@@ -400,7 +572,7 @@ def _run_pipeline_core(cfg, datasets, configuration, filtering, cwd, save_output
     if save_output:
         _save_results(strategy, cfg)
 
-    return strategy.postprocessor.data
+    return strategy
 
 
 def _apply_auto_defaults(datasets, cfg, configuration):
@@ -583,6 +755,30 @@ def _save_results(strategy, cfg):
             print("No data to save. Saving output skipped.")
 
 
+def _make_dashboard_builder(strategy, cfg, cwd: str) -> DashboardBuilder:
+    """Bouw een :class:`DashboardBuilder` uit een uitgevoerde strategy en config.
+
+    Gedeeld door de CLI-route (:func:`_try_build_dashboard`) en de Python-API
+    (:func:`build_dashboard_from_dataframes`) zodat de constructie op één plek staat.
+    """
+    dd = strategy.get_dashboard_data()
+    return DashboardBuilder(
+        data=strategy.postprocessor.data,
+        data_option=cfg.data_option,
+        numerus_fixus_list=strategy.postprocessor.numerus_fixus_list,
+        student_year_prediction=cfg.student_year_prediction,
+        ci_test_n=cfg.ci_test_n,
+        cwd=cwd,
+        predict_week=cfg.weeks[-1] if cfg.weeks else None,
+        data_cumulative=dd["data_cumulative"],
+        data_studentcount=strategy.postprocessor.data_studentcount,
+        data_xgboost_curve=dd["xgboost_curve"],
+        xgb_classifier_importance=dd["xgb_classifier_importance"],
+        xgb_regressor_importance=dd["xgb_regressor_importance"],
+        final_academic_week=strategy.final_academic_week,
+    )
+
+
 def _try_build_dashboard(strategy, cfg):
     """Build the Plotly dashboard. A failure here is logged but never crashes the pipeline."""
     if len(cfg.weeks) > 1:
@@ -591,23 +787,7 @@ def _try_build_dashboard(strategy, cfg):
         )
 
     try:
-        dd = strategy.get_dashboard_data()
-        dashboard = DashboardBuilder(
-            data=strategy.postprocessor.data,
-            data_option=cfg.data_option,
-            numerus_fixus_list=strategy.postprocessor.numerus_fixus_list,
-            student_year_prediction=cfg.student_year_prediction,
-            ci_test_n=cfg.ci_test_n,
-            cwd=os.getcwd(),
-            predict_week=cfg.weeks[-1] if cfg.weeks else None,
-            data_cumulative=dd["data_cumulative"],
-            data_studentcount=strategy.postprocessor.data_studentcount,
-            data_xgboost_curve=dd["xgboost_curve"],
-            xgb_classifier_importance=dd["xgb_classifier_importance"],
-            xgb_regressor_importance=dd["xgb_regressor_importance"],
-            final_academic_week=strategy.final_academic_week,
-        )
-        dashboard.build_and_save()
+        _make_dashboard_builder(strategy, cfg, os.getcwd()).build_and_save()
     except Exception:
         log_path = os.path.join(os.getcwd(), "data", "output", "dashboard_error.log")
         os.makedirs(os.path.dirname(log_path), exist_ok=True)

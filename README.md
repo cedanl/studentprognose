@@ -130,7 +130,13 @@ studentprognose tune -d c -w 12                # stem hyperparameters af (cumula
 | `--noetl` | Sla ETL over | als je al verwerkte data in `data/input/` hebt |
 | `--yes` | Sla interactieve prompts over | voor CI/CD en cron |
 
-Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-referentie) voor alle vlaggen, configuratie, validatie-instellingen en uitgebreide voorbeelden.
+Naast voorspellen kun je met het `benchmark`-subcommando alternatieve ML-modellen vergelijken op je eigen data:
+
+```bash
+studentprognose benchmark -d c                 # vergelijk cumulatieve modellen
+```
+
+Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-referentie) voor alle vlaggen, configuratie, validatie-instellingen en uitgebreide voorbeelden, en [Benchmarks](https://cedanl.github.io/studentprognose/methodologie/benchmarks/) voor de modelvergelijking.
 
 ---
 
@@ -169,23 +175,23 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 | 2 | Validatie ruwe data (skip met `--noetl`) | `data/validation` |
 | 3 | ETL (skip met `--noetl`) | `data/etl` |
 | 4 | Configuratie laden | `config.py` |
-| 5 | Data laden | `loader` → `preprocessing/add_zero_weeks` |
+| 5 | Data laden | `data/loader` → `data/preprocessing/add_zero_weeks` |
 | 6 | CI subset (indien `--ci`) | `utils/ci_subset` |
 
-**Modus-specifieke stappen:**
+**Modus-specifieke stappen** (vervolgen op de gedeelde stappen):
 
 | Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
 |------|------|---------------------|---------------------|---------------|
-| 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative |
-| 7 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` |
-| 8 | Classificatie | `xgboost_classifier` | — | `xgboost_classifier` |
-| 9 | Transformatie | `transforms` | — | `transforms` |
-| 10 | SARIMA | `sarima` (individual) | `sarima` → `transforms` | `sarima` (both) |
-| 11 | XGBoost regressor | — | `xgboost_regressor` | `xgboost_regressor` |
-| 12 | Ratio model | — | `ratio` | `ratio` |
-| 13 | Postprocessing + Opslaan | `postprocessor` | `postprocessor` | `postprocessor` |
+| 7 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative |
+| 8 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` |
+| 9 | Classificatie | `models/xgboost_classifier` | — | `models/xgboost_classifier` |
+| 10 | Transformatie | `data/transforms` | — | `data/transforms` |
+| 11 | SARIMA | `models/sarima` (individual) | `models/sarima` → `data/transforms` | `models/sarima` (both) |
+| 12 | XGBoost regressor | — | `models/xgboost_regressor` | `models/xgboost_regressor` |
+| 13 | Ratio model | — | `models/ratio` | `models/ratio` |
+| 14 | Postprocessing + Opslaan | `output/postprocessor` | `output/postprocessor` | `output/postprocessor` |
 
-Zie de [Technische README](doc/TECHNICAL_README.md) voor meer details over de architectuur. Voor een end-to-end uitleg van het individueel spoor (inclusief Mermaid-flow), zie [Individueel model](https://cedanl.github.io/studentprognose/methodologie/individueel/) in de methodologische documentatie.
+Zie [`doc/PIPELINE.md`](doc/PIPELINE.md) voor de gedetailleerde end-to-end pipeline (inclusief Mermaid-diagrammen). Voor een uitleg van het individueel spoor, zie [Individueel model](https://cedanl.github.io/studentprognose/methodologie/individueel/) in de methodologische documentatie.
 
 ---
 
