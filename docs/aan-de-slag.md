@@ -177,6 +177,7 @@ studentprognose --help
 |----------|-------------|
 | `init` | Maak een nieuwe projectmap aan met configuratie en mappenstructuur |
 | `benchmark` | Vergelijk alternatieve ML-modellen (`-d c` of `-d i` verplicht, zie [Benchmarks](methodologie/benchmarks.md)) |
+| `tune` | Stem het cumulatieve spoor af — regressor (stap 2) en/of SARIMA (stap 1) via `--tune-target` (`-d c` verplicht, zie [Hyperparameter tuning](#hyperparameter-tuning)) |
 
 ### Vlaggen
 
@@ -192,6 +193,7 @@ studentprognose --help
 | `--noetl` | — | uit | Sla ETL én validatie over |
 | `--yes` | — | uit | Sla validatieprompts over (voor CI/CD) |
 | `--dashboard` | — | uit | Genereer interactieve Plotly-dashboards (`data/output/visualisations/`) |
+| `--tune-target` | `regressor` / `sarima` / `both` | `regressor` | Welke trap het `tune`-commando afstemt |
 | `--ci test N` | getal | — | Testmodus: beperkt tot N opleidingen |
 
 Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
@@ -341,6 +343,99 @@ print(f"Dashboards geschreven naar {output_dir}")
     De `year`/`week`-rangecontrole is identiek aan die van `run_pipeline_from_dataframes`;
     komt geen enkele rij door de filters, dan krijg je een heldere `ValueError` in plaats
     van een leeg dashboard.
+
+## Hyperparameter tuning
+
+Het cumulatieve spoor is twee-traps en je kunt **beide trappen** afstemmen op je
+eigen data:
+
+| Trap | Wat | Wat tuning kiest | Vastgelegd in |
+|------|-----|------------------|---------------|
+| **Stap 1 — SARIMA** | extrapoleert de vooraanmeldcurve | ARIMA-ordes `(p,d,q)(P,D,Q,s)` | `forecaster_params.sarima` |
+| **Stap 2 — regressor** | vertaalt de curve naar inschrijvingen | hyperparameters (default XGBoost) | `regressor_params.<naam>` |
+
+Beide gebruiken een **tijd-bewuste** zoektocht (geen random k-fold — dat lekt
+toekomst) met dezelfde MAPE-metriek als de [benchmark](methodologie/benchmarks.md),
+en laten het operationele voorspelpad standaard onaangeroerd. Zie
+[XGBoost → Hyperparameter tuning](methodologie/xgboost.md#hyperparameter-tuning)
+(regressor) en [SARIMA → Orde-selectie](methodologie/sarima.md#orde-selectie-tuning)
+voor de methodologie.
+
+### Via de CLI — zoeken en vastleggen
+
+```bash
+studentprognose tune -d c -w 12                    # default: regressor (stap 2)
+studentprognose tune -d c -w 12 --tune-target sarima   # alleen SARIMA (stap 1)
+studentprognose tune -d c -w 12 --tune-target both     # beide trappen
+```
+
+Dit draait de zoektocht op je geladen data, print per trap een overzicht van alle
+geteste sets met hun MAPE (de best presterende set gemarkeerd met `✓`), en geeft
+een kant-en-klaar config-snippet terug. Plak dat snippet in `configuration.json`
+om de gevonden waarden vast te leggen (zie
+[Configuratie → vastleggen](configuratie.md#waarden-vastleggen)).
+Vastgelegde waarden zijn reproduceerbaar: ze worden bij elke run gebruikt zonder
+opnieuw te tunen.
+
+### Via de Python-API — tunen en voorspellen in één keer
+
+`run_pipeline_from_dataframes` heeft een `tune`-parameter (standaard `False`) waarmee
+je kiest **welke trap(pen)** getuned worden:
+
+```python
+result = run_pipeline_from_dataframes(
+    year=2025,
+    week=10,
+    data_cumulative=df_cum,
+    data_student_numbers=data_studentcount,
+    dataset=DataOption.CUMULATIVE,
+    tune="both",  # tune stap 1 (SARIMA) én stap 2 (regressor), daarna voorspellen
+)
+```
+
+De ondersteunde waarden:
+
+| `tune=` | Wat wordt getuned |
+|---------|-------------------|
+| `False` *(default)* | niets — gebruikt vastgelegde/default-waarden |
+| `True` of `"regressor"` | alleen de regressor (stap 2) |
+| `"sarima"` | alleen SARIMA-ordes (stap 1) |
+| `"both"` | beide trappen, elk apart gelogd |
+| `{"regressor": {...}, "sarima": {...}}` | beide/één trap met **eigen zoekruimte** (waarde weglaten of `None` = ingebouwde grid) |
+
+Elke gekozen trap draait de zoektocht éénmaal, voorspelt met de beste waarden en
+koppelt ze terug in de configuratie zodat je ze kunt vastleggen. Het overzicht (met
+`✓` op de winnaar) gaat naar de console; de functie **retourneert het
+voorspellings-DataFrame**, niet het tuning-resultaat.
+
+Bij `tune="both"` zie je twee aparte tabellen — één per trap, elk met een eigen `✓`:
+
+```
+           MAPE   Folds  Parameters
+  ─────────────────────────────────
+  ✓      0.0912       6  {"order": [1, 1, 1], "seasonal_order": [1, 1, 0, 52]}
+         0.1041       6  {"order": [1, 0, 1], "seasonal_order": [1, 1, 1, 52]}
+
+Beste parameters voor 'sarima' (MAPE=0.0912, 6 kandidaten):
+Plak dit in je configuration.json om de ordes vast te leggen:
+{ "model_config": { "forecaster_params": { "sarima": { ... } } } }
+
+           MAPE   Folds  Parameters
+  ─────────────────────────────────
+  ✓      0.1424      12  {"learning_rate": 0.25, "n_estimators": 200, "max_depth": 5}
+         0.1487      12  {"learning_rate": 0.1, "n_estimators": 200, "max_depth": 3}
+
+Beste parameters voor 'xgboost' (MAPE=0.1424, 12 kandidaten):
+Plak dit in je configuration.json om de parameters vast te leggen:
+{ "model_config": { "regressor_params": { "xgboost": { ... } } } }
+```
+
+!!! note "Tuning is opt-in"
+    Standaard (`tune=False`) gebruikt de pipeline de waarden uit
+    `model_config.regressor_params` / `forecaster_params` of de modeldefaults —
+    snel en reproduceerbaar. Zet `tune` alleen aan wanneer je bewust wilt afstemmen;
+    het maakt de run langzamer en, zonder de uitkomst vast te leggen,
+    niet-deterministisch.
 
 ## Bekende valkuil: stille modus-downgrade
 

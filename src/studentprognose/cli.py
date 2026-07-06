@@ -22,6 +22,7 @@ class PipelineConfig:
     yes: bool = False
     dashboard: bool = False
     command: str | None = None
+    tune_target: str = "regressor"
 
 
 def _expand_slices(tokens):
@@ -78,9 +79,18 @@ def parse_args(argv):
     parser.add_argument(
         "command",
         nargs="?",
-        choices=["init", "benchmark"],
+        choices=["init", "benchmark", "tune"],
         help="init       Maak een nieuwe projectmap aan met configuratie en mappenstructuur\n"
-             "benchmark  Vergelijk alternatieve modellen (-d c of -d i verplicht)",
+             "benchmark  Vergelijk alternatieve modellen (-d c of -d i verplicht)\n"
+             "tune       Hyperparameter tuning voor het cumulatieve spoor (-d c verplicht)",
+    )
+    parser.add_argument(
+        "--tune-target",
+        choices=["regressor", "sarima", "both"],
+        default="regressor",
+        dest="tune_target",
+        help="Welke trap van het cumulatieve spoor te tunen bij 'tune': "
+             "regressor (stap 2, default), sarima (stap 1), of both.",
     )
     parser.add_argument("-w", "-W", "-week", nargs="*", default=None, dest="weeks")
     parser.add_argument("-y", "-Y", "-year", nargs="*", default=None, dest="years")
@@ -134,6 +144,7 @@ def parse_args(argv):
 
     cfg = PipelineConfig()
     cfg.command = args.command
+    cfg.tune_target = args.tune_target
     cfg.noetl = args.noetl
     cfg.yes = args.yes
     cfg.dashboard = args.dashboard

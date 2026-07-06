@@ -64,6 +64,30 @@ class TestParseArgs:
         cfg = parse_args(["prog", "init"])
         assert cfg.command == "init"
 
+    def test_tune_command_in_parse_args(self):
+        cfg = parse_args(["prog", "tune", "-d", "c"])
+        assert cfg.command == "tune"
+        assert cfg.data_option == DataOption.CUMULATIVE
+        assert cfg.dataset_specified is True
+
+    def test_tune_command_without_dataset(self):
+        cfg = parse_args(["prog", "tune"])
+        assert cfg.command == "tune"
+        assert cfg.dataset_specified is False
+
+    def test_tune_target_defaults_to_regressor(self):
+        cfg = parse_args(["prog", "tune", "-d", "c"])
+        assert cfg.tune_target == "regressor"
+
+    def test_tune_target_both(self):
+        cfg = parse_args(["prog", "tune", "-d", "c", "--tune-target", "both"])
+        assert cfg.tune_target == "both"
+
+    def test_tune_target_rejects_unknown(self):
+        with pytest.raises(SystemExit) as exc:
+            parse_args(["prog", "tune", "--tune-target", "ensemble"])
+        assert exc.value.code == 2
+
     def test_default_command_is_none(self):
         cfg = parse_args(["prog"])
         assert cfg.command is None

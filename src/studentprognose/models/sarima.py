@@ -18,7 +18,11 @@ class SARIMAForecaster(BaseForecaster):
     """
 
     def __init__(self, order=SARIMA_ORDER, seasonal_order=SARIMA_SEASONAL_ORDER):
-        self.order = order
+        # Coerce naar tuples zodat ordes uit JSON-config (lijsten, bijv. getunede
+        # waarden in model_config.forecaster_params) net zo werken als de
+        # tuple-constanten — de ARIMA-backend verwacht tuples.
+        self.order = tuple(order)
+        seasonal_order = tuple(seasonal_order)
         self.seasonal_order = seasonal_order[:3]
         self.season_length = seasonal_order[3]
         self._model = None

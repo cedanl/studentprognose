@@ -22,7 +22,7 @@ Aanmelddata heeft een sterk seizoenspatroon (jaarlijkse cyclus, wekelijkse granu
 
 $$SARIMA(p, d, q)(P, D, Q)_{52}$$
 
-De nominale seizoenslengte is **52 weken** (één jaar). In het cumulatieve spoor wordt deze automatisch verkleind naar het werkelijke aantal gevulde weken per jaar wanneer dat lager ligt — zie [Seizoenslengte: afgeleid uit de data](#seizoenslengte-afgeleid-uit-de-data). De overige parameters zijn **vaste waarden** — er wordt geen automatische parameter-selectie toegepast. De keuze hangt af van het spoor en het moment in het jaar:
+De nominale seizoenslengte is **52 weken** (één jaar). In het cumulatieve spoor wordt deze automatisch verkleind naar het werkelijke aantal gevulde weken per jaar wanneer dat lager ligt — zie [Seizoenslengte: afgeleid uit de data](#seizoenslengte-afgeleid-uit-de-data). De overige parameters zijn standaard **vaste waarden** (voor het cumulatieve spoor optioneel af te stemmen — zie [Orde-selectie (tuning)](#orde-selectie-tuning)). De keuze hangt af van het spoor en het moment in het jaar:
 
 | Situatie | Order `(p,d,q)` | Seizoensorder `(P,D,Q)` |
 |----------|----------------|------------------------|
@@ -33,6 +33,43 @@ De nominale seizoenslengte is **52 weken** (één jaar). In het cumulatieve spoo
 De implementatie gebruikt `statsforecast.models.ARIMA` (Nixtla) als backend. Dit vervangt de eerdere `statsmodels.tsa.statespace.SARIMAX`-backend. De modelspecificatie is identiek; het verschil zit in de schattingsmethode: **CSS-ML** (conditional sum of squares, gevolgd door maximum likelihood) in plaats van MLE via een Kalman-filter. Dit levert een snelheidswinst van ~10–15× per reeks op bij gelijkwaardige nauwkeurigheid.
 
 Zie `src/studentprognose/models/sarima.py` voor de `SARIMAForecaster`-klasse.
+
+## Orde-selectie (tuning)
+
+De vaste ordes hierboven zijn onderbouwde standaardwaarden, maar je kunt ze voor het **cumulatieve spoor** afstemmen op je eigen historie.
+
+### Wat doet het?
+
+Tuning zoekt de ARIMA-ordes `(p,d,q)(P,D,Q,s)` die de vooraanmeldcurve het beste extrapoleren. Een kleine grid van orde-combinaties wordt geëvalueerd; de set met de laagste gemiddelde fout wint.
+
+```bash
+studentprognose tune -d c --tune-target sarima      # of: --tune-target both
+```
+
+Het commando print een overzicht met de MAPE per orde-combinatie (winnaar gemarkeerd met `✓`) en een `forecaster_params`-snippet om vast te leggen. Via de Python-API doet `run_pipeline_from_dataframes(..., tune="sarima")` (of `"both"`) hetzelfde en voorspelt direct met de gevonden ordes.
+
+### Hoe wordt geëvalueerd?
+
+Identiek aan de [benchmark](benchmarks.md): **tijd-bewuste cross-validatie** (train op jaren tot en met N−1, valideer op jaar N) met MAPE op de curve zelf als selectiemetriek — exact dezelfde `evaluate_timeseries_model` die de benchmark gebruikt. Random k-fold wordt **niet** gebruikt: dat zou toekomstige jaren in de trainingsset lekken.
+
+### Waarom een kleine vaste grid en geen volledige `auto_arima`?
+
+Een brede orde-zoektocht per serie (zoals `auto_arima` per opleiding × herkomst) is bij deze reekslengtes — een handvol collegejaren — duur en overfit-gevoelig. De ingebouwde grid is daarom bewust compact: een paar niet-seizoens-ordes × twee seizoens-ordes rond de waarden die de pipeline historisch gebruikte. Wil je toch breder zoeken? Overschrijf de grid met `model_config.sarima_tuning_grid`. Een volwaardige automatische selectie is los beschikbaar als het [AutoARIMA-model](#alternatieve-tijdreeksmodellen).
+
+### Aannames
+
+- Er zijn genoeg historische collegejaren voor minstens één tijdreeks-split (≥ 4 jaren met data). Bij minder valt tuning terug op de standaardordes met een waarschuwing.
+- De seizoensvorm van de curve is stabiel genoeg dat ordes die op het verleden goed scoren, ook voor het komende jaar gelden.
+
+### Wanneer vertrouw je het niet?
+
+- **Marginale verschillen.** Liggen de MAPE-waarden dicht bij elkaar, dan is de winnaar grotendeels toeval — wijk dan niet zonder reden af van de robuuste defaults.
+- **Korte/onregelmatige reeksen.** Bij weinig of sterk wisselende historie is de gekozen orde een steekproef van bijna niets; behandel het resultaat als indicatief.
+- **Tuning op het productiepad.** Net als bij de regressor hoort tuning een bewuste, periodieke stap te zijn waarvan je het resultaat *vastlegt* in `forecaster_params`, niet iets dat elke run opnieuw draait.
+
+### Relatie tot het ensemble
+
+Orde-tuning raakt uitsluitend stap 1 van het cumulatieve spoor (de curve-extrapolatie). Stap 2 (de [regressor](xgboost.md#hyperparameter-tuning)), het individuele spoor en de [ensemble-weging](ensemble.md) blijven ongewijzigd.
 
 ## Exogene variabelen (individueel spoor)
 

@@ -202,3 +202,103 @@ class TestInMemoryConfigValidation:
         with patch("studentprognose.config.os.cpu_count", return_value=4):
             assert get_cpu_count(cfg) == 4
         assert capsys.readouterr().out == ""
+
+
+# ---------------------------------------------------------------------------
+# load_configuration — regressor_params / tuning_grid validatie
+# ---------------------------------------------------------------------------
+
+class TestRegressorParamsValidation:
+    def test_valid_regressor_params_loads(self, tmp_path):
+        cfg = {"model_config": {"regressor_params": {"xgboost": {"max_depth": 3}}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        result = load_configuration(str(f))
+        assert result["model_config"]["regressor_params"]["xgboost"] == {"max_depth": 3}
+
+    def test_regressor_params_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"regressor_params": [1, 2, 3]}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_regressor_params_unknown_regressor_exits(self, tmp_path):
+        cfg = {"model_config": {"regressor_params": {"nonexistent": {"max_depth": 3}}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_regressor_params_value_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"regressor_params": {"xgboost": 5}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_tuning_grid_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"tuning_grid": [1, 2]}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_valid_tuning_grid_loads(self, tmp_path):
+        cfg = {"model_config": {"tuning_grid": {"max_depth": [3, 5]}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        result = load_configuration(str(f))
+        assert result["model_config"]["tuning_grid"] == {"max_depth": [3, 5]}
+
+
+class TestForecasterParamsValidation:
+    def test_valid_forecaster_params_loads(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": {"sarima": {"order": [1, 0, 1]}}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        result = load_configuration(str(f))
+        assert result["model_config"]["forecaster_params"]["sarima"]["order"] == [1, 0, 1]
+
+    def test_forecaster_params_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": [1, 2]}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_forecaster_params_unknown_forecaster_exits(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": {"prophet": {"order": [1, 0, 1]}}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_forecaster_params_value_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"forecaster_params": {"sarima": 5}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_sarima_tuning_grid_not_dict_exits(self, tmp_path):
+        cfg = {"model_config": {"sarima_tuning_grid": [1, 2]}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        with pytest.raises(SystemExit) as exc:
+            load_configuration(str(f))
+        assert exc.value.code == 1
+
+    def test_valid_sarima_tuning_grid_loads(self, tmp_path):
+        cfg = {"model_config": {"sarima_tuning_grid": {"order": [[1, 0, 1], [1, 1, 1]]}}}
+        f = tmp_path / "configuration.json"
+        f.write_text(json.dumps(cfg))
+        result = load_configuration(str(f))
+        assert result["model_config"]["sarima_tuning_grid"]["order"] == [[1, 0, 1], [1, 1, 1]]
