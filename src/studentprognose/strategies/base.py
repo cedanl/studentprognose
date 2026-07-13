@@ -63,6 +63,21 @@ class PredictionStrategy(ABC):
             "xgb_regressor_importance": None,
         }
 
+    def _programme_column_name(self) -> str:
+        """Naam van de programmakolom (config-driven, valt terug op default)."""
+        return self.configuration.get("column_roles", {}).get(
+            "programme", "Croho groepeernaam"
+        )
+
+    def get_programme_columns_by_track(self) -> dict:
+        """Programmakolom per geladen spoor, voor de numerus_fixus-guard (#258).
+
+        Retourneert een mapping ``{spoornaam: Series}`` met alleen de sporen die
+        na preprocessing daadwerkelijk data hebben. De basisimplementatie levert
+        niets op; elke strategie vult haar eigen spoor/sporen in.
+        """
+        return {}
+
     def get_data_to_predict(
         self, data, programme_filtering=None, herkomst_filtering=None, examentype_filtering=None
     ):

@@ -131,6 +131,21 @@ uv run studentprognose --yes -y 2024 -w 10
 
 Met `--yes` verschijnt een waarschuwing in de console maar stopt de pipeline niet. Gebruik dit bewust: een extreme afwijking kan duiden op een Studielink-probleem dat je niet wilt meenemen in de modeltraining.
 
+### Numerus-fixus-sleutels
+
+Direct na het preprocessen — vóór de voorspelling — controleert de pipeline of elke sleutel in [`numerus_fixus`](configuratie.md#numerus_fixus) daadwerkelijk voorkomt in de programmakolom (`Croho groepeernaam`) van de geladen data. Dit voorkomt de stille misconfiguratie uit issue #258: een sleutel die niet matcht, levert bij `.isin`/`==` simpelweg `False` op, zonder foutmelding, waardoor de numerus-fixus-behandeling (aparte regressor, capaciteitsplafond, aparte foutrapportage) ongemerkt niet aangrijpt.
+
+De check draait op de genormaliseerde, gepreprocesste data, zodat het exacte dtype van de kolom wordt gezien.
+
+| Situatie | Gedrag |
+|----------|--------|
+| Sleutel matcht **geen enkel** geladen spoor | Hard stop — pipeline stopt (typefout of verkeerd formaat) |
+| Sleutel matcht wel het ene, maar niet het andere geladen spoor | Waarschuwing — bekende namen-vs-Isatcodes-mismatch (#238) |
+| Elke sleutel matcht alle geladen sporen | Check slaagt stilzwijgend |
+
+!!! tip "Oplossing"
+    Gebruik voor het cumulatieve spoor de numerieke **Isatcode** als sleutel, voor het individuele spoor de leesbare **opleidingsnaam** — precies de waarde zoals die in de programmakolom van dat spoor staat. Zie [`numerus_fixus`](configuratie.md#numerus_fixus).
+
 ## Post-prediction checks
 
 Nadat het ensemble zijn voorspellingen heeft opgeleverd, voert de pipeline twee informatieve checks uit. Ze stoppen de pipeline **nooit** — ze printen alleen waarschuwingen in de console.
