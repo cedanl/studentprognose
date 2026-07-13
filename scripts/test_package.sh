@@ -16,6 +16,9 @@
 #      TerminatedWorkerError in de parallel-helper; de fallback uit PR #198 moet
 #      kicken en de pipeline moet doorlopen tot outputbestand. Bewaakt issue #197
 #      structureel, ook op Windows-runners.
+#   9. Multi-instelling filter (#200) — --institution scoopt de teldata tot één
+#      instelling (pipeline slaagt), en een onbekende instelling faalt hard
+#      (exitcode != 0) i.p.v. stil een lege pipeline te draaien.
 #
 # Gebruik: bash scripts/test_package.sh [--skip-build]
 
@@ -131,6 +134,20 @@ fi
     || { echo "FOUT: output ontbreekt na crash-injectie run"; exit 1; }
 grep -q "Opnieuw proberen met n_jobs=2" "$CRASH_LOG" \
     || { echo "FOUT: fallback-waarschuwing niet gevonden in log — fallback fired niet"; tail -n 30 "$CRASH_LOG"; exit 1; }
+echo "OK"
+
+echo ""
+echo "=== [9] Multi-instelling filter (--institution) ==="
+# De demo-teldata bevat 52 instellingen (Brincodes). --institution 21PC moet de
+# pipeline tot die ene instelling scopen en gewoon een outputbestand opleveren.
+rm -f data/output/output_prelim_cumulatief.xlsx
+uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution 21PC > /dev/null
+[ -f data/output/output_prelim_cumulatief.xlsx ] || { echo "FOUT: output ontbreekt na --institution run"; exit 1; }
+# Een onbekende instelling mag NIET stil een lege pipeline draaien: harde fout.
+if uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution ZZZZ 2>/dev/null; then
+    echo "FOUT: exitcode 0 verwacht bij onbekende instelling, maar pipeline slaagde"
+    exit 1
+fi
 echo "OK"
 
 echo ""

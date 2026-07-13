@@ -189,6 +189,7 @@ studentprognose --help
 | `-sy` | `f` / `h` / `v` | `f` | Studentjaar: `first-years` (standaard), `higher-years`, `volume` |
 | `-c` | pad | `configuration/configuration.json` | Configuratiebestand |
 | `-f` | pad | `configuration/filtering/base.json` | Filterbestand |
+| `--institution` | instellingscode(s) | alle instellingen | Beperk de teldata tot één of meer instellingen (Brincode), bijv. `--institution 21PC` |
 | `-sk` | getal | `0` | Skip N jaren (backtesting) |
 | `--noetl` | — | uit | Sla ETL én validatie over |
 | `--yes` | — | uit | Sla validatieprompts over (voor CI/CD) |
@@ -200,6 +201,20 @@ Weekbereiken zijn mogelijk: `-w 8:12` is gelijk aan `-w 8 9 10 11 12`.
 
 !!! note "Eerstejaars als focus"
     De tool draait standaard op `-sy f` (eerstejaars). De modus `-sy v` (volume) is een vervolgstap — gebruik die pas als je eerstejaarsvoorspelling op orde is.
+
+### `--institution`
+
+De landelijke Studielink-teldata bevat rijen van álle instellingen. Met `--institution` scoop je de run op je eigen instelling(en):
+
+```bash
+# Alleen instelling 21PC
+studentprognose -w 10 -y 2025 -d cumulative --institution 21PC
+
+# Meerdere instellingen
+studentprognose -w 10 -y 2025 -d cumulative --institution 21PC 00IC
+```
+
+De vlag overschrijft de config-key [`institution_filter`](configuratie.md#institution_filter-beperk-de-teldata-tot-een-of-meer-instellingen); laat je hem weg, dan geldt de configuratiewaarde (standaard: alle instellingen). Een onbekende instellingscode stopt de run met een duidelijke foutmelding in plaats van stil een lege dataset te verwerken. Zet je in je config bijvoorbeeld je eigen Brincode vast, dan hoef je de vlag niet elke keer mee te geven.
 
 ## Gebruik als Python-package
 

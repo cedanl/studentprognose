@@ -53,6 +53,7 @@
         "cumulative_regressor": "xgboost"
     },
     "numerus_fixus": {},
+    "institution_filter": [],
     "excluded_data_points": [],
     "ensemble_override_cumulative": [],
     "exclude_from_combined": [],
@@ -69,6 +70,7 @@
         "exam_type": "Examentype",
         "origin": "Herkomst",
         "faculty": "Faculteit",
+        "institution": "Korte naam instelling",
         "enrollment_status": "Inschrijfstatus",
         "cancellation_date": "Datum intrekking vooraanmelding",
         "student_count": "Aantal_studenten",

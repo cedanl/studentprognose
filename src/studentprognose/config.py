@@ -68,6 +68,7 @@ def load_configuration(file_path: str) -> dict:
     _validate_model_config(cfg, file_path)
     _validate_runtime(cfg, file_path)
     _validate_telbestand_filename_patterns(cfg, file_path)
+    _validate_institution_filter(cfg, file_path)
 
     # Normaliseer de numerus_fixus-keys (programmesleutels) naar hetzelfde dtype
     # als de datakolom: een numerieke Isatcode-key wordt int en matcht zo de
@@ -352,3 +353,32 @@ def _validate_runtime(cfg, file_path):
             f"cores ({available}). Verlaagd naar {available}."
         )
         cfg["runtime"]["cpu_count"] = available
+
+
+def _validate_institution_filter(cfg, file_path):
+    """Valideer ``institution_filter`: een lijst van instellingscodes/-namen.
+
+    Leeg of afwezig = geen filter (alle instellingen). Elke waarde moet een string
+    of geheel getal zijn (Brincodes zijn tekstcodes zoals ``"00IC"``, maar een
+    numerieke code als int wordt geaccepteerd en later als string vergeleken).
+    """
+    institutions = cfg.get("institution_filter")
+    if institutions is None:
+        return
+
+    if not isinstance(institutions, list):
+        print(
+            f"Configuratiefout in {file_path}: "
+            f"'institution_filter' moet een lijst van instellingscodes zijn, "
+            f"niet {type(institutions).__name__}."
+        )
+        sys.exit(1)
+
+    for i, value in enumerate(institutions):
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            print(
+                f"Configuratiefout in {file_path}: "
+                f"'institution_filter[{i}]' moet een string of geheel getal zijn, "
+                f"niet {type(value).__name__}."
+            )
+            sys.exit(1)

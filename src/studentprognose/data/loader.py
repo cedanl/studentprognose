@@ -3,6 +3,7 @@ import os
 from studentprognose.utils.weeks import DataOption
 from studentprognose.utils.programme_key import normalize_programme_series
 from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
+from studentprognose.data.preprocessing.institution_filter import apply_institution_filter
 
 
 def _normalize_programme_code(df, column):
@@ -60,6 +61,39 @@ def _merge_new_cumulative_data(data_cumulative, src_path, dst_path):
     os.remove(src_path)
 
     return data_cumulative
+
+
+def filter_datasets_by_institution(datasets, configuration):
+    """Scoop de geladen datasets tot de instelling(en) uit ``institution_filter``.
+
+    Toegepast op de sporen die een instellingskolom dragen (het cumulatieve spoor
+    uit de landelijke teldata). Het individuele spoor (eigen aanmeldexport, geen
+    Brincode-kolom) en het label ``student_count`` worden ongemoeid gelaten:
+    :func:`apply_institution_filter` is een no-op wanneer de kolom ontbreekt.
+
+    Een lege ``institution_filter`` (default) laat alle datasets ongewijzigd —
+    dan behoudt de pipeline alle instellingen (backwards compatible).
+
+    Args:
+        datasets: De 5-tuple uit :func:`load_data`
+            ``(individual, cumulative, student_numbers, latest, ensemble)``.
+        configuration: De configuratiedict.
+
+    Returns:
+        De (mogelijk) gefilterde 5-tuple, in dezelfde volgorde.
+    """
+    institutions = configuration.get("institution_filter", [])
+    if not institutions:
+        return datasets
+
+    institution_col = configuration.get("column_roles", {}).get(
+        "institution", "Korte naam instelling"
+    )
+
+    data_individual, data_cumulative, *rest = datasets
+    data_individual = apply_institution_filter(data_individual, institutions, institution_col)
+    data_cumulative = apply_institution_filter(data_cumulative, institutions, institution_col)
+    return (data_individual, data_cumulative, *rest)
 
 
 def get_path_latest(paths, data_option):

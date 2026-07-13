@@ -23,6 +23,7 @@ class PipelineConfig:
     dashboard: bool = False
     command: str | None = None
     tune_target: str = "regressor"
+    institutions: list | None = None
 
 
 def _expand_slices(tokens):
@@ -113,6 +114,18 @@ def parse_args(argv):
         "-f", "-F", "-filtering", nargs="*", default=None, dest="filtering"
     )
     parser.add_argument(
+        "--institution",
+        "-institution",
+        "-inst",
+        nargs="*",
+        default=None,
+        dest="institutions",
+        metavar="INSTELLING",
+        help="Beperk de teldata tot één of meer instellingen (Brincode / 'Korte naam "
+             "instelling'), bijv. --institution 21PC. Overschrijft de config-key "
+             "'institution_filter'. Weglaten = alle instellingen (default).",
+    )
+    parser.add_argument(
         "-sy",
         "-SY",
         "-studentyear",
@@ -158,6 +171,12 @@ def parse_args(argv):
     if args.filtering is not None:
         for path in args.filtering:
             cfg.filtering_path = path
+
+    # Instellingsfilter (issue #200). None = geen override (config-key geldt);
+    # een (evt. lege) lijst overschrijft de config: `--institution` zonder
+    # waarden zet expliciet "alle instellingen".
+    if args.institutions is not None:
+        cfg.institutions = args.institutions
 
     # Dataset
     if args.dataset is not None:

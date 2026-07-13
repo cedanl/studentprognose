@@ -261,6 +261,30 @@ Een object met opleidingsnamen als sleutels en het maximale inschrijvingsaantal 
 
 Als de gesommeerde voorspelling over herkomstgroepen het maximum overschrijdt, wordt het overschot afgetrokken van de NL-herkomstgroep. Opleidingen die hier niet staan worden niet gecapped.
 
+## `institution_filter` — beperk de teldata tot één of meer instellingen
+
+De landelijke Studielink-teldata bevat rijen van **álle** instellingen (elke Brincode staat in de kolom `Korte naam instelling`). Met `institution_filter` beperk je de pipeline tot je eigen instelling(en), zodat de modellen niet op andermans instroom trainen.
+
+```json
+{
+    "institution_filter": ["21PC"]
+}
+```
+
+- **Type:** lijst van instellingscodes (Brincodes, bijv. `"21PC"`) of leesbare instellingsnamen — precies zoals ze in de kolom `Korte naam instelling` staan.
+- **Standaard (`[]`):** geen filter — **alle instellingen** in de data worden meegenomen. Dit is het backwards-compatibele default-gedrag.
+- Meerdere instellingen: `["21PC", "00IC"]`.
+
+Het filter grijpt aan op **load-tijd**, vóór preprocessing, zodat zowel de training als de voorspelling op de gekozen instelling(en) draaien.
+
+!!! info "Welke sporen worden gefilterd?"
+    Alleen sporen die een instellingskolom dragen — dat is het **cumulatieve spoor** (de landelijke teldata). Het **individuele spoor** is doorgaans de eigen aanmeldexport van één instelling en heeft geen instellingskolom; daar is het filter een no-op. Het studentaantallenbestand (`student_count`) wordt eveneens verondersteld al instelling-specifiek te zijn.
+
+!!! warning "Onbekende instelling faalt hard"
+    Komt een opgegeven code in het geheel niet voor in de data, dan stopt de pipeline met een duidelijke foutmelding (en de lijst van beschikbare instellingen) in plaats van stil een lege dataset te verwerken. Komt een code wél gedeeltelijk voor, dan zie je een waarschuwing voor de ontbrekende codes.
+
+Je kunt deze config-waarde op de commandline overschrijven met de vlag [`--institution`](aan-de-slag.md#-institution) — handig om snel voor één instelling te draaien zonder de config aan te passen.
+
 ## `excluded_data_points` — anomaliejaren uitsluiten van trainingsdata
 
 Optionele lijst van filterregels voor het verwijderen van bekende problematische datapunten uit de **trainingsdata**. De tool past de regels toe vóór elk model wordt getraind. Het voorspeljaar (`predict_year`) wordt **altijd** beschermd en nooit uitgesloten, ongeacht de regels.
@@ -399,6 +423,9 @@ Waar `columns` instellings-specifieke namen vertaalt naar kanonieke namen, koppe
 | `weighted_applicants` | `Gewogen vooraanmelders` | `unweighted_applicants` | `Ongewogen vooraanmelders` |
 | `single_applicants` | `Aantal aanmelders met 1 aanmelding` | `higher_years` | `Hogerejaars` |
 | `croho_source` | `Groepeernaam Croho` | `higher_education_type` | `Type hoger onderwijs` |
+| `institution` | `Korte naam instelling` | | |
+
+De rol `institution` bepaalt op welke kolom [`institution_filter`](#institution_filter-beperk-de-teldata-tot-een-of-meer-instellingen) filtert.
 
 Pas dit alleen aan als je de **interne** kanonieke namen wijzigt — in de meeste gevallen gebruik je `columns` (voor je ruwe inputkolommen) en laat je `column_roles` ongemoeid.
 
