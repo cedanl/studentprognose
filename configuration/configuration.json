@@ -50,9 +50,7 @@
         "cumulative_regressor": "xgboost",
         "final_academic_week": 36
     },
-    "numerus_fixus": {
-        "B Opleiding": 0
-    },
+    "numerus_fixus": {},
     "excluded_data_points": [],
     "ensemble_override_cumulative": [
         "B Geneeskunde",

@@ -140,6 +140,12 @@ class IndividualStrategy(PredictionStrategy):
             "xgb_regressor_importance": None,
         }
 
+    def get_programme_columns_by_track(self) -> dict:
+        col = self._programme_column_name()
+        if self.data_individual is None or col not in self.data_individual.columns:
+            return {}
+        return {"individueel": self.data_individual[col]}
+
     def set_xgboost_importance(self, importance):
         self.xgboost_importance = importance
 
