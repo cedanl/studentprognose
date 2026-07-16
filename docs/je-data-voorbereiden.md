@@ -149,7 +149,7 @@ De classifier-features (`numeric`/`categorical`) zijn instelbaar in `configurati
 Pad: `data/input_raw/oktober_bestand.xlsx`
 Bron: door je instelling zelf aangeleverd
 
-Dit bestand bevat de werkelijke inschrijvingen per opleiding, herkomst en collegejaar — de ground truth waarop het model wordt geëvalueerd en die het ratio-model voedt. De meeste instellingen genereren dit bestand uit hun SIS/datawarehouse (Osiris, Usis, of vergelijkbaar).
+Dit bestand bevat de werkelijke inschrijvingen per collegejaar, opleiding (`Isatcode`), herkomst (`EER-NL-nietEER`) en examentype — de ground truth waarop het model wordt geëvalueerd en die het ratio-model voedt. Elke rij is een telling geaggregeerd op die combinatie van vier dimensies. De meeste instellingen genereren dit bestand uit hun SIS/datawarehouse (Osiris, Usis, of vergelijkbaar).
 
 !!! note "Waarom heet het bestand `oktober_bestand.xlsx`?"
     Historische naam. De bestandsnaam en de configuratiesleutels (`path_raw_october`, `columns.oktober`) zijn ongewijzigd gelaten om bestaande installaties niet te breken. Inhoudelijk is het een **telbestand met studentaantallen**.
@@ -161,7 +161,7 @@ Dit bestand bevat de werkelijke inschrijvingen per opleiding, herkomst en colleg
 | `Groepeernaam Croho` | Naam van de opleiding (optioneel, voor leesbaarheid; niet langer de joinsleutel) |
 | `Aantal eerstejaars croho` | Aantal eerstejaars |
 | `EER-NL-nietEER` | Herkomstgroep |
-| `Examentype code` | `B` (Bachelor) of `M` (Master) |
+| `Examentype code` | Examentype, bv. `Bachelor eerstejaars`, `Bachelor hogerejaars`, `Master` |
 | `Aantal Hoofdinschrijvingen` | Aantal hoofdinschrijvingen |
 
 !!! warning "`Isatcode` is verplicht en moet matchen met de telbestanden"
