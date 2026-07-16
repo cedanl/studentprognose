@@ -116,6 +116,7 @@ uv run studentprognose -w 6 -y 2020
 studentprognose -w 6 -y 2024                  # specifieke week en jaar
 studentprognose -w 10 : 20 -y 2023            # weekbereik
 studentprognose -d c                           # alleen cumulatief spoor
+studentprognose -d c --institution 21PC        # scoop de teldata op je eigen instelling
 studentprognose -y 2023 2024 -w 10 : 20 -d b  # meerdere jaren, beide sporen
 
 studentprognose benchmark -d c -w 12           # vergelijk alternatieve modellen
@@ -127,6 +128,7 @@ studentprognose tune -d c -w 12                # stem hyperparameters af (cumula
 | `-w` | Voorspelweek(en) | weeknummers of bereik, bijv. `10 : 20` |
 | `-y` | Voorspeljaar(en) | bijv. `2024` of `2023 2024` |
 | `-d` | Dataset | `i`ndividual, `c`umulative, `b`oth (standaard) |
+| `--institution` | Beperk teldata tot instelling(en) | Brincode(s), bijv. `21PC`; standaard alle |
 | `--noetl` | Sla ETL over | als je al verwerkte data in `data/input/` hebt |
 | `--yes` | Sla interactieve prompts over | voor CI/CD en cron |
 

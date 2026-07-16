@@ -9,7 +9,11 @@ from studentprognose.cli import PipelineConfig, parse_args
 from studentprognose.config import (
     load_configuration, load_defaults_filtering, load_filtering, get_final_academic_week,
 )
-from studentprognose.data.loader import load_data, _normalize_programme_code
+from studentprognose.data.loader import (
+    load_data,
+    filter_datasets_by_institution,
+    _normalize_programme_code,
+)
 from studentprognose.data.nf_validation import (
     NumerusFixusConfigError,
     enforce_numerus_fixus_keys,
@@ -127,6 +131,12 @@ def main(argv):
     print("Loading configuration...")
     configuration = load_configuration(cfg.configuration_path)
 
+    # De CLI-vlag --institution overschrijft de config-key institution_filter,
+    # analoog aan hoe -f de filtering-file overschrijft. None = geen override,
+    # dan geldt de waarde uit configuration.json (default: [] = alle instellingen).
+    if cfg.institutions is not None:
+        configuration["institution_filter"] = cfg.institutions
+
     if not cfg.noetl:
         from studentprognose.data.validation import validate_raw_data
         from studentprognose.data.etl import run_etl
@@ -139,6 +149,15 @@ def main(argv):
 
     print("Loading data...")
     datasets = load_data(configuration, cfg.data_option)
+    # Scoop op instelling(en) vóór de CI-subset en preprocessing, zodat training
+    # én predictie alleen op de gekozen instelling(en) draaien (issue #200). Een
+    # niet-matchende instelling faalt hard, maar met een nette melding i.p.v. een
+    # kale traceback.
+    try:
+        datasets = filter_datasets_by_institution(datasets, configuration)
+    except ValueError as exc:
+        print(f"\nFout: {exc}")
+        sys.exit(1)
     if cfg.ci_test_n is not None:
         datasets = apply_ci_test_subset(cfg.ci_test_n, *datasets)
 
@@ -518,6 +537,11 @@ def _prepare_in_memory_run(
         data_latest,
         data_weighted_ensemble,
     )
+
+    # Zelfde instellingsfilter als het CLI-pad (issue #200): scoop de in-memory
+    # DataFrames op configuration["institution_filter"] vóór de pipeline-kern.
+    # Leeg (default) = alle instellingen, dus no-op voor bestaande aanroepers.
+    datasets = filter_datasets_by_institution(datasets, configuration)
 
     return cfg, datasets, configuration, filtering, cwd
 

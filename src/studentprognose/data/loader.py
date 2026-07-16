@@ -3,6 +3,7 @@ import os
 from studentprognose.utils.weeks import DataOption
 from studentprognose.utils.programme_key import normalize_programme_series
 from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
+from studentprognose.data.preprocessing.institution_filter import apply_institution_filter
 
 
 def _normalize_programme_code(df, column):
@@ -60,6 +61,103 @@ def _merge_new_cumulative_data(data_cumulative, src_path, dst_path):
     os.remove(src_path)
 
     return data_cumulative
+
+
+def filter_datasets_by_institution(datasets, configuration):
+    """Scoop de geladen datasets tot de instelling(en) uit ``institution_filter``.
+
+    Toegepast op de sporen die een instellingskolom dragen (het cumulatieve spoor
+    uit de landelijke teldata). Het individuele spoor (eigen aanmeldexport, geen
+    Brincode-kolom) en het label ``student_count`` worden ongemoeid gelaten:
+    :func:`apply_institution_filter` is een no-op wanneer de kolom ontbreekt.
+
+    Een lege ``institution_filter`` (default) laat alle datasets ongewijzigd —
+    dan behoudt de pipeline alle instellingen (backwards compatible).
+
+    Args:
+        datasets: De 5-tuple uit :func:`load_data`
+            ``(individual, cumulative, student_numbers, latest, ensemble)``.
+        configuration: De configuratiedict.
+
+    Print altijd één regel met de instellings-scope van de run (issue #200), of
+    er nu wél of níét gefilterd wordt, zodat de eindgebruiker nooit ongemerkt
+    over alle instellingen (of over de verkeerde) rekent.
+
+    Returns:
+        De (mogelijk) gefilterde 5-tuple, in dezelfde volgorde.
+    """
+    institutions = configuration.get("institution_filter", [])
+    institution_col = configuration.get("column_roles", {}).get(
+        "institution", "Korte naam instelling"
+    )
+
+    data_individual, data_cumulative, *rest = datasets
+
+    # Rapporteer de scope op basis van het cumulatieve spoor: het enige spoor dat
+    # de instellingsdimensie (Brincode) draagt. Gebeurt vóór het filteren, zodat
+    # de melding "X van Y rijen" het totaal vóór filtering laat zien.
+    _report_institution_scope(data_cumulative, institutions, institution_col)
+
+    if not institutions:
+        return datasets
+
+    data_individual = apply_institution_filter(data_individual, institutions, institution_col)
+    data_cumulative = apply_institution_filter(data_cumulative, institutions, institution_col)
+    return (data_individual, data_cumulative, *rest)
+
+
+def _format_nl_int(n: int) -> str:
+    """Formatteer een geheel getal met een Nederlandse duizendtalscheiding (``.``)."""
+    return f"{n:,}".replace(",", ".")
+
+
+def _report_institution_scope(reference_df, institutions, institution_col) -> None:
+    """Print één regel die samenvat waarvoor deze run rekent.
+
+    De eindgebruiker moet altijd weten of er gefilterd wordt (en op welke
+    instelling(en)) of niet (alle instellingen). De telling is gebaseerd op
+    ``reference_df`` — het cumulatieve spoor, het enige spoor met een
+    instellingskolom.
+
+    Args:
+        reference_df: Het cumulatieve DataFrame (of ``None`` als dat spoor niet
+            geladen is), gebruikt om het totaal en de beschikbare instellingen
+            te tellen.
+        institutions: De actieve filterlijst (leeg = geen filter).
+        institution_col: Naam van de instellingskolom.
+    """
+    has_column = reference_df is not None and institution_col in reference_df.columns
+
+    if not has_column:
+        # Geen spoor met instellingsdimensie geladen (bijv. individueel-only run).
+        # Alleen melden als de gebruiker tóch een filter zette dat hier niet
+        # toegepast kan worden — anders zou de regel ruis zijn.
+        if institutions:
+            gevraagd = ", ".join(str(i) for i in institutions)
+            print(
+                f"Instellingsfilter: '{gevraagd}' opgegeven, maar er is geen spoor met "
+                f"een instellingskolom ('{institution_col}') geladen — filter niet toegepast."
+            )
+        return
+
+    col_as_str = reference_df[institution_col].astype(str)
+    total_rows = len(col_as_str)
+    available = col_as_str.nunique()
+
+    if not institutions:
+        print(
+            f"Instellingsfilter: geen — alle {available} instellingen worden meegenomen "
+            f"({_format_nl_int(total_rows)} rijen). "
+            "Zet 'institution_filter' (of --institution) om je eigen instelling(en) te kiezen."
+        )
+        return
+
+    wanted = [str(i) for i in institutions]
+    kept_rows = int(col_as_str.isin(wanted).sum())
+    print(
+        f"Instellingsfilter actief: {', '.join(wanted)} — {_format_nl_int(kept_rows)} van "
+        f"{_format_nl_int(total_rows)} rijen behouden (uit {available} beschikbare instellingen)."
+    )
 
 
 def get_path_latest(paths, data_option):

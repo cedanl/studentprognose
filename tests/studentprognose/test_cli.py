@@ -88,6 +88,28 @@ class TestParseArgs:
             parse_args(["prog", "tune", "--tune-target", "ensemble"])
         assert exc.value.code == 2
 
+    def test_institution_defaults_to_none(self):
+        # Geen vlag = None → de config-key institution_filter blijft leidend.
+        cfg = parse_args(["prog", "-w", "10"])
+        assert cfg.institutions is None
+
+    def test_institution_single(self):
+        cfg = parse_args(["prog", "--institution", "21PC"])
+        assert cfg.institutions == ["21PC"]
+
+    def test_institution_multiple(self):
+        cfg = parse_args(["prog", "--institution", "21PC", "00IC"])
+        assert cfg.institutions == ["21PC", "00IC"]
+
+    def test_institution_alias_inst(self):
+        cfg = parse_args(["prog", "-inst", "21PC"])
+        assert cfg.institutions == ["21PC"]
+
+    def test_institution_empty_means_all(self):
+        # Expliciete lege lijst overschrijft de config met "alle instellingen".
+        cfg = parse_args(["prog", "--institution"])
+        assert cfg.institutions == []
+
     def test_default_command_is_none(self):
         cfg = parse_args(["prog"])
         assert cfg.command is None
