@@ -248,18 +248,32 @@ De canonieke output is altijd `;`-gescheiden, ongeacht de input-separator.
 
 ## `numerus_fixus`
 
-Een object met opleidingsnamen als sleutels en het maximale inschrijvingsaantal als waarde:
+Een object met **programmasleutels** als keys en het maximale inschrijvingsaantal (de NF-capaciteit) als waarde. Numerus-fixus-opleidingen krijgen een aparte behandeling: een eigen regressor (los van de gedeelde pool), een capaciteitsplafond op de voorspelling, en aparte foutrapportage.
 
 ```json
 {
     "numerus_fixus": {
-        "B Geneeskunde": 340,
-        "B Tandheelkunde": 50
+        "56604": 350,
+        "50033": 260
     }
 }
 ```
 
 Als de gesommeerde voorspelling over herkomstgroepen het maximum overschrijdt, wordt het overschot afgetrokken van de NL-herkomstgroep. Opleidingen die hier niet staan worden niet gecapped.
+
+!!! danger "De sleutel moet exact matchen met de programmakolom (`Croho groepeernaam`)"
+    De NF-behandeling grijpt **alleen** aan als de sleutel exact overeenkomt met een waarde in de programmakolom van je data. Welk formaat dat is, hangt af van je instelling:
+
+    - **Cumulatief spoor** — de programmakolom bevat sinds de Isatcode-migratie de numerieke **Isatcode** (CROHO-code, bijv. `56604`). Gebruik dan de Isatcode als sleutel.
+    - **Individueel spoor / legacy** — de programmakolom bevat de **leesbare opleidingsnaam** (bijv. `"B Geneeskunde"`). Gebruik dan de naam als sleutel.
+
+    Het dtype maakt niet uit: een numerieke sleutel wordt automatisch als getal geïnterpreteerd (`"56604"` en `56604` zijn equivalent). JSON kent geen inline-commentaar, dus noteer de leesbare naam bij voorkeur in je eigen documentatie of changelog naast de Isatcode.
+
+!!! warning "Sleutelruimtes van de twee sporen overlappen niet (#238)"
+    Het cumulatieve spoor keyt op Isatcodes, het individuele spoor op namen. Eén sleutel kan daardoor maar één van beide sporen matchen. Draai je `-d both`, dan grijpt een Isatcode-sleutel wél aan in het cumulatieve spoor maar niet in het individuele — je krijgt hierover een **waarschuwing**. Tot #238 is opgelost is er geen sleutel die beide sporen tegelijk bedient.
+
+!!! info "Guard tegen stille misconfiguratie (#258)"
+    Vóór de voorspelling controleert de pipeline of elke `numerus_fixus`-sleutel voorkomt in de programmakolom. Matcht een sleutel **geen enkel** geladen spoor (typefout of verkeerd formaat), dan **stopt de pipeline met een harde fout** — een niet-matchende sleutel wordt nooit meer stil genegeerd. Zie [validatie](validatie.md#numerus-fixus-sleutels).
 
 ## `institution_filter` — beperk de teldata tot één of meer instellingen
 

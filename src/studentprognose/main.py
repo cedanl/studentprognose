@@ -14,6 +14,10 @@ from studentprognose.data.loader import (
     filter_datasets_by_institution,
     _normalize_programme_code,
 )
+from studentprognose.data.nf_validation import (
+    NumerusFixusConfigError,
+    enforce_numerus_fixus_keys,
+)
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
 from studentprognose.data.range_check import (
     detect_data_range_mismatch,
@@ -162,7 +166,17 @@ def main(argv):
 
     # Steps 2-7: gemeenschappelijke pipeline-kern
     cwd = os.getcwd()
-    _run_pipeline_core(cfg, datasets, configuration, filtering, cwd)
+    try:
+        _run_pipeline_core(cfg, datasets, configuration, filtering, cwd)
+    except NumerusFixusConfigError as exc:
+        # Config-fout: netjes afsluiten met exitcode 1 i.p.v. een traceback.
+        # (Het in-memory API-pad vangt dezelfde exception zelf af.)
+        print(f"\nValidatie mislukt — de pipeline kan niet worden gestart:\n{exc}")
+        print(
+            "\nLos de numerus_fixus-configuratie op (gebruik de exacte "
+            "programmasleutel uit je data) en probeer opnieuw."
+        )
+        sys.exit(1)
 
 
 def cli():
@@ -563,6 +577,21 @@ def _run_pipeline_strategy(cfg, datasets, configuration, filtering, cwd, save_ou
 
     # Step 3: Preprocess (feature engineering)
     data_cumulative = _preprocess(strategy, cfg.student_year_prediction)
+
+    # Step 3b: Guard op de numerus_fixus-sleutels (#258). Voorkomt dat een
+    # NF-sleutel die niet exact matcht met de programmakolom stil wordt
+    # genegeerd (geen aparte regressor, geen ratio-cap). Draait op de
+    # genormaliseerde, gepreprocesste data zodat de check het echte dtype ziet.
+    if cfg.student_year_prediction in (
+        StudentYearPrediction.FIRST_YEARS,
+        StudentYearPrediction.VOLUME,
+    ):
+        get_tracks = getattr(strategy, "get_programme_columns_by_track", None)
+        if callable(get_tracks):
+            enforce_numerus_fixus_keys(
+                getattr(strategy, "numerus_fixus_list", None),
+                get_tracks(),
+            )
 
     # Step 4: Apply filtering
     strategy.set_filtering(

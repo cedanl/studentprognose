@@ -153,6 +153,12 @@ class CumulativeStrategy(PredictionStrategy):
             "xgb_regressor_importance": self.xgboost_importance,
         }
 
+    def get_programme_columns_by_track(self) -> dict:
+        col = self._programme_column_name()
+        if self.data_cumulative is None or col not in self.data_cumulative.columns:
+            return {}
+        return {"cumulatief": self.data_cumulative[col]}
+
     def preprocess(self):
         data = self.data_cumulative
 

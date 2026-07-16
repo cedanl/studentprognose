@@ -50,6 +50,12 @@ class CombinedStrategy(PredictionStrategy):
             "xgb_regressor_importance": self.cumulative.xgboost_importance,
         }
 
+    def get_programme_columns_by_track(self) -> dict:
+        tracks = {}
+        tracks.update(self.individual.get_programme_columns_by_track())
+        tracks.update(self.cumulative.get_programme_columns_by_track())
+        return tracks
+
     def preprocess(self):
         print("Preprocessing individual data...")
         self.individual.preprocess()
