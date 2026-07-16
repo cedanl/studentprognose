@@ -140,9 +140,19 @@ echo ""
 echo "=== [9] Multi-instelling filter (--institution) ==="
 # De demo-teldata bevat 52 instellingen (Brincodes). --institution 21PC moet de
 # pipeline tot die ene instelling scopen en gewoon een outputbestand opleveren.
+# Verwijder eerst een eventueel achtergebleven outputbestand (van een vorige
+# lokale run of eerdere stap), zodat de -f check hieronder écht bewijst dat déze
+# run output produceerde en niet stilletjes slaagt op een oud bestand.
 rm -f data/output/output_prelim_cumulatief.xlsx
-uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution 21PC > /dev/null
+FILTER_LOG="$(uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution 21PC)"
 [ -f data/output/output_prelim_cumulatief.xlsx ] || { echo "FOUT: output ontbreekt na --institution run"; exit 1; }
+# De run moet de gebruiker informeren waarvoor er gerekend wordt.
+echo "$FILTER_LOG" | grep -q "Instellingsfilter actief: 21PC" \
+    || { echo "FOUT: scope-melding voor actief filter niet gevonden"; echo "$FILTER_LOG" | tail -n 20; exit 1; }
+# Zonder filter moet de tool expliciet melden dat álle instellingen meedraaien.
+NOFILTER_LOG="$(uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes)"
+echo "$NOFILTER_LOG" | grep -q "Instellingsfilter: geen — alle" \
+    || { echo "FOUT: scope-melding voor 'geen filter' niet gevonden"; echo "$NOFILTER_LOG" | tail -n 20; exit 1; }
 # Een onbekende instelling mag NIET stil een lege pipeline draaien: harde fout.
 if uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution ZZZZ 2>/dev/null; then
     echo "FOUT: exitcode 0 verwacht bij onbekende instelling, maar pipeline slaagde"

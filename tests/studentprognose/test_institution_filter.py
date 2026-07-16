@@ -115,6 +115,67 @@ class TestFilterDatasetsByInstitution:
         assert list(out[1]["waarde"]) == [1, 2]
 
 
+class TestInstitutionScopeReport:
+    """De run moet altijd melden waarvoor er gerekend wordt (issue #200)."""
+
+    def _config(self, institutions):
+        return {
+            "institution_filter": institutions,
+            "column_roles": {"institution": "Korte naam instelling"},
+        }
+
+    def test_reports_no_filter_all_institutions(self, capsys):
+        # 4 rijen, 3 unieke instellingen (21PC, 00IC, 02NR).
+        datasets = (_df(), _df(), None, None, None)
+        filter_datasets_by_institution(datasets, self._config([]))
+        out = capsys.readouterr().out
+        assert "geen" in out
+        assert "alle 3 instellingen" in out
+        assert "4 rijen" in out
+
+    def test_reports_active_filter_with_counts(self, capsys):
+        datasets = (_df(), _df(), None, None, None)
+        filter_datasets_by_institution(datasets, self._config(["21PC"]))
+        out = capsys.readouterr().out
+        assert "actief" in out
+        assert "21PC" in out
+        # 2 van de 4 rijen zijn 21PC.
+        assert "2 van 4 rijen" in out
+
+    def test_reports_multiple_institutions(self, capsys):
+        datasets = (_df(), _df(), None, None, None)
+        filter_datasets_by_institution(datasets, self._config(["21PC", "00IC"]))
+        out = capsys.readouterr().out
+        assert "21PC, 00IC" in out
+        assert "3 van 4 rijen" in out
+
+    def test_reports_when_filter_cannot_apply(self, capsys):
+        # Cumulatief spoor niet geladen én filter gezet: meld dat 't niet toepast.
+        datasets = (_df(), None, None, None, None)
+        filter_datasets_by_institution(datasets, self._config(["21PC"]))
+        out = capsys.readouterr().out
+        assert "niet toegepast" in out
+        assert "21PC" in out
+
+    def test_silent_when_no_filter_and_no_institution_column(self, capsys):
+        # Individueel-only run zonder filter: geen ruis.
+        datasets = (_df(), None, None, None, None)
+        filter_datasets_by_institution(datasets, self._config([]))
+        assert capsys.readouterr().out == ""
+
+    def test_uses_dutch_thousands_separator(self, capsys):
+        big = pd.DataFrame(
+            {
+                "Korte naam instelling": ["21PC"] * 1500 + ["00IC"] * 500,
+                "waarde": range(2000),
+            }
+        )
+        datasets = (None, big, None, None, None)
+        filter_datasets_by_institution(datasets, self._config([]))
+        out = capsys.readouterr().out
+        assert "2.000 rijen" in out
+
+
 class TestConfigValidation:
     def _write(self, tmp_path, value):
         p = tmp_path / "configuration.json"

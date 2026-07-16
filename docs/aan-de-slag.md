@@ -216,6 +216,20 @@ studentprognose -w 10 -y 2025 -d cumulative --institution 21PC 00IC
 
 De vlag overschrijft de config-key [`institution_filter`](configuratie.md#institution_filter-beperk-de-teldata-tot-een-of-meer-instellingen); laat je hem weg, dan geldt de configuratiewaarde (standaard: alle instellingen). Een onbekende instellingscode stopt de run met een duidelijke foutmelding in plaats van stil een lege dataset te verwerken. Zet je in je config bijvoorbeeld je eigen Brincode vast, dan hoef je de vlag niet elke keer mee te geven.
 
+!!! warning "Standaard reken je over álle instellingen"
+    Zonder `--institution` én zonder `institution_filter` in je config traint en voorspelt het cumulatieve spoor over de héle landelijke teldata (alle instellingen tegelijk). Dat is het backwards-compatibele default-gedrag, maar zelden wat je wilt als je één instelling voorspelt. Zet daarom je eigen Brincode vast in de config.
+
+!!! note "De run meldt altijd de scope"
+    Bij elke run print de tool één regel met de instellings-scope, zodat je nooit ongemerkt over de verkeerde (of alle) instellingen rekent:
+
+    ```
+    # Met filter
+    Instellingsfilter actief: 21PC — 9.650 van 211.183 rijen behouden (uit 52 beschikbare instellingen).
+
+    # Zonder filter
+    Instellingsfilter: geen — alle 52 instellingen worden meegenomen (211.183 rijen). Zet 'institution_filter' (of --institution) om je eigen instelling(en) te kiezen.
+    ```
+
 ## Gebruik als Python-package
 
 Naast de CLI kun je `studentprognose` ook direct vanuit Python-scripts importeren. Dit is handig voor geautomatiseerde pipelines, notebooks, of cloudworkflows waarbij de data al in-memory beschikbaar is.
