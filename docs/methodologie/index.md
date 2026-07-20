@@ -2,14 +2,10 @@
 
 Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt** en **wanneer je de output kritisch moet beoordelen**.
 
-!!! info "Verhouding tot de Radboud-implementatie"
-    De methodologie op deze pagina's komt voort uit het model dat oorspronkelijk bij Radboud is ontwikkeld. Die productie-implementatie draait intern en is niet publiek toegankelijk; deze CEDA-versie is de publieke, generieke variant.
-
-    Concreet betekent dat:
-
-    - Modelkeuzes (features, parameters, ensemble-gewichten) zijn dezelfde als die in de Radboud-implementatie en worden hier per pagina onderbouwd.
-    - Radboud-specifieke configuratie (faculteitsnamen, programma-lijsten) is uit de gedeelde code gehaald en moet door elke instelling zelf worden ingevuld via `configuration.json`.
-    - Waar de aanpak afwijkt van een rechttoe rechtaan implementatie — bijvoorbeeld de vaste week-38 override voor 2021 — wordt dat expliciet vermeld.
+!!! abstract "In het kort"
+    - **Wat je hier vindt:** per model hoe het werkt, waarom die keuze is gemaakt, en wanneer je de output kritisch moet beoordelen.
+    - **Twee sporen:** de pipeline draait een cumulatief spoor (telbestanden) en een individueel spoor (per-student data) en combineert ze in het ensemble.
+    - **Nieuw hier?** Begin bij de modellenkaart hieronder en klik door naar het model dat je gebruikt.
 
 ## Modellen in het ensemble
 
@@ -23,7 +19,9 @@ Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt
 | Ensemble | [Ensemble](ensemble.md) | Gewogen combinatie van bovenstaande modellen |
 | Benchmarks | [Benchmarks](benchmarks.md) | Vergelijking van alternatieve modellen |
 
-Het cumulatieve spoor is configureerbaar: via `model_config.cumulative_timeseries` en `model_config.cumulative_regressor` in de [configuratie](../configuratie.md#cumulative_timeseries) kies je welk tijdreeksmodel en welk regressiemodel wordt gebruikt.
+Twee termen die in de tabel terugkomen: een **geaggregeerde curve** ontstaat door de losse voorspellingen op te tellen tot één wekelijkse lijn per opleiding, en **extrapolatie** is het doortrekken van die lijn naar het einde van het jaar (week 38).
+
+Het cumulatieve spoor is configureerbaar: via `model_config.cumulative_timeseries` en `model_config.cumulative_regressor` in de [configuratie](../configuratie-referentie.md#cumulative_timeseries) kies je welk tijdreeksmodel en welk regressiemodel wordt gebruikt.
 
 ## Datasporen
 
@@ -54,6 +52,10 @@ Alleen in `-d b` worden `SARIMA_individual` en `SARIMA_cumulative` samengevoegd 
 
 *Individueel spoor: per-student records → XGBoost classifier → ΣP = verwacht cohort (demodata)*
 
+## Verhouding tot de Radboud-implementatie
+
+De methodologie op deze pagina's komt voort uit het model dat oorspronkelijk bij Radboud is ontwikkeld; zie [In de praktijk](../index.md#in-de-praktijk) op de homepagina voor de achtergrond. Voor de methodologie is één ding van belang: modelkeuzes (features, parameters, gewichten) zijn dezelfde als in de Radboud-implementatie en worden hier per pagina onderbouwd, terwijl Radboud-specifieke configuratie (faculteitsnamen, programma-lijsten) uit de gedeelde code is gehaald en per instelling wordt ingevuld via `configuration.json`.
+
 ## Aannames en beperkingen
 
 - Het model extrapoleert op basis van historische patronen. **Structurele breuken** (bijv. nieuwe opleiding, COVID-jaar) worden niet automatisch gedetecteerd.
@@ -62,4 +64,4 @@ Alleen in `-d b` worden `SARIMA_individual` en `SARIMA_cumulative` samengevoegd 
 
 ## Dashboard-visualisatie
 
-Na het opslaan van de resultaten genereert de pipeline een interactief Plotly-dashboard per modus. Het dashboard biedt grafieken per opleiding (voorspellingen, foutmaten, feature importance) en wordt opgeslagen als zelfstandig HTML-bestand onder `data/output/visualisaties/`. Zie [Output begrijpen](../output-begrijpen.md#interactief-dashboard) voor details.
+Na het opslaan van de resultaten genereert de pipeline een interactief Plotly-dashboard per modus. Het dashboard biedt grafieken per opleiding (voorspellingen, foutmaten, feature importance) en wordt opgeslagen als zelfstandig HTML-bestand onder `data/output/visualisaties/`. Zie [Output lezen](../output-begrijpen.md#interactief-dashboard) voor details.

@@ -1,5 +1,11 @@
 # XGBoost
 
+!!! abstract "In het kort"
+    - **Wat het doet:** XGBoost voorspelt op twee plekken — als classifier de inschrijfkans per individuele student, en als regressor het totale cohortaantal uit het wekelijkse vooraanmeldpatroon.
+    - **Vertrouw het als:** er genoeg historische inschrijfpatronen zijn die representatief zijn voor het huidige cohort.
+    - **Wees voorzichtig als:** de samenstelling van vooraanmelders sterk afwijkt van de historie (nieuwe campagne, gewijzigd beleid), of bij opleidingen met weinig historische data.
+    - **In het ensemble:** levert de classifier de curve van het individuele spoor en de regressor de inschrijvingsschatting van het cumulatieve spoor; beide gaan mee in de gewogen eindvoorspelling.
+
 XGBoost wordt op twee plekken ingezet in de pipeline, met fundamenteel verschillende rollen: als **classifier** (individueel spoor) en als **regressor** (cumulatief spoor).
 
 !!! tip "Uitgebreide versie — Jupyter notebook"
@@ -18,7 +24,7 @@ De classifier voorspelt per individuele student de **kans dat deze zich uiteinde
 
 ### Waarom XGBoost hier?
 
-De inschrijfkans hangt af van meerdere interacterende factoren. XGBoost vangt niet-lineaire interacties op zonder expliciete feature engineering, en is robuust bij scheve klasseverdeling (de meeste vooraanmelders schrijven zich wel in — de klassen zijn ongelijk verdeeld).
+De inschrijfkans hangt af van meerdere factoren die op elkaar inwerken. XGBoost vangt zulke niet-lineaire samenhangen op zonder dat je die vooraf handmatig hoeft te specificeren (geen expliciete feature engineering). Bovendien gaat het goed om met het feit dat er veel meer 'wel'- dan 'niet'-inschrijvers zijn: de meeste vooraanmelders schrijven zich uiteindelijk in, dus de twee klassen zijn ongelijk verdeeld.
 
 ### Features
 
@@ -49,7 +55,7 @@ De regressor voorspelt het **totaal aantal inschrijvingen** per opleiding/herkom
 |------|----------|
 | Numeriek | Collegejaar, weekkolommen (week 1 t/m 38 als afzonderlijke kolommen) |
 | Afgeleid — lagged | `Gewogen_t-2`, `Gewogen_t-5`: gewogen vooraanmelders 2 en 5 weken vóór de voorspelweek |
-| Afgeleid — dynamiek | `Gewogen_acceleration`: tweede afgeleide van de aanmeldstroom — `(huidig − t-2) − (t-2 − t-5)`. Positief = instroom versnelt, negatief = instroom vlakt af. |
+| Afgeleid — dynamiek | `Gewogen_acceleration`: geeft aan of de aanmeldstroom versnelt of juist afvlakt — positief = instroom versnelt, negatief = instroom vlakt af. Berekend als de tweede afgeleide van de aanmeldstroom: `(huidig − t-2) − (t-2 − t-5)`. |
 | Afgeleid — commitment | `exclusivity_ratio`: aandeel aanmelders dat exclusief voor deze opleiding kiest — `Aantal aanmelders met 1 aanmelding / (Ongewogen vooraanmelders + ε)`. Hogere waarde = grotere commitment. |
 | Categorisch | Examentype, Faculteit, Croho groepeernaam, Herkomst |
 
@@ -57,7 +63,7 @@ De lagged en afgeleide features worden per (opleiding × herkomst × examentype 
 
 ### Waarom XGBoost hier?
 
-De relatie tussen het cumulatieve vooraanmeldpatroon en het uiteindelijke inschrijvingsaantal is niet-lineair en varieert per opleiding, herkomst en jaar. XGBoost kan dit patroon leren zonder dat de wekelijkse curve expliciet gemodelleerd hoeft te worden.
+Om dezelfde reden als bij de classifier (zie [Waarom XGBoost hier?](#waarom-xgboost-hier) hierboven): de relatie tussen het cumulatieve vooraanmeldpatroon en het uiteindelijke inschrijvingsaantal is niet-lineair en varieert per opleiding, herkomst en jaar. XGBoost leert dat patroon zonder dat de wekelijkse curve expliciet gemodelleerd hoeft te worden.
 
 ### Wanneer vertrouw je het niet?
 
@@ -66,11 +72,22 @@ De relatie tussen het cumulatieve vooraanmeldpatroon en het uiteindelijke inschr
 
 ---
 
+## Relatie tot andere modellen
+
+De twee XGBoost-modellen staan elk aan het begin van een eigen spoor:
+
+- De **classifier** levert per student een inschrijfkans; die kansen worden gesommeerd tot een cohortcurve die vervolgens met [SARIMA](sarima.md) wordt geëxtrapoleerd naar het einde van het jaar (zie [Individueel model](individueel.md)).
+- De **regressor** vormt stap 2 van het cumulatieve spoor: hij vertaalt het (door SARIMA geëxtrapoleerde) vooraanmeldpatroon naar een verwacht aantal inschrijvingen.
+
+De uitkomsten van beide sporen komen samen in het [ensemble](ensemble.md), waar ze gewogen worden gecombineerd met het [ratio-model](ratio-model.md).
+
+---
+
 ## Feature importance
 
 Na het trainen van elk XGBoost-model wordt de **feature importance** geëxtraheerd en gegroepeerd per oorspronkelijke feature. One-hot geëncodeerde categorieën worden teruggegroepeerd naar hun oorspronkelijke kolom (bijv. alle `Herkomst_NL`, `Herkomst_EER`, … worden samengevoegd tot `Herkomst`). Weeknummers worden weergegeven als `Week 1`, `Week 2`, etc.
 
-De gegroepeerde importances worden getoond in het interactieve dashboard (zie [Output begrijpen](../output-begrijpen.md#interactief-dashboard)).
+De gegroepeerde importances worden getoond in het interactieve dashboard (zie [Output lezen](../output-begrijpen.md#interactief-dashboard)).
 
 <iframe src="../../assets/plots/xgb_classifier_importance.html" width="100%" height="450" frameborder="0" style="border-radius: 8px;"></iframe>
 

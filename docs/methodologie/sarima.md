@@ -1,5 +1,11 @@
 # SARIMA
 
+!!! abstract "In het kort"
+    - **Wat het doet:** trekt de wekelijkse aanmeldcurve van een opleiding door naar het verwachte eindaantal, op basis van hoe die curve in eerdere jaren liep.
+    - **Vertrouw het als:** de opleiding meerdere jaren stabiele historie heeft en het aanmeldpatroon van jaar tot jaar op elkaar lijkt.
+    - **Wees voorzichtig als:** de opleiding nieuw is (< 3 jaar data), na een uitzonderlijk jaar (bijv. COVID), of vroeg in het jaar wanneer er nog weinig datapunten zijn.
+    - **In het ensemble:** levert de tijdreeksvoorspelling per opleiding per week; in de both-modus gecombineerd met de XGBoost-uitkomsten.
+
 SARIMA staat voor **Seasonal AutoRegressive Integrated Moving Average**. Het is het kerntijdreeksmodel in de pipeline en wordt ingezet in zowel het cumulatieve als het individuele spoor.
 
 !!! tip "Uitgebreide versie — Jupyter notebook"
@@ -22,6 +28,8 @@ Aanmelddata heeft een sterk seizoenspatroon (jaarlijkse cyclus, wekelijkse granu
 
 $$SARIMA(p, d, q)(P, D, Q)_{52}$$
 
+Deze getallen bepalen hoeveel het model naar het verleden en naar het seizoen kijkt; als gebruiker hoef je ze zelden aan te passen.
+
 De nominale seizoenslengte is **52 weken** (één jaar). In het cumulatieve spoor wordt deze automatisch verkleind naar het werkelijke aantal gevulde weken per jaar wanneer dat lager ligt — zie [Seizoenslengte: afgeleid uit de data](#seizoenslengte-afgeleid-uit-de-data). De overige parameters zijn standaard **vaste waarden** (voor het cumulatieve spoor optioneel af te stemmen — zie [Orde-selectie (tuning)](#orde-selectie-tuning)). De keuze hangt af van het spoor en het moment in het jaar:
 
 | Situatie | Order `(p,d,q)` | Seizoensorder `(P,D,Q)` |
@@ -30,9 +38,10 @@ De nominale seizoenslengte is **52 weken** (één jaar). In het cumulatieve spoo
 | Individueel — Bachelor, weken 17–21 | `(1, 0, 1)` | `(1, 1, 1)` |
 | Individueel — overige gevallen | `(1, 1, 1)` | `(1, 1, 0)` |
 
-De implementatie gebruikt `statsforecast.models.ARIMA` (Nixtla) als backend. Dit vervangt de eerdere `statsmodels.tsa.statespace.SARIMAX`-backend. De modelspecificatie is identiek; het verschil zit in de schattingsmethode: **CSS-ML** (conditional sum of squares, gevolgd door maximum likelihood) in plaats van MLE via een Kalman-filter. Dit levert een snelheidswinst van ~10–15× per reeks op bij gelijkwaardige nauwkeurigheid.
+Onder de motorkap gebruikt het model een snellere rekenmethode met gelijkwaardige nauwkeurigheid.
 
-Zie `src/studentprognose/models/sarima.py` voor de `SARIMAForecaster`-klasse.
+??? note "Technisch: schattingsmethode"
+    De implementatie gebruikt `statsforecast.models.ARIMA` (Nixtla) als backend. Dit vervangt de eerdere `statsmodels.tsa.statespace.SARIMAX`-backend. De modelspecificatie is identiek; het verschil zit in de schattingsmethode: **CSS-ML** (conditional sum of squares, gevolgd door maximum likelihood) in plaats van MLE via een Kalman-filter. Dit levert een snelheidswinst van ~10–15× per reeks op bij gelijkwaardige nauwkeurigheid. Bij zeer korte reeksen of reeksen met ontbrekende waarden kan dit iets afwijkende parameterschattingen opleveren.
 
 ## Orde-selectie (tuning)
 
@@ -73,14 +82,13 @@ Orde-tuning raakt uitsluitend stap 1 van het cumulatieve spoor (de curve-extrapo
 
 ## Exogene variabelen (individueel spoor)
 
-In het individuele spoor kan een deadlineweek-variabele als exogene regresssor worden meegegeven. Dit markeert weken 16–17 (Bachelor niet-numerus fixus) of weken 1–2 (numerus fixus) als deadlineweek, zodat het model de aanmeldpiek rond deadlines beter kan modelleren.
+In het individuele spoor kan een deadlineweek-variabele als exogene regressor worden meegegeven. Dit markeert weken 16–17 (Bachelor niet-numerus fixus) of weken 1–2 (numerus fixus) als deadlineweek, zodat het model de aanmeldpiek rond deadlines beter kan modelleren.
 
 ## Aannames
 
 1. **Herhaalbaar seizoenspatroon** — het model gaat ervan uit dat het patroon van dit jaar op het patroon van voorgaande jaren lijkt. Dit geldt niet bij structurele veranderingen (nieuwe opleiding, beleidsingreep, COVID).
 2. **Voldoende historische data** — trainingsdata start vanaf het jaar ingesteld via `min_training_year` in `configuration.json` (standaard 2016). Bij opleidingen met minder dan ~3 jaar data zijn de seizoensschattingen onbetrouwbaar.
 3. **Stationariteit** — het model past één seizoensdifferentiatie toe (`D=1`). Als de trend structureel niet-stationair is, kan de differentiatie onvoldoende zijn.
-4. **CSS-ML schattingsmethode** — de backend gebruikt conditional sum of squares als startpunt voor maximum likelihood. Dit is sneller dan exact MLE via het Kalman-filter, maar kan bij zeer korte reeksen of reeksen met ontbrekende waarden iets afwijkende parameterschattingen opleveren.
 
 ## Wanneer vertrouw je het niet?
 
@@ -91,42 +99,33 @@ In het individuele spoor kan een deadlineweek-variabele als exogene regresssor w
 
 ## Academische-jaargrens (`final_academic_week`)
 
-Het cumulatieve spoor modelleert één academisch jaar als een vaste week-volgorde die loopt van de reset-week (`final_academic_week + 1`) via week 52 door naar `final_academic_week` van het jaar erop. Deze grens bepaalt de voorspelhorizon (`pred_len`), de seizoensvolgorde van de kolommen en de reset-week die als nulpunt wordt geïnjecteerd.
-
-Standaard is dit **week 38** (eind september, de inschrijfdeadline van het legacy Studielink-instellingsformaat). De grens is configureerbaar via `model_config.final_academic_week` omdat niet elke leverancier dezelfde kalender hanteert:
-
-- **Legacy instellingsformaat:** leveringen lopen tot week 38 → `final_academic_week = 38`.
-- **UvA SQL-telbestand:** de aanmeldfase eindigt rond week 36; er zijn geen leveringen in de weken 37–39 (de Studielink-cyclus reset daar). Met de standaard 38 zou het model proberen te voorspellen tot een week die niet in de data bestaat. Daarom `final_academic_week = 36`.
-
-**Aanname:** de waarde moet overeenkomen met de week tot waar de aanmeldfase daadwerkelijk gegevens levert. Een te hoge waarde laat de voorspelling crashen of extrapoleert naar niet-bestaande weken; een te lage waarde kapt de voorspelhorizon onnodig af. De grens geldt voor het cumulatieve spoor; het individuele spoor gebruikt de vaste Studielink-kalender (week 38).
-
-!!! warning "52-weeks model en ISO-week 53"
-    Het seizoensvenster omvat maximaal **52 weken**. In lange ISO-jaren (bijv. een leverdatum eind december 2020 of 2026) levert de afleiding uit de leverdatum **ISO-week 53** op. Zulke weeksnapshots blijven wél in `vooraanmeldingen_cumulatief.csv` staan, maar vallen **buiten het seizoensvenster** dat het cumulatieve model gebruikt — ze worden niet meegetraind (de ETL geeft hierover een waarschuwing). Voor de jaaroverzichten betekent dit dat de allerlaatste decembersnapshot van een lang ISO-jaar niet apart wordt gemodelleerd; de eerstvolgende januarisnapshot (week 1) vangt de cumulatieve stand weer op. Volledige ondersteuning van week 53 zou een variabele seizoenslengte vereisen en is bewust niet in deze stap meegenomen.
+Het cumulatieve spoor modelleert één academisch jaar dat standaard eindigt in **week 38** (eind september, de inschrijfdeadline). Deze grens bepaalt hoe ver het model vooruit voorspelt en is configureerbaar via `model_config.final_academic_week`, omdat niet elke leverancier dezelfde kalender hanteert (het UvA SQL-telbestand levert bijvoorbeeld tot week 36). De waarde moet overeenkomen met de laatste week waarin de aanmeldfase echt gegevens levert: te hoog en het model voorspelt naar niet-bestaande weken, te laag en de voorspelhorizon wordt onnodig afgekapt. De grens geldt voor het cumulatieve spoor; het individuele spoor gebruikt de vaste Studielink-kalender (week 38).
 
 ## Seizoenslengte: afgeleid uit de data
 
-De seizoenslag bepaalt naar welk punt in het verleden het model kijkt om "dezelfde week vorig jaar" te vinden. Nominaal is dat **52 weken**. Het cumulatieve spoor zet een reeks echter in elkaar door de trainingsjaren achter elkaar te plakken over precies de weekkolommen die ná het pivotteren bestaan — de **union van gevulde weken** over alle jaren en opleidingen, plus de geïnjecteerde reset-week. Lege start- en eindweken (vóór de openbaarmakingsdrempel van de telleverancier — bij UvA `Aantal ≥ 21` — en nadat de aanmeldingen weer onder die drempel zakken) bestaan niet als kolom. Die union telt daardoor **minder dan 52 weken** (op de huidige UvA-demodata empirisch ruwweg 43–45). Dat aantal is de werkelijke jaarblok-lengte ("stride") van de afgevlakte reeks.
+De seizoenslengte bepaalt naar welk punt in het verleden het model kijkt om "dezelfde week vorig jaar" te vinden. Nominaal is dat 52 weken, maar in de praktijk zijn niet alle weken van het jaar gevuld met aanmeldingen. Daarom bepaalt het cumulatieve spoor de jaarcyclus **uit de data** in plaats van blind 52 weken aan te houden. De aanpassing verkleint de lengte alleen; een volledig gevuld jaar houdt gewoon 52 weken aan.
 
-Staat de seizoenslag vast op 52 terwijl de stride korter is, dan wijst de lag naar de **verkeerde week-in-het-jaar**: de jaarcyclus staat uit fase en het model kan de seizoensvorm niet reproduceren. Het netto-effect op de prognose is datagedreven — op de UvA-funneldata uit dit zich concreet als een prognose die ná de piek **omhoog drijft in plaats van mee te dalen** met de werkelijke (teruglopende) openstaande vooraanmeldingen.
+Het praktische signaal: **krijg je een prognose die ná de piek omhoog drijft in plaats van mee te dalen** met de teruglopende aanmeldingen, dan is een verkeerd uitgelijnde seizoenslengte vaak de oorzaak.
 
-Daarom stelt het cumulatieve spoor de seizoenslengte gelijk aan deze stride (`len(get_all_weeks_valid(...))`, inclusief de reset-week). De aanpassing **verkleint alleen**: een volledig gevulde cyclus (stride == 52) houdt `season_length = 52`, dus correct gevulde reeksen blijven ongemoeid. Dezelfde afleiding wordt toegepast in de [benchmark](benchmarks.md), zodat modelselectie hetzelfde model meet als productie.
+**Aanname:** de set gevulde weken is over de jaren heen stabiel genoeg om de jaarcyclus goed te benaderen. **Wanneer vertrouw je het niet?** Bij leveranciers of opleidingen waar de gevulde weken sterk wisselen tussen jaren, of bij een gemengde dataset met uiteenlopende weekdekking.
 
-**Aanname:** de set gevulde weken is over de jaren heen stabiel genoeg dat de union een goede benadering is van de cyclus per jaar. Wisselt de weekdekking sterk per jaar, dan wordt de seizoensuitlijning minder scherp.
+??? note "Technisch: hoe de seizoenslengte wordt bepaald"
+    Het cumulatieve spoor plakt de trainingsjaren achter elkaar over precies de weekkolommen die ná het pivotteren bestaan — de **union van gevulde weken** over alle jaren en opleidingen, plus de geïnjecteerde reset-week (`final_academic_week + 1`). Lege start- en eindweken (vóór de openbaarmakingsdrempel van de telleverancier — bij UvA `Aantal ≥ 21` — en nadat de aanmeldingen weer onder die drempel zakken) bestaan niet als kolom. Die union telt daardoor minder dan 52 weken (op de huidige UvA-demodata ruwweg 43–45); dat aantal is de werkelijke jaarblok-lengte ("stride"), waaraan de seizoenslengte gelijk wordt gesteld (`len(get_all_weeks_valid(...))`). Dezelfde afleiding wordt toegepast in de [benchmark](benchmarks.md), zodat modelselectie hetzelfde model meet als productie.
 
-**Wanneer vertrouw je het niet?** Bij leveranciers of opleidingen waar de set gevulde weken sterk wisselt tussen jaren, of bij een gemengde dataset waarin cohorten een uiteenlopende weekdekking hebben.
+??? note "52-weeks model en ISO-week 53"
+    Het seizoensvenster omvat maximaal **52 weken**. In lange ISO-jaren (bijv. een leverdatum eind december 2020 of 2026) levert de afleiding uit de leverdatum **ISO-week 53** op. Zulke weeksnapshots blijven wél in `vooraanmeldingen_cumulatief.csv` staan, maar vallen **buiten het seizoensvenster** dat het cumulatieve model gebruikt — ze worden niet meegetraind (de ETL geeft hierover een waarschuwing). De eerstvolgende januarisnapshot (week 1) vangt de cumulatieve stand weer op.
 
 ## Bekende hardgecodeerde uitzondering: 2021
 
-In `utils/weeks.py` staat een expliciete uitzondering voor collegejaar 2021:
+Dit illustreert een bredere aanname: **het model gaat ervan uit dat historische aanmeldpatronen representatief zijn**. Uitzonderingsjaren zoals 2021 (COVID) moeten handmatig worden afgehandeld.
 
-```python
-if predict_year == 2021:
-    max_week = 38
-```
+??? note "Technisch: de 2021-uitzondering in `utils/weeks.py`"
+    ```python
+    if predict_year == 2021:
+        max_week = 38
+    ```
 
-Dit forceert de maximale week voor dat jaar op 38 (de standaard inschrijfdeadline), in plaats van die te berekenen uit de data. De vermoedelijke reden is dat de aanmeldingscyclus in 2021 een afwijkend patroon had door COVID, waardoor de normale berekening geen betrouwbaar resultaat gaf. De achterliggende reden is nog niet formeel gedocumenteerd — zie issue [#84](https://github.com/cedanl/studentprognose/issues/84).
-
-Dit illustreert een bredere aanname: **het model gaat ervan uit dat historische aanmeldpatronen representatief zijn**. Uitzonderingsjaren zoals 2021 moeten handmatig worden afgehandeld.
+    Dit forceert de maximale week voor 2021 op 38 (de standaard inschrijfdeadline) in plaats van die uit de data te berekenen. Vermoedelijk had de aanmeldingscyclus in 2021 door COVID een afwijkend patroon waardoor de normale berekening geen betrouwbaar resultaat gaf. De achterliggende reden is nog niet formeel gedocumenteerd — zie issue [#84](https://github.com/cedanl/studentprognose/issues/84).
 
 ## Alternatieve tijdreeksmodellen
 

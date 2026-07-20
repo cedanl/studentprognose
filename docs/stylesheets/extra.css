@@ -1,0 +1,4 @@
+/* Centreer de bovenste navigatietabs (Home, Aan de slag, Configuratie, …) */
+.md-tabs__list {
+  justify-content: center;
+}
