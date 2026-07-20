@@ -24,6 +24,9 @@
 > [!NOTE]
 > Dit model is oorspronkelijk ontwikkeld door **Radboud Universiteit** en vervolgens samen met CEDA open source gemaakt zodat andere instellingen er ook van kunnen profiteren. Lees meer in het [VOX-artikel](https://www.voxweb.nl/nieuws/de-universiteit-heeft-nu-haar-eigen-glazen-bol-nieuw-model-voorspelt-toekomstige-instroom-van-studenten).
 
+> [!TIP]
+> **Zie het in actie:** bekijk een [voorbeeld-dashboard en een uitgewerkte prognose](https://cedanl.github.io/studentprognose/) op de documentatiesite — van vooraanmelders op een peilmoment naar het verwachte aantal inschrijvingen, met demodata.
+
 ---
 
 ## 📦 Aan de slag
@@ -36,7 +39,7 @@ Installeer met [uv](https://docs.astral.sh/uv/):
 uv tool install studentprognose
 ```
 
-> Heb je uv nog niet? Eenmalig installeren met `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) of `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` (Windows). Voor pip-instructies, zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#andere-installatiemethoden).
+> Heb je uv nog niet? Eenmalig installeren met `curl -LsSf https://astral.sh/uv/install.sh | sh` (macOS/Linux) of `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"` (Windows). Voor pip-instructies, zie de [documentatie](https://cedanl.github.io/studentprognose/installeren/).
 
 Na installatie:
 
@@ -103,14 +106,11 @@ uv run studentprognose -w 6 -y 2020
 
 ---
 
-## 🗃️ Studielink Data
+## ✨ Gebruik
 
 > [!IMPORTANT]
-> Dit model werkt met **Studielink-telbestanden**. Je hebt deze data nodig om voorspellingen te maken voor jouw instelling. Demodata is meegeleverd zodat je het model eerst kunt uitproberen.
+> Dit model werkt met **Studielink-telbestanden**. Je hebt deze data nodig om voorspellingen te maken voor jouw instelling; de meegeleverde demodata laat je het model eerst uitproberen. Zie [Je data voorbereiden](https://cedanl.github.io/studentprognose/je-data-voorbereiden/).
 
----
-
-## ✨ Gebruik
 
 ```bash
 studentprognose -w 6 -y 2024                  # specifieke week en jaar

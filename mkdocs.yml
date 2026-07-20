@@ -8,6 +8,12 @@ edit_uri: edit/main/docs/
 docs_dir: docs
 site_dir: site
 
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
 theme:
   name: material
   language: nl
@@ -73,6 +79,9 @@ markdown_extensions:
   - pymdownx.arithmatex:
       generic: true
 
+extra_css:
+  - stylesheets/extra.css
+
 extra_javascript:
   - javascripts/mathjax.js
   - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
@@ -80,12 +89,16 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - Presentatie: presentatie.md
-  - Aan de slag: aan-de-slag.md
-  - Je data voorbereiden: je-data-voorbereiden.md
-  - Configuratie: configuratie.md
-  - Validatie: validatie.md
-  - Output begrijpen: output-begrijpen.md
+  - Aan de slag:
+    - Snelstart (5 min): snelstart.md
+    - Installeren: installeren.md
+    - Je data klaarzetten: je-data-voorbereiden.md
+    - Draaien & CLI: aan-de-slag.md
+    - Output lezen: output-begrijpen.md
+  - Configuratie:
+    - Basis: configuratie.md
+    - Referentie: configuratie-referentie.md
+    - Validatie: validatie.md
   - Methodologie:
     - methodologie/index.md
     - Individueel model: methodologie/individueel.md
@@ -94,7 +107,11 @@ nav:
     - Ratio-model: methodologie/ratio-model.md
     - Ensemble: methodologie/ensemble.md
     - Benchmarks: methodologie/benchmarks.md
-  - API-referentie:
-    - api/index.md
-    - Modellen: api/models.md
-    - Strategies: api/strategies.md
+  - Gevorderd & naslag:
+    - Gevorderd gebruik: gevorderd-gebruik.md
+    - Begrippen: begrippen.md
+    - API-referentie:
+      - api/index.md
+      - Modellen: api/models.md
+      - Strategies: api/strategies.md
+    - Presentatie: presentatie.md

@@ -1,11 +1,14 @@
-# Output begrijpen
+# Output lezen
 
-De pipeline schrijft de resultaten naar `data/output/`. Er zijn twee typen uitvoerbestanden: een tussenresultaat en drie eindresultaten.
+De tool schrijft je resultaten naar `data/output/`. Het belangrijkste bestand is **`output_first-years_{modus}.xlsx`** — de prognose per opleiding.
+
+!!! abstract "In het kort"
+    - **Waar staat mijn prognose?** In `output_first-years_{modus}.xlsx`, kolom `Ensemble_prediction` (of `SARIMA_cumulative` bij alleen `-d c`).
+    - **Kan ik hem vertrouwen?** Liggen de modellen dicht bij elkaar en is de historische fout (`MAE`/`MAPE`) klein? Zie [Wanneer is een prognose betrouwbaar?](#wanneer-is-een-prognose-betrouwbaar).
+    - **Wat betekent een getal?** Zie [Kolomdefinities](#kolomdefinities). Onbekende term? Zie [Begrippen](begrippen.md).
 
 !!! tip "Uitgebreide versie — Jupyter notebook"
-    Een uitvoerbare versie die een in-memory pipeline-run uitvoert en de outputkolommen stap
-    voor stap interpreteert (inclusief MAE/MAPE-voorbeelden en modelvergelijking) staat in
-    [`notebooks/06_output_interpreteren.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/06_output_interpreteren.ipynb).
+    Een uitvoerbare versie die de outputkolommen stap voor stap interpreteert (met MAE/MAPE-voorbeelden en modelvergelijking): [`notebooks/06_output_interpreteren.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/06_output_interpreteren.ipynb).
 
 ## Outputbestanden
 
@@ -14,7 +17,7 @@ De pipeline schrijft de resultaten naar `data/output/`. Er zijn twee typen uitvo
 | `output_prelim_{modus}.xlsx` | Tussenresultaat | Voorlopige voorspellingen vóór ratio-model, ensemble en foutmaten. Nuttig voor debugging. |
 | `output_first-years_{modus}.xlsx` | Eindresultaat | Eerstejaars voorspellingen per opleiding/herkomst/week |
 | `output_volume_{modus}.xlsx` | Eindresultaat | Totaal studentvolume-voorspellingen (alleen bij `-sy v`) |
-| `_totaal_{studentjaar}_{modus}.xlsx` | Audittrail | Doorlopend bestand waar elke run zijn rijen aan toevoegt. Wordt nooit als input ingelezen. Zie [Audittrail](#audittrail-_totaalxlsx). |
+| `_totaal_{studentjaar}_{modus}.xlsx` | Audittrail | Doorlopend bestand waar elke run zijn rijen aan toevoegt. Wordt nooit als input ingelezen. Zie [Audittrail](#audittrail-_totaal_xlsx). |
 
 `{modus}` is `cumulatief`, `individueel` of `beide`, afhankelijk van de gebruikte `-d` vlag.
 `{studentjaar}` is `first-years`, `higher-years` of `volume`, afhankelijk van `-sy`.
@@ -29,17 +32,13 @@ Naast de week-specifieke `output_*.xlsx`-bestanden — die elke run worden overs
 
 Het bestand wordt **nooit** door de pipeline als input ingelezen — de data loader leest enkel de paden uit `configuration.json`. Daarmee is een circulaire afhankelijkheid structureel uitgesloten.
 
-### Wanneer is de audittrail nuttig?
+**Waarvoor nuttig?** Trends over weken heen volgen (hoe ontwikkelde de voorspelling zich door het seizoen?) en achteraf reconstrueren wanneer een voorspelling is gemaakt (`Run_date`), zonder zelf wekelijkse exports te koppelen.
 
-- **Trends over weken heen** — open één bestand om te zien hoe de voorspelling voor een opleiding zich gedurende het inschrijfseizoen ontwikkelde, zonder dat je zelf wekelijkse exports hoeft te koppelen.
-- **Achteraf reconstrueren** — `Run_date` toont wanneer een voorspelling is gemaakt, wat helpt bij retrospectief onderzoek of audits.
-
-### Bekende limieten
-
-- **Filterwijzigingen tussen runs** worden niet gedetecteerd. Als je in week 10 met `-f base.json` draait en in week 11 met een ander filter, leven beide rijensets naast elkaar in dezelfde audittrail. Geen filterhash; documenteer welke filterconfig hoort bij welke run zelf.
-- **Modelversie-drift**: rijen uit oudere runs kunnen door een andere modelvariant zijn gegenereerd. `Run_date` maakt dit traceerbaar maar is geen vervanging voor versiebeheer van de pipeline zelf.
-- **Numerus-fixusvoorspellingen** worden net als in de week-output afgekapt; de audittrail erft die waarden ongewijzigd.
-- **CI-modus** (`--ci test N`) schrijft géén audittrail — alleen reguliere runs.
+??? note "Bekende limieten"
+    - **Filterwijzigingen tussen runs** worden niet gedetecteerd. Draai je week 10 met `-f base.json` en week 11 met een ander filter, dan leven beide rijensets naast elkaar. Documenteer zelf welke filterconfig bij welke run hoort.
+    - **Modelversie-drift**: rijen uit oudere runs kunnen door een andere modelvariant zijn gegenereerd. `Run_date` maakt dit traceerbaar maar vervangt geen versiebeheer.
+    - **Numerus-fixusvoorspellingen** worden afgekapt; de audittrail erft die waarden ongewijzigd.
+    - **CI-modus** (`--ci test N`) schrijft géén audittrail — alleen reguliere runs.
 
 ## Kolomdefinities
 
@@ -121,107 +120,17 @@ Er is geen harde drempel, maar de volgende signalen helpen:
 - Vroeg in het jaar (vóór week 6) — de tijdreeks is dan erg kort
 - Het jaar na een uitzonderlijk jaar (COVID, beleidswijziging)
 
-## Meerdere modellen vergelijken
-
-De individuele modelkolommen naast `Ensemble_prediction` zijn bewust in de output opgenomen. Ze stellen je in staat om:
-
-- Te controleren of de modellen het eens zijn
-- Te signaleren welk model structureel afwijkt voor een specifieke opleiding
-- De baseline (ratio-model) te vergelijken met de complexere modellen — als het ensemble niet beter is dan de ratio, is er reden om kritischer te kijken
-
-Zie [Ensemble](methodologie/ensemble.md) voor uitleg over hoe de gewichten tot stand komen.
+De individuele modelkolommen staan bewust naast `Ensemble_prediction`, zodat je kunt controleren of de modellen het eens zijn, kunt signaleren welk model structureel afwijkt, en de baseline (ratio-model) tegen de complexere modellen kunt afzetten. Zie [Ensemble](methodologie/ensemble.md) voor hoe de gewichten tot stand komen.
 
 ## Foutmaten en numerus-fixusopleidingen
 
 MAE en MAPE worden berekend **exclusief numerus-fixusopleidingen**. Voor deze opleidingen worden de foutkolommen op `NaN` gezet. De reden: bij numerus-fixusopleidingen wordt het voorspelde aantal afgekapt op de capaciteitslimiet, waardoor de modelfouten niet vergelijkbaar zijn met reguliere opleidingen.
 
-## Het model evalueren (`evaluate_predictions`)
+## Het model evalueren (geaggregeerde metrieken)
 
-De per-rij `MAE_*`/`MAPE_*`-kolommen hierboven zijn handig om één rij te lezen, maar voor **modelevaluatie** wil je geaggregeerde, scalaire metrieken (één getal per model). Daarvoor levert het pakket `evaluate_predictions`:
+De per-rij `MAE_*`/`MAPE_*`-kolommen hierboven zijn handig om één rij te lezen. Wil je een model **als geheel** beoordelen — één getal per model, of een eerlijke backtest over meerdere jaren — dan levert het pakket daarvoor de functies `evaluate_predictions`, `pivot_metrics` en `to_mlflow_metrics`.
 
-```python
-from studentprognose import run_pipeline_from_dataframes, evaluate_predictions, DataOption
-
-result = run_pipeline_from_dataframes(
-    year=2023, week=12,
-    data_cumulative=df_cum, data_student_numbers=df_sc,
-    dataset=DataOption.CUMULATIVE, save_output=False,
-)
-
-metrics = evaluate_predictions(result, week=12)
-print(metrics)
-```
-
-De functie vergelijkt elke voorspelkolom met de gerealiseerde `Aantal_studenten` en geeft per model één rij terug met:
-
-| Metriek | Betekenis | Interpretatie |
-|---------|-----------|---------------|
-| `n` | aantal meegetelde (opleiding × herkomst)-rijen | klein `n` → metriek is ruisgevoelig |
-| `mae` | Mean Absolute Error | gemiddelde afwijking in studenten |
-| `mape` | Mean Absolute Percentage Error (fractie) | elke opleiding telt even zwaar — kleine opleidingen domineren |
-| `wape` | Weighted APE = `Σ\|fout\| / Σ\|werkelijk\|` (fractie) | instellingsbrede procentuele fout, robuust tegen kleine opleidingen |
-| `rmse` | Root Mean Squared Error | straft grote uitschieters zwaarder |
-| `bias` | gemiddelde `voorspeld − werkelijk` | positief = structurele overschatting |
-| `r2` | determinatiecoëfficiënt | aandeel verklaarde variantie |
-
-`mape` en `wape` zijn fracties (`0.08` betekent 8%). De metrieken gebruiken dezelfde primitieven en numerus-fixus-uitsluiting als de `MAE_*`-kolommen, dus ze zijn consistent met de rest van de output.
-
-!!! warning "Evalueren kan alleen via een backtest"
-    Een model evalueren betekent voorspellingen vergelijken met de **gerealiseerde** instroom. Voor het lopende, nog niet afgeronde collegejaar bestaat die realisatie nog niet — `Aantal_studenten` is dan leeg en `evaluate_predictions` geeft een foutmelding. Evalueer daarom een **afgerond** collegejaar (bijv. voorspel `year=2023` terwijl je de realisatie van 2023 als `data_student_numbers` meegeeft). De modellen trainen sowieso alleen op jaren vóór het voorspeljaar, dus zo'n backtest lekt geen toekomstinformatie.
-
-!!! tip "Geef altijd `week` mee bij cumulatieve output"
-    In het cumulatieve spoor draagt alleen de **peilweekrij** de `SARIMA_cumulative`-voorspelling; latere weken bevatten enkel de vooraanmeldcurve (met `NaN` als voorspelling). Zonder `week=`-filter mengt `Prognose_ratio` bovendien meerdere weken. Geef de gebruikte peilweek mee (`evaluate_predictions(result, week=12)`) voor een zuivere, één-rij-per-opleiding vergelijking tussen modellen.
-
-Segmenteer met `group_by` (bijv. `group_by="Examentype"` of `group_by=["Examentype", "Herkomst"]`) om te zien waar een model structureel afwijkt.
-
-### Backtesten over meerdere jaren (`pivot_metrics`)
-
-Eén afgerond jaar is **één datapunt**: de instroom schommelt jaar-op-jaar om redenen buiten het model. Voor een eerlijk beeld backtest je daarom meerdere afgeronde jaren op dezelfde peilweek, evalueer je per jaar met `group_by="Collegejaar"`, en draai je het resultaat met `pivot_metrics` tot een model × jaar-matrix:
-
-```python
-import pandas as pd
-from studentprognose import run_pipeline_from_dataframes, evaluate_predictions, pivot_metrics, DataOption
-
-WEEK = 10
-frames = [
-    run_pipeline_from_dataframes(
-        year=jaar, week=WEEK, data_cumulative=df_cum,
-        data_student_numbers=df_sc, dataset=DataOption.CUMULATIVE, save_output=False,
-    )
-    for jaar in (2021, 2022, 2023)            # afgeronde jaren met realisatie
-]
-
-metrics = evaluate_predictions(pd.concat(frames, ignore_index=True),
-                               week=WEEK, group_by="Collegejaar")
-print(pivot_metrics(metrics, value="wape", over="Collegejaar").round(3))
-```
-
-```text
-                    2021   2022   2023   mean    min    max  n_groups
-prediction
-Prognose_ratio     0.078  0.071  0.069  0.073  0.069  0.078         3
-SARIMA_cumulative  0.063  0.058  0.066  0.062  0.058  0.066         3
-```
-
-De `mean`-kolom is het gemiddelde over de jaren; `min`/`max` tonen de spreiding. Ligt de jaar-op-jaar spreiding in dezelfde orde als het verschil tussen modellen, trek dan geen harde conclusie uit één jaar. Kies met `value=` een andere metriek (`"mae"`, `"mape"`, …) en met `over=` een andere as (bijv. `over="Weeknummer"` voor de accuraatheid-over-tijd-curve bij één jaar).
-
-### Metrieken loggen in MS Fabric / Databricks (MLflow)
-
-Beide platforms hebben **MLflow** als ingebouwde experiment-tracker. `to_mlflow_metrics` vlakt het resultaat af tot een dict die je direct kunt loggen, zodat de metrieken in de Fabric/Databricks ML-experiment-UI verschijnen en over runs (jaar/peilweek) vergelijkbaar zijn:
-
-```python
-import mlflow
-from studentprognose import evaluate_predictions, to_mlflow_metrics
-
-metrics = evaluate_predictions(result, week=WEEK)
-
-with mlflow.start_run(run_name=f"prognose_{YEAR}_wk{WEEK}"):
-    mlflow.log_params({"year": YEAR, "week": WEEK, "dataset": "cumulatief"})
-    mlflow.log_metrics(to_mlflow_metrics(metrics))
-    mlflow.log_table(metrics, "metrics.json")  # volledige tabel als artifact
-```
-
-`mlflow` zit standaard in de Fabric- en Databricks-runtime; in een Fabric-notebook worden runs automatisch aan het gekoppelde experiment gehangen. Wil je geen MLflow gebruiken, dan kun je het `metrics`-DataFrame ook gewoon naar een Lakehouse/Delta-tabel wegschrijven voor je eigen monitoring.
+Dat is Python-API-werk (notebooks, cloud, MLflow) en staat daarom op de pagina [Gevorderd gebruik → Het model evalueren](gevorderd-gebruik.md#het-model-evalueren).
 
 ## Interactief dashboard
 
@@ -237,7 +146,7 @@ De dashboards zijn zelfstandige HTML-bestanden (geen server nodig) en kunnen in 
     Sinds deze versie wordt het dashboard alleen gegenereerd als je expliciet `--dashboard` meegeeft. Een voorbeeld:
 
     ```bash
-    studentprognose --dashboard -d both -w 10 -y 2025
+    studentprognose --dashboard -d both -w 10 -y 2024
     ```
 
     Mocht dashboard-generatie onverhoopt falen, dan loopt de rest van de pipeline gewoon door en wordt de stack trace weggeschreven naar `data/output/dashboard_error.log`. De Excel-output blijft in dat geval beschikbaar.

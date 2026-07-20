@@ -1,5 +1,11 @@
 # Individueel model
 
+!!! abstract "In het kort"
+    - **Wat het doet:** schat per aanmelder de kans dat die zich inschrijft, telt die kansen op en extrapoleert de curve naar het einde van het jaar.
+    - **Vertrouw het als:** persoonskenmerken (vooropleiding, herkomst) sterk meebepalen wie doorstroomt en er al veel aanmelders binnen zijn.
+    - **Wees voorzichtig als:** de opleiding nieuw is, het beleid veranderde, of er nog weinig aanmelders zijn.
+    - **In het ensemble:** levert `SARIMA_individual`; in de both-modus gewogen gecombineerd met het cumulatieve `SARIMA_cumulative`.
+
 Het individueel model voorspelt het verwachte cohortaantal door **per individuele student** een inschrijfkans te schatten en die kansen vervolgens te aggregeren tot een wekelijkse cumulatieve curve, die met SARIMA wordt geëxtrapoleerd naar week 38.
 
 Dit is fundamenteel anders dan het cumulatieve spoor: in plaats van geaggregeerde wekelijkse telbestanden te modelleren, werkt dit spoor op **per-student records** uit Osiris/Usis. Dat geeft toegang tot persoonskenmerken (vooropleiding, herkomst, nationaliteit, …) die in geaggregeerde data verloren gaan.
@@ -20,10 +26,8 @@ studentprognose -d b -w 6 -y 2024   # individueel + cumulatief → ensemble
 
 In de `-d b` (both) modus draait dit model parallel aan het cumulatieve spoor; de uitkomsten worden gecombineerd in het [ensemble](ensemble.md).
 
-!!! warning "Sleutelruimte in both-modus: individueel keyt op naam, cumulatief op Isatcode"
-    Sinds de [isatcode-migratie](../je-data-voorbereiden.md) keyt het cumulatieve spoor (en het label) op de numerieke `Isatcode`, terwijl het individuele spoor nog op de **leesbare opleidingsnaam** keyt. Die twee sleutelruimtes overlappen niet, dus de feature-merge tussen beide sporen matcht in de praktijk **0 rijen** op de programmesleutel — de cumulatieve features worden niet daadwerkelijk op de individuele records gejoind. De sporen worden daardoor pas op het **ensemble**-niveau gecombineerd, niet op feature-niveau.
-
-    Dit is gedrag dat losstaat van het sleutel-dtype (ook met de oude string-sleutel matchte de join al niets). De merges zijn dtype-veilig gemaakt zodat ze niet crashen; het structureel uitlijnen van beide sporen op één sleutel wordt opgevolgd in [#238](https://github.com/cedanl/studentprognose/issues/238). Interpreteer de both-uitkomst dus als een **ensemble van twee onafhankelijk geschatte sporen**, niet als een individueel model dat met cumulatieve features is verrijkt.
+!!! warning "Both-modus: twee onafhankelijke voorspellingen"
+    In de both-modus (`-d b`) schat het model beide sporen **onafhankelijk** en combineert ze pas op **ensembleniveau** — de individuele records worden niet verrijkt met cumulatieve cijfers. Interpreteer de both-uitkomst dus als een combinatie van twee losse voorspellingen, niet als een individueel model dat met cumulatieve gegevens is aangevuld.
 
 ## Pipeline op hoofdlijnen
 
@@ -54,19 +58,6 @@ De classifier vertaalt persoonskenmerken naar een kans. De SARIMA extrapoleert d
 
 Voordat de classifier draait, wordt de ruwe per-student data gefilterd en verrijkt. De filterregels zijn bewust streng zodat het model alleen leert van vergelijkbare cases.
 
-```mermaid
-flowchart TD
-    R["Ruwe Osiris/Usis records"] --> F1["Filter:<br/>Ingangsdatum 01-09 of 01-10"]
-    F1 --> F2["Filter:<br/>Eerstejaars croho = 1<br/>Hogerejaars = 0<br/>BBC = 0"]
-    F2 --> F3["Filter:<br/>Examentype ∈ {Bachelor,<br/>Master, Pre-master}"]
-    F3 --> A1["Afleiden:<br/>Herkomst (NL / EER / Niet-EER)<br/>op basis van nationaliteit + EER"]
-    A1 --> A2["Afleiden:<br/>Weeknummer uit datum"]
-    A2 --> A3["Afleiden:<br/>Deadlineweek (week 17,<br/>Bachelor niet-NF)"]
-    A3 --> A4["Afleiden:<br/>is_numerus_fixus,<br/>Sleutel_count per student"]
-    A4 --> A5["Categorie-opschoning:<br/>kleine nationaliteiten →<br/>'Overig' (<100)"]
-    A5 --> Out["Klaar voor classifier"]
-```
-
 Belangrijke afleidingen:
 
 - **Herkomst** — afgeleid uit nationaliteit + EER-vlag (`Nederlandse` → NL; overig EER → EER; rest → Niet-EER). Dit normaliseert kleine landverschillen tot drie hanteerbare groepen.
@@ -80,7 +71,7 @@ Studenten van wie de aanmelding is ingetrokken vóór de voorspelweek krijgen la
 
 ### Wat doet het?
 
-Per individuele student wordt de **kans op inschrijving** geschat: $P(\text{ingeschreven} \mid \text{features})$. De voorspelling is een waarschijnlijkheid tussen 0 en 1, geen harde label.
+Per individuele student schat het model **hoe waarschijnlijk het is dat die zich inschrijft**, gegeven wat we van de aanmelder weten (de features). Het antwoord is een getal tussen 0 en 1 — dus een kans, geen harde ja/nee. In formulevorm: $P(\text{ingeschreven} \mid \text{features})$.
 
 ### Waarom XGBoost?
 
@@ -107,19 +98,10 @@ Categorische features worden one-hot geëncodeerd. Onbekende categorieën in de 
 
 ### Training / test split
 
-```mermaid
-flowchart LR
-    H["Historische jaren<br/>≥ min_training_year<br/>(standaard 2016)"] --> T["Train set"]
-    P["Voorspeljaar"] --> X["Test set<br/>(weken ≤ voorspelweek)"]
-    T --> M["XGBoost<br/>binary:logistic"]
-    X --> M
-    M --> Pr["P(inschrijving)<br/>per student"]
-```
-
 - **Train** — alle historische jaren vanaf `min_training_year` (configureerbaar, standaard 2016), exclusief het voorspeljaar zelf.
 - **Test** — aanmeldingen uit het voorspeljaar tot en met de voorspelweek.
 - **Vermijden van data leakage** — intrekkingen na de voorspelweek worden uit de trainingsdata gefilterd; je mag niet weten wat na week *w* gebeurt als je *voor* week *w* voorspelt.
-- **Backtest-modus** — wanneer je een eerder jaar voorspelt (`predict_year < max_year`), worden zowel het voorspeljaar *als* het meest recente jaar uit de trainingsdata weggelaten. Anders zou het model toekomstige informatie zien die op het simulatie-moment nog niet bestond. Bij voorspellingen voor het meest recente jaar (`predict_year == max_year`) blijft alle historie tot dat jaar gewoon in de trainingsset.
+- **Backtest-modus** — een *backtest* betekent dat je doet alsof je in het verleden staat: je voorspelt een jaar waarvan de uitkomst eigenlijk al bekend is, om te controleren hoe goed het model toen zou hebben gepresteerd. Wanneer je zo'n eerder jaar voorspelt (`predict_year < max_year`), worden zowel het voorspeljaar *als* het meest recente jaar uit de trainingsdata weggelaten. Anders zou het model toekomstige informatie zien die op het simulatie-moment nog niet bestond. Bij voorspellingen voor het meest recente jaar (`predict_year == max_year`) blijft alle historie tot dat jaar gewoon in de trainingsset.
 
 Trainingsdata vóór `min_training_year` wordt bewust weggelaten omdat oudere cohorten een ander aanmeldgedrag vertonen (andere wettelijke kaders, andere studieduur, vóór de invoering van het BSA-regime).
 

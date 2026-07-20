@@ -1,5 +1,7 @@
 # Validatie
 
+Krijg je een foutmelding? Spring direct naar [Een validatiefout oplossen](#een-validatiefout-oplossen).
+
 De pipeline voert vóór de ETL automatisch een datakwaliteitscontrole uit op alle ruwe inputbestanden. Dit voorkomt dat fouten in de brondata pas later in de pipeline of in de output zichtbaar worden.
 
 Gebruik `--noetl` om zowel de ETL als de validatie over te slaan (alleen als de data eerder al gevalideerd is).
@@ -35,6 +37,20 @@ De ✓ en ✗ symbolen worden in kleur weergegeven (groen/rood) als de terminal 
 
 In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te omzeilen.
 
+## Een validatiefout oplossen
+
+**Hard error — ontbrekende kolommen:**
+De kolomnaam in jouw bestand wijkt af van de kanonieke naam. Voeg een kolomnamen-mapping toe in `configuration.json` onder `columns.individual` of `columns.oktober` (de mapping voor het telbestand studenten).
+
+**Soft error — onverwacht collegejaar:**
+Controleer of het bestand het juiste studiejaar bevat. Als de afwijking verwacht is (bijv. historische data), kun je `collegejaar_min_offset` verhogen of met `--yes` doorgaan.
+
+**Soft error — ongeldige herkomstwaarden:**
+Jouw instelling gebruikt mogelijk `"ONBEKEND"` of een andere waarde. Voeg die toe aan `validation.telbestand.herkomst_allowed` in je configuratie.
+
+**Waarschuwing — witruimte gestript:**
+De data wordt automatisch gecorrigeerd. Overweeg de brondata te corrigeren om dit te voorkomen.
+
 ## Gevalideerde bestanden
 
 ### Telbestanden (`data/input_raw/telbestanden/`)
@@ -63,7 +79,7 @@ In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te o
 
 ### Telbestand studenten (`data/input_raw/oktober_bestand.xlsx`)
 
-Telbestand met studentaantallen, door de instelling zelf aangeleverd — zie [Je data voorbereiden](je-data-voorbereiden.md#telbestand-studenten). De bestandsnaam heet historisch `oktober_bestand.xlsx`.
+Telbestand met studentaantallen, door de instelling zelf aangeleverd — zie [Je data klaarzetten](je-data-voorbereiden.md#telbestand-studenten). De bestandsnaam heet historisch `oktober_bestand.xlsx`.
 
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
@@ -133,22 +149,23 @@ Met `--yes` verschijnt een waarschuwing in de console maar stopt de pipeline nie
 
 ### Numerus-fixus-sleutels
 
-Direct na het preprocessen — vóór de voorspelling — controleert de pipeline of elke sleutel in [`numerus_fixus`](configuratie.md#numerus_fixus) daadwerkelijk voorkomt in de programmakolom (`Croho groepeernaam`) van de geladen data. Dit voorkomt de stille misconfiguratie uit issue #258: een sleutel die niet matcht, levert bij `.isin`/`==` simpelweg `False` op, zonder foutmelding, waardoor de numerus-fixus-behandeling (aparte regressor, capaciteitsplafond, aparte foutrapportage) ongemerkt niet aangrijpt.
-
-De check draait op de genormaliseerde, gepreprocesste data, zodat het exacte dtype van de kolom wordt gezien.
+Als een numerus-fixus-sleutel niet exact overeenkomt met een opleiding in je data, werd die vroeger stil genegeerd: de speciale numerus-fixus-behandeling (aparte regressor, capaciteitsplafond, aparte foutrapportage) greep dan ongemerkt niet aan, zonder foutmelding. Nu krijg je vóór de voorspelling een duidelijke melding als een sleutel uit [`numerus_fixus`](configuratie.md#numerus_fixus) niet voorkomt in je opleidingen.
 
 | Situatie | Gedrag |
 |----------|--------|
-| Sleutel matcht **geen enkel** geladen spoor | Hard stop — pipeline stopt (typefout of verkeerd formaat) |
-| Sleutel matcht wel het ene, maar niet het andere geladen spoor | Waarschuwing — bekende namen-vs-Isatcodes-mismatch (#238) |
+| Sleutel matcht **geen enkel** geladen spoor | Hard stop — pipeline stopt (waarschijnlijk een typefout of verkeerd formaat) |
+| Sleutel matcht wel het ene, maar niet het andere geladen spoor | Waarschuwing — bekende naam-versus-Isatcode-verschil tussen de twee sporen |
 | Elke sleutel matcht alle geladen sporen | Check slaagt stilzwijgend |
+
+??? note "Technische achtergrond"
+    De check draait direct na het preprocessen op de genormaliseerde, gepreprocesste data, zodat het exacte dtype van de programmakolom (`Croho groepeernaam`) wordt gezien. Een niet-matchende sleutel leverde bij `.isin`/`==` simpelweg `False` op zonder foutmelding (issue #258); het gedeeltelijke-match-geval is de bekende namen-vs-Isatcodes-mismatch uit issue #238.
 
 !!! tip "Oplossing"
     Gebruik voor het cumulatieve spoor de numerieke **Isatcode** als sleutel, voor het individuele spoor de leesbare **opleidingsnaam** — precies de waarde zoals die in de programmakolom van dat spoor staat. Zie [`numerus_fixus`](configuratie.md#numerus_fixus).
 
 ## Post-prediction checks
 
-Nadat het ensemble zijn voorspellingen heeft opgeleverd, voert de pipeline twee informatieve checks uit. Ze stoppen de pipeline **nooit** — ze printen alleen waarschuwingen in de console.
+Nadat het ensemble zijn voorspellingen heeft opgeleverd, krijg je nog twee informatieve checks. Ze stoppen de pipeline **nooit** — je ziet alleen een waarschuwing in de console als de uitkomst opvalt.
 
 | Check | Wat wordt gecheckt |
 |-------|-------------------|
@@ -165,18 +182,4 @@ De week-op-week-check slaat de eerste week van elke run over (geen vorige week b
 
 ## Drempels aanpassen
 
-De standaarddrempels voor NaN-percentages en jaarbereiken zijn instelbaar via `configuration.json`. Zie [Configuratie — validation](configuratie.md#validation--validatiedrempels-overschrijven).
-
-## Een validatiefout oplossen
-
-**Hard error — ontbrekende kolommen:**
-De kolomnaam in jouw bestand wijkt af van de kanonieke naam. Voeg een kolomnamen-mapping toe in `configuration.json` onder `columns.individual` of `columns.oktober` (de mapping voor het telbestand studenten).
-
-**Soft error — onverwacht collegejaar:**
-Controleer of het bestand het juiste studiejaar bevat. Als de afwijking verwacht is (bijv. historische data), kun je `collegejaar_min_offset` verhogen of met `--yes` doorgaan.
-
-**Soft error — ongeldige herkomstwaarden:**
-Jouw instelling gebruikt mogelijk `"ONBEKEND"` of een andere waarde. Voeg die toe aan `validation.telbestand.herkomst_allowed` in je configuratie.
-
-**Waarschuwing — witruimte gestript:**
-De data wordt automatisch gecorrigeerd. Overweeg de brondata te corrigeren om dit te voorkomen.
+De standaarddrempels voor NaN-percentages en jaarbereiken zijn instelbaar via `configuration.json`. Zie [Configuratie — validation](configuratie-referentie.md#validation-validatiedrempels-overschrijven).
