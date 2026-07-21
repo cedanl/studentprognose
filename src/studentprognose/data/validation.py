@@ -157,7 +157,7 @@ class ValidationResult:
     warnings: list = field(default_factory=list)
 
 
-def validate_raw_data(configuration, yes=False, data_option=None):
+def validate_raw_data(configuration, yes=False, data_option=None, no_warnings=False):
     """Validate all raw input files before ETL. Blocks on hard errors, prompts on soft errors.
 
     Skipped automatically when --noetl is used, on the assumption that if ETL has
@@ -198,7 +198,7 @@ def validate_raw_data(configuration, yes=False, data_option=None):
     )
     _validate_oktober(cwd, paths, validation_cfg, columns_cfg, result)
 
-    _handle_result(result, yes)
+    _handle_result(result, yes, no_warnings=no_warnings)
     print("==== Validatie voltooid ====\n")
 
 
@@ -638,9 +638,10 @@ def _format_programmes(programmes, limit=5):
 # Result handler
 # ---------------------------------------------------------------------------
 
-def _handle_result(result, yes):
-    for w in result.warnings:
-        print(f"  [WAARSCHUWING] {w}")
+def _handle_result(result, yes, no_warnings=False):
+    if not no_warnings:
+        for w in result.warnings:
+            print(f"  [WAARSCHUWING] {w}")
 
     if result.hard_errors:
         print("\nValidatie mislukt — de pipeline kan niet worden gestart:")

@@ -107,6 +107,7 @@ def validate_numerus_fixus_keys(
 def enforce_numerus_fixus_keys(
     numerus_fixus_list: dict | None,
     programme_series_by_track: dict[str, pd.Series | None] | None,
+    no_warnings: bool = False,
 ) -> None:
     """Draai de guard en handel de bevindingen af.
 
@@ -121,8 +122,9 @@ def enforce_numerus_fixus_keys(
     """
     result = validate_numerus_fixus_keys(numerus_fixus_list, programme_series_by_track)
 
-    for warning in result.warnings:
-        print(f"  [WAARSCHUWING] {warning}")
+    if not no_warnings:
+        for warning in result.warnings:
+            print(f"  [WAARSCHUWING] {warning}")
 
     if result.hard_errors:
         raise NumerusFixusConfigError(

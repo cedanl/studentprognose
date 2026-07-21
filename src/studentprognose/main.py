@@ -145,7 +145,7 @@ def main(argv):
         from studentprognose.data.validation import validate_raw_data
         from studentprognose.data.etl import run_etl
 
-        validate_raw_data(configuration, yes=cfg.yes, data_option=cfg.data_option)
+        validate_raw_data(configuration, yes=cfg.yes, data_option=cfg.data_option, no_warnings=cfg.no_warnings)
         run_etl(configuration)
 
     # Step 1: Load data
@@ -595,6 +595,7 @@ def _run_pipeline_strategy(cfg, datasets, configuration, filtering, cwd, save_ou
             enforce_numerus_fixus_keys(
                 getattr(strategy, "numerus_fixus_list", None),
                 get_tracks(),
+                no_warnings=cfg.no_warnings,
             )
 
     # Step 4: Apply filtering
