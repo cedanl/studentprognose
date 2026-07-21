@@ -44,11 +44,11 @@ uv tool install studentprognose
 Na installatie:
 
 ```bash
-studentprognose init        # mapstructuur + configuratie aanmaken
-studentprognose -w 6 -y 2024
+studentprognose init           # mapstructuur aanmaken + demodata downloaden (optioneel)
+studentprognose -d c -y 2024   # eerste prognose op demodata
 ```
 
-`init` maakt de benodigde mapstructuur aan en legt uit welke bestanden je moet aanleveren.
+`init` vraagt of je demodata wilt downloaden (4 MB) zodat je direct kunt starten. Kies `n` als je meteen je eigen data wilt gebruiken.
 
 Voor geautomatiseerde runs (cron, taakplanner) — sla de interactieve prompt over:
 
@@ -72,7 +72,7 @@ Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen
 | **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
 | **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
 | **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
-| **Demo data inbegrepen** | Direct uitproberen zonder eigen data — demobestanden zitten in `data/input_raw/` |
+| **Demodata via init** | Direct uitproberen zonder eigen data — `studentprognose init` downloadt 4 MB demodata op aanvraag |
 
 ---
 
