@@ -10,11 +10,11 @@
 
 ```bash
 uv tool install studentprognose   # zie Installeren voor uv/pip/Windows
-studentprognose init              # projectmap aanmaken
-studentprognose                   # eerste prognose (op demodata)
+studentprognose init              # projectmap aanmaken + optioneel demodata downloaden
+studentprognose -d c -y 2024      # eerste prognose (cumulatief spoor)
 ```
 
-Er zit **demodata** in de installatie, dus je kunt direct draaien zonder eigen data. Details in **[Installeren](installeren.md)** en de **[Snelstart](snelstart.md)** (5 minuten).
+`init` vraagt of je **demodata** wilt downloaden (4 MB) zodat je direct kunt starten zonder eigen data. Details in **[Installeren](installeren.md)** en de **[Snelstart](snelstart.md)** (5 minuten).
 
 ## Wat doet de tool?
 
