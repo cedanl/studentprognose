@@ -142,6 +142,14 @@ class TestParseArgs:
         cfg = parse_args(["prog"])
         assert cfg.dashboard is False
 
+    def test_no_warnings_flag(self):
+        cfg = parse_args(["prog", "--no-warnings"])
+        assert cfg.no_warnings is True
+
+    def test_no_warnings_default_is_false(self):
+        cfg = parse_args(["prog"])
+        assert cfg.no_warnings is False
+
     def test_noetl_and_yes_combination(self):
         cfg = parse_args(["prog", "--noetl", "--yes"])
         assert cfg.noetl is True

@@ -1,6 +1,7 @@
 import os
 import sys
 import traceback
+import warnings
 from typing import Optional
 
 import pandas as pd
@@ -92,6 +93,9 @@ def _resolve_tune_targets(tune) -> dict:
 
 def main(argv):
     cfg = parse_args(argv)
+
+    if cfg.no_warnings:
+        warnings.filterwarnings("ignore", category=UserWarning, module=r"studentprognose\.")
 
     if cfg.command == "init":
         from studentprognose.init import run_init

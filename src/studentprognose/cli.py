@@ -20,6 +20,7 @@ class PipelineConfig:
     ci_test_n: int | None = None
     noetl: bool = False
     yes: bool = False
+    no_warnings: bool = False
     dashboard: bool = False
     command: str | None = None
     tune_target: str = "regressor"
@@ -148,6 +149,13 @@ def parse_args(argv):
         help="Sla de interactieve validatieprompt over (voor geautomatiseerde runs)",
     )
     parser.add_argument(
+        "--no-warnings",
+        action="store_true",
+        dest="no_warnings",
+        help="Onderdruk UserWarning-meldingen (historisch realisme, ontbrekende lag-fallback). "
+             "Gebruik dit als de warnings bekend zijn en je de uitvoer overzichtelijk wil houden.",
+    )
+    parser.add_argument(
         "--dashboard",
         action="store_true",
         help="Genereer interactieve Plotly-dashboards in data/output/visualisations/. Standaard uit.",
@@ -160,6 +168,7 @@ def parse_args(argv):
     cfg.tune_target = args.tune_target
     cfg.noetl = args.noetl
     cfg.yes = args.yes
+    cfg.no_warnings = args.no_warnings
     cfg.dashboard = args.dashboard
 
     # Configuration path — load_configuration handles missing files gracefully

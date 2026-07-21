@@ -131,6 +131,7 @@ studentprognose tune -d c -w 12                # stem hyperparameters af (cumula
 | `--institution` | Beperk teldata tot instelling(en) | Brincode(s), bijv. `21PC`; standaard alle |
 | `--noetl` | Sla ETL over | als je al verwerkte data in `data/input/` hebt |
 | `--yes` | Sla interactieve prompts over | voor CI/CD en cron |
+| `--no-warnings` | Onderdruk UserWarning-meldingen | als bekende warnings de uitvoer onoverzichtelijk maken |
 
 Naast voorspellen kun je met het `benchmark`-subcommando alternatieve ML-modellen vergelijken op je eigen data:
 
