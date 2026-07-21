@@ -1,4 +1,4 @@
-# Externe brondata (raw input)
+# Externe brondata (raw input) — synthetische demodata
 
 Deze map bevat de **ruwe externe bestanden** die als input dienen voor het prognosemodel. Ze worden verwerkt door de ETL-stap (`src/data/etl.py`) en de resultaten komen in `data/input/`.
 
