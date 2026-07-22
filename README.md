@@ -106,6 +106,18 @@ uv run studentprognose -w 6 -y 2020
 
 ---
 
+## 🖥️ Grafische interface (optioneel)
+
+Liever klikken dan typen? Er is een optionele webinterface (NiceGUI) die de CLI omhult — een project opzetten, de configuratie instellen en voorspellingen draaien, zonder terminalkennis. Je draait haar vanuit een clone van deze repository:
+
+```bash
+uv run --extra gui python -m gui
+```
+
+Open daarna [http://localhost:8080](http://localhost:8080) in je browser. De interface is een schil rond dezelfde CLI; alles wat je in de GUI doet kun je ook op de opdrachtregel doen. Zie [Grafische interface](https://cedanl.github.io/studentprognose/gui/) in de documentatie.
+
+---
+
 ## ✨ Gebruik
 
 > [!IMPORTANT]

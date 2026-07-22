@@ -48,6 +48,13 @@ src/studentprognose/
 ├── benchmark/           # `studentprognose benchmark` — alternatieve modellen vergelijken
 └── utils/               # Week-/parallel-/key-hulpfuncties + constants
 
+gui/                     # Optionele NiceGUI-webapp (schil rond de CLI)
+├── app.py               # Entry point + routing (`python -m gui`)
+├── theme.py             # Design-tokens (kleuren/statussen)
+├── state.py             # Gedeelde sessiestate (actief project)
+├── pages/               # Paginamodules (home, wizard, config, run, output, benchmark)
+└── components/          # Herbruikbaar (layout, bestandskiezer, log-streaming)
+
 docs/                    # MkDocs bronbestanden
 ├── index.md
 ├── aan-de-slag.md
@@ -68,6 +75,9 @@ docs/                    # MkDocs bronbestanden
 ```bash
 # Applicatie draaien
 uv run studentprognose --help
+
+# Grafische interface (optioneel, NiceGUI) — draait op http://localhost:8080
+uv run --extra gui python -m gui
 
 # Tests
 uv run pytest
@@ -131,6 +141,7 @@ Gebruik de onderstaande mapping om te bepalen welke pagina('s) bijgewerkt moeten
 | `strategies/individual.py` / individueel-pipeline / filterregels | `docs/methodologie/individueel.md` |
 | Ensemble-logica / gewichten / postprocessor | `docs/methodologie/ensemble.md` |
 | Architectuur / pipeline-volgorde | `docs/methodologie/index.md` |
+| `gui/` / GUI-pagina's of -gedrag | `docs/gui.md` |
 
 ### Wat hoort in een methodologie-pagina?
 

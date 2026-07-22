@@ -94,6 +94,7 @@ nav:
     - Installeren: installeren.md
     - Je data klaarzetten: je-data-voorbereiden.md
     - Draaien & CLI: aan-de-slag.md
+    - Grafische interface: gui.md
     - Output lezen: output-begrijpen.md
   - Configuratie:
     - Basis: configuratie.md
