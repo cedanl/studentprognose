@@ -29,7 +29,8 @@ Open daarna [http://localhost:8080](http://localhost:8080) in je browser.
 
 De interface leidt je langs vijf stappen, in volgorde:
 
-1. **Project** — kies of maak een projectmap met de juiste structuur.
+1. **Project** — kies of maak een projectmap met de juiste structuur. Je kunt
+   hier optioneel de demodataset downloaden om het model direct te proberen.
 2. **Configuratie** — stel de modelparameters en paden in.
 3. **Filteren** — bepaal op welke opleidingen, herkomst en examentypes je draait.
 4. **Uitvoeren** — start de voorspelling en volg de voortgang live.
