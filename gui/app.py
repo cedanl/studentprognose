@@ -21,10 +21,11 @@ def _register_pages() -> None:
     ``create()``-functie. Zo blijft dit bestand een dunne router en groeit het
     niet mee met elke feature-issue.
     """
-    from gui.pages import home, wizard
+    from gui.pages import config_page, home, wizard
 
     home.create()
     wizard.create()
+    config_page.create()
 
 
 def main() -> None:
