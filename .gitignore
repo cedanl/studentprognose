@@ -6,6 +6,9 @@ __pycache__/
 site/
 dist/
 
+# NiceGUI-runtime opslag (app.storage.general) — GUI
+.nicegui/
+
 # Losse test-/scratch-output in de repo-root
 /fabric_testoutput.xlsx
 
