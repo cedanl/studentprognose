@@ -21,3 +21,11 @@ def test_theme_tokens_are_hex_colors():
 
     for name, value in QUASAR_COLORS.items():
         assert value.startswith("#"), f"{name} is geen hex-kleur: {value}"
+
+
+def test_demo_filtering_is_valid():
+    """De demo-scope moet geldige filterwaarden bevatten."""
+    from gui import filtering_io
+    from gui.pages.home import _DEMO_FILTERING
+
+    assert filtering_io.validate_filtering(_DEMO_FILTERING) == []
