@@ -25,6 +25,21 @@ Open daarna [http://localhost:8080](http://localhost:8080) in je browser.
     een clone van de repository (`git clone` + `uv run --extra gui python -m gui`)
     — ze wordt niet meegeleverd in het PyPI-pakket.
 
+## Zo werkt de interface
+
+De interface leidt je langs vijf stappen, in volgorde:
+
+1. **Project** — kies of maak een projectmap met de juiste structuur.
+2. **Configuratie** — stel de modelparameters en paden in.
+3. **Filteren** — bepaal op welke opleidingen, herkomst en examentypes je draait.
+4. **Uitvoeren** — start de voorspelling en volg de voortgang live.
+5. **Resultaten** — bekijk een overzicht van de voorspellingen.
+
+Nieuwe gebruikers volgen deze stappen van boven naar beneden; de stap-indicator
+bovenaan toont waar je bent. Terugkerende gebruikers springen via de zijbalk
+direct naar de gewenste pagina. Stappen die een project vereisen zijn
+uitgeschakeld tot je er een hebt gekozen, zodat je nooit vastloopt.
+
 ## Wanneer gebruik je wat?
 
 | Situatie | Aanbeveling |
