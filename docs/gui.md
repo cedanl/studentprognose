@@ -25,6 +25,14 @@ Open daarna [http://localhost:8080](http://localhost:8080) in je browser.
     een clone van de repository (`git clone` + `uv run --extra gui python -m gui`)
     — ze wordt niet meegeleverd in het PyPI-pakket.
 
+## Direct proberen (demo)
+
+Op de startpagina staat een knop **"Probeer direct met demodata"**. Die zet
+automatisch een tijdelijk project op, downloadt de demodataset en draait de
+pipeline — allemaal met live voortgang. Voor de snelheid beperkt de demo zich tot
+een subset (Master, Niet-EER). Na afloop open je met één klik het
+resultatenoverzicht. Ideaal om de tool te verkennen zonder eigen data.
+
 ## Zo werkt de interface
 
 De interface leidt je langs vijf stappen, in volgorde:
