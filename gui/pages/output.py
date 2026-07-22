@@ -88,7 +88,9 @@ class _ResultsView:
         self._render_kpis(df)
         self._render_model_comparison(df)
         self._render_programme_table(df)
-        self._render_audit_button()
+        with ui.row().classes("items-center gap-2"):
+            self._render_audit_button()
+            self._render_share_button()
 
     def _on_file_change(self, e) -> None:
         self._path = e.value
@@ -268,6 +270,34 @@ class _ResultsView:
             icon="compare_arrows",
             on_click=self._show_audit,
         ).props("outline")
+
+    # --- Delen (placeholder) --------------------------------------------------
+
+    #: Placeholder-ontvanger voor het delen van resultaten.
+    _SHARE_RECIPIENT = "ceda@surf.nl"
+
+    def _render_share_button(self) -> None:
+        ui.button(
+            "Deel resultaten",
+            icon="share",
+            on_click=self._show_share,
+        ).props("outline")
+
+    def _show_share(self) -> None:
+        """Dummy: nog niet functioneel — verstuurt niets (#275)."""
+        with ui.dialog() as dialog, ui.card().classes("w-[30rem] max-w-full"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("share").style(f"color: {INFO}").classes("text-2xl")
+                ui.label("Resultaten delen").classes("text-lg font-medium")
+            ui.label(
+                f"Deze functie deelt de resultaten binnenkort met "
+                f"{self._SHARE_RECIPIENT}. Ze is nog niet actief — er wordt nu "
+                f"niets verzonden."
+            ).classes("text-sm opacity-80")
+            ui.badge("Binnenkort beschikbaar", color="warning")
+            with ui.row().classes("w-full justify-end"):
+                ui.button("Sluiten", on_click=dialog.close).props("flat")
+        dialog.open()
 
     def _show_audit(self) -> None:
         totaal_path = self._totaal_path()
