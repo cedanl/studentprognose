@@ -17,6 +17,88 @@ from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
 from gui.state import STATE
 
+#: Uitleg per configuratieveld — getoond als hover-tooltip. In lijn met
+#: configuration.json en docs/configuratie-referentie.md.
+HELP = {
+    "cumulative_timeseries": (
+        "Tijdreeksmodel voor stap 1 van het cumulatieve spoor: extrapoleert de "
+        "vooraanmelderscurve tot de laatste academische week. 'sarima' is de "
+        "standaard; ets/theta/auto_arima zijn alternatieven (vergelijk ze via de "
+        "Benchmark-tab)."
+    ),
+    "cumulative_regressor": (
+        "Regressiemodel voor stap 2 van het cumulatieve spoor: vertaalt de "
+        "vooraanmelderscijfers naar het verwachte aantal ingeschreven studenten."
+    ),
+    "individual_classifier": (
+        "Classifier voor het individuele spoor: schat per aanmelding de kans op "
+        "inschrijving. Standaard 'xgboost'."
+    ),
+    "min_training_year": (
+        "Vroegste collegejaar dat als trainingsdata meetelt. Data van vóór dit "
+        "jaar wordt genegeerd. Verlaag dit alleen als je betrouwbare historische "
+        "data hebt die verder teruggaat."
+    ),
+    "final_academic_week": (
+        "De laatste week van het academisch jaar in de Studielink-cyclus. Bepaalt "
+        "de seizoensvolgorde van de weken, de voorspelhorizon en de reset-week in "
+        "het cumulatieve spoor. Vaak 38; bij de UvA 36."
+    ),
+    "ensemble_weights": (
+        "Gewicht van het individuele versus het cumulatieve spoor bij het "
+        "combineren (modus 'beide'), per weeksegment. Elk paar moet optellen tot "
+        "1,0. Wordt genegeerd in de losse sporen."
+    ),
+    "numerus_fixus": (
+        "Opleidingen met een capaciteitslimiet (numerus fixus). Gebruik exact "
+        "dezelfde programmasleutel als in je data; de voorspelling wordt op dit "
+        "maximum afgetopt."
+    ),
+    "institution_filter": (
+        "Beperk de teldata tot je eigen instelling(en) via Brincode of korte "
+        "naam. Leeg = alle instellingen. De meeste gebruikers zetten hier hun "
+        "eigen instelling."
+    ),
+    "excluded_data_points": (
+        "Sluit bekende probleemjaren (bijv. een uitzonderlijk coronajaar) uit de "
+        "trainingsdata. Het voorspeljaar zelf wordt altijd beschermd en nooit "
+        "uitgesloten."
+    ),
+    "aggregate": (
+        "Tel fijnmazige invoerrijen op naar de canonieke grain. Nodig voor o.a. de "
+        "UvA-levering (bereken 'Gewogen' per rij, sommeer daarna); anders crasht "
+        "de pivot op dubbele indexrijen."
+    ),
+    "drop_deleted": (
+        "Filter rijen met de soft-delete-vlag (etl_is_deleted ≠ 0) uit de UvA "
+        "SQL-levering weg."
+    ),
+    "cpu_count": (
+        "Aantal CPU-cores voor de parallelle voorspelling. Leeg = automatisch "
+        "(os.cpu_count()). Verlaag dit om het CPU-gebruik op een gedeelde machine "
+        "te beperken."
+    ),
+    "weight_individual": "Gewicht van het individuele spoor in dit weeksegment.",
+    "weight_cumulative": "Gewicht van het cumulatieve spoor in dit weeksegment.",
+    "excl_year": "Exact collegejaar om uit te sluiten (bijv. 2020).",
+    "excl_herkomst": "Optioneel: beperk de regel tot NL, EER of Niet-EER.",
+    "excl_examentype": "Optioneel: beperk de regel tot Bachelor, Master of Pre-master.",
+    "excl_opleiding": "Optioneel: beperk de regel tot één programmasleutel.",
+}
+
+#: Korte tooltip per ensemble-gewichtgroep (welke weken het betreft).
+_GROUP_HELP = {
+    "master_week_17_23": "Masters in de vroege weken 17 t/m 23.",
+    "week_30_34": "Weken 30 t/m 34.",
+    "week_35_37": "Weken 35 t/m 37 (vlak voor de deadline).",
+    "default": "Alle overige weken en combinaties.",
+}
+
+
+def _info_icon(text: str) -> None:
+    """Render een klein help-icoon met een hover-tooltip."""
+    ui.icon("help_outline").classes("text-sm opacity-50 cursor-help").tooltip(text)
+
 
 def create() -> None:
     """Registreer de route ``/config``."""
@@ -100,6 +182,7 @@ class _ConfigView:
                     mc,
                     "cumulative_timeseries",
                     "sarima",
+                    help=HELP["cumulative_timeseries"],
                 )
                 self._select(
                     "Regressor (cumulatief)",
@@ -107,6 +190,7 @@ class _ConfigView:
                     mc,
                     "cumulative_regressor",
                     "xgboost",
+                    help=HELP["cumulative_regressor"],
                 )
                 self._select(
                     "Classifier (individueel)",
@@ -114,36 +198,59 @@ class _ConfigView:
                     mc,
                     "individual_classifier",
                     "xgboost",
+                    help=HELP["individual_classifier"],
                 )
-                self._number("Min. trainingsjaar", mc, "min_training_year", 2016)
-                self._number("Laatste academische week", mc, "final_academic_week", 36)
+                self._number(
+                    "Min. trainingsjaar",
+                    mc,
+                    "min_training_year",
+                    2016,
+                    help=HELP["min_training_year"],
+                )
+                self._number(
+                    "Laatste academische week",
+                    mc,
+                    "final_academic_week",
+                    36,
+                    help=HELP["final_academic_week"],
+                )
 
     def _ensemble_section(self) -> None:
         weights = self._config.setdefault("ensemble_weights", {})
         with ui.expansion("Ensemble-gewichten", icon="balance", value=True).classes(
             "w-full"
         ):
-            ui.label(
-                "Per weeksegment het gewicht van het individuele en cumulatieve "
-                "spoor. Elk paar moet optellen tot 1,0."
-            ).classes("text-sm opacity-70")
+            with ui.row().classes("items-center gap-1"):
+                ui.label(
+                    "Per weeksegment het gewicht van het individuele en cumulatieve "
+                    "spoor. Elk paar moet optellen tot 1,0."
+                ).classes("text-sm opacity-70")
+                _info_icon(HELP["ensemble_weights"])
             self._ensemble_error = ui.column().classes("w-full")
             for group in config_io.ENSEMBLE_GROUPS:
                 grp = weights.setdefault(group, {"individual": 0.5, "cumulative": 0.5})
                 with ui.row().classes("w-full items-center gap-4 no-wrap"):
-                    ui.label(group).classes("text-sm font-mono w-48")
-                    self._weight_input(grp, "individual", "individueel")
-                    self._weight_input(grp, "cumulative", "cumulatief")
+                    with ui.row().classes("items-center gap-1 w-48"):
+                        ui.label(group).classes("text-sm font-mono")
+                        _info_icon(_GROUP_HELP.get(group, ""))
+                    self._weight_input(
+                        grp, "individual", "individueel", help=HELP["weight_individual"]
+                    )
+                    self._weight_input(
+                        grp, "cumulative", "cumulatief", help=HELP["weight_cumulative"]
+                    )
             self._validate_ensemble()
 
     def _numerus_fixus_section(self) -> None:
         nf = self._config.setdefault("numerus_fixus", {})
         self._nf_rows = [{"key": k, "value": v} for k, v in nf.items()]
         with ui.expansion("Numerus fixus", icon="lock", value=False).classes("w-full"):
-            ui.label(
-                "Opleidingen met een capaciteitslimiet (exacte programmasleutel → "
-                "aantal plaatsen)."
-            ).classes("text-sm opacity-70")
+            with ui.row().classes("items-center gap-1"):
+                ui.label(
+                    "Opleidingen met een capaciteitslimiet (exacte programmasleutel → "
+                    "aantal plaatsen)."
+                ).classes("text-sm opacity-70")
+                _info_icon(HELP["numerus_fixus"])
             self._nf_container = ui.column().classes("w-full gap-1")
             self._render_nf_rows()
             ui.button("Rij toevoegen", icon="add", on_click=self._add_nf_row).props(
@@ -155,10 +262,12 @@ class _ConfigView:
         with ui.expansion("Instellingsfilter", icon="business", value=False).classes(
             "w-full"
         ):
-            ui.label(
-                "Beperk tot één of meer instellingen (Brincode of korte naam). "
-                "Leeg = alle instellingen."
-            ).classes("text-sm opacity-70")
+            with ui.row().classes("items-center gap-1"):
+                ui.label(
+                    "Beperk tot één of meer instellingen (Brincode of korte naam). "
+                    "Leeg = alle instellingen."
+                ).classes("text-sm opacity-70")
+                _info_icon(HELP["institution_filter"])
             self._inst_select = (
                 ui.select(
                     options=list(current),
@@ -169,6 +278,7 @@ class _ConfigView:
                 .props("use-chips new-value-mode=add-unique hide-dropdown-icon")
                 .classes("w-full")
             )
+            self._inst_select.tooltip(HELP["institution_filter"])
             self._inst_select.on_value_change(self._on_institution_change)
 
     def _excluded_section(self) -> None:
@@ -177,10 +287,12 @@ class _ConfigView:
         with ui.expansion("Uitgesloten datapunten", icon="block", value=False).classes(
             "w-full"
         ):
-            ui.label(
-                "Datapunten die uit de training worden gehouden (bijv. een "
-                "uitzonderlijk coronajaar)."
-            ).classes("text-sm opacity-70")
+            with ui.row().classes("items-center gap-1"):
+                ui.label(
+                    "Datapunten die uit de training worden gehouden (bijv. een "
+                    "uitzonderlijk coronajaar)."
+                ).classes("text-sm opacity-70")
+                _info_icon(HELP["excluded_data_points"])
             self._excl_container = ui.column().classes("w-full gap-1")
             self._render_excl_rows()
             ui.button("Rij toevoegen", icon="add", on_click=self._add_excl_row).props(
@@ -190,8 +302,16 @@ class _ConfigView:
     def _misc_section(self) -> None:
         ci = self._config.setdefault("cumulative_input", {})
         with ui.expansion("Overig", icon="settings", value=False).classes("w-full"):
-            self._switch("Aggregeren (cumulatief)", ci, "aggregate", True)
-            self._switch("Verwijderde rijen weglaten", ci, "drop_deleted", True)
+            self._switch(
+                "Aggregeren (cumulatief)", ci, "aggregate", True, help=HELP["aggregate"]
+            )
+            self._switch(
+                "Verwijderde rijen weglaten",
+                ci,
+                "drop_deleted",
+                True,
+                help=HELP["drop_deleted"],
+            )
             runtime = self._config.setdefault("runtime", {})
             self._number(
                 "CPU-cores (leeg = automatisch)",
@@ -199,16 +319,19 @@ class _ConfigView:
                 "cpu_count",
                 None,
                 allow_none=True,
+                help=HELP["cpu_count"],
             )
 
     # --- Widget-helpers -------------------------------------------------------
 
-    def _select(self, label, choices, target, key, default) -> None:
+    def _select(self, label, choices, target, key, default, *, help=None) -> None:
         value = target.get(key, default)
         options = list(choices)
         if value not in options:
             options.append(value)
         sel = ui.select(options, value=value, label=label).classes("w-full")
+        if help:
+            sel.tooltip(help)
 
         def _on_change(e) -> None:
             target[key] = e.value
@@ -216,9 +339,13 @@ class _ConfigView:
 
         sel.on_value_change(_on_change)
 
-    def _number(self, label, target, key, default, *, allow_none=False) -> None:
+    def _number(
+        self, label, target, key, default, *, allow_none=False, help=None
+    ) -> None:
         value = target.get(key, default)
         inp = ui.number(label=label, value=value).classes("w-full")
+        if help:
+            inp.tooltip(help)
 
         def _on_change(e) -> None:
             val = e.value
@@ -229,8 +356,10 @@ class _ConfigView:
 
         inp.on_value_change(_on_change)
 
-    def _switch(self, label, target, key, default) -> None:
+    def _switch(self, label, target, key, default, *, help=None) -> None:
         sw = ui.switch(label, value=target.get(key, default))
+        if help:
+            sw.tooltip(help)
 
         def _on_change(e) -> None:
             target[key] = e.value
@@ -238,12 +367,14 @@ class _ConfigView:
 
         sw.on_value_change(_on_change)
 
-    def _weight_input(self, group_dict, key, caption) -> None:
+    def _weight_input(self, group_dict, key, caption, *, help=None) -> None:
         inp = (
             ui.number(label=caption, value=group_dict.get(key, 0.5), step=0.1)
             .props("dense")
             .classes("w-32")
         )
+        if help:
+            inp.tooltip(help)
 
         def _on_change(e) -> None:
             try:
@@ -306,6 +437,7 @@ class _ConfigView:
                             .props("dense")
                             .classes("grow")
                         )
+                        inp.tooltip(HELP.get(f"excl_{field}", field))
                         inp.on_value_change(
                             lambda e, r=row, f=field: (
                                 r.update({f: e.value}),
