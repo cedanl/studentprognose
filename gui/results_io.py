@@ -76,7 +76,9 @@ def prediction_rows(df: pd.DataFrame) -> pd.DataFrame:
 
 def _clean_metric(series: pd.Series) -> pd.Series:
     """Vervang inf door NaN zodat gemiddelden robuust zijn."""
-    return series.replace([float("inf"), float("-inf")], pd.NA).astype(float)
+    return pd.to_numeric(series, errors="coerce").replace(
+        [float("inf"), float("-inf")], float("nan")
+    )
 
 
 def model_comparison(rows: pd.DataFrame) -> dict[str, float]:

@@ -21,7 +21,15 @@ def _register_pages() -> None:
     ``create()``-functie. Zo blijft dit bestand een dunne router en groeit het
     niet mee met elke feature-issue.
     """
-    from gui.pages import config_page, filtering, home, output, run, wizard
+    from gui.pages import (
+        benchmark,
+        config_page,
+        filtering,
+        home,
+        output,
+        run,
+        wizard,
+    )
 
     home.create()
     wizard.create()
@@ -29,6 +37,7 @@ def _register_pages() -> None:
     filtering.create()
     run.create()
     output.create()
+    benchmark.create()
 
 
 def main() -> None:
