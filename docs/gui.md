@@ -41,6 +41,10 @@ bovenaan toont waar je bent. Terugkerende gebruikers springen via de zijbalk
 direct naar de gewenste pagina. Stappen die een project vereisen zijn
 uitgeschakeld tot je er een hebt gekozen, zodat je nooit vastloopt.
 
+Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
+modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de
+gevonden parameters met één klik naar de configuratie kopieert.
+
 ## Wanneer gebruik je wat?
 
 | Situatie | Aanbeveling |

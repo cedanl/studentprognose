@@ -36,7 +36,12 @@ class ProcessPanel:
     def __init__(self) -> None:
         self._process: asyncio.subprocess.Process | None = None
         self._error_slot: ui.element
+        self._all_lines: list[str] = []
         self._build()
+
+    def output_text(self) -> str:
+        """De volledige verzamelde uitvoer van de laatste run (voor parsing)."""
+        return "\n".join(self._all_lines)
 
     def _build(self) -> None:
         with ui.column().classes("w-full gap-2"):
@@ -86,6 +91,7 @@ class ProcessPanel:
         """
         self._error_slot.clear()
         self._log.clear()
+        self._all_lines = []
         self._set_status("running")
 
         try:
@@ -114,6 +120,7 @@ class ProcessPanel:
         async for raw in self._process.stdout:
             line = raw.decode("utf-8", errors="replace").rstrip("\n")
             self._log.push(line)
+            self._all_lines.append(line)
             tail.append(line)
             if len(tail) > 40:
                 tail.pop(0)
