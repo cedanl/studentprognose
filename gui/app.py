@@ -32,6 +32,8 @@ def _register_pages() -> None:
         config_page,
         filtering,
         home,
+        methodology,
+        nav_prototypes,
         output,
         run,
         wizard,
@@ -44,6 +46,8 @@ def _register_pages() -> None:
     run.create()
     output.create()
     benchmark.create()
+    methodology.create()
+    nav_prototypes.create()
 
 
 def main() -> None:

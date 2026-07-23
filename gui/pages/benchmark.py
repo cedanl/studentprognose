@@ -12,7 +12,7 @@ import os
 
 from nicegui import ui
 
-from gui import benchmark_io, config_io, nav
+from gui import benchmark_io, config_io, nav, tracks
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.states import empty_state, section_title
@@ -61,8 +61,11 @@ class _BenchmarkSection:
     def __init__(self) -> None:
         with ui.row().classes("w-full items-end gap-4"):
             self._dataset = ui.select(
-                ["Cumulatief", "Individueel"], value="Cumulatief", label="Dataset"
+                ["Cumulatief", "Individueel"],
+                value="Cumulatief",
+                label="Dataset (voorspelspoor)",
             ).classes("w-48")
+            self._dataset.tooltip(tracks.dataset_tooltip(["Cumulatief", "Individueel"]))
             self._week = ui.number("Predict week", value=12, min=1, max=52).classes(
                 "w-40"
             )

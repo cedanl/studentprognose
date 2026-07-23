@@ -14,9 +14,10 @@ import tempfile
 
 from nicegui import ui
 
-from gui import demodata, filtering_io, nav, theme
+from gui import demodata, filtering_io, nav, theme, tracks
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
+from gui.components.progress_card import ProgressCard
 from gui.components.states import empty_state, error_banner, section_title, status_badge
 from gui.state import STATE
 
@@ -57,6 +58,8 @@ class _HomeView:
     def _render_intro(self) -> None:
         self._container.clear()
         with self._container:
+            self._render_tracks_explainer()
+
             # Één-klik demo.
             with (
                 ui.card()
@@ -70,8 +73,10 @@ class _HomeView:
                     ui.label("Direct proberen").classes("text-lg font-medium")
                 ui.label(
                     "Draai de pipeline met meegeleverde demodata — in een "
-                    "tijdelijke map, zonder iets in te stellen. Voor de snelheid "
-                    "beperkt de demo zich tot een subset (Master, Niet-EER)."
+                    "tijdelijke map, zonder iets in te stellen. De demo draait het "
+                    "cumulatieve spoor (de demodata bevat geen individuele "
+                    "aanmelddata) en beperkt zich voor de snelheid tot een subset "
+                    "(Master, Niet-EER)."
                 ).classes("text-sm opacity-70")
                 ui.button(
                     "Probeer direct met demodata",
@@ -97,6 +102,35 @@ class _HomeView:
                         on_action=lambda: ui.navigate.to("/wizard"),
                     )
 
+    def _render_tracks_explainer(self) -> None:
+        """Leg de drie voorspelsporen uit; knop leidt naar het schema (methodologie)."""
+        with ui.card().classes("w-full"):
+            with ui.row().classes("items-center gap-2"):
+                ui.icon("alt_route").classes("text-xl").style(f"color: {theme.ACCENT}")
+                ui.label("Hoe werkt het? — drie voorspelsporen").classes(
+                    "text-lg font-medium"
+                )
+            ui.label(
+                "De tool voorspelt studentinstroom via drie sporen. Kies er één "
+                "bij Uitvoeren:"
+            ).classes("text-sm opacity-70")
+            for t in tracks.TRACKS:
+                with ui.row().classes("items-start gap-3 no-wrap w-full"):
+                    ui.icon(t.icon).classes("text-xl mt-1").style(
+                        f"color: {theme.ACCENT}"
+                    )
+                    with ui.column().classes("gap-0"):
+                        with ui.row().classes("items-center gap-2 no-wrap"):
+                            ui.label(t.label).classes("font-medium")
+                            if t.label == tracks.RECOMMENDED:
+                                ui.badge("aanbevolen", color="accent").props("outline")
+                        ui.label(t.short).classes("text-sm opacity-70")
+            ui.button(
+                "Methodologie",
+                icon="schema",
+                on_click=lambda: ui.navigate.to("/methodologie"),
+            ).props("outline color=accent").classes("mt-1")
+
     async def _run_demo(self) -> None:
         """Voer init → demodata → pipeline automatisch uit in een tijdelijke map."""
         # Willekeurig genoemde tijdelijke map — bewust géén vaste 'studentprognose'-map,
@@ -112,6 +146,7 @@ class _HomeView:
                 self._steps = ui.column().classes("w-full gap-1")
                 self._progress = ui.linear_progress(value=0.0, show_value=False)
                 self._progress.set_visibility(False)
+                self._pipeline_progress = ProgressCard()
                 panel = ProcessPanel()
                 self._error = ui.column().classes("w-full")
 
@@ -131,12 +166,15 @@ class _HomeView:
             self._step("Demodata downloaden…")
             await self._download_demodata(project_dir)
 
-            # 3. pipeline
-            self._step("Voorspelling draaien…")
+            # 3. pipeline — start voortgangsbalk
+            self._step("Voorspelling draaien (cumulatief spoor)…")
+            self._pipeline_progress.start()
             rc = await panel.run(
                 ["-d", "c", "-w", _DEMO_WEEK, "-y", _DEMO_YEAR, "--yes"],
                 cwd=project_dir,
+                on_line=self._pipeline_progress.on_line,
             )
+            self._pipeline_progress.complete(success=rc == 0)
         except Exception as exc:  # noqa: BLE001 — nette melding i.p.v. crash
             with self._error:
                 error_banner("De demo kon niet worden voltooid.", f"Details: {exc}")

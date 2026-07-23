@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from nicegui import app, ui
 
-from gui import nav, process
+from gui import nav, process, theme, tracks
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.progress_card import ProgressCard
@@ -67,8 +67,10 @@ class _RunView:
                 self._dataset = ui.select(
                     ["Individueel", "Cumulatief", "Beide"],
                     value=self._settings["dataset"],
-                    label="Dataset",
+                    label="Dataset (voorspelspoor)",
                 ).classes("w-full")
+                self._dataset.tooltip(tracks.dataset_tooltip())
+                self._dataset.on_value_change(lambda _e: self._update_dataset_hint())
                 self._cohort = ui.select(
                     ["Eerstejaars", "Hogerejaars", "Volume"],
                     value=self._settings["cohort"],
@@ -100,6 +102,14 @@ class _RunView:
                     value=self._settings["skip_years"],
                     min=0,
                 ).classes("w-full")
+
+            # Uitleg van het gekozen voorspelspoor (werkt zonder de docs te openen).
+            with ui.row().classes("items-center gap-2 w-full"):
+                self._dataset_hint_icon = (
+                    ui.icon("info").classes("text-sm").style(f"color: {theme.ACCENT}")
+                )
+                self._dataset_hint = ui.label("").classes("text-sm opacity-80")
+            self._update_dataset_hint()
 
             with ui.row().classes("w-full gap-6 mt-2"):
                 self._noetl = ui.checkbox(
@@ -162,6 +172,14 @@ class _RunView:
             no_warnings=self._no_warnings.value,
             yes=self._yes.value,
         )
+
+    def _update_dataset_hint(self) -> None:
+        t = tracks.track(self._dataset.value)
+        if t is None:
+            self._dataset_hint.set_text("")
+            return
+        suffix = " (aanbevolen)" if t.label == tracks.RECOMMENDED else ""
+        self._dataset_hint.set_text(f"{t.label} — {t.short}{suffix}")
 
     def _update_preview(self) -> None:
         self._preview.set_text(process.preview_command(self._current_args()))
