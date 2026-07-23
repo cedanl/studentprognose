@@ -78,6 +78,7 @@ class ProcessPanel:
         *,
         cwd: str,
         on_success: Callable[[], None] | None = None,
+        on_line: Callable[[str], None] | None = None,
     ) -> int:
         """Draai ``studentprognose <args>`` in ``cwd`` en stream de uitvoer.
 
@@ -122,6 +123,8 @@ class ProcessPanel:
             self._log.push(line)
             self._all_lines.append(line)
             tail.append(line)
+            if on_line is not None:
+                on_line(line)
             if len(tail) > 40:
                 tail.pop(0)
 

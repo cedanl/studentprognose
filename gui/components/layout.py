@@ -130,11 +130,9 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
         .style(f"background: {theme.PRIMARY}; border-bottom: 3px solid {theme.ACCENT}")
     ):
         with ui.row().classes("items-center gap-3 no-wrap"):
-            # Officieel Npuls-logo (wit). Op de startpagina toont de hero de naam
-            # al groot, dus daar laten we de wordmark in de balk weg.
+            # Officieel Npuls-logo (wit) — co-branding met de toolnaam.
             ui.image("/gui-assets/npuls-logo-white.svg").classes("w-8 h-8")
-            if active != "/":
-                ui.label("Studentprognose").classes("text-lg font-medium text-white")
+            ui.label("Studentprognose").classes("text-lg font-medium text-white")
         ui.label(title).classes("text-sm text-white opacity-70")
 
     _drawer(active)

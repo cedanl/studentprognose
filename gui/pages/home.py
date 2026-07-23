@@ -20,21 +20,6 @@ from gui.components.log_stream import ProcessPanel
 from gui.components.states import empty_state, error_banner, section_title, status_badge
 from gui.state import STATE
 
-#: Pad naar de hero-SVG (inline gerenderd zodat de animaties afspelen).
-_HERO_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "assets", "header.svg"
-)
-
-
-def _hero_svg() -> str:
-    """Lees de hero-SVG als tekst (inline in de DOM → SMIL-animaties werken)."""
-    try:
-        with open(_HERO_PATH, encoding="utf-8") as f:
-            return f.read()
-    except OSError:
-        return ""
-
-
 #: Jaar/week voor de demo-voorspelling (de demodata dekt 2020–2026).
 _DEMO_YEAR = "2024"
 _DEMO_WEEK = "6"
@@ -54,10 +39,7 @@ def create() -> None:
     @ui.page("/")
     def home_page() -> None:
         with page_shell(active="/", title="Start", show_stepper=False):
-            # Op-merk hero-banner (CEDA/Npuls). Inline (ui.html) i.p.v. ui.image,
-            # zodat de SVG-animaties afspelen — een SVG als <img>-bron rendert
-            # statisch.
-            ui.html(_hero_svg()).classes("w-full rounded-xl overflow-hidden")
+            ui.label("Studentprognose").classes("text-3xl font-bold")
             ui.label(
                 "Grafische interface rond de studentprognose-pipeline. "
                 "Zet een project op, stel de configuratie in en draai voorspellingen."

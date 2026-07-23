@@ -11,6 +11,7 @@ from nicegui import app, ui
 from gui import nav, process
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
+from gui.components.progress_card import ProgressCard
 from gui.components.states import empty_state, section_title
 from gui.state import STATE
 
@@ -129,6 +130,7 @@ class _RunView:
             ).props("unelevated")
             self._result_slot = ui.row().classes("items-center gap-2")
 
+        self._progress = ProgressCard()
         self._panel = ProcessPanel()
 
         # Reageer op wijzigingen: preview verversen.
@@ -199,9 +201,15 @@ class _RunView:
         self._persist()
         self._result_slot.clear()
         self._start_btn.props("loading")
+        self._progress.start()
         try:
             args = self._current_args()
-            returncode = await self._panel.run(args, cwd=STATE.project_dir)
+            returncode = await self._panel.run(
+                args,
+                cwd=STATE.project_dir,
+                on_line=self._progress.on_line,
+            )
+            self._progress.complete(success=returncode == 0)
             if returncode == 0:
                 self._show_results_link()
         finally:
