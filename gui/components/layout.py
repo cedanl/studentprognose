@@ -130,7 +130,8 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
         .style(f"background: {theme.PRIMARY}; border-bottom: 3px solid {theme.ACCENT}")
     ):
         with ui.row().classes("items-center gap-3 no-wrap"):
-            ui.image("/gui-assets/logo.svg").classes("w-8 h-8").style("filter: none")
+            # Officieel Npuls-logo (wit) — co-branding met de toolnaam.
+            ui.image("/gui-assets/npuls-logo-white.svg").classes("w-8 h-8")
             ui.label("Studentprognose").classes("text-lg font-medium text-white")
         ui.label(title).classes("text-sm text-white opacity-70")
 

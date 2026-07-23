@@ -277,18 +277,20 @@ class _ResultsView:
     _SHARE_RECIPIENT = "ceda@surf.nl"
 
     def _render_share_button(self) -> None:
+        # Accent-oranje (npuls) knop — de CEDA-actie krijgt een eigen identiteit
+        # naast de neutrale "Vergelijk met vorige run".
         ui.button(
-            "Deel resultaten",
+            "Delen met CEDA",
             icon="share",
             on_click=self._show_share,
-        ).props("outline")
+        ).props("outline color=accent")
 
     def _show_share(self) -> None:
         """Dummy: nog niet functioneel — verstuurt niets (#275)."""
         with ui.dialog() as dialog, ui.card().classes("w-[30rem] max-w-full"):
             with ui.row().classes("items-center gap-2"):
-                ui.icon("share").style(f"color: {INFO}").classes("text-2xl")
-                ui.label("Resultaten delen").classes("text-lg font-medium")
+                ui.icon("share").style(f"color: {ACCENT}").classes("text-2xl")
+                ui.label("Delen met CEDA").classes("text-lg font-medium")
             ui.label(
                 f"Deze functie deelt de resultaten binnenkort met "
                 f"{self._SHARE_RECIPIENT}. Ze is nog niet actief — er wordt nu "
