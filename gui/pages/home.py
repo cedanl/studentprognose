@@ -39,6 +39,22 @@ def create() -> None:
 
     @ui.page("/")
     def home_page() -> None:
+        ui.add_head_html("""<style>
+@keyframes sp-shimmer {
+    0%   { background-position: 150% 50%; }
+    100% { background-position: -50% 50%; }
+}
+.sp-demo-btn {
+    background: linear-gradient(100deg,
+        #a84a15 0%, #dd784b 30%, #ffd166 52%, #dd784b 70%, #a84a15 100%) !important;
+    background-size: 300% 100% !important;
+    animation: sp-shimmer 1.6s linear infinite !important;
+    color: #fff !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.4px !important;
+    box-shadow: 0 4px 18px rgba(221,120,75,0.55), inset 0 1px 0 rgba(255,255,255,0.18) !important;
+}
+</style>""")
         with page_shell(active="/", title="Start", show_stepper=False):
             ui.label("Studentprognose").classes("text-3xl font-bold")
             ui.label(
@@ -60,7 +76,26 @@ class _HomeView:
         with self._container:
             self._render_tracks_explainer()
 
-            # Één-klik demo.
+            # Projectstatus / eigen project.
+            if STATE.is_initialised:
+                with ui.card().classes("w-full"):
+                    with ui.row().classes("items-center justify-between w-full"):
+                        section_title("Actief project")
+                        status_badge("ready")
+                    ui.label(STATE.project_dir).classes("text-sm opacity-70")
+            else:
+                with ui.card().classes("w-full"):
+                    empty_state(
+                        icon="rocket_launch",
+                        title="Eigen project opzetten",
+                        message="Werk je met je eigen data? Zet een projectmap op "
+                        "met configuratie en de juiste mappenstructuur.",
+                        action_label="Project opzetten",
+                        on_action=lambda: ui.navigate.to("/wizard"),
+                    )
+
+            # Één-klik demo — staat ónder de project-CTA zodat eigen project
+            # het primaire pad is en de demo de snelle kennismaking erbij.
             with (
                 ui.card()
                 .classes("w-full")
@@ -80,27 +115,9 @@ class _HomeView:
                 ).classes("text-sm opacity-70")
                 ui.button(
                     "Probeer direct met demodata",
-                    icon="rocket_launch",
+                    icon="bolt",
                     on_click=self._run_demo,
-                ).props("unelevated")
-
-            # Projectstatus / eigen project.
-            if STATE.is_initialised:
-                with ui.card().classes("w-full"):
-                    with ui.row().classes("items-center justify-between w-full"):
-                        section_title("Actief project")
-                        status_badge("ready")
-                    ui.label(STATE.project_dir).classes("text-sm opacity-70")
-            else:
-                with ui.card().classes("w-full"):
-                    empty_state(
-                        icon="rocket_launch",
-                        title="Eigen project opzetten",
-                        message="Werk je met je eigen data? Zet een projectmap op "
-                        "met configuratie en de juiste mappenstructuur.",
-                        action_label="Project opzetten",
-                        on_action=lambda: ui.navigate.to("/wizard"),
-                    )
+                ).props("unelevated").classes("sp-demo-btn")
 
     def _render_tracks_explainer(self) -> None:
         """Leg de drie voorspelsporen uit; knop leidt naar het schema (methodologie)."""
