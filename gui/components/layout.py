@@ -133,7 +133,15 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
             # Officieel Npuls-logo (wit) — co-branding met de toolnaam.
             ui.image("/gui-assets/npuls-logo-white.svg").classes("w-8 h-8")
             ui.label("Studentprognose").classes("text-lg font-medium text-white")
-        ui.label(title).classes("text-sm text-white opacity-70")
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.label(title).classes("text-sm text-white opacity-70")
+            if STATE.is_initialised:
+                def _reset() -> None:
+                    STATE.project_dir = None
+                    ui.navigate.to("/")
+                ui.button(icon="restart_alt", on_click=_reset).props(
+                    "flat round dense color=white"
+                ).tooltip("Reset — terug naar start")
 
     _drawer(active)
 
