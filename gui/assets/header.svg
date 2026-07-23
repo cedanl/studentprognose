@@ -1,26 +1,46 @@
-<svg width="820" height="180" viewBox="0 0 820 180" xmlns="http://www.w3.org/2000/svg">
+<svg width="100%" viewBox="0 0 820 180" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block">
   <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#000000"/>
-      <stop offset="100%" stop-color="#1a1a1a"/>
-    </linearGradient>
-    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+    <!-- Zwarte basis met langzaam bewegende oranje gloed (on-brand, geen regenboog) -->
+    <radialGradient id="glow" cx="50%" cy="120%" r="90%">
+      <stop offset="0%" stop-color="#DD784B">
+        <animate attributeName="stop-color" values="#DD784B;#E6A020;#DD784B" dur="9s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="55%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    <linearGradient id="line" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" stop-color="#DD784B"/>
       <stop offset="100%" stop-color="#F4D74B"/>
     </linearGradient>
+    <filter id="soft"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
   </defs>
 
   <!-- Achtergrond -->
-  <rect width="820" height="180" rx="14" fill="url(#bg)"/>
+  <rect width="820" height="180" rx="14" fill="#000000"/>
+  <rect width="820" height="180" rx="14" fill="url(#glow)" opacity="0.30"/>
 
-  <!-- Chart-decoratie (Npuls-kleuren, subtiel) -->
-  <polyline points="40,140 120,124 200,128 280,104 360,92 440,98 520,70 600,56 680,60 760,38"
-            fill="none" stroke="url(#accent)" stroke-width="2.5" opacity="0.55"
-            stroke-linecap="round" stroke-linejoin="round"/>
-  <polyline points="40,152 120,140 200,144 280,126 360,120 440,112 520,96 600,86 680,78 760,64"
-            fill="none" stroke="#3D68EC" stroke-width="1.5" opacity="0.35" stroke-dasharray="6,5"/>
-  <circle cx="520" cy="70" r="3.5" fill="#DD784B" opacity="0.9"/>
-  <circle cx="760" cy="38" r="4" fill="#F4D74B" opacity="0.9"/>
+  <!-- Chart-lijn (altijd zichtbaar) met zachte ademende gloed — Npuls-kleuren -->
+  <polyline points="40,142 120,126 200,130 280,106 360,94 440,100 520,72 600,58 680,62 780,38"
+            fill="none" stroke="url(#line)" stroke-width="2.6" stroke-linecap="round"
+            stroke-linejoin="round" filter="url(#soft)">
+    <animate attributeName="opacity" values="0.55;0.95;0.55" dur="6s" repeatCount="indefinite"/>
+  </polyline>
+  <!-- Voortschrijdende accentstip langs de lijn -->
+  <circle r="3" fill="#F4D74B" filter="url(#soft)">
+    <animateMotion dur="7s" repeatCount="indefinite"
+      path="M40,142 L120,126 L200,130 L280,106 L360,94 L440,100 L520,72 L600,58 L680,62 L780,38"/>
+  </circle>
+  <polyline points="40,154 120,142 200,146 280,128 360,122 440,114 520,98 600,88 680,80 780,64"
+            fill="none" stroke="#3D68EC" stroke-width="1.5" opacity="0.30" stroke-dasharray="6,5"/>
+
+  <!-- Pulserende accentpunten -->
+  <circle cx="520" cy="72" r="3.5" fill="#DD784B">
+    <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="780" cy="38" r="4.5" fill="#F4D74B" filter="url(#soft)">
+    <animate attributeName="opacity" values="0.5;1;0.5" dur="2.4s" repeatCount="indefinite"/>
+    <animate attributeName="r" values="3.5;5.5;3.5" dur="2.4s" repeatCount="indefinite"/>
+  </circle>
 
   <!-- Afstudeer-hoed (oranje mark) -->
   <g transform="translate(322, 46)" fill="#DD784B">
