@@ -36,7 +36,13 @@ import datetime
 import re
 from typing import NamedTuple
 
-DEFAULT_TELBESTAND_PATTERN = "telbestandY{year}W{week}"
+#: Beide instellingsformaten worden standaard herkend wanneer er geen configuratie is.
+DEFAULT_TELBESTAND_PATTERNS = [
+    "telbestandY{year}W{week}",
+    "telbestand_sl_{date}_v{volgnummer}_{year}",
+]
+# Alias voor backwards-compatibiliteit met bestaande imports.
+DEFAULT_TELBESTAND_PATTERN = DEFAULT_TELBESTAND_PATTERNS[0]
 
 # Placeholder -> named-group regex. ``year``/``date`` hebben een vaste lengte
 # zodat ze ondubbelzinnig matchen naast ``volgnummer``/``week`` (variabel).
@@ -135,7 +141,7 @@ def compile_patterns(configuration: dict | None) -> list[TelbestandPattern]:
     raw = (configuration or {}).get("telbestand_filename_patterns")
 
     if raw is None or raw == [] or raw == "":
-        raw_patterns: list[str] = [DEFAULT_TELBESTAND_PATTERN]
+        raw_patterns: list[str] = list(DEFAULT_TELBESTAND_PATTERNS)
     elif isinstance(raw, str):
         raw_patterns = [raw]
     else:

@@ -48,9 +48,9 @@ class TestDatePlaceholder:
 
 class TestCompilePatterns:
     def test_uses_default_when_config_is_none(self):
+        from studentprognose.utils.telbestand_filenames import DEFAULT_TELBESTAND_PATTERNS
         patterns = compile_patterns(None)
-        assert len(patterns) == 1
-        assert patterns[0].raw == DEFAULT_TELBESTAND_PATTERN
+        assert [p.raw for p in patterns] == DEFAULT_TELBESTAND_PATTERNS
 
     def test_uses_default_when_key_missing(self):
         patterns = compile_patterns({})

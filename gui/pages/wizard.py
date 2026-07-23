@@ -373,7 +373,7 @@ class _WizardView:
                 self._zone_tel = _UploadZone(
                     title="Telbestanden",
                     description="Weekelijkse Studielink-exports (één CSV per week).",
-                    hint="Verwacht: telbestandY{jaar}W{week}.csv",
+                    hint="bijv. telbestandY2024W10.csv of telbestand_sl_20241007_v01_2024.csv",
                     icon="bar_chart",
                     required=True,
                     accept=".csv",
@@ -404,10 +404,10 @@ class _WizardView:
 
             self._zone_okt = _UploadZone(
                 title="Oktober-bestand",
-                description="Excel-bestand met studentaantallen per opleiding.",
+                description="Excel-bestand met studentaantallen — labels voor het model.",
                 hint="Wordt opgeslagen als: oktober_bestand.xlsx",
                 icon="calendar_month",
-                required=False,
+                required=True,
                 accept=".xlsx",
                 multiple=False,
                 project_dir_getter=lambda: self._project_dir,
@@ -471,19 +471,20 @@ class _WizardView:
     def _refresh_summary(self) -> None:
         tel_ok = self._zone_tel.has_valid
         ind_ok = self._zone_ind.has_valid
+        okt_ok = self._zone_okt.has_valid
 
         needs_tel = self._mode in ("cumulative", "both")
         needs_ind = self._mode in ("individual", "both")
 
-        # Bepaal of de modus klaar is om verder te gaan.
+        # Oktober is altijd vereist (bevat de labels voor het model).
         ready = (
             (not needs_tel or tel_ok)
             and (not needs_ind or ind_ok)
+            and okt_ok
         )
 
         self._summary_card.clear()
         with self._summary_card:
-            # Status per vereist bestand
             rows: list[tuple[str, bool, str]] = []
 
             if needs_tel:
@@ -505,8 +506,11 @@ class _WizardView:
                     "Aanwezig" if ind_ok else "Nog uploaden",
                 ))
 
-            if not rows:
-                return
+            rows.append((
+                "Oktober-bestand",
+                okt_ok,
+                "Aanwezig" if okt_ok else "Nog uploaden",
+            ))
 
             with ui.row().classes("items-center gap-2 mb-2"):
                 ui.icon("checklist").classes("text-lg").style(f"color: {theme.ACCENT}")
