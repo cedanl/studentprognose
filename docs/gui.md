@@ -35,14 +35,7 @@ resultatenoverzicht. Ideaal om de tool te verkennen zonder eigen data.
 
 ## Zo werkt de interface
 
-De startpagina toont de **pipeline-hub**: de volledige voorspelpipeline als een
-klikbare keten. Je ziet in één oogopslag de vijf stappen, welke stap nu aan de
-beurt is (oranje), wat is afgerond (groen vinkje) en wat nog vergrendeld is (tot
-je een project kiest). Klik een stap om er direct naartoe te gaan. Onder de keten
-laat een schema zien hoe de drie modellen (SARIMA, XGBoost en het ratio-model)
-binnen stap 4 samenkomen in het ensemble, met **Benchmark & tune** als zijspoor.
-
-De vijf stappen, in volgorde:
+De interface leidt je langs vijf stappen, in volgorde:
 
 1. **Project** — kies of maak een projectmap met de juiste structuur. Je kunt
    hier optioneel de demodataset downloaden om het model direct te proberen.
@@ -52,10 +45,9 @@ De vijf stappen, in volgorde:
 5. **Resultaten** — bekijk een overzicht van de voorspellingen.
 
 Nieuwe gebruikers volgen deze stappen van boven naar beneden; de stap-indicator
-bovenaan toont waar je bent. Terugkerende gebruikers klikken in de pipeline-hub
-direct op de gewenste stap. Op elke diepere pagina brengt het logo linksboven
-je terug naar de hub. Stappen die een project vereisen zijn vergrendeld tot je
-er een hebt gekozen, zodat je nooit vastloopt.
+bovenaan toont waar je bent. Terugkerende gebruikers springen via de zijbalk
+direct naar de gewenste pagina. Stappen die een project vereisen zijn
+uitgeschakeld tot je er een hebt gekozen, zodat je nooit vastloopt.
 
 Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de

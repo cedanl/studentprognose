@@ -15,11 +15,10 @@ import tempfile
 from nicegui import ui
 
 from gui import demodata, filtering_io, nav, theme, tracks
-from gui.components import pipeline_rail
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.progress_card import ProgressCard
-from gui.components.states import error_banner, section_title, status_badge
+from gui.components.states import empty_state, error_banner, section_title, status_badge
 from gui.state import STATE
 
 #: Jaar/week voor de demo-voorspelling (de demodata dekt 2020–2026).
@@ -59,13 +58,7 @@ class _HomeView:
     def _render_intro(self) -> None:
         self._container.clear()
         with self._container:
-            # Pipeline-hub — de primaire navigatie. Klik een stap om te starten;
-            # de status per stap volgt de echte projectstatus.
-            section_title(
-                "De pipeline",
-                "Klik een stap om te beginnen — of probeer eerst de demo hieronder.",
-            )
-            pipeline_rail.render()
+            self._render_tracks_explainer()
 
             # Één-klik demo.
             with (
@@ -91,17 +84,23 @@ class _HomeView:
                     on_click=self._run_demo,
                 ).props("unelevated")
 
-            # Actief project (alleen als er een project is; de Project-knoop in de
-            # rail dekt het opzetten af voor nieuwe gebruikers).
+            # Projectstatus / eigen project.
             if STATE.is_initialised:
                 with ui.card().classes("w-full"):
                     with ui.row().classes("items-center justify-between w-full"):
                         section_title("Actief project")
                         status_badge("ready")
                     ui.label(STATE.project_dir).classes("text-sm opacity-70")
-
-            # Hoe werkt het — de drie voorspelsporen (diepere uitleg).
-            self._render_tracks_explainer()
+            else:
+                with ui.card().classes("w-full"):
+                    empty_state(
+                        icon="rocket_launch",
+                        title="Eigen project opzetten",
+                        message="Werk je met je eigen data? Zet een projectmap op "
+                        "met configuratie en de juiste mappenstructuur.",
+                        action_label="Project opzetten",
+                        on_action=lambda: ui.navigate.to("/wizard"),
+                    )
 
     def _render_tracks_explainer(self) -> None:
         """Leg de drie voorspelsporen uit; knop leidt naar het schema (methodologie)."""
