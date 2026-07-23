@@ -18,7 +18,7 @@ from gui import demodata, filtering_io, nav, theme, tracks
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.progress_card import ProgressCard
-from gui.components.states import empty_state, error_banner, section_title, status_badge
+from gui.components.states import error_banner, section_title, status_badge
 from gui.state import STATE
 
 #: Jaar/week voor de demo-voorspelling (de demodata dekt 2020–2026).
@@ -85,39 +85,22 @@ class _HomeView:
                     ui.label(STATE.project_dir).classes("text-sm opacity-70")
             else:
                 with ui.card().classes("w-full"):
-                    empty_state(
-                        icon="rocket_launch",
-                        title="Eigen project opzetten",
-                        message="Werk je met je eigen data? Zet een projectmap op "
-                        "met configuratie en de juiste mappenstructuur.",
-                        action_label="Project opzetten",
-                        on_action=lambda: ui.navigate.to("/wizard"),
-                    )
-
-            # Één-klik demo — staat ónder de project-CTA zodat eigen project
-            # het primaire pad is en de demo de snelle kennismaking erbij.
-            with (
-                ui.card()
-                .classes("w-full")
-                .style(
-                    f"background: {theme.ACCENT}14; border: 1px solid {theme.ACCENT}55"
-                )
-            ):
-                with ui.row().classes("items-center gap-2"):
-                    ui.icon("bolt").classes("text-2xl").style(f"color: {theme.ACCENT}")
-                    ui.label("Direct proberen").classes("text-lg font-medium")
-                ui.label(
-                    "Draai de pipeline met meegeleverde demodata — in een "
-                    "tijdelijke map, zonder iets in te stellen. De demo draait het "
-                    "cumulatieve spoor (de demodata bevat geen individuele "
-                    "aanmelddata) en beperkt zich voor de snelheid tot een subset "
-                    "(Master, Niet-EER)."
-                ).classes("text-sm opacity-70")
-                ui.button(
-                    "Probeer direct met demodata",
-                    icon="bolt",
-                    on_click=self._run_demo,
-                ).props("unelevated").classes("sp-demo-btn")
+                    with ui.column().classes("w-full items-center text-center gap-3 py-12"):
+                        ui.icon("rocket_launch").classes("text-6xl opacity-40")
+                        ui.label("Eigen project opzetten").classes("text-xl font-medium")
+                        ui.label(
+                            "Werk je met je eigen data? Zet een projectmap op "
+                            "met configuratie en de juiste mappenstructuur."
+                        ).classes("text-sm opacity-70 max-w-md")
+                        ui.button(
+                            "Project opzetten",
+                            on_click=lambda: ui.navigate.to("/wizard"),
+                        ).props("unelevated")
+                        ui.button(
+                            "Probeer direct met demodata",
+                            icon="bolt",
+                            on_click=self._run_demo,
+                        ).props("unelevated").classes("sp-demo-btn")
 
     def _render_tracks_explainer(self) -> None:
         """Leg de drie voorspelsporen uit; knop leidt naar het schema (methodologie)."""
