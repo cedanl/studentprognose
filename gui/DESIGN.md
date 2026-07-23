@@ -9,7 +9,22 @@ Wijzig tokens in `gui/theme.py`, niet los in pagina's. Gebruik de componenten ui
 
 ## 1. Navigatiestructuur
 
-Twee modi naast elkaar, beide gevoed door één model in `gui/nav.py`:
+Drie modi naast elkaar, alle gevoed door één model in `gui/nav.py`:
+
+**Pipeline-hub** (landingspagina `/`) — de volledige pipeline als klikbare keten,
+de primaire navigatie-hub. Gerenderd door `components/pipeline_rail.py`:
+
+```
+[1: Project] → [2: Configuratie] → [3: Filteren] → [4: Modelleren] → [5: Resultaten]
+                                              │ binnen stap 4:
+                            [SARIMA ‖ XGBoost ‖ Ratio] → Ensemble        (zijspoor: Benchmark & tune)
+```
+
+De status per knoop weerspiegelt de echte projectstatus (`pipeline_rail.compute_states`):
+afgerond (groen vinkje), nu (oranje rand + gevulde radio), te doen (grijs), of
+vergrendeld (slot + tooltip "Kies eerst een project (stap 1)"). Betekenis wordt
+altijd door kleur **én** icoon **én** tekst gedragen, nooit door kleur alleen. Elk
+knooppunt navigeert naar de bijbehorende pagina; vergrendelde knopen niet.
 
 **Wizard-flow** (nieuwe gebruikers) — lineaire progressie met stap-indicator:
 
@@ -20,8 +35,9 @@ Twee modi naast elkaar, beide gevoed door één model in `gui/nav.py`:
 De stepper (`layout._stepper`) toont afgeronde stappen met een groen vinkje, de
 huidige stap gemarkeerd, en komende stappen grijs.
 
-**Vrije navigatie** (terugkerende gebruikers) — de zijbalk (`layout._drawer`) geeft
-directe toegang tot alle pagina's plus de losse tools (Benchmark & tune).
+**Vrije navigatie** (terugkerende gebruikers) — de zijbalk (`layout._drawer`) blijft
+op alle pagina's als snelnavigatie naar alle pagina's plus de losse tools
+(Benchmark & tune).
 
 **Toegankelijkheidsregels voor navigatie-items:**
 
@@ -106,6 +122,7 @@ De volledige logregels blijven wél beschikbaar (uitklapbaar) voor wie ze wil zi
 | Component | Functie | Bron |
 |-----------|---------|------|
 | Paginaschil | `page_shell(active, title, show_stepper=)` | `components/layout.py` |
+| Pipeline-hub | `pipeline_rail.render(on_nav=)`, `compute_states()` | `components/pipeline_rail.py` |
 | Statusbadge | `status_badge(state)` | `components/states.py` |
 | Leegsituatie | `empty_state(icon, title, message, action_label, on_action)` | `components/states.py` |
 | Foutbanner | `error_banner(message, hint)` | `components/states.py` |
