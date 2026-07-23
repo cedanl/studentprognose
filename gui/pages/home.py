@@ -14,7 +14,7 @@ import tempfile
 
 from nicegui import ui
 
-from gui import demodata, filtering_io, nav
+from gui import demodata, filtering_io, nav, theme
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.states import empty_state, error_banner, section_title, status_badge
@@ -39,7 +39,10 @@ def create() -> None:
     @ui.page("/")
     def home_page() -> None:
         with page_shell(active="/", title="Start", show_stepper=False):
-            ui.label("Studentprognose").classes("text-3xl font-bold")
+            # Op-merk hero-banner (CEDA/Npuls).
+            ui.image("/gui-assets/header.svg").classes("w-full rounded-xl").style(
+                "max-height: 180px; object-fit: cover"
+            )
             ui.label(
                 "Grafische interface rond de studentprognose-pipeline. "
                 "Zet een project op, stel de configuratie in en draai voorspellingen."
@@ -58,9 +61,15 @@ class _HomeView:
         self._container.clear()
         with self._container:
             # Één-klik demo.
-            with ui.card().classes("w-full bg-blue-1"):
+            with (
+                ui.card()
+                .classes("w-full")
+                .style(
+                    f"background: {theme.ACCENT}14; border: 1px solid {theme.ACCENT}55"
+                )
+            ):
                 with ui.row().classes("items-center gap-2"):
-                    ui.icon("bolt").classes("text-2xl").style("color: #3f51b5")
+                    ui.icon("bolt").classes("text-2xl").style(f"color: {theme.ACCENT}")
                     ui.label("Direct proberen").classes("text-lg font-medium")
                 ui.label(
                     "Draai de pipeline met meegeleverde demodata — in een "

@@ -147,7 +147,7 @@ class _ConfigView:
             ).props("unelevated")
             self._status = ui.label("").classes("text-sm")
 
-        with ui.tabs().classes("w-full") as tabs:
+        with ui.tabs().props("indicator-color=accent").classes("w-full") as tabs:
             tab_settings = ui.tab("Instellingen", icon="tune")
             tab_json = ui.tab("Geavanceerd (JSON)", icon="data_object")
         with ui.tab_panels(tabs, value=tab_settings).classes("w-full"):

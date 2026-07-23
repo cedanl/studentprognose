@@ -13,7 +13,7 @@ import os
 import pandas as pd
 from nicegui import ui
 
-from gui import config_io, filtering_io, nav
+from gui import config_io, filtering_io, nav, theme
 from gui.components.dirty_guard import DirtyGuard
 from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, info_banner, section_title
@@ -130,7 +130,11 @@ class _FilteringView:
                     self._on_examentype_change,
                 )
 
-        with ui.card().classes("w-full bg-blue-1"):
+        with (
+            ui.card()
+            .classes("w-full")
+            .style(f"background: {theme.ACCENT}14; border: 1px solid {theme.ACCENT}55")
+        ):
             self._preview = ui.label().classes("text-base font-medium")
         self._update_preview()
 

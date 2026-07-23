@@ -45,7 +45,7 @@ def create() -> None:
                 )
                 return
 
-            with ui.tabs().classes("w-full") as tabs:
+            with ui.tabs().props("indicator-color=accent").classes("w-full") as tabs:
                 tab_bench = ui.tab("Benchmark", icon="leaderboard")
                 tab_tune = ui.tab("Tune", icon="tune")
             with ui.tab_panels(tabs, value=tab_bench).classes("w-full"):

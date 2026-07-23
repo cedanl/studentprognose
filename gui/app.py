@@ -8,10 +8,16 @@ modules.
 
 from __future__ import annotations
 
-from nicegui import ui
+import os
+
+from nicegui import app, ui
 
 #: Poort waarop de GUI draait. Vast, zodat de gedocumenteerde URL klopt.
 PORT = 8080
+
+#: Map met huisstijl-assets (logo, hero, favicon), geserveerd op ``/gui-assets``.
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+ASSETS_URL = "/gui-assets"
 
 
 def _register_pages() -> None:
@@ -47,13 +53,14 @@ def main() -> None:
     :func:`gui.components.layout.page_shell`. In de globale scope aanroepen zou
     NiceGUI's script-mode triggeren en botsen met ``@ui.page``.
     """
+    app.add_static_files(ASSETS_URL, ASSETS_DIR)
     _register_pages()
     ui.run(
         title="Studentprognose",
         port=PORT,
         reload=False,
         show=False,
-        favicon="🎓",
+        favicon=os.path.join(ASSETS_DIR, "favicon.svg"),
     )
 
 
