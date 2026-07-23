@@ -33,17 +33,34 @@ directe toegang tot alle pagina's plus de losse tools (Benchmark & tune).
 
 Zo ziet de gebruiker altijd de volledige flow, zonder ooit in een 404 te lopen.
 
-## 2. Kleur & typografie
+## 2. Kleur & typografie — CEDA/Npuls-huisstijl
 
-Bron: `gui/theme.py`. Primair indigo, gelijk aan de mkdocs-documentatie.
+Bron van de tokens: `gui/theme.py`, in lijn met de gedeelde organisatie-
+stylesheet [`cedanl/.github`](https://github.com/cedanl/.github) →
+`docs/stylesheets/extra.css`. Het merk is **zwart primair, wit als achtergrond,
+npuls-oranje als accent**, met de Npuls-secundaire kleuren voor reeksen/status.
 
 | Token | Waarde | Gebruik |
 |-------|--------|---------|
-| `PRIMARY` | `#3f51b5` | Hoofdacties, actieve navigatie |
-| `POSITIVE` | `#2e7d32` | Succes, lage voorspelfout |
-| `WARNING` | `#ed6c02` | Waarschuwing, matige fout |
-| `NEGATIVE` | `#c62828` | Fout, hoge voorspelfout |
-| `INFO` | `#0277bd` | Bezig, neutrale info |
+| `PRIMARY` | `#000000` (zwart) | App-bar, tekst, primaire knoppen |
+| `ACCENT` | `#DD784B` (npuls-oranje) | Accenten, actieve navigatie/stepper/tabs, hero, links |
+| `SECONDARY` | `#3D68EC` (npuls-blauw) | Secundaire highlights, KPI-iconen |
+| `POSITIVE` | `#00AF81` (npuls-groen) | Succes, lage voorspelfout, winnend model |
+| `WARNING` | `#E6A020` (amber) | Waarschuwing, matige fout |
+| `NEGATIVE` | `#C0392B` (rood) | Fout, hoge voorspelfout |
+| `INFO` | `#3D68EC` (npuls-blauw) | Bezig, neutrale info |
+
+Grafieken gebruiken `CHART_SEQUENCE` (oranje → blauw → groen → geel → paars) en
+de MAPE-buckets `MAPE_GOOD`/`MAPE_MEDIUM`/`MAPE_BAD` (groen/oranje/rood).
+
+**Merkregel**: zwart draagt de structuur en primaire acties (hoog contrast,
+premium); oranje is gereserveerd voor accenten en actieve staten. Meng deze
+rollen niet — een oranje vlak signaleert "hier ben je / let hierop", niet een
+standaardknop.
+
+**Assets** (`gui/assets/`, geserveerd op `/gui-assets`): `logo.svg` (app-bar-
+mark), `header.svg` (hero op de startpagina), `favicon.svg`. Allemaal zwart +
+npuls-oranje.
 
 - **Hiërarchie**: `text-3xl font-bold` (paginatitel) › `text-lg font-medium`
   (sectie) › `text-base` (body) › `text-sm opacity-70` (toelichting).

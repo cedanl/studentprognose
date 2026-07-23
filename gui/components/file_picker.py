@@ -66,7 +66,7 @@ class DirectoryPicker:
         with (
             ui.row()
             .classes(
-                "w-full items-center gap-2 cursor-pointer hover:bg-blue-1 rounded px-2 py-1"
+                "w-full items-center gap-2 cursor-pointer hover:bg-grey-2 rounded px-2 py-1"
             )
             .on("click", lambda t=target: self._enter(t))
         ):

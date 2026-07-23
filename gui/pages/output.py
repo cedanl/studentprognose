@@ -17,7 +17,7 @@ from gui import nav, results_io
 from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
 from gui.state import STATE
-from gui.theme import INFO, NEGATIVE, POSITIVE, WARNING
+from gui.theme import ACCENT, INFO, NEGATIVE, POSITIVE, WARNING
 
 _BUCKET_COLOR = {
     "positive": POSITIVE,
@@ -241,7 +241,7 @@ class _ResultsView:
             if row.get("voorspelling") is not None:
                 labels.append("Voorspelling")
                 values.append(row["voorspelling"])
-                colors.append(INFO)
+                colors.append(ACCENT)
             if row.get("werkelijk") is not None:
                 labels.append("Werkelijk")
                 values.append(row["werkelijk"])

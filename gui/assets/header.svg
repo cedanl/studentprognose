@@ -1,0 +1,39 @@
+<svg width="820" height="180" viewBox="0 0 820 180" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#000000"/>
+      <stop offset="100%" stop-color="#1a1a1a"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#DD784B"/>
+      <stop offset="100%" stop-color="#F4D74B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Achtergrond -->
+  <rect width="820" height="180" rx="14" fill="url(#bg)"/>
+
+  <!-- Chart-decoratie (Npuls-kleuren, subtiel) -->
+  <polyline points="40,140 120,124 200,128 280,104 360,92 440,98 520,70 600,56 680,60 760,38"
+            fill="none" stroke="url(#accent)" stroke-width="2.5" opacity="0.55"
+            stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="40,152 120,140 200,144 280,126 360,120 440,112 520,96 600,86 680,78 760,64"
+            fill="none" stroke="#3D68EC" stroke-width="1.5" opacity="0.35" stroke-dasharray="6,5"/>
+  <circle cx="520" cy="70" r="3.5" fill="#DD784B" opacity="0.9"/>
+  <circle cx="760" cy="38" r="4" fill="#F4D74B" opacity="0.9"/>
+
+  <!-- Afstudeer-hoed (oranje mark) -->
+  <g transform="translate(322, 46)" fill="#DD784B">
+    <polygon points="26,8 0,22 26,36 52,22"/>
+    <rect x="24" y="24" width="4" height="16" rx="1" opacity="0.85"/>
+    <path d="M11,25 L11,40 Q26,49 41,40 L41,25" fill="none" stroke="#DD784B" stroke-width="2.2" opacity="0.85"/>
+  </g>
+
+  <!-- Titel -->
+  <text x="410" y="118" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif"
+        font-size="40" font-weight="700" fill="#ffffff">Studentprognose</text>
+
+  <!-- Subtitel -->
+  <text x="410" y="144" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif"
+        font-size="15" fill="#DD784B" letter-spacing="2">Voorspel studentinstroom in het hoger onderwijs</text>
+</svg>

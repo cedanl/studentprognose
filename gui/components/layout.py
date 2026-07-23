@@ -19,7 +19,7 @@ from contextlib import contextmanager
 
 from nicegui import ui
 
-from gui import nav
+from gui import nav, theme
 from gui.state import STATE
 from gui.theme import QUASAR_COLORS
 
@@ -42,11 +42,11 @@ def _drawer(active: str) -> None:
             locked = _requires_project(item.route) and not STATE.is_initialised
             enabled = built and not locked
 
-            # Kleur draagt de betekenis: primair = actief, donkergrijs = klikbaar,
-            # lichtgrijs = uitgeschakeld. Op een uitgeschakelde q-btn (opacity 0.7)
-            # leest lichtgrijs duidelijk als "nu niet beschikbaar".
+            # Kleur draagt de betekenis: accent (oranje) = actief, donkergrijs =
+            # klikbaar, lichtgrijs = uitgeschakeld. Op een uitgeschakelde q-btn
+            # (opacity 0.7) leest lichtgrijs duidelijk als "nu niet beschikbaar".
             if item.route == active:
-                color = "primary"
+                color = "accent"
             elif enabled:
                 color = "grey-9"
             else:
@@ -54,7 +54,8 @@ def _drawer(active: str) -> None:
 
             classes = "w-full justify-start"
             if item.route == active:
-                classes += " font-medium bg-blue-1 rounded"
+                # Zachte oranje tint + linker accentrand voor de actieve pagina.
+                classes += " font-medium rounded"
 
             reason = (
                 "Nog in ontwikkeling"
@@ -76,6 +77,11 @@ def _drawer(active: str) -> None:
                     .props(f"flat align=left color={color}")
                     .classes(classes)
                 )
+                if item.route == active:
+                    btn.style(
+                        f"background: {theme.ACCENT}1a; "
+                        f"border-left: 3px solid {theme.ACCENT}"
+                    )
                 if not enabled:
                     btn.props("disable")
                     wrapper.tooltip(reason)
@@ -94,7 +100,7 @@ def _stepper(active: str) -> None:
             if done:
                 color, icon = "positive", "check_circle"
             elif current:
-                color, icon = "primary", "radio_button_checked"
+                color, icon = "accent", "radio_button_checked"
             else:
                 color, icon = "grey-5", "radio_button_unchecked"
             with ui.row().classes("items-center gap-1 no-wrap"):
@@ -117,11 +123,16 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
     """
     ui.colors(**QUASAR_COLORS)
 
-    with ui.header().classes("items-center justify-between q-px-md"):
-        with ui.row().classes("items-center gap-2 no-wrap"):
-            ui.icon("school").classes("text-2xl")
-            ui.label("Studentprognose").classes("text-lg font-medium")
-        ui.label(title).classes("text-sm opacity-80")
+    # Zwart app-bar (CEDA/Npuls) met een oranje accentlijn onderaan.
+    with (
+        ui.header()
+        .classes("items-center justify-between q-px-md")
+        .style(f"background: {theme.PRIMARY}; border-bottom: 3px solid {theme.ACCENT}")
+    ):
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.image("/gui-assets/logo.svg").classes("w-8 h-8").style("filter: none")
+            ui.label("Studentprognose").classes("text-lg font-medium text-white")
+        ui.label(title).classes("text-sm text-white opacity-70")
 
     _drawer(active)
 
