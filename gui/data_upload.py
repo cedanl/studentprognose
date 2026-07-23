@@ -72,6 +72,71 @@ _CFG: dict = {
 }
 
 
+@dataclass
+class TelCoverage:
+    """Tijdsdekkingsstatistieken afgeleid uit geüploade telbestanden."""
+
+    years: list[int]
+    present: dict[int, set[int]]   # year → set of week numbers
+    gaps: list[tuple[int, int]]    # (year, week) within expected range but missing
+    total: int                     # aantal geldige bestanden
+
+
+def compute_tel_coverage(results: dict[str, FileCheckResult]) -> TelCoverage | None:
+    """Leid week/jaar-dekking af uit de verzameling telbestand-resultaten.
+
+    Gaten worden bepaald als weken die ontbreken binnen het aaneengesloten
+    bereik [eerste week van eerste jaar … laatste week van laatste jaar].
+    Geeft None terug als er geen geldige bestanden zijn.
+    """
+    patterns = compile_patterns(None)
+    present: dict[int, set[int]] = {}
+
+    for filename, result in results.items():
+        if result.status not in (FileStatus.VALID, FileStatus.WARNINGS):
+            continue
+        match = match_telbestand(filename, patterns)
+        if match is None:
+            continue
+        try:
+            week = week_from_match(match)
+            year = int(match.group("year"))
+        except (ValueError, IndexError):
+            continue
+        present.setdefault(year, set()).add(week)
+
+    if not present:
+        return None
+
+    years = sorted(present.keys())
+    min_year, max_year = years[0], years[-1]
+    gaps: list[tuple[int, int]] = []
+
+    for year in range(min_year, max_year + 1):
+        year_weeks = present.get(year, set())
+        if year == min_year == max_year:
+            w_start = min(year_weeks) if year_weeks else 1
+            w_end = max(year_weeks) if year_weeks else 1
+        elif year == min_year:
+            w_start = min(present[min_year]) if present.get(min_year) else 1
+            w_end = 52
+        elif year == max_year:
+            w_start = 1
+            w_end = max(present[max_year]) if present.get(max_year) else 52
+        else:
+            w_start, w_end = 1, 52
+        for w in range(w_start, w_end + 1):
+            if w not in year_weeks:
+                gaps.append((year, w))
+
+    return TelCoverage(
+        years=years,
+        present=present,
+        gaps=gaps,
+        total=sum(len(ws) for ws in present.values()),
+    )
+
+
 def _to_status(hard: list, soft: list, warnings: list) -> FileStatus:
     if hard or soft:
         return FileStatus.ERRORS

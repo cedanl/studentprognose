@@ -25,6 +25,8 @@ from gui.components.states import error_banner, info_banner, section_title
 from gui.data_upload import (
     FileCheckResult,
     FileStatus,
+    TelCoverage,
+    compute_tel_coverage,
     save_and_validate_individueel,
     save_and_validate_oktober,
     save_and_validate_telbestand,
@@ -54,6 +56,114 @@ _MODE_OPTS: list[tuple[str, str, str, str, str]] = [
     ("individual", "Individueel", "person",    "-d individual", "Alleen aanmelddata"),
     ("both",       "Beide",       "bolt",      "-d both",       "Telbestanden + aanmelddata"),
 ]
+
+
+def _coverage_html(cov: TelCoverage) -> str:
+    """Genereer een zelfstandige HTML-visualisatie van de telbestand-dekking."""
+    gap_set = set(cov.gaps)
+    all_present = [(y, w) for y, ws in cov.present.items() for w in ws]
+    min_yw = min(all_present)
+    max_yw = max(all_present)
+
+    n_gaps = len(cov.gaps)
+    gap_color = theme.WARNING if n_gaps else theme.POSITIVE
+    gap_label = (
+        f"⚠ {n_gaps} {'gat' if n_gaps == 1 else 'gaten'}"
+        if n_gaps
+        else "✓ aaneengesloten"
+    )
+
+    header = (
+        f'<div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:10px;">'
+        f'<span style="font-size:13px;font-weight:600;color:#1a1a1a;">'
+        f'W{min_yw[1]} {min_yw[0]} → W{max_yw[1]} {max_yw[0]}'
+        f'</span>'
+        f'<span style="font-size:12px;color:#999;">'
+        f'{cov.total} bestand{"en" if cov.total != 1 else ""}'
+        f'</span>'
+        f'<span style="font-size:12px;font-weight:500;color:{gap_color};">{gap_label}</span>'
+        f'</div>'
+    )
+
+    rows_html: list[str] = []
+    for year in cov.years:
+        year_weeks = cov.present.get(year, set())
+        min_year, max_year = cov.years[0], cov.years[-1]
+        if year == min_year == max_year:
+            w_start, w_end = min(year_weeks, default=1), max(year_weeks, default=1)
+        elif year == min_year:
+            w_start = min(year_weeks, default=1)
+            w_end = 52
+        elif year == max_year:
+            w_start = 1
+            w_end = max(year_weeks, default=52)
+        else:
+            w_start, w_end = 1, 52
+
+        boxes: list[str] = []
+        for w in range(1, 53):
+            if w < w_start or w > w_end:
+                bg = "#efefef"
+                op = "0.25"
+            elif (year, w) in gap_set:
+                bg = "#FFD4B5"
+                op = "1"
+            else:
+                bg = theme.ACCENT
+                op = "1"
+            boxes.append(
+                f'<div title="W{w} {year}" style="'
+                f'width:8px;height:14px;background:{bg};opacity:{op};'
+                f'border-radius:2px;flex-shrink:0;"></div>'
+            )
+
+        rows_html.append(
+            f'<div style="display:flex;align-items:center;gap:6px;">'
+            f'<span style="font-size:11px;font-family:monospace;width:36px;'
+            f'color:#999;flex-shrink:0;">{year}</span>'
+            f'<div style="display:flex;gap:2px;">{"".join(boxes)}</div>'
+            f'<span style="font-size:10px;color:#bbb;margin-left:4px;flex-shrink:0;">'
+            f'W{w_start}–{w_end}</span>'
+            f'</div>'
+        )
+
+    gaps_html = ""
+    if cov.gaps:
+        shown = sorted(cov.gaps)[:10]
+        text = ", ".join(f"W{w}/{y}" for y, w in shown)
+        if len(cov.gaps) > 10:
+            text += f" (+{len(cov.gaps) - 10} meer)"
+        gaps_html = (
+            f'<div style="margin-top:8px;padding-top:8px;'
+            f'border-top:1px solid #efefef;'
+            f'font-size:11px;color:{theme.WARNING};'
+            f'display:flex;align-items:flex-start;gap:6px;">'
+            f'<span style="flex-shrink:0;font-weight:500;">Gaten:</span>'
+            f'<span style="word-break:break-all;line-height:1.5;">{text}</span>'
+            f'</div>'
+        )
+
+    legend = (
+        f'<div style="display:flex;gap:12px;margin-top:10px;'
+        f'padding-top:8px;border-top:1px solid #efefef;">'
+        f'<div style="display:flex;align-items:center;gap:5px;">'
+        f'<div style="width:10px;height:10px;border-radius:2px;background:{theme.ACCENT};"></div>'
+        f'<span style="font-size:10px;color:#999;">aanwezig</span></div>'
+        f'<div style="display:flex;align-items:center;gap:5px;">'
+        f'<div style="width:10px;height:10px;border-radius:2px;background:#FFD4B5;"></div>'
+        f'<span style="font-size:10px;color:#999;">ontbreekt</span></div>'
+        f'</div>'
+    ) if n_gaps else ""
+
+    return (
+        f'<div style="background:#fafafa;border:1px solid #efefef;'
+        f'border-radius:8px;padding:12px 14px;">'
+        f'{header}'
+        f'<div style="display:flex;flex-direction:column;gap:5px;">{"".join(rows_html)}</div>'
+        f'{gaps_html}'
+        f'{legend}'
+        f'</div>'
+    )
 
 
 def create() -> None:
@@ -368,7 +478,7 @@ class _WizardView:
                     self._mode_cards[key] = card
 
             # ── Upload-zones ───────────────────────────────────────────────
-            self._tel_wrapper = ui.column().classes("w-full")
+            self._tel_wrapper = ui.column().classes("w-full gap-3")
             with self._tel_wrapper:
                 self._zone_tel = _UploadZone(
                     title="Telbestanden",
@@ -380,8 +490,9 @@ class _WizardView:
                     multiple=True,
                     project_dir_getter=lambda: self._project_dir,
                     validate_fn=save_and_validate_telbestand,
-                    on_change=self._refresh_summary,
+                    on_change=self._on_tel_change,
                 )
+                self._coverage_slot = ui.column().classes("w-full")
 
             ui.space().classes("h-3")
 
@@ -440,6 +551,19 @@ class _WizardView:
 
             # Initialiseer visuele staat nadat alle elementen bestaan.
             self._apply_mode()
+
+    # ── Telbestand-dekking ───────────────────────────────────────────────────
+
+    def _on_tel_change(self) -> None:
+        self._refresh_coverage()
+        self._refresh_summary()
+
+    def _refresh_coverage(self) -> None:
+        cov = compute_tel_coverage(self._zone_tel._results)
+        self._coverage_slot.clear()
+        if cov is not None:
+            with self._coverage_slot:
+                ui.html(_coverage_html(cov))
 
     # ── Modus-logica ────────────────────────────────────────────────────────
 
@@ -581,6 +705,7 @@ class _WizardView:
         self._zone_tel.load_existing(existing["telbestanden"])
         self._zone_ind.load_existing(existing["individueel"])
         self._zone_okt.load_existing(existing["oktober"])
+        self._refresh_coverage()
         self._refresh_summary()
 
     async def _download_demodata(self) -> None:
