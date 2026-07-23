@@ -1,59 +1,70 @@
-<svg width="100%" viewBox="0 0 820 180" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block">
+<svg width="100%" viewBox="0 0 800 200" preserveAspectRatio="xMidYMid meet" xmlns="http://www.w3.org/2000/svg" style="display:block">
   <defs>
-    <!-- Zwarte basis met langzaam bewegende oranje gloed (on-brand, geen regenboog) -->
-    <radialGradient id="glow" cx="50%" cy="120%" r="90%">
-      <stop offset="0%" stop-color="#DD784B">
-        <animate attributeName="stop-color" values="#DD784B;#E6A020;#DD784B" dur="9s" repeatCount="indefinite"/>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%">
+        <animate attributeName="stop-color" values="#1a73e8;#00897b;#c62828;#2E7D32;#e91e90;#7b1fa2;#66bb6a;#1a73e8" dur="18s" repeatCount="indefinite"/>
       </stop>
-      <stop offset="55%" stop-color="#1a1a1a"/>
-      <stop offset="100%" stop-color="#000000"/>
-    </radialGradient>
-    <linearGradient id="line" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#DD784B"/>
-      <stop offset="100%" stop-color="#F4D74B"/>
+      <stop offset="50%">
+        <animate attributeName="stop-color" values="#7b1fa2;#1a73e8;#00897b;#c62828;#2E7D32;#e91e90;#7b1fa2;#7b1fa2" dur="18s" repeatCount="indefinite"/>
+      </stop>
+      <stop offset="100%">
+        <animate attributeName="stop-color" values="#00897b;#e91e90;#7b1fa2;#66bb6a;#c62828;#2E7D32;#00897b;#00897b" dur="18s" repeatCount="indefinite"/>
+      </stop>
     </linearGradient>
-    <filter id="soft"><feGaussianBlur stdDeviation="2.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00C9FF"/>
+      <stop offset="100%" stop-color="#92FE9D"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
   </defs>
 
-  <!-- Achtergrond -->
-  <rect width="820" height="180" rx="14" fill="#000000"/>
-  <rect width="820" height="180" rx="14" fill="url(#glow)" opacity="0.30"/>
+  <!-- Animated background -->
+  <rect width="800" height="200" rx="12" fill="url(#bg)"/>
 
-  <!-- Chart-lijn (altijd zichtbaar) met zachte ademende gloed — Npuls-kleuren -->
-  <polyline points="40,142 120,126 200,130 280,106 360,94 440,100 520,72 600,58 680,62 780,38"
-            fill="none" stroke="url(#line)" stroke-width="2.6" stroke-linecap="round"
-            stroke-linejoin="round" filter="url(#soft)">
-    <animate attributeName="opacity" values="0.55;0.95;0.55" dur="6s" repeatCount="indefinite"/>
-  </polyline>
-  <!-- Voortschrijdende accentstip langs de lijn -->
-  <circle r="3" fill="#F4D74B" filter="url(#soft)">
-    <animateMotion dur="7s" repeatCount="indefinite"
-      path="M40,142 L120,126 L200,130 L280,106 L360,94 L440,100 L520,72 L600,58 L680,62 L780,38"/>
-  </circle>
-  <polyline points="40,154 120,142 200,146 280,128 360,122 440,114 520,98 600,88 680,80 780,64"
-            fill="none" stroke="#3D68EC" stroke-width="1.5" opacity="0.30" stroke-dasharray="6,5"/>
+  <!-- Chart lines decoration -->
+  <polyline points="50,160 120,140 190,145 260,120 330,100 400,110 470,80 540,60 610,65 680,40 750,30"
+            fill="none" stroke="url(#accent)" stroke-width="2.5" opacity="0.3" stroke-linecap="round" stroke-linejoin="round"/>
+  <polyline points="50,170 120,155 190,160 260,140 330,135 400,125 470,105 540,95 610,85 680,70 750,55"
+            fill="none" stroke="#00C9FF" stroke-width="1.5" opacity="0.15" stroke-dasharray="6,4"/>
 
-  <!-- Pulserende accentpunten -->
-  <circle cx="520" cy="72" r="3.5" fill="#DD784B">
-    <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"/>
+  <!-- Dot accents with pulse -->
+  <circle cx="470" cy="80" r="4" fill="#92FE9D" opacity="0.5">
+    <animate attributeName="opacity" values="0.3;0.7;0.3" dur="3s" repeatCount="indefinite"/>
   </circle>
-  <circle cx="780" cy="38" r="4.5" fill="#F4D74B" filter="url(#soft)">
-    <animate attributeName="opacity" values="0.5;1;0.5" dur="2.4s" repeatCount="indefinite"/>
-    <animate attributeName="r" values="3.5;5.5;3.5" dur="2.4s" repeatCount="indefinite"/>
+  <circle cx="680" cy="40" r="4" fill="#00C9FF" opacity="0.5">
+    <animate attributeName="opacity" values="0.5;0.9;0.5" dur="4s" repeatCount="indefinite"/>
+  </circle>
+  <circle cx="750" cy="30" r="5" fill="#92FE9D" opacity="0.6" filter="url(#glow)">
+    <animate attributeName="opacity" values="0.4;0.8;0.4" dur="2.5s" repeatCount="indefinite"/>
+    <animate attributeName="r" values="4;6;4" dur="2.5s" repeatCount="indefinite"/>
   </circle>
 
-  <!-- Afstudeer-hoed (oranje mark) -->
-  <g transform="translate(322, 46)" fill="#DD784B">
-    <polygon points="26,8 0,22 26,36 52,22"/>
-    <rect x="24" y="24" width="4" height="16" rx="1" opacity="0.85"/>
-    <path d="M11,25 L11,40 Q26,49 41,40 L41,25" fill="none" stroke="#DD784B" stroke-width="2.2" opacity="0.85"/>
+  <!-- Graduation cap icon -->
+  <g transform="translate(310, 40)" fill="url(#accent)" filter="url(#glow)">
+    <polygon points="25,10 0,25 25,40 50,25" opacity="0.9"/>
+    <rect x="23" y="25" width="4" height="18" rx="1" opacity="0.7"/>
+    <path d="M10,27 L10,42 Q25,52 40,42 L40,27" fill="none" stroke="url(#accent)" stroke-width="2" opacity="0.7"/>
   </g>
 
-  <!-- Titel -->
-  <text x="410" y="118" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif"
-        font-size="40" font-weight="700" fill="#ffffff">Studentprognose</text>
+  <!-- Title -->
+  <text x="400" y="110" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="40" font-weight="700" fill="white" filter="url(#glow)">
+    Studentprognose
+  </text>
 
-  <!-- Subtitel -->
-  <text x="410" y="144" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif"
-        font-size="15" fill="#DD784B" letter-spacing="2">Voorspel studentinstroom in het hoger onderwijs</text>
+  <!-- Subtitle -->
+  <text x="400" y="140" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="16" fill="url(#accent)" letter-spacing="2">
+    Voorspel studentinstroom met geavanceerde modellen
+  </text>
+
+  <!-- Pill -->
+  <rect x="310" y="152" width="180" height="24" rx="12" fill="white" opacity="0.1"/>
+  <text x="400" y="169" text-anchor="middle" font-family="'Segoe UI', Arial, sans-serif" font-size="12" fill="#92FE9D" letter-spacing="1">
+    SARIMA · XGBoost · Ensemble
+  </text>
 </svg>
