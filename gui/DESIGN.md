@@ -35,9 +35,9 @@ knooppunt navigeert naar de bijbehorende pagina; vergrendelde knopen niet.
 De stepper (`layout._stepper`) toont afgeronde stappen met een groen vinkje, de
 huidige stap gemarkeerd, en komende stappen grijs.
 
-**Vrije navigatie** (terugkerende gebruikers) — de zijbalk (`layout._drawer`) blijft
-op alle pagina's als snelnavigatie naar alle pagina's plus de losse tools
-(Benchmark & tune).
+**Terug naar de hub** — op elke pagina navigeert een klik op het Npuls-logo of de
+toolnaam ("Studentprognose") in de header terug naar de pipeline-hub (`/`). Er is
+geen zijbalk meer.
 
 **Toegankelijkheidsregels voor navigatie-items:**
 

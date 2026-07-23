@@ -1,11 +1,10 @@
-"""Gedeelde paginaschil: header, zijbalknavigatie en wizard-stepper.
+"""Gedeelde paginaschil: header en wizard-stepper.
 
-Implementeert het navigatiemodel uit :mod:`gui.nav`:
+De primaire navigatie is de pipeline-hub op de startpagina (``/``, zie
+:mod:`gui.components.pipeline_rail`); er is geen zijbalk. Deze schil levert:
 
-* **Zijbalk** — vrije navigatie voor terugkerende gebruikers. Nog-niet-gebouwde
-  of (bij een ontbrekend project) nog-niet-toegankelijke bestemmingen staan
-  uitgeschakeld, zodat de gebruiker de volledige flow ziet zonder in een 404 te
-  lopen.
+* **Header** — het Npuls-logo en de toolnaam zijn klikbaar en brengen je vanaf
+  elke pagina terug naar de pipeline-hub.
 * **Stepper** — lineaire voortgang voor nieuwe gebruikers, met een vinkje op
   afgeronde stappen.
 
@@ -20,71 +19,7 @@ from contextlib import contextmanager
 from nicegui import ui
 
 from gui import nav, theme
-from gui.state import STATE
 from gui.theme import QUASAR_COLORS
-
-
-def _navigate(route: str) -> None:
-    ui.navigate.to(route)
-
-
-def _requires_project(route: str) -> bool:
-    """True als de route pas zin heeft nadat er een project is gekozen."""
-    return route not in ("/", "/wizard")
-
-
-def _drawer(active: str) -> None:
-    """Render de zijbalk met alle navigatie-items."""
-    with ui.left_drawer(fixed=False).classes("bg-grey-1 gap-1"):
-        ui.label("Navigatie").classes("text-xs uppercase opacity-50 px-3 pt-2")
-        for item in nav.all_items():
-            built = nav.is_available(item.route)
-            locked = _requires_project(item.route) and not STATE.is_initialised
-            enabled = built and not locked
-
-            # Kleur draagt de betekenis: accent (oranje) = actief, donkergrijs =
-            # klikbaar, lichtgrijs = uitgeschakeld. Op een uitgeschakelde q-btn
-            # (opacity 0.7) leest lichtgrijs duidelijk als "nu niet beschikbaar".
-            if item.route == active:
-                color = "accent"
-            elif enabled:
-                color = "grey-9"
-            else:
-                color = "grey-5"
-
-            classes = "w-full justify-start"
-            if item.route == active:
-                # Zachte oranje tint + linker accentrand voor de actieve pagina.
-                classes += " font-medium rounded"
-
-            reason = (
-                "Nog in ontwikkeling"
-                if not built
-                else "Kies eerst een project (stap 1)"
-            )
-
-            # Een uitgeschakelde q-btn vangt geen hover-events, dus de tooltip
-            # hangt aan een wrapper zodat de uitleg tóch verschijnt.
-            with ui.element("div").classes("w-full") as wrapper:
-                btn = (
-                    ui.button(
-                        item.label,
-                        icon=item.icon,
-                        on_click=(lambda r=item.route: _navigate(r))
-                        if enabled
-                        else None,
-                    )
-                    .props(f"flat align=left color={color}")
-                    .classes(classes)
-                )
-                if item.route == active:
-                    btn.style(
-                        f"background: {theme.ACCENT}1a; "
-                        f"border-left: 3px solid {theme.ACCENT}"
-                    )
-                if not enabled:
-                    btn.props("disable")
-                    wrapper.tooltip(reason)
 
 
 def _stepper(active: str) -> None:
@@ -129,13 +64,19 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
         .classes("items-center justify-between q-px-md")
         .style(f"background: {theme.PRIMARY}; border-bottom: 3px solid {theme.ACCENT}")
     ):
-        with ui.row().classes("items-center gap-3 no-wrap"):
+        # Logo + toolnaam vormen samen de weg terug naar de pipeline-hub (``/``):
+        # zonder zijbalk is dit de vaste navigatie-affordance op elke pagina.
+        brand = (
+            ui.row()
+            .classes("items-center gap-3 no-wrap cursor-pointer")
+            .on("click", lambda: ui.navigate.to("/"))
+        )
+        with brand:
             # Officieel Npuls-logo (wit) — co-branding met de toolnaam.
             ui.image("/gui-assets/npuls-logo-white.svg").classes("w-8 h-8")
             ui.label("Studentprognose").classes("text-lg font-medium text-white")
+        brand.tooltip("Terug naar de pipeline-hub")
         ui.label(title).classes("text-sm text-white opacity-70")
-
-    _drawer(active)
 
     with ui.column().classes("w-full max-w-5xl mx-auto p-6 gap-4"):
         if show_stepper:

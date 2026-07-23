@@ -52,9 +52,10 @@ De vijf stappen, in volgorde:
 5. **Resultaten** — bekijk een overzicht van de voorspellingen.
 
 Nieuwe gebruikers volgen deze stappen van boven naar beneden; de stap-indicator
-bovenaan toont waar je bent. Terugkerende gebruikers springen via de pipeline-hub
-of de zijbalk direct naar de gewenste pagina. Stappen die een project vereisen
-zijn vergrendeld tot je er een hebt gekozen, zodat je nooit vastloopt.
+bovenaan toont waar je bent. Terugkerende gebruikers klikken in de pipeline-hub
+direct op de gewenste stap. Op elke diepere pagina brengt het logo linksboven
+je terug naar de hub. Stappen die een project vereisen zijn vergrendeld tot je
+er een hebt gekozen, zodat je nooit vastloopt.
 
 Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de

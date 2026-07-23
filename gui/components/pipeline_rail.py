@@ -1,15 +1,14 @@
 """Pipeline-rail: de ML-pipeline als klikbare navigatie-hub.
 
 Rendert de vijf hoofdfasen van de voorspelpipeline als een horizontale keten van
-knooppunten, met daaronder de drie parallelle modellen die samenkomen in het
-ensemble. De status per knoop (afgerond / nu / te doen / vergrendeld)
-weerspiegelt de echte projectstatus (:data:`gui.state.STATE`), zodat de
-startpagina meteen toont waar je bent en wat de logische volgende stap is. Elk
-knooppunt navigeert naar de bijbehorende pagina.
+klikbare knooppunten, met daaronder het benchmark-zijspoor. De status per knoop
+(afgerond / nu / te doen / vergrendeld) weerspiegelt de echte projectstatus
+(:data:`gui.state.STATE`), zodat de startpagina meteen toont waar je bent en wat
+de logische volgende stap is. Elk knooppunt navigeert naar de bijbehorende pagina.
 
-Dit is de primaire navigatie-hub van de app (de landingspagina ``/``); de
-zijbalk in :mod:`gui.components.layout` blijft als snelnavigatie op de diepere
-pagina's bestaan. Zie ``gui/DESIGN.md`` voor de stijlgids.
+Dit is de primaire navigatie-hub van de app (de landingspagina ``/``). Er is geen
+zijbalk meer; vanaf een diepere pagina keer je via het logo linksboven terug naar
+deze hub. Zie ``gui/DESIGN.md`` voor de stijlgids.
 
 De flow volgt :mod:`studentprognose.main`::
 
@@ -86,13 +85,6 @@ STAGES: list[RailStage] = [
         "insights",
         "Bekijk de prognose, dashboards en foutmaten.",
     ),
-]
-
-#: De drie parallelle modellen die samenkomen in het ensemble (kern van stap 4).
-MODELS: list[tuple[str, str, str]] = [
-    ("SARIMA", "timeline", "Tijdreeks — seizoenspatroon per week."),
-    ("XGBoost", "account_tree", "Machine learning — individueel + cumulatief."),
-    ("Ratio", "percent", "Historische conversie vooraanmelding → inschrijving."),
 ]
 
 #: Losse tool buiten de lineaire flow.
@@ -184,7 +176,6 @@ def render(*, on_nav: Callable[[str], None] | None = None) -> None:
                 nxt = states[STAGES[i + 1].route]
                 _connector(nxt in ("done", "current"))
 
-    _model_card()
     _benchmark_track(states["/benchmark"], navigate)
 
 
@@ -228,45 +219,6 @@ def _connector(reached: bool) -> None:
     col = theme.ACCENT if reached else "#cfcfcf"
     with ui.column().classes("justify-center self-center px-1"):
         ui.icon("east").style(f"color: {col}")
-
-
-def _model_card() -> None:
-    """Toon de drie parallelle modellen die samenkomen in het ensemble (stap 4)."""
-    with (
-        ui.card()
-        .classes("w-full")
-        .style(f"border: 1px dashed {theme.SECONDARY}66; background: {theme.SECONDARY}0a")
-    ):
-        with ui.row().classes("items-center gap-2"):
-            ui.icon("play_arrow").style(f"color: {theme.ACCENT}")
-            ui.label("Binnen stap 4 · Modelleren").classes("font-medium")
-        with ui.row().classes("w-full items-stretch no-wrap gap-3 mt-1"):
-            with ui.column().classes("gap-2 justify-center"):
-                for name, icon, blurb in MODELS:
-                    with ui.row().classes("items-center gap-2 no-wrap"):
-                        with (
-                            ui.element("div")
-                            .classes("flex items-center justify-center rounded")
-                            .style(f"width: 28px; height: 28px; background: {theme.SECONDARY}1a")
-                        ):
-                            ui.icon(icon).style(f"color: {theme.SECONDARY}")
-                        with ui.column().classes("gap-0"):
-                            ui.label(name).classes("text-sm font-medium")
-                            ui.label(blurb).classes("text-xs opacity-60")
-            # Samenvoeg-beugel: de drie modellen bundelen tot één stroom.
-            ui.element("div").classes("self-stretch my-2").style(
-                f"width: 14px; border: 2px solid {theme.SECONDARY}55; "
-                "border-left: none; border-radius: 0 12px 12px 0"
-            )
-            ui.icon("chevron_right").classes("text-2xl opacity-40 self-center")
-            with (
-                ui.column()
-                .classes("items-center gap-1 p-3 rounded self-center")
-                .style(f"background: {theme.ACCENT}1a; border: 1px solid {theme.ACCENT}")
-            ):
-                ui.icon("hub").classes("text-2xl").style(f"color: {theme.ACCENT}")
-                ui.label("Ensemble").classes("text-sm font-medium")
-                ui.label("gewogen combinatie").classes("text-xs opacity-60")
 
 
 def _benchmark_track(state: str, navigate: Callable[[str], None]) -> None:
