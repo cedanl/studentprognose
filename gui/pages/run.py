@@ -9,6 +9,7 @@ from __future__ import annotations
 from nicegui import app, ui
 
 from gui import nav, process, theme, tracks
+from gui.components import train_test_viz as tvz
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.progress_card import ProgressCard
@@ -59,6 +60,8 @@ class _RunView:
 
     def __init__(self) -> None:
         self._settings = {**_DEFAULTS, **app.storage.general.get(_STORAGE_KEY, {})}
+        self._viz_variant: int = 1
+        self._viz_btns: list[ui.button] = []
         self._build()
 
     def _build(self) -> None:
@@ -129,6 +132,27 @@ class _RunView:
                     "Aanbevolen aan: een GUI-run heeft geen interactieve invoer."
                 )
 
+        # Dataverdeling-visualisatie.
+        with ui.card().classes("w-full"):
+            section_title("Dataverdeling", "Traindata · backtest · prognose")
+            with ui.row().classes("gap-2 mt-2 mb-3"):
+                for lbl, var in [
+                    ("① Horizon", 1),
+                    ("② Jaar-chips", 2),
+                    ("③ Dashboard", 3),
+                    ("④ Nacht", 4),
+                ]:
+                    btn = ui.button(
+                        lbl,
+                        on_click=lambda _e, v=var: self._select_viz(v),
+                    ).classes("text-xs")
+                    if var == self._viz_variant:
+                        btn.props("unelevated color=accent")
+                    else:
+                        btn.props("outline color=grey-7")
+                    self._viz_btns.append(btn)
+            self._viz_html = ui.html("").classes("w-full")
+
         # Live command-preview.
         with ui.card().classes("w-full bg-grey-2"):
             ui.label("Commando").classes("text-xs uppercase opacity-60")
@@ -183,6 +207,27 @@ class _RunView:
 
     def _update_preview(self) -> None:
         self._preview.set_text(process.preview_command(self._current_args()))
+        self._update_viz()
+
+    def _select_viz(self, variant: int) -> None:
+        """Wissel van visuele variant en herrender de tijdlijn."""
+        self._viz_variant = variant
+        for i, btn in enumerate(self._viz_btns, 1):
+            if i == variant:
+                btn.props(remove="outline")
+                btn.props("unelevated color=accent")
+            else:
+                btn.props(remove="unelevated")
+                btn.props("outline color=grey-7")
+        self._update_viz()
+
+    def _update_viz(self) -> None:
+        """Herrender de dataverdeling-tijdlijn op basis van de huidige parameters."""
+        years = self._years.value or ""
+        skip = int(self._skip_years.value or 0)
+        render_fns = [tvz.render_v1, tvz.render_v2, tvz.render_v3, tvz.render_v4]
+        html = render_fns[self._viz_variant - 1](years, skip)
+        self._viz_html.set_content(html)
 
     def _persist(self) -> None:
         app.storage.general[_STORAGE_KEY] = {
