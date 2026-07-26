@@ -13,7 +13,7 @@ import os
 import plotly.graph_objects as go
 from nicegui import ui
 
-from gui import nav, results_io
+from gui import nav, results_io, run_history
 from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
 from gui.state import STATE
@@ -35,27 +35,106 @@ def create() -> None:
     def output_page() -> None:
         with page_shell(active="/output", title="Resultaten"):
             section_title("Resultaten", "Overzicht van de laatste voorspelling.")
-            if not STATE.is_initialised:
-                empty_state(
-                    icon="folder_off",
-                    title="Nog geen project",
-                    message="Kies eerst een project.",
-                    action_label="Project opzetten",
-                    on_action=lambda: ui.navigate.to("/wizard"),
+            _RunHistoryView()
+
+
+class _RunHistoryView:
+    """Run-selector + resultatenweergave.
+
+    Bouwt een dropdown van alle beschikbare runs (huidige + historisch) en
+    rendert de bijbehorende :class:`_ResultsView` in een wisselbaar container.
+    """
+
+    def __init__(self) -> None:
+        # Huidige project-run
+        current_files: list[tuple[str, str]] = []
+        if STATE.is_initialised and STATE.output_dir:
+            current_files = results_io.find_output_files(STATE.output_dir)
+
+        # Historische runs uit tmp/
+        history = run_history.find_historical_runs(
+            exclude_dir=STATE.project_dir if STATE.is_initialised else None
+        )
+
+        # Bouw opties: {output_dir: label}
+        options: dict[str, str] = {}
+        if current_files and STATE.output_dir:
+            name = os.path.basename(STATE.project_dir or "huidig")
+            options[STATE.output_dir] = f"Huidige run — {name}"
+        for entry in history:
+            options[entry.output_dir] = entry.label
+
+        if not options:
+            self._show_empty()
+            return
+
+        first_dir = next(iter(options))
+        self._current_output_dir = STATE.output_dir if STATE.is_initialised else None
+
+        # Dropdown bovenaan — DOM-volgorde: selector → banner → resultaten.
+        if len(options) > 1:
+            with ui.card().classes("w-full").style("background:#f8f8f8"):
+                with ui.row().classes("items-center gap-3 w-full no-wrap"):
+                    ui.icon("history").classes("text-xl").style(f"color:{ACCENT}")
+                    sel = ui.select(
+                        options,
+                        value=first_dir,
+                        label="Run bekijken",
+                        on_change=lambda e: self._load(e.value),
+                    ).classes("flex-1")
+                    sel.tooltip(
+                        "Kies een eerdere run om de resultaten ervan te bekijken. "
+                        "De actieve projectmap wijzigt niet."
+                    )
+
+        self._banner_slot = ui.row().classes("w-full")
+        self._area = ui.column().classes("w-full gap-4")
+        self._load(first_dir)
+
+    def _load(self, output_dir: str) -> None:
+        self._banner_slot.clear()
+        self._area.clear()
+
+        is_historical = self._current_output_dir is None or (
+            os.path.realpath(output_dir)
+            != os.path.realpath(self._current_output_dir)
+        )
+        if is_historical:
+            with self._banner_slot:
+                with ui.row().classes("items-center gap-2 py-1"):
+                    ui.icon("history").classes("text-sm").style("color:#888")
+                    ui.label("Historische run — niet het actieve project.").classes(
+                        "text-sm opacity-60"
+                    )
+
+        with self._area:
+            files = results_io.find_output_files(output_dir)
+            if files:
+                _ResultsView(files)
+            else:
+                error_banner(
+                    "Geen outputbestanden gevonden voor deze run.",
+                    "De run is mogelijk niet succesvol afgerond.",
                 )
-                return
-            files = results_io.find_output_files(STATE.output_dir)
-            if not files:
-                empty_state(
-                    icon="query_stats",
-                    title="Nog geen resultaten",
-                    message="Er is nog geen voorspelling gedraaid. Start de "
-                    "pipeline om resultaten te zien.",
-                    action_label="Naar Uitvoeren",
-                    on_action=lambda: ui.navigate.to("/run"),
-                )
-                return
-            _ResultsView(files)
+
+    def _show_empty(self) -> None:
+        if not STATE.is_initialised:
+            empty_state(
+                icon="folder_off",
+                title="Nog geen project",
+                message="Kies eerst een project voordat je resultaten bekijkt.",
+                action_label="Project opzetten",
+                on_action=lambda: ui.navigate.to("/wizard"),
+            )
+        else:
+            empty_state(
+                icon="query_stats",
+                title="Nog geen resultaten",
+                message="Er is nog geen voorspelling gedraaid. Start de "
+                "pipeline om resultaten te zien.",
+                action_label="Naar Uitvoeren",
+                on_action=lambda: ui.navigate.to("/run"),
+            )
 
 
 class _ResultsView:
