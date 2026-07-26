@@ -130,12 +130,7 @@ class _FilteringView:
                     self._on_examentype_change,
                 )
 
-        with (
-            ui.card()
-            .classes("w-full")
-            .style(f"background: {theme.ACCENT}14; border: 1px solid {theme.ACCENT}55")
-        ):
-            self._preview = ui.label().classes("text-base font-medium")
+        self._preview_container = ui.column().classes("w-full")
         self._update_preview()
 
     def _programme_options(self) -> list[str]:
@@ -177,23 +172,30 @@ class _FilteringView:
     # --- Preview & opslaan ----------------------------------------------------
 
     def _update_preview(self) -> None:
-        if self._df is None:
-            self._preview.set_text(
-                "Live preview niet beschikbaar (geen student_count-bestand)."
+        self._preview_container.clear()
+        with self._preview_container:
+            if self._df is None:
+                info_banner(
+                    "Live preview niet beschikbaar (geen student_count-bestand)."
+                )
+                return
+            remaining, total = filtering_io.count_programmes(
+                self._df,
+                programme_col=self._roles["programme"],
+                origin_col=self._roles["origin"],
+                exam_col=self._roles["exam_type"],
+                programme=self._filtering.get("programme", []),
+                herkomst=self._filtering.get("herkomst", []),
+                examentype=self._filtering.get("examentype", []),
             )
-            return
-        remaining, total = filtering_io.count_programmes(
-            self._df,
-            programme_col=self._roles["programme"],
-            origin_col=self._roles["origin"],
-            exam_col=self._roles["exam_type"],
-            programme=self._filtering.get("programme", []),
-            herkomst=self._filtering.get("herkomst", []),
-            examentype=self._filtering.get("examentype", []),
-        )
-        self._preview.set_text(
-            f"{remaining} van {total} opleidingen geselecteerd na filtering."
-        )
+            with (
+                ui.card()
+                .classes("w-full")
+                .style(f"background: {theme.ACCENT}14; border: 1px solid {theme.ACCENT}55")
+            ):
+                ui.label(
+                    f"{remaining} van {total} opleidingen geselecteerd na filtering."
+                ).classes("text-base font-medium")
 
     def _save(self) -> None:
         errors = filtering_io.validate_filtering(self._data)

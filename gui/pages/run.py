@@ -84,11 +84,19 @@ class _RunView:
                     value=self._settings["years"],
                     placeholder="bijv. 2024 of 2023 2024",
                 ).classes("w-full")
+                self._years.tooltip(
+                    "Het academisch jaar waarvoor de prognose wordt gemaakt. "
+                    "Meerdere jaren scheiden met spaties."
+                )
                 self._weeks = ui.input(
                     "Weken",
                     value=self._settings["weeks"],
                     placeholder="bijv. 6 of 1:38",
                 ).classes("w-full")
+                self._weeks.tooltip(
+                    "Weeknummer van de aanmeldpeildatum. "
+                    "Bijv. 6 = week 6 van het academisch jaar."
+                )
                 self._institutions = (
                     ui.select(
                         options=list(self._settings["institutions"]),
@@ -105,6 +113,10 @@ class _RunView:
                     value=self._settings["skip_years"],
                     min=0,
                 ).classes("w-full")
+                self._skip_years.tooltip(
+                    "Aantal jaren vóór het prognosejaar dat als testset wordt "
+                    "achtergehouden voor backtesting. 0 = geen backtest."
+                )
 
             # Uitleg van het gekozen voorspelspoor (werkt zonder de docs te openen).
             with ui.row().classes("items-center gap-2 w-full"):
@@ -133,7 +145,7 @@ class _RunView:
                 )
 
         # Dataverdeling-visualisatie.
-        with ui.card().classes("w-full"):
+        with ui.card().classes("w-full pr-16"):
             section_title("Dataverdeling", "Traindata · backtest · prognose")
             with ui.row().classes("gap-2 mt-2 mb-3"):
                 for lbl, var in [
@@ -165,7 +177,9 @@ class _RunView:
             self._result_slot = ui.row().classes("items-center gap-2")
 
         self._progress = ProgressCard()
-        self._panel = ProcessPanel()
+        with ui.column().classes("w-full") as self._panel_container:
+            self._panel = ProcessPanel()
+        self._panel_container.set_visibility(False)
 
         # Reageer op wijzigingen: preview verversen.
         for widget in (
@@ -264,6 +278,7 @@ class _RunView:
         self._persist()
         self._result_slot.clear()
         self._start_btn.props("loading")
+        self._panel_container.set_visibility(True)
         self._progress.start()
         try:
             args = self._current_args()

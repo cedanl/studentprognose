@@ -127,14 +127,23 @@ class _RunHistoryView:
                 on_action=lambda: ui.navigate.to("/wizard"),
             )
         else:
-            empty_state(
-                icon="query_stats",
-                title="Nog geen resultaten",
-                message="Er is nog geen voorspelling gedraaid. Start de "
-                "pipeline om resultaten te zien.",
-                action_label="Naar Uitvoeren",
-                on_action=lambda: ui.navigate.to("/run"),
-            )
+            with ui.column().classes("w-full items-center text-center gap-3 py-12"):
+                ui.icon("query_stats").classes("text-6xl opacity-40")
+                ui.label("Nog geen resultaten").classes("text-xl font-medium")
+                ui.label(
+                    "Nog geen voorspelling uitgevoerd. Ga naar Uitvoeren om de "
+                    "pipeline te starten. Na afloop verschijnen hier de resultaten "
+                    "per opleiding."
+                ).classes("text-sm opacity-70 max-w-md")
+                ui.button(
+                    "Naar Uitvoeren",
+                    on_click=lambda: ui.navigate.to("/run"),
+                ).props("unelevated")
+                ui.button(
+                    "Bekijk demo-resultaten",
+                    icon="science",
+                    on_click=lambda: ui.navigate.to("/"),
+                ).props("flat")
 
 
 class _ResultsView:

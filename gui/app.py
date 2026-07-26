@@ -28,13 +28,17 @@ def _register_pages() -> None:
     niet mee met elke feature-issue.
     """
     from gui.pages import (
+        api_explorer,
         benchmark,
         config_page,
+        explainability,
         filtering,
         home,
         methodology,
         output,
+        peer_benchmark,
         run,
+        scenarios,
         wizard,
     )
 
@@ -46,6 +50,11 @@ def _register_pages() -> None:
     output.create()
     benchmark.create()
     methodology.create()
+    # Concept-features
+    scenarios.create()
+    peer_benchmark.create()
+    api_explorer.create()
+    explainability.create()
 
 
 def main() -> None:

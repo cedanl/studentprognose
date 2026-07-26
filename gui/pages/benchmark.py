@@ -12,7 +12,7 @@ import os
 
 from nicegui import ui
 
-from gui import benchmark_io, config_io, nav, tracks
+from gui import benchmark_io, config_io, nav, theme, tracks
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.states import empty_state, section_title
@@ -44,6 +44,17 @@ def create() -> None:
                     on_action=lambda: ui.navigate.to("/wizard"),
                 )
                 return
+
+            with ui.card().classes("w-full").style(
+                f"border-left: 4px solid {theme.SECONDARY}; background: #f0f4ff"
+            ):
+                ui.label("Wat doet Benchmark & Tune?").classes("font-medium")
+                ui.label(
+                    "Benchmark vergelijkt alternatieve tijdreeks- en regressiemodellen "
+                    "met het standaard SARIMA/XGBoost-model. "
+                    "Tune zoekt optimale hyperparameters. Gebruik dit om te valideren "
+                    "of het standaardmodel de beste keuze is voor jouw data."
+                ).classes("text-sm opacity-70")
 
             with ui.tabs().props("indicator-color=accent").classes("w-full") as tabs:
                 tab_bench = ui.tab("Benchmark", icon="leaderboard")

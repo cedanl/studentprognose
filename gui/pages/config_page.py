@@ -169,6 +169,10 @@ class _ConfigView:
             self._institution_section()
             self._excluded_section()
             self._misc_section()
+            # Tweede opslaan-knop onderaan de pagina voor snelle toegang
+            ui.button(
+                "Opslaan", icon="save", on_click=self._save
+            ).props("unelevated").classes("mt-2")
 
     # --- Secties --------------------------------------------------------------
 
@@ -539,7 +543,7 @@ class _ConfigView:
             ui.notify(f"Opslaan mislukt: {exc}", type="negative")
             return
         self._clear_dirty()
-        ui.notify("Configuratie opgeslagen.", type="positive")
+        ui.notify("Configuratie opgeslagen.", type="positive", position="top")
 
     def _on_institution_change(self, e) -> None:
         self._config["institution_filter"] = list(e.value or [])

@@ -91,6 +91,25 @@ def info_banner(message: str) -> None:
             ui.label(message).classes("text-sm")
 
 
+def concept_banner() -> None:
+    """Prominente banner die aangeeft dat een pagina een niet-functionele mockup is."""
+    with (
+        ui.card()
+        .classes("w-full border-l-4")
+        .style("border-color: #E53935; background: #fff5f5;")
+    ):
+        with ui.row().classes("items-center gap-3 no-wrap"):
+            ui.icon("science").style("color: #E53935; font-size: 22px;").classes("flex-none")
+            with ui.column().classes("gap-0"):
+                ui.label("Concept — niet functioneel").classes("font-semibold text-sm").style(
+                    "color: #B71C1C;"
+                )
+                ui.label(
+                    "Dit is een interactieve mockup voor evaluatie en feedback. "
+                    "Alle data is illustratief."
+                ).classes("text-xs opacity-70")
+
+
 def section_title(text: str, subtitle: str | None = None) -> None:
     """Render een consistente sectiekop."""
     ui.label(text).classes("text-lg font-medium mt-2")

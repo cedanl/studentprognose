@@ -36,6 +36,16 @@ def create() -> None:
                         "target=_blank"
                     ).classes("text-sm").style(f"color: {theme.ACCENT}")
 
-            ui.button(
-                "Terug naar start", icon="arrow_back", on_click=lambda: ui.navigate.to("/")
-            ).props("flat")
+            with ui.row().classes("gap-2 flex-wrap"):
+                ui.button(
+                    "Ga naar documentatie",
+                    icon="open_in_new",
+                    on_click=lambda: ui.navigate.to(
+                        "https://cedanl.github.io/studentprognose"
+                    ),
+                ).props("outline color=accent")
+                ui.button(
+                    "Naar Uitvoeren",
+                    icon="play_arrow",
+                    on_click=lambda: ui.navigate.to("/run"),
+                ).props("unelevated")

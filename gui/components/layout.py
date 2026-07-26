@@ -63,10 +63,16 @@ def _drawer(active: str) -> None:
                         )
             ui.separator().classes("mx-3 my-1")
         ui.label("Navigatie").classes("text-xs uppercase opacity-50 px-3 pt-2")
+        prev_was_enabled = True
         for item in nav.all_items():
             built = nav.is_available(item.route)
             locked = _requires_project(item.route) and not STATE.is_initialised
             enabled = built and not locked
+
+            # Visuele scheiding tussen beschikbare en uitgeschakelde items.
+            if not enabled and prev_was_enabled:
+                ui.separator().classes("mx-3 my-1 opacity-30")
+            prev_was_enabled = enabled
 
             # Kleur draagt de betekenis: accent (oranje) = actief, donkergrijs =
             # klikbaar, lichtgrijs = uitgeschakeld. Op een uitgeschakelde q-btn
@@ -110,7 +116,34 @@ def _drawer(active: str) -> None:
                     )
                 if not enabled:
                     btn.props("disable")
+                    btn.style("font-size: 12px; opacity: 0.55;")
                     wrapper.tooltip(reason)
+
+        # ── Concept-features ────────────────────────────────────────────────
+        ui.separator().classes("mx-3 mt-3 mb-1 opacity-40")
+        with ui.row().classes("items-center gap-1 px-3 pt-1 pb-1"):
+            ui.label("Concept").classes("text-xs uppercase font-semibold").style(
+                "color: #E53935; letter-spacing: 0.06em;"
+            )
+            ui.badge("preview").props("color=red-2 text-color=red-8 dense outline").classes(
+                "text-xs"
+            )
+        for item in nav.CONCEPTS:
+            is_active = item.route == active
+            with ui.element("div").classes("w-full"):
+                (
+                    ui.button(
+                        item.label,
+                        icon=item.icon,
+                        on_click=lambda r=item.route: _navigate(r),
+                    )
+                    .props(f"flat align=left")
+                    .classes("w-full justify-start" + (" font-medium rounded" if is_active else ""))
+                    .style(
+                        f"color: {'#B71C1C' if is_active else '#E53935'};"
+                        + (f"background: #FFEBEE; border-left: 3px solid #E53935;" if is_active else "")
+                    )
+                )
 
         # ── Feedback — gepind onderaan de zijbalk ───────────────────────────
         ui.element("div").style("flex: 1;")  # duwt feedback naar beneden
@@ -217,8 +250,8 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
             def _reset() -> None:
                 STATE.project_dir = None
                 ui.navigate.to("/")
-            ui.button(icon="restart_alt", on_click=_reset).props(
-                "flat round dense color=white"
+            ui.button("Reset", icon="restart_alt", on_click=_reset).props(
+                "flat dense color=white"
             ).tooltip("Reset — terug naar start")
 
     _drawer(active)
