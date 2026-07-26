@@ -6,6 +6,7 @@ nooit ``sys.exit()`` aan — in de GUI worden fouten teruggegeven als datastruct
 
 from __future__ import annotations
 
+import csv
 import datetime
 import os
 from dataclasses import dataclass, field
@@ -49,14 +50,15 @@ _CFG: dict = {
     "nan_warning_threshold": 0.05,
     "nan_error_threshold": 0.30,
     "telbestand": {
+        # Groepeernaam ontbreekt in het UvA SQL (SL) formaat — de ETL genereert
+        # die kolom zelf op basis van Isatcode (#232). Geen vereiste kolom.
         "required_columns": [
-            "Studiejaar", "Isatcode", "Groepeernaam", "Aantal", "meercode_V",
+            "Studiejaar", "Isatcode", "Aantal", "meercode_V",
             "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
         ],
         "herkomst_allowed": ["N", "E", "R"],
         "herinschrijving_allowed": ["J", "N"],
         "hogerejaars_allowed": ["J", "N"],
-        "separator": ";",
     },
     "individueel": {
         "critical_columns": [
@@ -135,6 +137,17 @@ def compute_tel_coverage(results: dict[str, FileCheckResult]) -> TelCoverage | N
         gaps=gaps,
         total=sum(len(ws) for ws in present.values()),
     )
+
+
+def _sniff_separator(filepath: str) -> str:
+    """Detecteer het scheidingsteken (`;`, `,` of `\t`) via csv.Sniffer."""
+    try:
+        with open(filepath, newline="", encoding="utf-8", errors="replace") as fh:
+            sample = fh.read(8192)
+        dialect = csv.Sniffer().sniff(sample, delimiters=";,\t")
+        return dialect.delimiter
+    except csv.Error:
+        return ";"
 
 
 def _to_status(hard: list, soft: list, warnings: list) -> FileStatus:
@@ -243,12 +256,13 @@ def _check_telbestand(filepath: str, filename: str) -> FileCheckResult:
         )
 
     tel = _CFG["telbestand"]
+    sep = _sniff_separator(filepath)
     try:
-        df = pd.read_csv(filepath, sep=tel["separator"], low_memory=False)
+        df = pd.read_csv(filepath, sep=sep, low_memory=False)
     except Exception as exc:
         hard.append(
             f"Bestand kan niet worden gelezen: {exc}. "
-            "Controleer of het een geldige CSV is met puntkomma (;) als scheidingsteken."
+            "Controleer of het een geldige CSV is (puntkomma- of kommagescheiden)."
         )
         return FileCheckResult(filename=filename, status=FileStatus.ERRORS, hard_errors=hard)
 
@@ -256,7 +270,8 @@ def _check_telbestand(filepath: str, filename: str) -> FileCheckResult:
     if missing:
         hard.append(
             f"Vereiste kolommen ontbreken: {', '.join(missing)}. "
-            "Controleer het scheidingsteken (verwacht: ';') en of dit een Studielink-export is."
+            f"Herkend scheidingsteken: '{sep}'. "
+            "Controleer of dit een Studielink-export is."
         )
         return FileCheckResult(filename=filename, status=FileStatus.ERRORS, hard_errors=hard)
 
