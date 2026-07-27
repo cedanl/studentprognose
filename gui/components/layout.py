@@ -119,31 +119,38 @@ def _drawer(active: str) -> None:
                     btn.style("font-size: 12px; opacity: 0.55;")
                     wrapper.tooltip(reason)
 
-        # ── Concept-features ────────────────────────────────────────────────
-        ui.separator().classes("mx-3 mt-3 mb-1 opacity-40")
-        with ui.row().classes("items-center gap-1 px-3 pt-1 pb-1"):
-            ui.label("Concept").classes("text-xs uppercase font-semibold").style(
-                "color: #E53935; letter-spacing: 0.06em;"
-            )
-            ui.badge("preview").props("color=red-2 text-color=red-8 dense outline").classes(
-                "text-xs"
-            )
-        for item in nav.CONCEPTS:
-            is_active = item.route == active
-            with ui.element("div").classes("w-full"):
-                (
-                    ui.button(
-                        item.label,
-                        icon=item.icon,
-                        on_click=lambda r=item.route: _navigate(r),
-                    )
-                    .props(f"flat align=left")
-                    .classes("w-full justify-start" + (" font-medium rounded" if is_active else ""))
-                    .style(
-                        f"color: {'#B71C1C' if is_active else '#E53935'};"
-                        + (f"background: #FFEBEE; border-left: 3px solid #E53935;" if is_active else "")
-                    )
+        # ── Concept-features — verborgen op de startpagina ──────────────────
+        if active != "/":
+            ui.separator().classes("mx-3 mt-3 mb-1 opacity-40")
+            is_concept_active = active == "/concept"
+            with (
+                ui.row()
+                .classes("items-center gap-1 px-3 pt-1 pb-1 cursor-pointer rounded")
+                .style("background:#FFEBEE;" if is_concept_active else "")
+                .on("click", lambda: _navigate("/concept"))
+            ):
+                ui.label("Concept").classes("text-xs uppercase font-semibold").style(
+                    "color: #E53935; letter-spacing: 0.06em;"
                 )
+                ui.badge("preview").props("color=red-2 text-color=red-8 dense outline").classes(
+                    "text-xs"
+                )
+            for item in nav.CONCEPTS:
+                is_active = item.route == active
+                with ui.element("div").classes("w-full"):
+                    (
+                        ui.button(
+                            item.label,
+                            icon=item.icon,
+                            on_click=lambda r=item.route: _navigate(r),
+                        )
+                        .props("flat align=left")
+                        .classes("w-full justify-start" + (" font-medium rounded" if is_active else ""))
+                        .style(
+                            f"color: {'#B71C1C' if is_active else '#E53935'};"
+                            + ("background: #FFEBEE; border-left: 3px solid #E53935;" if is_active else "")
+                        )
+                    )
 
         # ── Feedback — gepind onderaan de zijbalk ───────────────────────────
         ui.element("div").style("flex: 1;")  # duwt feedback naar beneden

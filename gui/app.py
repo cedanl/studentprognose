@@ -30,6 +30,7 @@ def _register_pages() -> None:
     from gui.pages import (
         api_explorer,
         benchmark,
+        concept_hub,
         config_page,
         explainability,
         filtering,
@@ -51,6 +52,7 @@ def _register_pages() -> None:
     benchmark.create()
     methodology.create()
     # Concept-features
+    concept_hub.create()
     scenarios.create()
     peer_benchmark.create()
     api_explorer.create()

@@ -1,4 +1,9 @@
-"""Concept: Peer Benchmark — geanonimiseerde vergelijking met vergelijkbare instellingen.
+"""Concept: Peer Benchmark — directe vergelijking met een gekozen instelling.
+
+Stroom:
+  1. Kies een vergelijkende instelling (bijv. Leiden Universiteit)
+  2. Kies de opleiding om mee te vergelijken
+  3. Bekijk de zij-aan-zij vergelijking
 
 Interactieve mockup. Alle data is illustratief.
 """
@@ -11,162 +16,314 @@ from gui import nav, theme
 from gui.components.layout import page_shell
 from gui.components.states import concept_banner, section_title
 
-_ACCENT = theme.ACCENT
-_GREEN = theme.POSITIVE
+_ACCENT  = theme.ACCENT
+_GREEN   = theme.POSITIVE
 _WARNING = theme.WARNING
-_RED = theme.NEGATIVE
-_MUTED = theme.MUTED
+_RED     = theme.NEGATIVE
+_INFO    = theme.INFO
+_MUTED   = theme.MUTED
 
-_PROGRAMMES = [
+# ---------------------------------------------------------------------------
+# Mock data
+# ---------------------------------------------------------------------------
+
+# "Eigen" opleidingen — de instelling die de tool gebruikt
+_OWN_PROGRAMMES = [
     "Technische Informatica (Bachelor · WO)",
     "Bedrijfskunde (Bachelor · WO)",
     "Psychologie (Bachelor · WO)",
     "Werktuigbouwkunde (Bachelor · WO)",
 ]
 
-# Mock data: (jij_pct, mediaan_pct, top25_pct, n_peers, trend_richting)
-_MOCK: dict[str, tuple] = {
-    _PROGRAMMES[0]: (87, 94, 112, 7, "stabiel"),
-    _PROGRAMMES[1]: (103, 98, 118, 11, "stijgend"),
-    _PROGRAMMES[2]: (79, 91, 109, 9, "dalend"),
-    _PROGRAMMES[3]: (95, 93, 115, 6, "stabiel"),
-}
-
-# Week-over-week mock (week 8 t/m 14)
+# Weken 8 t/m 14 — huidig aanmeldseizoen (cumulatief %)
 _WEEKS = [8, 9, 10, 11, 12, 13, 14]
-_WEEK_DATA: dict[str, dict] = {
-    _PROGRAMMES[0]: {
-        "jij":    [62, 68, 73, 77, 81, 84, 87],
-        "mediaan":[65, 71, 76, 80, 85, 90, 94],
-        "top25":  [78, 85, 90, 95, 101, 107, 112],
-    },
-    _PROGRAMMES[1]: {
-        "jij":    [88, 91, 94, 97, 100, 101, 103],
-        "mediaan":[84, 87, 90, 93, 95, 97, 98],
-        "top25":  [100, 103, 107, 110, 113, 116, 118],
-    },
-    _PROGRAMMES[2]: {
-        "jij":    [72, 74, 75, 76, 77, 78, 79],
-        "mediaan":[80, 82, 84, 86, 88, 89, 91],
-        "top25":  [96, 98, 101, 103, 105, 107, 109],
-    },
-    _PROGRAMMES[3]: {
-        "jij":    [85, 87, 89, 91, 92, 94, 95],
-        "mediaan":[82, 84, 87, 89, 90, 92, 93],
-        "top25":  [100, 103, 106, 109, 111, 113, 115],
-    },
-}
 
-_INSIGHTS: dict[str, list[tuple[str, str, str]]] = {
-    _PROGRAMMES[0]: [
-        ("warning", "Jij zit 7% onder mediaan in week 14.",
-         "Bij 4 van 7 peers is dit patroon hersteld via extra open dagen in week 16–18."),
-        ("info", "EER-aandeel jij: 23% vs mediaan 18%.",
-         "EER-studenten schrijven zich historisch vaker definitief in — positief signaal."),
-        ("check_circle", "NL-conversie vergelijkbaar met peers.",
-         "Geen actie nodig op NL-instroom."),
+_PEER_INSTELLINGEN = [
+    "Leiden Universiteit",
+    "VU Amsterdam",
+    "Radboud Universiteit",
+    "Universiteit Utrecht",
+    "TU Delft",
+    "Universiteit van Amsterdam",
+]
+
+# Vergelijkbare opleidingen per peer-instelling
+_PEER_OPLEIDINGEN: dict[str, list[str]] = {
+    "Leiden Universiteit": [
+        "Informatica (Bachelor · WO)",
+        "Economie en Bedrijfskunde (Bachelor · WO)",
+        "Psychologie (Bachelor · WO)",
     ],
-    _PROGRAMMES[1]: [
-        ("check_circle", "Jij zit 5% boven mediaan — uitstekend.",
-         "Huidige tempo volhouden. Open dag bereik is waarschijnlijk de driver."),
-        ("info", "Top 25% zit 15% boven jou.",
-         "Verschil verklaard door vroege matching-activiteiten (week 4–6)."),
+    "VU Amsterdam": [
+        "Computer Science (Bachelor · WO)",
+        "Bedrijfskunde (Bachelor · WO)",
+        "Psychologie (Bachelor · WO)",
+        "Werktuigbouwkunde (Bachelor · WO)",
     ],
-    _PROGRAMMES[2]: [
-        ("error", "Jij zit 12% onder mediaan — actie aanbevolen.",
-         "Historisch patroon: achterstand in week 14 wordt zelden hersteld zonder interventie."),
-        ("warning", "Dalende trend afgelopen 3 weken.",
-         "Controleer of er een externe factor speelt (concurrentieopleiding, media-aandacht)."),
+    "Radboud Universiteit": [
+        "Informatica (Bachelor · WO)",
+        "Bedrijfskunde (Bachelor · WO)",
+        "Psychologie (Bachelor · WO)",
+        "Technische Wetenschappen (Bachelor · WO)",
     ],
-    _PROGRAMMES[3]: [
-        ("check_circle", "Jij loopt vrijwel gelijk met mediaan.", ""),
-        ("info", "Top 25% loopt 20% voor — mogelijk door vroegere deadlines.",
-         "Overweeg aanmelddeadline 2 weken naar voren te verschuiven."),
+    "Universiteit Utrecht": [
+        "Informatica (Bachelor · WO)",
+        "Economie (Bachelor · WO)",
+        "Psychologie (Bachelor · WO)",
+        "Mechanical Engineering (Bachelor · WO)",
+    ],
+    "TU Delft": [
+        "Computer Science (Bachelor · WO)",
+        "Mechanical Engineering (Bachelor · WO)",
+        "Electrical Engineering (Bachelor · WO)",
+    ],
+    "Universiteit van Amsterdam": [
+        "Informatica (Bachelor · WO)",
+        "Bedrijfskunde (Bachelor · WO)",
+        "Psychologie (Bachelor · WO)",
+        "Werktuigbouwkunde (Bachelor · WO)",
     ],
 }
 
+# Eigen opleiding-data: wekelijkse % van historisch doel
+_OWN_DATA: dict[str, dict] = {
+    _OWN_PROGRAMMES[0]: {
+        "pct_series": [62, 68, 73, 77, 81, 84, 87],
+        "huidig_pct": 87,
+        "prognose": 312,
+        "vorig_jaar_pct": 96,
+    },
+    _OWN_PROGRAMMES[1]: {
+        "pct_series": [88, 91, 94, 97, 100, 101, 103],
+        "huidig_pct": 103,
+        "prognose": 487,
+        "vorig_jaar_pct": 101,
+    },
+    _OWN_PROGRAMMES[2]: {
+        "pct_series": [72, 74, 75, 76, 77, 78, 79],
+        "huidig_pct": 79,
+        "prognose": 643,
+        "vorig_jaar_pct": 91,
+    },
+    _OWN_PROGRAMMES[3]: {
+        "pct_series": [85, 87, 89, 91, 92, 94, 95],
+        "huidig_pct": 95,
+        "prognose": 201,
+        "vorig_jaar_pct": 93,
+    },
+}
 
-def _gauge_html(jij: int, mediaan: int, top25: int) -> str:
+# Peer-vergelijkingsdata: (instelling, opleiding) → dict
+# Sleutels die niet bestaan krijgen een deterministische fallback via _peer_data()
+_PEER_DATA_EXACT: dict[tuple[str, str], dict] = {
+    ("Leiden Universiteit", "Informatica (Bachelor · WO)"): {
+        "pct_series": [65, 71, 76, 80, 85, 90, 94],
+        "huidig_pct": 94,
+        "prognose": 287,
+        "trend": "stijgend",
+        "note": "Leiden groeide de afgelopen 4 weken sneller dan het sectorgemiddelde.",
+    },
+    ("Leiden Universiteit", "Economie en Bedrijfskunde (Bachelor · WO)"): {
+        "pct_series": [84, 87, 90, 93, 95, 97, 98],
+        "huidig_pct": 98,
+        "prognose": 521,
+        "trend": "stabiel",
+        "note": "Vergelijkbaar tempo; Leiden heeft historisch een hogere eindconversie.",
+    },
+    ("Leiden Universiteit", "Psychologie (Bachelor · WO)"): {
+        "pct_series": [80, 82, 84, 86, 88, 89, 91],
+        "huidig_pct": 91,
+        "prognose": 704,
+        "trend": "stabiel",
+        "note": "Leiden loopt 12 procentpunt voor — patroon consistent met 2023.",
+    },
+    ("VU Amsterdam", "Computer Science (Bachelor · WO)"): {
+        "pct_series": [70, 75, 79, 83, 87, 90, 93],
+        "huidig_pct": 93,
+        "prognose": 241,
+        "trend": "stijgend",
+        "note": "VU laat sterke groei zien na een open dag in week 11.",
+    },
+    ("VU Amsterdam", "Bedrijfskunde (Bachelor · WO)"): {
+        "pct_series": [90, 93, 95, 97, 99, 101, 102],
+        "huidig_pct": 102,
+        "prognose": 498,
+        "trend": "stabiel",
+        "note": "VU en uw instelling lopen nagenoeg gelijk; VU heeft iets hogere instroom.",
+    },
+    ("VU Amsterdam", "Psychologie (Bachelor · WO)"): {
+        "pct_series": [75, 78, 81, 83, 85, 87, 89],
+        "huidig_pct": 89,
+        "prognose": 688,
+        "trend": "stabiel",
+        "note": "Vergelijkbaar aanmeldtempo; uw achterstand is kleiner dan in 2024.",
+    },
+    ("TU Delft", "Computer Science (Bachelor · WO)"): {
+        "pct_series": [78, 83, 87, 91, 95, 99, 104],
+        "huidig_pct": 104,
+        "prognose": 389,
+        "trend": "stijgend",
+        "note": "TU Delft loopt significant voor — hogere naamsbekendheid in technisch segment.",
+    },
+    ("TU Delft", "Mechanical Engineering (Bachelor · WO)"): {
+        "pct_series": [88, 91, 94, 96, 98, 100, 102],
+        "huidig_pct": 102,
+        "prognose": 312,
+        "trend": "stabiel",
+        "note": "TU Delft en uw instelling nagenoeg gelijk; kleine voorsprong TU Delft.",
+    },
+}
+
+
+def _peer_data(instelling: str, opleiding: str) -> dict:
+    key = (instelling, opleiding)
+    if key in _PEER_DATA_EXACT:
+        return _PEER_DATA_EXACT[key]
+    # Deterministische fallback op basis van namen
+    h = (hash(instelling + opleiding) % 30) + 70  # 70–99
+    base = max(60, h - 5)
+    series = [max(50, base - 20 + i * 4) for i in range(len(_WEEKS))]
+    return {
+        "pct_series": series,
+        "huidig_pct": series[-1],
+        "prognose": 200 + (hash(instelling) % 400),
+        "trend": ["stabiel", "stijgend", "dalend"][hash(opleiding) % 3],
+        "note": f"Vergelijkingsdata voor {instelling} — {opleiding} is illustratief.",
+    }
+
+
+# ---------------------------------------------------------------------------
+# SVG-visualisaties
+# ---------------------------------------------------------------------------
+
+def _comparison_bars_html(own_pct: int, peer_pct: int, peer_label: str) -> str:
+    own_color  = _GREEN if own_pct >= peer_pct else (_WARNING if own_pct >= peer_pct * 0.9 else _RED)
+    peer_color = _ACCENT
+
     def bar(label: str, pct: int, color: str, bold: bool = False) -> str:
         w = min(pct, 130) / 130 * 100
-        fw = "700" if bold else "400"
+        fw = "700" if bold else "500"
         return (
-            f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">'
-            f'<div style="width:120px;font-size:12px;color:#555;font-weight:{fw};flex-shrink:0;">{label}</div>'
-            f'<div style="flex:1;background:#f0f0f0;border-radius:100px;height:10px;position:relative;">'
-            f'<div style="width:{w:.1f}%;height:100%;background:{color};border-radius:100px;"></div>'
+            f'<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">'
+            f'<div style="width:140px;font-size:12px;color:#555;font-weight:{fw};'
+            f'flex-shrink:0;line-height:1.3;">{label}</div>'
+            f'<div style="flex:1;background:#f0f0f0;border-radius:100px;height:12px;'
+            f'position:relative;">'
+            f'<div style="width:{w:.1f}%;height:100%;background:{color};'
+            f'border-radius:100px;transition:width 0.3s;"></div>'
             f'</div>'
-            f'<div style="width:48px;text-align:right;font-size:13px;font-weight:{fw};color:{color};">{pct}%</div>'
+            f'<div style="width:48px;text-align:right;font-size:13px;'
+            f'font-weight:{fw};color:{color};">{pct}%</div>'
             f'</div>'
         )
 
-    jij_color = _GREEN if jij >= mediaan else (_WARNING if jij >= mediaan * 0.9 else _RED)
+    delta     = own_pct - peer_pct
+    delta_s   = f"+{delta}" if delta >= 0 else str(delta)
+    delta_col = _GREEN if delta >= 0 else _RED
+    delta_txt = "boven peer" if delta >= 0 else "onder peer"
 
     return (
         f'<div style="background:#fafafa;border:1px solid #efefef;'
         f'border-radius:10px;padding:16px 20px;">'
-        f'<div style="font-size:11px;color:#999;margin-bottom:12px;font-weight:500;">'
+        f'<div style="font-size:11px;color:#999;margin-bottom:14px;font-weight:500;">'
         f'% van historisch doel — week 14 · 2025</div>'
-        + bar("Jouw instelling", jij, jij_color, bold=True)
-        + bar("Mediaan 7 peers", mediaan, "#9e9e9e")
-        + bar("Top 25%", top25, _ACCENT)
-        + f'</div>'
+        + bar("Uw instelling", own_pct, own_color, bold=True)
+        + bar(peer_label, peer_pct, peer_color)
+        + f'<div style="font-size:11px;color:{delta_col};font-weight:600;'
+        f'margin-top:8px;padding-top:8px;border-top:1px solid #f0f0f0;">'
+        f'{delta_s} procentpunt {delta_txt}</div>'
+        f'</div>'
     )
 
 
-def _sparkline_html(weeks: list[int], data: dict) -> str:
-    w, h = 520, 110
-    margin = 20
-    x_step = (w - margin * 2) / (len(weeks) - 1)
-    y_min, y_max = 50, 130
+def _sparkline_html(
+    weeks: list[int],
+    own_series: list[int],
+    peer_series: list[int],
+    peer_label: str,
+) -> str:
+    W, H = 540, 130
+    m = 22
 
-    def y(val: float) -> float:
-        return h - margin - (val - y_min) / (y_max - y_min) * (h - margin * 2)
+    y_min = max(40, min(own_series + peer_series) - 8)
+    y_max = max(own_series + peer_series) + 12
+    x_step = (W - m * 2) / (len(weeks) - 1)
 
-    def polyline(vals: list[int], color: str, dash: str = "") -> str:
+    own_color  = _GREEN if own_series[-1] >= peer_series[-1] else _RED
+    peer_color = _ACCENT
+
+    def y(v: float) -> float:
+        return H - m - (v - y_min) / (y_max - y_min) * (H - m * 2)
+
+    def polyline(vals: list[int], color: str, bold: bool = False) -> str:
         pts = " ".join(
-            f"{margin + i * x_step:.1f},{y(v):.1f}" for i, v in enumerate(vals)
+            f"{m + i * x_step:.1f},{y(v):.1f}" for i, v in enumerate(vals)
         )
-        dash_attr = f'stroke-dasharray="{dash}"' if dash else ""
+        sw = "2.5" if bold else "1.8"
         return (
             f'<polyline points="{pts}" fill="none" stroke="{color}" '
-            f'stroke-width="2" stroke-linecap="round" {dash_attr}/>'
+            f'stroke-width="{sw}" stroke-linecap="round" stroke-linejoin="round"/>'
         )
 
-    lines = (
-        polyline(data["top25"], _ACCENT, "5,3")
-        + polyline(data["mediaan"], "#bbb")
-        + polyline(data["jij"], _GREEN if data["jij"][-1] >= data["mediaan"][-1] else _RED)
-    )
+    # Eindpunt-dots
+    ex = m + (len(weeks) - 1) * x_step
+    own_dot  = f'<circle cx="{ex:.1f}" cy="{y(own_series[-1]):.1f}" r="4" fill="{own_color}" stroke="white" stroke-width="1.5"/>'
+    peer_dot = f'<circle cx="{ex:.1f}" cy="{y(peer_series[-1]):.1f}" r="4" fill="{peer_color}" stroke="white" stroke-width="1.5"/>'
+
     x_labels = "".join(
-        f'<text x="{margin + i * x_step:.1f}" y="{h - 2}" '
-        f'text-anchor="middle" font-size="9" fill="#bbb">W{w_}</text>'
-        for i, w_ in enumerate(weeks)
+        f'<text x="{m + i * x_step:.1f}" y="{H - 4}" text-anchor="middle" '
+        f'font-size="9" fill="#bbb">W{w}</text>'
+        for i, w in enumerate(weeks)
     )
-    legend = (
-        f'<line x1="0" y1="0" x2="18" y2="0" stroke="{_GREEN if data["jij"][-1] >= data["mediaan"][-1] else _RED}" stroke-width="2"/>'
-        f'<text x="22" y="4" font-size="9" fill="#666">Jouw instelling</text>'
-        f'<line x1="110" y1="0" x2="128" y2="0" stroke="#bbb" stroke-width="2"/>'
-        f'<text x="132" y="4" font-size="9" fill="#666">Mediaan peers</text>'
-        f'<line x1="220" y1="0" x2="238" y2="0" stroke="{_ACCENT}" stroke-width="2" stroke-dasharray="5,3"/>'
-        f'<text x="242" y="4" font-size="9" fill="#666">Top 25%</text>'
-    )
+
+    # Legenda
+    leg_items = [
+        (own_color,  "Uw instelling", False),
+        (peer_color, peer_label, True),
+    ]
+    leg = ""
+    lx = m
+    for color, label, dashed in leg_items:
+        da = 'stroke-dasharray="5,3"' if dashed else ""
+        leg += (
+            f'<line x1="{lx}" y1="0" x2="{lx + 16}" y2="0" stroke="{color}" '
+            f'stroke-width="2" {da}/>'
+            f'<text x="{lx + 20}" y="4" font-size="9" fill="#666">{label}</text>'
+        )
+        lx += len(label) * 6 + 34
+
+    grid = ""
+    for tick in range(int(y_min // 10) * 10, int(y_max) + 10, 10):
+        if tick < y_min or tick > y_max:
+            continue
+        yy = y(tick)
+        grid += (
+            f'<line x1="{m}" y1="{yy:.1f}" x2="{W - m}" y2="{yy:.1f}" '
+            f'stroke="#f0f0f0" stroke-width="1"/>'
+            f'<text x="{m - 4}" y="{yy + 3:.1f}" text-anchor="end" '
+            f'font-size="8" fill="#ddd">{tick}%</text>'
+        )
 
     return (
         f'<div style="background:#fafafa;border:1px solid #efefef;'
         f'border-radius:10px;padding:16px;">'
-        f'<div style="font-size:11px;color:#999;margin-bottom:8px;font-weight:500;">'
+        f'<div style="font-size:11px;color:#999;margin-bottom:10px;font-weight:500;">'
         f'% van historisch doel — week 8 t/m 14</div>'
-        f'<svg width="100%" viewBox="0 0 {w} {h}" style="overflow:visible;">'
-        f'{lines}{x_labels}'
-        f'<g transform="translate(10, 8)">{legend}</g>'
+        f'<svg width="100%" viewBox="0 0 {W} {H}" style="overflow:visible;display:block;">'
+        f'{grid}'
+        f'{polyline(peer_series, peer_color, bold=False)}'
+        f'{polyline(own_series, own_color, bold=True)}'
+        f'{own_dot}{peer_dot}'
+        f'{x_labels}'
+        f'<g transform="translate(0,8)">{leg}</g>'
         f'</svg>'
-        f'<div style="font-size:10px;color:#bbb;margin-top:6px;">'
-        f'7 geanonimiseerde vergelijkbare WO-instellingen · zelfde CROHO-cluster · '
-        f'>200 aanmeldingen/jr · k-anonimiteit gegarandeerd</div>'
         f'</div>'
     )
 
+
+# ---------------------------------------------------------------------------
+# Pagina
+# ---------------------------------------------------------------------------
 
 def create() -> None:
     nav.register_route("/peer-benchmark")
@@ -177,89 +334,224 @@ def create() -> None:
             concept_banner()
             section_title(
                 "Peer benchmark",
-                "Vergelijk jouw instroom met geanonimiseerde vergelijkbare instellingen.",
+                "Vergelijk uw aanmeldingen direct met een andere instelling.",
             )
             _PeerBenchmarkView()
 
 
 class _PeerBenchmarkView:
     def __init__(self) -> None:
-        self._programme = _PROGRAMMES[0]
+        self._own_programme: str     = _OWN_PROGRAMMES[0]
+        self._instelling: str | None = None
+        self._peer_opleiding: str | None = None
         self._build()
 
+    # ── Build ────────────────────────────────────────────────────────────────
+
     def _build(self) -> None:
+        # ── Stap 1 + 2: selectoren ──────────────────────────────────────────
         with ui.card().classes("w-full"):
-            with ui.row().classes("items-center gap-3 no-wrap w-full"):
-                ui.icon("leaderboard").classes("text-2xl flex-none").style(
-                    f"color:{_ACCENT}"
-                )
-                ui.select(
-                    _PROGRAMMES,
-                    value=self._programme,
-                    label="Opleiding",
-                    on_change=lambda e: self._on_programme(e.value),
-                ).props("outlined dense").classes("flex-1")
-                ui.label("Week 14 · 2025").classes("text-xs opacity-50 flex-none")
-
-        self._content = ui.column().classes("w-full gap-4")
-        self._render()
-
-    def _on_programme(self, value: str) -> None:
-        self._programme = value
-        self._content.clear()
-        with self._content:
-            self._render_inner()
-
-    def _render(self) -> None:
-        with self._content:
-            self._render_inner()
-
-    def _render_inner(self) -> None:
-        p = self._programme
-        jij, mediaan, top25, n_peers, trend = _MOCK[p]
-        jij_color = _GREEN if jij >= mediaan else (_WARNING if jij >= mediaan * 0.9 else _RED)
-        trend_icon = {"stijgend": "trending_up", "dalend": "trending_down", "stabiel": "trending_flat"}[trend]
-        trend_color = {"stijgend": _GREEN, "dalend": _RED, "stabiel": _MUTED}[trend]
-
-        # Toplijn: 3 stat-kaarten
-        with ui.row().classes("w-full gap-3"):
-            for label, val, color, suffix in [
-                ("Jouw positie", f"{jij}%", jij_color, "van doel"),
-                ("Mediaan peers", f"{mediaan}%", _MUTED, f"{n_peers} instellingen"),
-                ("Top 25%", f"{top25}%", _ACCENT, "benchmark"),
-            ]:
-                with ui.card().classes("flex-1").style(f"border-top: 3px solid {color};"):
-                    ui.label(label).classes("text-xs opacity-50 uppercase font-medium")
-                    ui.label(val).classes("text-3xl font-bold").style(f"color:{color};")
-                    ui.label(suffix).classes("text-xs opacity-50 mt-1")
-
-        # Trend indicator
-        with ui.row().classes("items-center gap-2"):
-            ui.icon(trend_icon).style(f"color:{trend_color}").classes("text-xl")
-            ui.label(f"Trend afgelopen 4 weken: {trend}").classes("text-sm").style(
-                f"color:{trend_color}"
+            ui.label("Stap 1 — uw eigen opleiding").classes(
+                "text-xs font-semibold uppercase opacity-50 mb-1"
             )
+            with ui.row().classes("items-center gap-3 no-wrap w-full mb-4"):
+                ui.icon("school").classes("text-2xl flex-none").style(f"color:{_ACCENT}")
+                self._own_sel = ui.select(
+                    _OWN_PROGRAMMES,
+                    value=self._own_programme,
+                    label="Uw opleiding",
+                    on_change=lambda e: self._on_own(e.value),
+                ).props("outlined dense").classes("flex-1")
 
-        # Gauge
-        ui.html(_gauge_html(jij, mediaan, top25))
+            ui.separator()
 
-        # Sparkline
-        ui.html(_sparkline_html(_WEEKS, _WEEK_DATA[p]))
+            ui.label("Stap 2 — vergelijk met instelling").classes(
+                "text-xs font-semibold uppercase opacity-50 mt-3 mb-1"
+            )
+            with ui.row().classes("items-center gap-3 no-wrap w-full mb-3"):
+                ui.icon("account_balance").classes("text-2xl flex-none").style(
+                    f"color:{_INFO}"
+                )
+                self._inst_sel = ui.select(
+                    _PEER_INSTELLINGEN,
+                    value=None,
+                    label="Kies een instelling…",
+                    on_change=lambda e: self._on_instelling(e.value),
+                ).props("outlined dense").classes("flex-1")
 
-        # Inzichten
-        ui.label("Inzichten & aanbevelingen").classes("font-medium mt-1")
-        for icon, title, body in _INSIGHTS.get(p, []):
-            color_map = {
-                "check_circle": (_GREEN, "#f0faf5"),
-                "warning": (_WARNING, "#fff8e1"),
-                "error": (_RED, "#fff5f5"),
-                "info": (theme.INFO, "#e8f4fb"),
-            }
-            c, bg = color_map.get(icon, (_MUTED, "#fafafa"))
-            with ui.card().classes("w-full").style(f"background:{bg};border-left:3px solid {c};"):
-                with ui.row().classes("items-start gap-2 no-wrap"):
-                    ui.icon(icon).style(f"color:{c}").classes("text-lg flex-none mt-0.5")
-                    with ui.column().classes("gap-0"):
-                        ui.label(title).classes("text-sm font-medium")
-                        if body:
-                            ui.label(body).classes("text-xs opacity-70 leading-relaxed")
+            # Opleiding-selector (peer) — aanvankelijk uitgeschakeld
+            with ui.row().classes("items-center gap-3 no-wrap w-full"):
+                ui.icon("compare").classes("text-2xl flex-none opacity-30").style(
+                    f"color:{_INFO}"
+                )
+                self._opl_sel = ui.select(
+                    [],
+                    value=None,
+                    label="Kies daarna een opleiding…",
+                    on_change=lambda e: self._on_peer_opleiding(e.value),
+                ).props("outlined dense disable").classes("flex-1")
+
+        # ── Resultaatgebied ──────────────────────────────────────────────────
+        self._results = ui.column().classes("w-full gap-4")
+        self._show_empty_state()
+
+    # ── Selectors ────────────────────────────────────────────────────────────
+
+    def _on_own(self, val: str) -> None:
+        self._own_programme = val
+        if self._instelling and self._peer_opleiding:
+            self._render_results()
+
+    def _on_instelling(self, val: str | None) -> None:
+        self._instelling     = val
+        self._peer_opleiding = None
+
+        if val:
+            opleidingen = _PEER_OPLEIDINGEN.get(val, [])
+            self._opl_sel.options = opleidingen
+            self._opl_sel.value   = None
+            self._opl_sel.props(remove="disable")
+        else:
+            self._opl_sel.options = []
+            self._opl_sel.value   = None
+            self._opl_sel.props("disable")
+
+        self._results.clear()
+        with self._results:
+            if val:
+                self._show_instelling_state(val)
+            else:
+                self._show_empty_state()
+
+    def _on_peer_opleiding(self, val: str | None) -> None:
+        self._peer_opleiding = val
+        self._results.clear()
+        with self._results:
+            if val:
+                self._render_results()
+            elif self._instelling:
+                self._show_instelling_state(self._instelling)
+
+    # ── Tussenstaten ─────────────────────────────────────────────────────────
+
+    def _show_empty_state(self) -> None:
+        with ui.card().classes("w-full").style(
+            "border:2px dashed #e8e8e8;background:#fafafa;"
+            "display:flex;align-items:center;justify-content:center;min-height:160px;"
+        ):
+            with ui.column().classes("items-center gap-2"):
+                ui.icon("account_balance").classes("text-5xl opacity-20")
+                ui.label("Kies eerst een instelling om de vergelijking te starten.").classes(
+                    "text-sm opacity-40 text-center"
+                )
+
+    def _show_instelling_state(self, instelling: str) -> None:
+        opleidingen = _PEER_OPLEIDINGEN.get(instelling, [])
+        with ui.card().classes("w-full").style(
+            "border:2px dashed #e8e8e8;background:#fafafa;"
+        ):
+            with ui.column().classes("items-center gap-3 py-6"):
+                ui.icon("compare").classes("text-4xl").style(f"color:{_INFO};opacity:0.5;")
+                ui.label(f"{instelling} geselecteerd").classes("text-sm font-semibold opacity-60")
+                ui.label(
+                    f"Kies nu een van de {len(opleidingen)} beschikbare opleidingen "
+                    f"om de vergelijking te zien."
+                ).classes("text-xs opacity-40 text-center")
+                with ui.row().classes("gap-2 flex-wrap justify-center"):
+                    for opl in opleidingen:
+                        ui.chip(
+                            opl,
+                            on_click=lambda e, o=opl: self._pick_opleiding(o),
+                        ).props("outline color=accent clickable")
+
+    def _pick_opleiding(self, opleiding: str) -> None:
+        self._opl_sel.value = opleiding
+        self._on_peer_opleiding(opleiding)
+
+    # ── Resultaten ────────────────────────────────────────────────────────────
+
+    def _render_results(self) -> None:
+        own  = _OWN_DATA[self._own_programme]
+        peer = _peer_data(self._instelling, self._peer_opleiding)
+
+        own_pct  = own["huidig_pct"]
+        peer_pct = peer["huidig_pct"]
+        delta    = own_pct - peer_pct
+        delta_s  = f"+{delta}" if delta >= 0 else str(delta)
+
+        own_color  = _GREEN if delta >= 0 else _RED
+        trend_icon = {"stijgend": "trending_up", "dalend": "trending_down", "stabiel": "trending_flat"}.get(
+            peer["trend"], "trending_flat"
+        )
+        trend_col  = {"stijgend": _GREEN, "dalend": _RED, "stabiel": _MUTED}.get(
+            peer["trend"], _MUTED
+        )
+
+        # ── Header: wie staat voor? ──────────────────────────────────────────
+        with ui.card().classes("w-full").style(
+            f"border-left:4px solid {own_color};background:#fafafa;"
+        ):
+            with ui.row().classes("items-center gap-4 no-wrap"):
+                ui.icon(
+                    "arrow_upward" if delta > 0 else ("arrow_downward" if delta < 0 else "remove")
+                ).style(f"color:{own_color};font-size:32px;").classes("flex-none")
+                with ui.column().classes("gap-0 flex-1"):
+                    if delta > 0:
+                        kopje = f"Uw instelling loopt {abs(delta)} procentpunt voor"
+                    elif delta < 0:
+                        kopje = f"Uw instelling loopt {abs(delta)} procentpunt achter"
+                    else:
+                        kopje = "Uw instelling en peer lopen exact gelijk"
+                    ui.label(kopje).classes("text-base font-semibold")
+                    ui.label(
+                        f"{self._own_programme}  ↔  {self._peer_opleiding} @ {self._instelling}"
+                    ).classes("text-xs opacity-50 mt-0.5")
+                with ui.row().classes("items-center gap-1 flex-none"):
+                    ui.icon(trend_icon).style(f"color:{trend_col}").classes("text-lg")
+                    ui.label(f"Trend peer: {peer['trend']}").classes("text-xs").style(
+                        f"color:{trend_col};"
+                    )
+
+        # ── Drie stat-kaarten ────────────────────────────────────────────────
+        with ui.row().classes("w-full gap-3"):
+            for label, val, color, sub in [
+                ("Uw instelling",   f"{own_pct}%",  own_color,  "% van historisch doel (W14)"),
+                ("Gat (procentpunt)", f"{delta_s}pp", own_color, "uw positie t.o.v. peer"),
+                (self._instelling,  f"{peer_pct}%", _ACCENT,  f"% van historisch doel (W14)"),
+            ]:
+                with ui.card().classes("flex-1").style(f"border-top:3px solid {color};"):
+                    ui.label(label).classes("text-xs opacity-50 font-medium uppercase tracking-wide")
+                    ui.label(val).classes("text-3xl font-bold mt-1").style(f"color:{color};")
+                    ui.label(sub).classes("text-xs opacity-40 mt-0.5")
+
+        # ── Staafdiagram ─────────────────────────────────────────────────────
+        peer_short = self._instelling.split()[0]  # "Leiden", "VU", etc.
+        ui.html(_comparison_bars_html(own_pct, peer_pct, peer_short))
+
+        # ── Sparkline ────────────────────────────────────────────────────────
+        ui.html(_sparkline_html(_WEEKS, own["pct_series"], peer["pct_series"], peer_short))
+
+        # ── Inzicht ──────────────────────────────────────────────────────────
+        with ui.card().classes("w-full").style(
+            f"border-left:3px solid {_INFO};background:#f4f7ff;"
+        ):
+            with ui.row().classes("items-start gap-3 no-wrap"):
+                ui.icon("lightbulb").style(f"color:{_INFO}").classes("text-xl flex-none mt-0.5")
+                with ui.column().classes("gap-1"):
+                    ui.label("Inzicht").classes("font-medium text-sm")
+                    ui.label(peer["note"]).classes("text-xs opacity-70 leading-relaxed")
+                    ui.label(
+                        "Let op: vergelijking is op % van historisch doel, niet op absolute aantallen. "
+                        "Instellingen met een hoger instroomdoel tellen niet zwaarder mee."
+                    ).classes("text-xs opacity-40 italic mt-1")
+
+        # ── Opleiding wisselen ────────────────────────────────────────────────
+        andere = [o for o in _PEER_OPLEIDINGEN.get(self._instelling, []) if o != self._peer_opleiding]
+        if andere:
+            with ui.row().classes("items-center gap-2 flex-wrap"):
+                ui.label("Vergelijk ook met:").classes("text-xs opacity-50 flex-none")
+                for opl in andere:
+                    ui.chip(
+                        opl,
+                        on_click=lambda e, o=opl: self._pick_opleiding(o),
+                    ).props("outline color=grey-6 clickable dense")
