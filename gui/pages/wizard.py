@@ -656,10 +656,38 @@ class _WizardView:
 
     def _build_step3(self) -> None:
         with ui.step("Aanmaken"):
-            self._demo_checkbox = ui.checkbox(
-                "Demodata downloaden (≈4 MB, om het model direct te proberen)",
-                value=False,
-            )
+            with ui.row().classes("items-center gap-4 flex-wrap"):
+                self._demo_checkbox = ui.checkbox(
+                    "Demodata downloaden (≈4 MB, om het model direct te proberen)",
+                    value=False,
+                )
+                # Vertikale scheidingslijn
+                ui.html(
+                    '<div style="width:1px;height:20px;background:#e0e0e0;'
+                    'align-self:center;flex-shrink:0"></div>'
+                )
+                # Studielink-knop: visueel greyed-out, tooltip + klikfeedback
+                with ui.row().classes("items-center gap-1.5").style(
+                    "opacity:0.5; cursor:not-allowed"
+                ):
+                    ui.tooltip(
+                        "Directe koppeling met het Studielink-portaal"
+                        " — binnenkort beschikbaar"
+                    )
+                    (
+                        ui.button(
+                            "Download vanuit Studielink",
+                            icon="cloud_download",
+                            on_click=self._on_studielink_click,
+                        )
+                        .props("flat color=grey dense")
+                        .style("pointer-events:auto; cursor:not-allowed")
+                    )
+                    ui.label("binnenkort").classes("text-xs rounded-full px-2").style(
+                        "background:#f0f0f0; color:#999;"
+                        " border:1px solid #ddd; font-style:italic;"
+                        " white-space:nowrap"
+                    )
             self._demo_progress = ui.linear_progress(value=0.0, show_value=False)
             self._demo_progress.set_visibility(False)
             self._panel = ProcessPanel()
@@ -954,6 +982,15 @@ class _WizardView:
         self._refresh_coverage()
         self._refresh_summary()
         self._refresh_overlap()
+
+    def _on_studielink_click(self) -> None:
+        ui.notify(
+            "Studielink-koppeling is nog niet beschikbaar"
+            " — wordt toegevoegd in een volgende versie.",
+            type="info",
+            icon="cloud_off",
+            timeout=4000,
+        )
 
     async def _download_demodata(self) -> None:
         dest = os.path.join(self._project_dir, "data", "input_raw")
