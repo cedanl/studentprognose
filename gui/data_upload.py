@@ -38,6 +38,7 @@ class FileCheckResult:
     soft_errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
     row_count: int | None = None
+    years: list[int] | None = None  # unieke jaren in het bestand (bijv. Collegejaar)
 
 
 # Validatie-defaults gespiegeld van validation.py — geen import om
@@ -82,6 +83,45 @@ class TelCoverage:
     present: dict[int, set[int]]   # year → set of week numbers
     gaps: list[tuple[int, int]]    # (year, week) within expected range but missing
     total: int                     # aantal geldige bestanden
+
+
+@dataclass
+class OverlapInfo:
+    """Overlap tussen telbestand-jaren en oktober-jaren."""
+
+    tel_years: list[int]
+    okt_years: list[int]
+    intersection: list[int]
+    year_range: list[int]  # aaneengesloten reeks min..max over beide datasets
+
+
+def compute_overlap(
+    cov: TelCoverage | None,
+    okt_result: FileCheckResult | None,
+) -> OverlapInfo | None:
+    """Bereken de jaar-overlap tussen telbestanden en het oktober-bestand.
+
+    Geeft None terug als één van beide ontbreekt of ongeldig is.
+    """
+    if cov is None or okt_result is None:
+        return None
+    if okt_result.status not in (FileStatus.VALID, FileStatus.WARNINGS):
+        return None
+    if not okt_result.years:
+        return None
+
+    tel_set = set(cov.years)
+    okt_set = set(okt_result.years)
+    all_years = tel_set | okt_set
+    if not all_years:
+        return None
+
+    return OverlapInfo(
+        tel_years=sorted(tel_set),
+        okt_years=sorted(okt_set),
+        intersection=sorted(tel_set & okt_set),
+        year_range=list(range(min(all_years), max(all_years) + 1)),
+    )
 
 
 def compute_tel_coverage(results: dict[str, FileCheckResult]) -> TelCoverage | None:
@@ -405,6 +445,10 @@ def _check_oktober(filepath: str) -> FileCheckResult:
         if col in df.columns:
             _append_nan_messages(df, col, filename, warn, soft)
 
+    valid_years = sorted(
+        int(y) for y in collegejaar[collegejaar.between(y_min, y_max)].dropna().unique()
+    )
+
     return FileCheckResult(
         filename=filename,
         status=_to_status(hard, soft, warn),
@@ -412,6 +456,7 @@ def _check_oktober(filepath: str) -> FileCheckResult:
         soft_errors=soft,
         warnings=warn,
         row_count=len(df),
+        years=valid_years,
     )
 
 

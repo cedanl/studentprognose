@@ -25,7 +25,9 @@ from gui.components.states import error_banner, info_banner, section_title
 from gui.data_upload import (
     FileCheckResult,
     FileStatus,
+    OverlapInfo,
     TelCoverage,
+    compute_overlap,
     compute_tel_coverage,
     save_and_validate_individueel,
     save_and_validate_oktober,
@@ -162,6 +164,161 @@ def _coverage_html(cov: TelCoverage) -> str:
         f'<div style="display:flex;flex-direction:column;gap:5px;">{"".join(rows_html)}</div>'
         f'{gaps_html}'
         f'{legend}'
+        f'</div>'
+    )
+
+
+def _overlap_html(info: OverlapInfo) -> str:
+    """Genereer een HTML-visualisatie van de jaar-overlap tussen telbestanden en oktober."""
+    n = len(info.intersection)
+    tel_set = set(info.tel_years)
+    okt_set = set(info.okt_years)
+    ovl_set = set(info.intersection)
+
+    # ── Verdict ──────────────────────────────────────────────────────────────
+    if n >= 6:
+        vc, vi, vt = theme.POSITIVE, "✓", "Uitstekend"
+        adv = f"{n} overlappende jaren — ruim voldoende data voor betrouwbare prognoses."
+    elif n >= 4:
+        vc, vi, vt = theme.POSITIVE, "✓", "Goed"
+        adv = f"{n} overlappende jaren — goede basis voor modeltraining."
+    elif n == 3:
+        vc, vi, vt = theme.WARNING, "⚠", "Voldoende"
+        adv = f"{n} overlappende jaren — acceptabel, maar meer historische data verbetert de nauwkeurigheid."
+    elif n == 2:
+        vc, vi, vt = theme.WARNING, "⚠", "Minimaal"
+        adv = f"Slechts {n} overlappende jaren — voeg meer historische data toe voor betere prognoses."
+    elif n == 1:
+        vc, vi, vt = theme.NEGATIVE, "✗", "Onvoldoende"
+        adv = "Slechts 1 overlappend jaar. Dit is te weinig voor een betrouwbaar model."
+    else:
+        vc, vi, vt = theme.NEGATIVE, "✗", "Geen overlap"
+        adv = (
+            "Geen overlappende jaren gevonden. "
+            "Controleer of de datasets dezelfde periode beslaan."
+        )
+
+    if info.intersection:
+        adv += f" Trainingsvenster: {info.intersection[0]}–{info.intersection[-1]}."
+
+    # Jaar-bereik in badge tonen bij beperkte overlap zodat het direct leesbaar is.
+    badge_range = ""
+    if 0 < n <= 3 and info.intersection:
+        badge_range = f" ({info.intersection[0]}–{info.intersection[-1]})"
+
+    # ── Blokbreedte dynamisch op basis van jaarbereik ─────────────────────────
+    # Beschikbare breedte is ~600px (container minus label 95px + gap 8px = 103px).
+    # Blok = bw px + 3px gap; bw * n_years ≤ ~580px.
+    n_yrs = len(info.year_range)
+    bw = 40 if n_yrs <= 13 else 34 if n_yrs <= 16 else 28
+
+    # ── Blokbouwers per dataset ───────────────────────────────────────────────
+    def _tel_block(y: int) -> str:
+        if y in tel_set:
+            return (
+                f'<div title="Telbestand aanwezig: {y}"'
+                f' style="min-width:{bw}px;padding:5px 3px;'
+                f'background:#DD784B18;border:1px solid #DD784B88;border-radius:6px;'
+                f'text-align:center;font-size:11px;font-family:monospace;color:#DD784B;">'
+                f'{y}</div>'
+            )
+        return (
+            f'<div style="min-width:{bw}px;padding:5px 3px;background:transparent;'
+            f'border:1px dashed #e4e4e4;border-radius:6px;text-align:center;'
+            f'font-size:11px;font-family:monospace;color:#d4d4d4;">{y}</div>'
+        )
+
+    def _okt_block(y: int) -> str:
+        if y in okt_set:
+            return (
+                f'<div title="Oktober aanwezig: {y}"'
+                f' style="min-width:{bw}px;padding:5px 3px;'
+                f'background:#3D68EC15;border:1px solid #3D68EC77;border-radius:6px;'
+                f'text-align:center;font-size:11px;font-family:monospace;color:#3D68EC;">'
+                f'{y}</div>'
+            )
+        return (
+            f'<div style="min-width:{bw}px;padding:5px 3px;background:transparent;'
+            f'border:1px dashed #e4e4e4;border-radius:6px;text-align:center;'
+            f'font-size:11px;font-family:monospace;color:#d4d4d4;">{y}</div>'
+        )
+
+    def _ovl_block(y: int) -> str:
+        if y in ovl_set:
+            return (
+                f'<div title="Overlappend jaar: {y}"'
+                f' style="min-width:{bw}px;padding:5px 3px;'
+                f'background:#00AF8118;border:1.5px solid {theme.POSITIVE};border-radius:6px;'
+                f'text-align:center;font-size:11px;font-family:monospace;'
+                f'font-weight:600;color:{theme.POSITIVE};">'
+                f'{y}</div>'
+            )
+        # onzichtbare placeholder: behoudt kolomuitlijning zonder visuele ruis
+        return (
+            f'<div style="min-width:{bw}px;padding:5px 3px;border:1px solid transparent;'
+            f'border-radius:6px;color:transparent;">{y}</div>'
+        )
+
+    def _row(label: str, blocks: str, bold: bool = False) -> str:
+        fw = "600" if bold else "400"
+        lc = "#333" if bold else "#999"
+        return (
+            f'<div style="display:flex;align-items:center;gap:8px;">'
+            f'<span style="width:95px;text-align:right;flex-shrink:0;'
+            f'font-size:11px;font-weight:{fw};color:{lc};">{label}</span>'
+            f'<div style="display:flex;gap:3px;">{blocks}</div>'
+            f'</div>'
+        )
+
+    tel_blocks = "".join(_tel_block(y) for y in info.year_range)
+    okt_blocks = "".join(_okt_block(y) for y in info.year_range)
+    ovl_blocks = "".join(_ovl_block(y) for y in info.year_range)
+
+    return (
+        f'<div style="background:#fafafa;border:1px solid #efefef;'
+        f'border-radius:8px;padding:14px 16px;">'
+
+        # ── Header ──────────────────────────────────────────────────────────
+        f'<div style="display:flex;align-items:center;justify-content:space-between;'
+        f'margin-bottom:14px;">'
+        f'<span style="font-size:13px;font-weight:600;color:#1a1a1a;">'
+        f'Datadekking &amp; overlap</span>'
+        f'<span style="font-size:12px;font-weight:600;padding:3px 10px;border-radius:12px;'
+        f'background:{vc}20;color:{vc};">{vi}&nbsp;{vt} — {n} jaar{badge_range}</span>'
+        f'</div>'
+
+        # ── Rijen ────────────────────────────────────────────────────────────
+        f'<div style="display:flex;flex-direction:column;gap:6px;">'
+        + _row("Telbestanden", tel_blocks)
+        + _row("Oktober", okt_blocks)
+        + f'<div style="border-top:1px dashed #e8e8e8;margin:3px 0 3px 103px;"></div>'
+        + _row("Overlap", ovl_blocks, bold=True)
+        + f'</div>'
+
+        # ── Advies ───────────────────────────────────────────────────────────
+        + f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid #f0f0f0;'
+        f'display:flex;align-items:flex-start;gap:8px;">'
+        f'<span style="font-size:14px;color:{vc};flex-shrink:0;line-height:1.3;">{vi}</span>'
+        f'<span style="font-size:12px;color:#555;line-height:1.5;">{adv}</span>'
+        f'</div>'
+
+        # ── Legenda ──────────────────────────────────────────────────────────
+        + f'<div style="display:flex;gap:16px;margin-top:8px;padding-top:8px;'
+        f'border-top:1px solid #f0f0f0;">'
+        f'<div style="display:flex;align-items:center;gap:5px;">'
+        f'<div style="width:10px;height:10px;background:#DD784B18;'
+        f'border:1px solid #DD784B88;border-radius:2px;"></div>'
+        f'<span style="font-size:10px;color:#999;">Telbestanden</span></div>'
+        f'<div style="display:flex;align-items:center;gap:5px;">'
+        f'<div style="width:10px;height:10px;background:#3D68EC15;'
+        f'border:1px solid #3D68EC77;border-radius:2px;"></div>'
+        f'<span style="font-size:10px;color:#999;">Oktober</span></div>'
+        f'<div style="display:flex;align-items:center;gap:5px;">'
+        f'<div style="width:10px;height:10px;background:#00AF8118;'
+        f'border:1.5px solid {theme.POSITIVE};border-radius:2px;"></div>'
+        f'<span style="font-size:10px;color:#999;">Overlap</span></div>'
+        f'</div>'
+
         f'</div>'
     )
 
@@ -523,10 +680,13 @@ class _WizardView:
                 multiple=False,
                 project_dir_getter=lambda: self._project_dir,
                 validate_fn=save_and_validate_oktober,
-                on_change=self._refresh_summary,
+                on_change=self._on_okt_change,
             )
 
             ui.space().classes("h-4")
+
+            # ── Overlap-visualisatie (tel vs. oktober) ─────────────────────
+            self._overlap_slot = ui.column().classes("w-full gap-0")
 
             # ── Statuskaart ────────────────────────────────────────────────
             self._summary_card = (
@@ -557,6 +717,11 @@ class _WizardView:
     def _on_tel_change(self) -> None:
         self._refresh_coverage()
         self._refresh_summary()
+        self._refresh_overlap()
+
+    def _on_okt_change(self) -> None:
+        self._refresh_summary()
+        self._refresh_overlap()
 
     def _refresh_coverage(self) -> None:
         cov = compute_tel_coverage(self._zone_tel._results)
@@ -564,6 +729,19 @@ class _WizardView:
         if cov is not None:
             with self._coverage_slot:
                 ui.html(_coverage_html(cov))
+
+    def _refresh_overlap(self) -> None:
+        """Toon overlap-visualisatie zodra zowel telbestanden als oktober geldig zijn."""
+        self._overlap_slot.clear()
+        if self._mode not in ("cumulative", "both"):
+            return
+        cov = compute_tel_coverage(self._zone_tel._results)
+        okt_result = next(iter(self._zone_okt._results.values()), None)
+        info = compute_overlap(cov, okt_result)
+        if info is not None:
+            with self._overlap_slot:
+                ui.html(_overlap_html(info))
+                ui.space().classes("h-4")
 
     # ── Modus-logica ────────────────────────────────────────────────────────
 
@@ -589,6 +767,7 @@ class _WizardView:
         self._ind_wrapper.set_visibility(needs_ind)
 
         self._refresh_summary()
+        self._refresh_overlap()
 
     # ── Samenvattingskaart ───────────────────────────────────────────────────
 
@@ -707,6 +886,7 @@ class _WizardView:
         self._zone_okt.load_existing(existing["oktober"])
         self._refresh_coverage()
         self._refresh_summary()
+        self._refresh_overlap()
 
     async def _download_demodata(self) -> None:
         dest = os.path.join(self._project_dir, "data", "input_raw")
