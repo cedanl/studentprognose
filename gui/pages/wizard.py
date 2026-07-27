@@ -344,6 +344,9 @@ def create() -> None:
 class _UploadZone:
     """Upload-zone voor één bestandstype met directe validatiefeedback."""
 
+    # Boven deze drempel wordt de bestandslijst ingeklapt getoond.
+    _COLLAPSE_THRESHOLD = 5
+
     def __init__(
         self,
         *,
@@ -362,6 +365,7 @@ class _UploadZone:
         self._validate_fn = validate_fn
         self._on_change = on_change
         self._results: dict[str, FileCheckResult] = {}
+        self._collapsed: bool = True
         self._build(title, description, hint, icon, required, accept, multiple)
 
     # --- Public interface ---------------------------------------------------
@@ -474,11 +478,74 @@ class _UploadZone:
 
     # --- UI-rendering -------------------------------------------------------
 
+    def _toggle_collapse(self) -> None:
+        self._collapsed = not self._collapsed
+        self._refresh_results()
+
     def _refresh_results(self) -> None:
         self._results_slot.clear()
+        count = len(self._results)
+        if count == 0:
+            return
         with self._results_slot:
-            for result in self._results.values():
-                self._render_file_row(result)
+            if count > self._COLLAPSE_THRESHOLD:
+                self._render_summary_row()
+                for result in self._results.values():
+                    # In ingeklapte staat: alleen fouten en waarschuwingen tonen.
+                    if not self._collapsed or result.status in (
+                        FileStatus.ERRORS, FileStatus.WARNINGS
+                    ):
+                        self._render_file_row(result)
+            else:
+                for result in self._results.values():
+                    self._render_file_row(result)
+
+    def _render_summary_row(self) -> None:
+        """Compacte samenvattingsbalk met inklapknop voor grote bestandslijsten."""
+        total = len(self._results)
+        valid = self.valid_count
+        n_err = sum(1 for r in self._results.values() if r.status == FileStatus.ERRORS)
+        n_warn = sum(1 for r in self._results.values() if r.status == FileStatus.WARNINGS)
+        n_checking = sum(
+            1 for r in self._results.values() if r.status == FileStatus.CHECKING
+        )
+
+        if n_err:
+            icon_n, color = "error", theme.NEGATIVE
+            msg = f"{n_err} met fouten — {valid} geldig"
+        elif n_warn:
+            icon_n, color = "warning", theme.WARNING
+            msg = f"{n_warn} met opmerkingen — {valid - n_warn} puur geldig"
+        elif n_checking:
+            icon_n, color = "hourglass_top", theme.INFO
+            msg = f"{valid} van {total} geldig · {n_checking} laden…"
+        else:
+            icon_n, color = "check_circle", theme.POSITIVE
+            msg = f"{total} bestand{'en' if total != 1 else ''} geldig"
+
+        btn_label = "Inklappen" if not self._collapsed else f"Toon alle ({total})"
+        btn_icon = "expand_less" if not self._collapsed else "expand_more"
+
+        with ui.row().classes("w-full items-center justify-between gap-2 py-0.5"):
+            with ui.row().classes("items-center gap-2 no-wrap"):
+                ui.icon(icon_n).classes("text-base flex-none").style(f"color: {color}")
+                ui.label(msg).classes("text-sm font-medium").style(f"color: {color}")
+            ui.button(
+                btn_label,
+                icon=btn_icon,
+                on_click=self._toggle_collapse,
+            ).props("flat dense size=sm color=grey-7").classes("flex-none")
+
+        # Subtiele scheidingslijn vóór de bestandsrijen als die zichtbaar zijn.
+        n_visible = (
+            sum(
+                1 for r in self._results.values()
+                if r.status in (FileStatus.ERRORS, FileStatus.WARNINGS)
+            )
+            if self._collapsed else total
+        )
+        if n_visible:
+            ui.separator().classes("my-0.5 opacity-40")
 
     def _render_file_row(self, result: FileCheckResult) -> None:
         icon_name, color, status_text = _STATUS_VISUAL.get(
