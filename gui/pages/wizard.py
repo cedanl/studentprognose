@@ -376,7 +376,7 @@ class _WizardView:
     def __init__(self) -> None:
         stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         self._project_dir = os.path.join(os.getcwd(), "tmp", f"studentprognose{stamp}")
-        self._mode: str = "both"
+        self._mode: str = "cumulative"
         self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
