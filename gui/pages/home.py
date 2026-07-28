@@ -104,6 +104,26 @@ def create() -> None:
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; font-size: 12px; font-weight: 700; color: #fff;
 }
+.sp-use-chip {
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(221, 120, 75, 0.08);
+    border: 1px solid rgba(221, 120, 75, 0.15);
+    cursor: help;
+    transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    min-width: 76px;
+    text-align: center;
+    user-select: none;
+}
+.sp-use-chip:hover {
+    background: rgba(221, 120, 75, 0.15);
+    border-color: rgba(221, 120, 75, 0.40);
+    box-shadow: 0 2px 10px rgba(221, 120, 75, 0.12);
+}
 </style>""")
         with page_shell(active="/", title="Start", show_stepper=False):
             ui.label("Studentprognose").classes("text-3xl font-bold")
@@ -174,35 +194,26 @@ class _HomeView:
 
             self._render_use_cases()
 
-            ui.separator().classes("mt-3 mb-2")
-            with ui.column().classes("gap-0"):
-                ui.label(
-                    "Zonder prognose: beslissing in juni op gevoel."
-                ).classes("text-xs opacity-50")
-                ui.label(
-                    "Met prognose: beslissing in maart op data."
-                ).classes("text-xs font-semibold").style(
-                    f"color: {theme.ACCENT}"
+            with ui.row().classes("items-center gap-2 mt-2"):
+                ui.label("Zonder prognose: juni, op gevoel.").classes(
+                    "text-xs opacity-40"
                 )
+                ui.label("→").classes("text-xs opacity-30")
+                ui.label("Met prognose: maart, op data.").classes(
+                    "text-xs font-semibold"
+                ).style(f"color: {theme.ACCENT}")
 
     def _render_use_cases(self) -> None:
-        """Render de vijf use-case-rijen (gedeeld tussen compact en volledig)."""
-        for icon, title, desc in _USE_CASES:
-            with ui.row().classes("items-start gap-3 no-wrap py-1.5"):
-                with ui.element("div").style(
-                    f"width:34px;height:34px;border-radius:8px;"
-                    f"background:{theme.ACCENT}18;"
-                    "display:flex;align-items:center;justify-content:center;"
-                    "flex-shrink:0;margin-top:2px"
-                ):
-                    ui.icon(icon).classes("text-base").style(
-                        f"color: {theme.ACCENT}"
+        """Render de vijf use-cases als compacte icon-chips met hover-tooltip."""
+        with ui.row().classes("gap-2 flex-wrap my-1"):
+            for icon, title, desc in _USE_CASES:
+                with ui.element("div").classes("sp-use-chip"):
+                    ui.tooltip(desc).style(
+                        "max-width: 220px; white-space: normal; "
+                        "line-height: 1.45; font-size: 12px;"
                     )
-                with ui.column().classes("gap-0"):
-                    ui.label(title).classes("font-semibold text-sm")
-                    ui.label(desc).classes("text-sm leading-snug").style(
-                        "color: #666;"
-                    )
+                    ui.icon(icon).classes("text-2xl").style(f"color: {theme.ACCENT}")
+                    ui.label(title).classes("text-xs font-semibold")
 
     # ── Dashboard (terugkerende gebruiker) ────────────────────────────────────
 
