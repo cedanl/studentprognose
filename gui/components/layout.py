@@ -194,7 +194,19 @@ def _feedback_dialog() -> ui.dialog:
                     ui.button("Annuleren", on_click=dialog.close).props(
                         "flat color=grey-7"
                     )
-                    ui.button("Versturen", icon="send").props("unelevated color=accent")
+
+                    def _send() -> None:
+                        dialog.close()
+                        ui.notify(
+                            "Bedankt voor je feedback!",
+                            type="positive",
+                            position="top",
+                            timeout=3000,
+                        )
+
+                    ui.button("Versturen", icon="send", on_click=_send).props(
+                        "unelevated color=accent"
+                    )
     return dialog
 
 

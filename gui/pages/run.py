@@ -6,6 +6,8 @@ bevestiging en streamt de uitvoer live. Parameters worden per sessie bewaard.
 
 from __future__ import annotations
 
+import datetime
+
 from nicegui import app, ui
 
 from gui import nav, process, theme, tracks
@@ -19,11 +21,18 @@ from gui.state import STATE
 #: Sleutel waaronder de laatst gebruikte parameters bewaard worden.
 _STORAGE_KEY = "run_settings"
 
-_DEFAULTS = {
+# Jaarbereik voor prognosejaren: DATA_START is het eerste trainingsjaar
+# (gedefinieerd in de vizmodule). Een geldig prognosejaar heeft ten minste
+# één trainingsjaar nodig, dus de ondergrens is DATA_START+1.
+_DATA_START: int = tvz.DATA_START
+_CURRENT_YEAR: int = datetime.date.today().year
+_FORECAST_YEARS: list[int] = list(range(_DATA_START + 1, _CURRENT_YEAR + 4))
+
+_DEFAULTS: dict = {
     "dataset": "Beide",
     "cohort": "Eerstejaars",
-    "years": "",
-    "weeks": "",
+    "years": [_CURRENT_YEAR],
+    "weeks": "38",
     "institutions": [],
     "skip_years": 0,
     "noetl": False,
@@ -31,6 +40,66 @@ _DEFAULTS = {
     "no_warnings": False,
     "yes": True,
 }
+
+#: Aanbevolen waarden — worden visueel gemarkeerd in de UI.
+_RECOMMENDED = {"weeks": "38"}
+
+_WIZARD_MODE_TO_DATASET = {
+    "cumulative": "Cumulatief",
+    "individual": "Individueel",
+    "both": "Beide",
+}
+
+
+# ---------------------------------------------------------------------------
+# Validatiehulpfuncties (pure logica, geen NiceGUI)
+# ---------------------------------------------------------------------------
+
+
+def _validate_weeks(raw: str) -> str | None:
+    """Valideer weekinvoer; geeft ``None`` terug als geldig.
+
+    Accepteert: leeg (= alle weken), enkelvoudig getal (bijv. ``6``),
+    meerdere getallen (``6 10 20``) en bereiksyntaxis (``1:38``).
+    """
+    if not raw.strip():
+        return None
+    for token in raw.strip().split():
+        if ":" in token:
+            parts = token.split(":")
+            if len(parts) != 2:
+                return f"Ongeldig bereik '{token}' — gebruik bijv. 1:38"
+            try:
+                n, m = int(parts[0].strip()), int(parts[1].strip())
+            except ValueError:
+                return f"Ongeldig bereik '{token}' — gebruik bijv. 1:38"
+            if not (1 <= n <= 52 and 1 <= m <= 52):
+                return f"Weekbereik '{token}': waarden moeten tussen 1 en 52 liggen"
+            if n > m:
+                return (
+                    f"Weekbereik '{token}': begin ({n}) mag niet groter zijn dan einde ({m})"
+                )
+        else:
+            try:
+                w = int(token)
+            except ValueError:
+                return f"'{token}' is geen geldig weeknummer"
+            if not (1 <= w <= 52):
+                return f"Weeknummer {w} ligt buiten het geldige bereik (1–52)"
+    return None
+
+
+def _max_skip(min_forecast_year: int) -> int:
+    """Bereken het maximum aantal te overslaan jaren voor backtesting.
+
+    Minstens één trainingsjaar (``DATA_START``) moet overblijven.
+    """
+    return max(0, min_forecast_year - _DATA_START - 1)
+
+
+# ---------------------------------------------------------------------------
+# Route-registratie
+# ---------------------------------------------------------------------------
 
 
 def create() -> None:
@@ -55,48 +124,121 @@ def create() -> None:
             _RunView()
 
 
+# ---------------------------------------------------------------------------
+# Parameterformulier + runner
+# ---------------------------------------------------------------------------
+
+
 class _RunView:
     """Rendert het parameterformulier, de preview en de runner."""
 
     def __init__(self) -> None:
-        self._settings = {**_DEFAULTS, **app.storage.general.get(_STORAGE_KEY, {})}
-        self._viz_variant: int = 1
-        self._viz_btns: list[ui.button] = []
+        stored = dict(app.storage.general.get(_STORAGE_KEY, {}))
+
+        # Achterwaartse compatibiliteit: years was vroeger een string.
+        raw_years = stored.get("years", _DEFAULTS["years"])
+        if isinstance(raw_years, str):
+            parsed = [int(x) for x in raw_years.strip().split() if x.isdigit()]
+            raw_years = parsed if parsed else list(_DEFAULTS["years"])
+        # Filter opgeslagen jaren tot het geldige bereik.
+        stored["years"] = [y for y in raw_years if y in _FORECAST_YEARS] or list(
+            _DEFAULTS["years"]
+        )
+
+        self._settings = {**_DEFAULTS, **stored}
+
+        # Als er nog geen opgeslagen instellingen zijn maar de wizard heeft een
+        # modus gekozen, gebruik die als standaard voor de dataset-dropdown.
+        if not app.storage.general.get(_STORAGE_KEY):
+            wizard_mode = getattr(STATE, "wizard_mode", None)
+            if wizard_mode:
+                self._settings["dataset"] = _WIZARD_MODE_TO_DATASET.get(
+                    wizard_mode, _DEFAULTS["dataset"]
+                )
+
         self._build()
+
+    # ── UI-opbouw ────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
         with ui.card().classes("w-full"):
             with ui.grid(columns=2).classes("w-full gap-4"):
+
+                # ── Dataset ─────────────────────────────────────────────────
                 self._dataset = ui.select(
-                    ["Individueel", "Cumulatief", "Beide"],
+                    ["Cumulatief", "Individueel", "Beide"],
                     value=self._settings["dataset"],
                     label="Dataset (voorspelspoor)",
                 ).classes("w-full")
                 self._dataset.tooltip(tracks.dataset_tooltip())
-                self._dataset.on_value_change(lambda _e: self._update_dataset_hint())
+                self._dataset.on_value_change(
+                    lambda _e: (self._update_dataset_hint(), self._update_preview())
+                )
+
+                # ── Cohort ──────────────────────────────────────────────────
                 self._cohort = ui.select(
                     ["Eerstejaars", "Hogerejaars", "Volume"],
                     value=self._settings["cohort"],
                     label="Cohort",
                 ).classes("w-full")
-                self._years = ui.input(
-                    "Jaren",
-                    value=self._settings["years"],
-                    placeholder="bijv. 2024 of 2023 2024",
-                ).classes("w-full")
-                self._years.tooltip(
-                    "Het academisch jaar waarvoor de prognose wordt gemaakt. "
-                    "Meerdere jaren scheiden met spaties."
-                )
-                self._weeks = ui.input(
-                    "Weken",
-                    value=self._settings["weeks"],
-                    placeholder="bijv. 6 of 1:38",
-                ).classes("w-full")
-                self._weeks.tooltip(
-                    "Weeknummer van de aanmeldpeildatum. "
-                    "Bijv. 6 = week 6 van het academisch jaar."
-                )
+                self._cohort.on_value_change(lambda _e: self._update_preview())
+
+                # ── Prognosejaren (dropdown — alleen geldige jaren) ──────────
+                with ui.column().classes("w-full gap-0"):
+                    self._years = (
+                        ui.select(
+                            options=_FORECAST_YEARS,
+                            value=list(self._settings["years"]),
+                            multiple=True,
+                            label="Prognosejaren",
+                        )
+                        .props("use-chips")
+                        .classes("w-full")
+                    )
+                    self._years.tooltip(
+                        "Het academisch jaar waarvoor de prognose wordt gemaakt. "
+                        "Meerdere jaren tegelijk zijn mogelijk."
+                    )
+                    self._years_error = (
+                        ui.label("")
+                        .classes("text-xs mt-0.5 font-medium")
+                        .style(f"color: {theme.NEGATIVE}")
+                    )
+                    self._years_error.set_visibility(False)
+                    self._years.on_value_change(lambda _e: self._on_years_change())
+
+                # ── Weken (tekstveld + inline validatie + aanbevolen-hint) ──
+                with ui.column().classes("w-full gap-0"):
+                    with ui.row().classes("items-center gap-2 mb-0.5"):
+                        pass  # spacer — label zit in het input-widget zelf
+                    self._weeks = ui.input(
+                        "Weken",
+                        value=self._settings["weeks"],
+                        placeholder="bijv. 6 of 1:38  (leeg = alle weken)",
+                    ).classes("w-full")
+                    self._weeks.tooltip(
+                        "Weeknummer van de aanmeldpeildatum (1–52). "
+                        "Gebruik bereiknotatie als 1:38 voor meerdere weken."
+                    )
+                    # Aanbevolen-hint (altijd zichtbaar als informatielabel)
+                    with ui.row().classes("items-center gap-1 mt-0.5"):
+                        ui.icon("star").classes("text-xs flex-none").style(
+                            f"color: {theme.ACCENT}; font-size: 12px;"
+                        )
+                        self._weeks_rec_label = ui.label(
+                            f"Aanbevolen: week {_RECOMMENDED['weeks']}"
+                        ).classes("text-xs font-medium").style(
+                            f"color: {theme.ACCENT}; opacity: 0.85"
+                        )
+                    self._weeks_error = (
+                        ui.label("")
+                        .classes("text-xs mt-0.5 font-medium")
+                        .style(f"color: {theme.NEGATIVE}")
+                    )
+                    self._weeks_error.set_visibility(False)
+                    self._weeks.on_value_change(lambda _e: self._on_weeks_change())
+
+                # ── Instellingsfilter ────────────────────────────────────────
                 self._institutions = (
                     ui.select(
                         options=list(self._settings["institutions"]),
@@ -108,17 +250,23 @@ class _RunView:
                     .props("use-chips new-value-mode=add-unique")
                     .classes("w-full")
                 )
-                self._skip_years = ui.number(
-                    "Jaren overslaan (backtesting)",
-                    value=self._settings["skip_years"],
-                    min=0,
-                ).classes("w-full")
-                self._skip_years.tooltip(
-                    "Aantal jaren vóór het prognosejaar dat als testset wordt "
-                    "achtergehouden voor backtesting. 0 = geen backtest."
-                )
+                self._institutions.on_value_change(lambda _e: self._update_preview())
 
-            # Uitleg van het gekozen voorspelspoor (werkt zonder de docs te openen).
+                # ── Jaren overslaan — max afhankelijk van jarenselectie ──────
+                with ui.column().classes("w-full gap-0"):
+                    self._skip_years = ui.number(
+                        "Jaren overslaan (backtesting)",
+                        value=self._settings["skip_years"],
+                        min=0,
+                    ).classes("w-full")
+                    self._skip_years.tooltip(
+                        "Aantal jaren vóór het prognosejaar dat als testset wordt "
+                        "achtergehouden voor backtesting. 0 = geen backtest."
+                    )
+                    self._skip_hint = ui.label("").classes("text-xs opacity-60 mt-0.5")
+                    self._skip_years.on_value_change(lambda _e: self._update_preview())
+
+            # ── Dataset-hint ─────────────────────────────────────────────────
             with ui.row().classes("items-center gap-2 w-full"):
                 self._dataset_hint_icon = (
                     ui.icon("info").classes("text-sm").style(f"color: {theme.ACCENT}")
@@ -126,6 +274,7 @@ class _RunView:
                 self._dataset_hint = ui.label("").classes("text-sm opacity-80")
             self._update_dataset_hint()
 
+            # ── Checkboxen ──────────────────────────────────────────────────
             with ui.row().classes("w-full gap-6 mt-2"):
                 self._noetl = ui.checkbox(
                     "ETL overslaan (--noetl)", value=self._settings["noetl"]
@@ -143,29 +292,15 @@ class _RunView:
                 self._yes.tooltip(
                     "Aanbevolen aan: een GUI-run heeft geen interactieve invoer."
                 )
+                for cb in (self._noetl, self._dashboard, self._no_warnings, self._yes):
+                    cb.on_value_change(lambda _e: self._update_preview())
 
-        # Dataverdeling-visualisatie.
+        # ── Dataverdeling-visualisatie ────────────────────────────────────────
         with ui.card().classes("w-full pr-16"):
             section_title("Dataverdeling", "Traindata · backtest · prognose")
-            with ui.row().classes("gap-2 mt-2 mb-3"):
-                for lbl, var in [
-                    ("① Horizon", 1),
-                    ("② Jaar-chips", 2),
-                    ("③ Dashboard", 3),
-                    ("④ Nacht", 4),
-                ]:
-                    btn = ui.button(
-                        lbl,
-                        on_click=lambda _e, v=var: self._select_viz(v),
-                    ).classes("text-xs")
-                    if var == self._viz_variant:
-                        btn.props("unelevated color=accent")
-                    else:
-                        btn.props("outline color=grey-7")
-                    self._viz_btns.append(btn)
             self._viz_html = ui.html("").classes("w-full")
 
-        # Live command-preview.
+        # ── Live command-preview ──────────────────────────────────────────────
         with ui.card().classes("w-full bg-grey-2"):
             ui.label("Commando").classes("text-xs uppercase opacity-60")
             self._preview = ui.label("").classes("font-mono text-sm break-all")
@@ -181,27 +316,76 @@ class _RunView:
             self._panel = ProcessPanel()
         self._panel_container.set_visibility(False)
 
-        # Reageer op wijzigingen: preview verversen.
-        for widget in (
-            self._dataset,
-            self._cohort,
-            self._years,
-            self._weeks,
-            self._institutions,
-            self._skip_years,
-            self._noetl,
-            self._dashboard,
-            self._no_warnings,
-            self._yes,
-        ):
-            widget.on_value_change(lambda _e: self._update_preview())
+        # Initialiseer skip-hint, weeks-validatie en preview op basis van
+        # opgeslagen waarden.
+        self._on_weeks_change()
+        self._on_years_change()  # roept ook _update_preview() aan
+
+    # ── Parameterwijzigingen ──────────────────────────────────────────────────
+
+    def _on_years_change(self) -> None:
+        """Ververs skip-max, inline feedback en preview bij jarenselectie."""
+        selected = sorted(self._years.value or [])
+
+        if not selected:
+            self._years_error.set_text("Selecteer minstens één prognosejaar.")
+            self._years_error.set_visibility(True)
+            self._skip_years.props("max=0")
+            self._skip_years.set_value(0)
+            self._skip_hint.set_text("")
+        else:
+            self._years_error.set_visibility(False)
+            mx = _max_skip(min(selected))
+            # Pas de max-prop aan zodat het veld zelf ook klaagt bij overschrijding.
+            self._skip_years.props(f"max={mx}")
+            # Klem de huidige waarde als die nu buiten het geldige bereik valt.
+            cur = int(self._skip_years.value or 0)
+            if cur > mx:
+                self._skip_years.set_value(mx)
+            # Informatieve hint over het backtesting-bereik.
+            if mx == 0:
+                self._skip_hint.set_text(
+                    f"Backtest niet mogelijk — prognose {min(selected)} "
+                    f"ligt direct na traindata ({_DATA_START})."
+                )
+            else:
+                self._skip_hint.set_text(
+                    f"Max. {mx} jaar  ·  traindata {_DATA_START}–{min(selected) - 1}."
+                )
+
         self._update_preview()
+
+    def _on_weeks_change(self) -> None:
+        """Valideer weekinvoer, toon inline foutmelding en pas aanbevolen-hint aan."""
+        val = (self._weeks.value or "").strip()
+        err = _validate_weeks(val)
+        if err:
+            self._weeks_error.set_text(err)
+            self._weeks_error.set_visibility(True)
+        else:
+            self._weeks_error.set_visibility(False)
+        # Toon hint opvallender (groen) als waarde overeenkomt met aanbeveling.
+        if val == _RECOMMENDED["weeks"]:
+            self._weeks_rec_label.style(
+                f"color: {theme.ACCENT}; opacity: 0.85; font-weight: 600;"
+            )
+        else:
+            self._weeks_rec_label.style(
+                f"color: {theme.ACCENT}; opacity: 0.45;"
+            )
+        self._update_preview()
+
+    # ── Preview + visualisatie ────────────────────────────────────────────────
+
+    def _years_as_str(self) -> str:
+        """Geef de geselecteerde jaren terug als spatie-gescheiden string."""
+        return " ".join(str(y) for y in sorted(self._years.value or []))
 
     def _current_args(self) -> list[str]:
         return process.build_run_args(
             dataset=self._dataset.value,
             cohort=self._cohort.value,
-            years=self._years.value or "",
+            years=self._years_as_str(),
             weeks=self._weeks.value or "",
             institutions=list(self._institutions.value or []),
             skip_years=int(self._skip_years.value or 0),
@@ -223,31 +407,42 @@ class _RunView:
         self._preview.set_text(process.preview_command(self._current_args()))
         self._update_viz()
 
-    def _select_viz(self, variant: int) -> None:
-        """Wissel van visuele variant en herrender de tijdlijn."""
-        self._viz_variant = variant
-        for i, btn in enumerate(self._viz_btns, 1):
-            if i == variant:
-                btn.props(remove="outline")
-                btn.props("unelevated color=accent")
-            else:
-                btn.props(remove="unelevated")
-                btn.props("outline color=grey-7")
-        self._update_viz()
-
     def _update_viz(self) -> None:
-        """Herrender de dataverdeling-tijdlijn op basis van de huidige parameters."""
-        years = self._years.value or ""
         skip = int(self._skip_years.value or 0)
-        render_fns = [tvz.render_v1, tvz.render_v2, tvz.render_v3, tvz.render_v4]
-        html = render_fns[self._viz_variant - 1](years, skip)
-        self._viz_html.set_content(html)
+        self._viz_html.set_content(tvz.render_v1(self._years_as_str(), skip))
+
+    # ── Validatie ────────────────────────────────────────────────────────────
+
+    def _validate_params(self) -> list[str]:
+        """Valideer alle parameters; leeg = alles geldig."""
+        errors: list[str] = []
+
+        selected = sorted(self._years.value or [])
+        if not selected:
+            errors.append("Selecteer minstens één prognosejaar.")
+        else:
+            skip = int(self._skip_years.value or 0)
+            mx = _max_skip(min(selected))
+            if skip > mx:
+                errors.append(
+                    f"Jaren overslaan ({skip}) is te groot voor prognosejaar"
+                    f" {min(selected)}. Maximum is {mx}"
+                    f" (traindata begint in {_DATA_START})."
+                )
+
+        weeks_err = _validate_weeks(self._weeks.value or "")
+        if weeks_err:
+            errors.append(f"Weken: {weeks_err}")
+
+        return errors
+
+    # ── Persistentie ─────────────────────────────────────────────────────────
 
     def _persist(self) -> None:
         app.storage.general[_STORAGE_KEY] = {
             "dataset": self._dataset.value,
             "cohort": self._cohort.value,
-            "years": self._years.value or "",
+            "years": list(self._years.value or []),
             "weeks": self._weeks.value or "",
             "institutions": list(self._institutions.value or []),
             "skip_years": int(self._skip_years.value or 0),
@@ -257,7 +452,33 @@ class _RunView:
             "yes": self._yes.value,
         }
 
+    # ── Starten ──────────────────────────────────────────────────────────────
+
     def _confirm(self) -> None:
+        # Valideer eerst; toon foutpopup bij ongeldige invoer.
+        errors = self._validate_params()
+        if errors:
+            with ui.dialog() as err_dialog, ui.card().classes("max-w-lg w-full"):
+                with ui.row().classes("items-center gap-2 mb-2"):
+                    ui.icon("error_outline").props("color=negative size=sm")
+                    ui.label("Ongeldige parameterinvoer").classes(
+                        "text-base font-semibold"
+                    )
+                with ui.column().classes("w-full gap-2 my-1"):
+                    for msg in errors:
+                        with ui.row().classes("items-start gap-2 no-wrap"):
+                            ui.icon("chevron_right").classes(
+                                "text-sm flex-none mt-0.5"
+                            ).style(f"color: {theme.NEGATIVE}")
+                            ui.label(msg).classes("text-sm leading-snug")
+                ui.separator().classes("my-1")
+                with ui.row().classes("w-full justify-end"):
+                    ui.button("Aanpassen", on_click=err_dialog.close).props(
+                        "unelevated"
+                    )
+            err_dialog.open()
+            return
+
         command = process.preview_command(self._current_args())
         with ui.dialog() as dialog, ui.card():
             ui.label("Deze voorspelling uitvoeren?").classes("text-lg font-medium")

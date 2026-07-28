@@ -70,16 +70,24 @@ class _BenchmarkSection:
     """Draai een benchmark en toon de gesorteerde resultaattabel(len)."""
 
     def __init__(self) -> None:
-        with ui.row().classes("w-full items-end gap-4"):
+        with ui.row().classes("w-full items-end gap-4 flex-wrap"):
             self._dataset = ui.select(
                 ["Cumulatief", "Individueel"],
                 value="Cumulatief",
                 label="Dataset (voorspelspoor)",
             ).classes("w-48")
             self._dataset.tooltip(tracks.dataset_tooltip(["Cumulatief", "Individueel"]))
-            self._week = ui.number("Predict week", value=12, min=1, max=52).classes(
-                "w-40"
-            )
+            with ui.column().classes("gap-0"):
+                self._week = ui.number("Predict week", value=38, min=1, max=52).classes(
+                    "w-40"
+                )
+                with ui.row().classes("items-center gap-1 mt-0.5"):
+                    ui.icon("star").style(
+                        f"color: {theme.ACCENT}; font-size: 11px;"
+                    )
+                    ui.label("Aanbevolen: 38").classes("text-xs font-medium").style(
+                        f"color: {theme.ACCENT}; opacity: 0.8"
+                    )
             self._start = ui.button(
                 "Start benchmark", icon="play_arrow", on_click=self._run
             ).props("unelevated")
@@ -149,13 +157,21 @@ class _TuneSection:
     """Draai hyperparameter-tuning en maak de gevonden parameters kopieerbaar."""
 
     def __init__(self) -> None:
-        with ui.row().classes("w-full items-end gap-4"):
+        with ui.row().classes("w-full items-end gap-4 flex-wrap"):
             self._target = ui.select(
                 ["Regressor", "SARIMA", "Beide"], value="Regressor", label="Tune-doel"
             ).classes("w-48")
-            self._week = ui.number("Predict week", value=12, min=1, max=52).classes(
-                "w-40"
-            )
+            with ui.column().classes("gap-0"):
+                self._week = ui.number("Predict week", value=38, min=1, max=52).classes(
+                    "w-40"
+                )
+                with ui.row().classes("items-center gap-1 mt-0.5"):
+                    ui.icon("star").style(
+                        f"color: {theme.ACCENT}; font-size: 11px;"
+                    )
+                    ui.label("Aanbevolen: 38").classes("text-xs font-medium").style(
+                        f"color: {theme.ACCENT}; opacity: 0.8"
+                    )
             self._start = ui.button(
                 "Start tuning", icon="play_arrow", on_click=self._run
             ).props("unelevated")

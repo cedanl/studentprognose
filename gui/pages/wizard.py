@@ -52,11 +52,11 @@ _STATUS_VISUAL: dict[FileStatus, tuple[str, str, str]] = {
 }
 
 # Beschikbare pipeline-modi met bijbehorende metadata.
-_MODE_OPTS: list[tuple[str, str, str, str, str]] = [
-    # (key, label, icon, cli_flag, beschrijving)
-    ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden"),
-    ("individual", "Individueel", "person",    "-d individual", "Alleen aanmelddata"),
-    ("both",       "Beide",       "bolt",      "-d both",       "Telbestanden + aanmelddata"),
+# Tuple: (key, label, icon, cli_flag, beschrijving, aanbevolen)
+_MODE_OPTS: list[tuple[str, str, str, str, str, bool]] = [
+    ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden",       True),
+    ("individual", "Individueel", "person",    "-d individual", "Alleen aanmelddata",         False),
+    ("both",       "Beide",       "bolt",      "-d both",       "Telbestanden + aanmelddata", False),
 ]
 
 
@@ -713,7 +713,7 @@ class _WizardView:
 
             self._mode_cards: dict[str, ui.card] = {}
             with ui.row().classes("w-full gap-3 mb-5"):
-                for key, label, icon, cli_flag, desc in _MODE_OPTS:
+                for key, label, icon, cli_flag, desc, recommended in _MODE_OPTS:
                     with (
                         ui.card()
                         .classes("flex-1 cursor-pointer")
@@ -727,6 +727,10 @@ class _WizardView:
                             ui.label(label).classes("font-medium text-sm")
                             ui.label(cli_flag).classes("text-xs font-mono opacity-40")
                             ui.label(desc).classes("text-xs opacity-60")
+                            if recommended:
+                                ui.badge("★ Aanbevolen").props(
+                                    "color=accent outline"
+                                ).classes("text-xs mt-1")
                     self._mode_cards[key] = card
 
             # ── Upload-zones ───────────────────────────────────────────────
@@ -746,7 +750,8 @@ class _WizardView:
                 )
                 self._coverage_slot = ui.column().classes("w-full")
 
-            ui.space().classes("h-3")
+            # Ruimte tussen tel en ind: alleen zichtbaar als beide secties actief zijn.
+            self._space_tel_ind = ui.space().classes("h-3")
 
             self._ind_wrapper = ui.column().classes("w-full")
             with self._ind_wrapper:
@@ -846,6 +851,8 @@ class _WizardView:
 
     def _apply_mode(self) -> None:
         """Pas kaartrand, zichtbaarheid van zones en badge-teksten aan."""
+        STATE.wizard_mode = self._mode
+
         for key, card in self._mode_cards.items():
             if key == self._mode:
                 card.style(
@@ -860,6 +867,8 @@ class _WizardView:
 
         self._tel_wrapper.set_visibility(needs_tel)
         self._ind_wrapper.set_visibility(needs_ind)
+        # Tussenruimte alleen tonen als beide secties zichtbaar zijn.
+        self._space_tel_ind.set_visibility(needs_tel and needs_ind)
 
         self._refresh_summary()
         self._refresh_overlap()

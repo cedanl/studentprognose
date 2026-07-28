@@ -19,9 +19,13 @@ class AppState:
         project_dir: Absolute werkmap van het gekozen project (de map waarin
             ``studentprognose init`` de structuur heeft aangemaakt). ``None`` tot
             de gebruiker een project kiest of aanmaakt.
+        wizard_mode: Modus gekozen in wizard-stap 4 (``"cumulative"``,
+            ``"individual"`` of ``"both"``). ``None`` als de wizard nog niet
+            doorlopen is. Wordt door de run-pagina als standaardwaarde gebruikt.
     """
 
     project_dir: str | None = None
+    wizard_mode: str | None = None
 
     # --- Afgeleide paden (relatief aan project_dir) ----------------------------
 

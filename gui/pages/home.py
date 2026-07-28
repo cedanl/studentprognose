@@ -1,9 +1,9 @@
 """Startpagina van de GUI.
 
-Referentie-implementatie van het design system (#272): welkomst, projectstatus
-en — bij een leeg project — een leegsituatie met call-to-action naar de eerste
-wizard-stap. Biedt daarnaast een één-klik demo (#274) die de volledige flow
-automatisch met demodata uitvoert in een tijdelijke, willekeurig genoemde map.
+Toont voor nieuwe gebruikers de zakelijke meerwaarde van instroom-prognoses
+en de drie voorspelsporen; voor terugkerende gebruikers een projectdashboard
+met snelkoppelingen. Bevat ook een één-klik demo die de volledige flow
+automatisch met demodata uitvoert in een tijdelijke map.
 """
 
 from __future__ import annotations
@@ -26,8 +26,7 @@ _DEMO_YEAR = "2024"
 _DEMO_WEEK = "6"
 
 #: De demo scopt bewust op een subset (Master + Niet-EER) zodat de volledige
-#: pipeline in seconden klaar is in plaats van minuten — snappy én het houdt de
-#: verbinding levend (geen client-reconnect halverwege een lange run).
+#: pipeline in seconden klaar is in plaats van minuten.
 _DEMO_FILTERING = {
     "filtering": {"programme": [], "herkomst": ["Niet-EER"], "examentype": ["Master"]}
 }
@@ -36,6 +35,38 @@ _ACTION_CARDS = [
     ("tune", "Configuratie", "/config", "Model- en pipelineparameters"),
     ("play_circle", "Uitvoeren", "/run", "Voorspelling draaien"),
     ("insights", "Resultaten", "/output", "Bekijk de laatste uitvoer"),
+]
+
+#: Vijf concrete toepassingen van instroom-prognoses — op volgorde van
+#: herkenbaarheid voor een beleidsmaker.
+_USE_CASES: list[tuple[str, str, str]] = [
+    (
+        "account_balance",
+        "Begroting",
+        "Weet al in februari wat september brengt — stuur begrotingsposten bij "
+        "terwijl het nog kan.",
+    ),
+    (
+        "groups",
+        "Personeel",
+        "Plan docenten en lokalen tijdig — geen noodconstructies in augustus.",
+    ),
+    (
+        "lock",
+        "Numerus fixus",
+        "Zet selectiegrenzen op data — geen gissen naar omzettingspercentages.",
+    ),
+    (
+        "campaign",
+        "Werving",
+        "Zie mid-seizoen of een opleiding achterblijft en stuur campagne bij.",
+    ),
+    (
+        "trending_up",
+        "Strategie",
+        "Groeit een opleiding structureel of is het een tijdelijke piek? "
+        "De meerjarentrend vertelt het.",
+    ),
 ]
 
 
@@ -84,7 +115,7 @@ def create() -> None:
 
 
 class _HomeView:
-    """Beheert de startpagina: intro/CTA's en de één-klik demo-uitvoering."""
+    """Beheert de startpagina: waardepropositie, intro/CTA's en de één-klik demo."""
 
     def __init__(self) -> None:
         self._container = ui.column().classes("w-full gap-4")
@@ -96,28 +127,106 @@ class _HomeView:
         with self._container:
             if STATE.is_initialised:
                 self._render_dashboard()
+                self._render_value_proposition(compact=True)
             else:
                 with ui.row().classes("items-center gap-2"):
                     ui.icon("info").style(f"color: {theme.ACCENT}")
                     ui.label(
-                        "Nieuw hier? Begin met 'Project opzetten' of probeer eerst de demo."
+                        "Nieuw hier? Bekijk wat je ermee kunt of probeer direct de demo."
                     ).classes("text-sm opacity-70")
+                self._render_value_proposition(compact=False)
                 self._render_tracks_explainer()
                 self._render_cta()
+
+    # ── Waardepropositie ──────────────────────────────────────────────────────
+
+    def _render_value_proposition(self, *, compact: bool = False) -> None:
+        """Toon de vijf zakelijke toepassingen van instroom-prognoses.
+
+        Args:
+            compact: Ingeklapte variant voor terugkerende gebruikers die de
+                informatie al kennen.
+        """
+        if compact:
+            with ui.card().classes("w-full").style(
+                f"border: 1px solid {theme.ACCENT}25;"
+                f"background: {theme.ACCENT}05;"
+            ):
+                with ui.expansion(
+                    "Waarvoor gebruik je instroom-prognoses?",
+                    icon="lightbulb",
+                ).props("dense").classes("w-full"):
+                    ui.space().classes("h-1")
+                    self._render_use_cases()
+            return
+
+        # Prominente variant voor nieuwe gebruikers.
+        with ui.card().classes("w-full").style(
+            f"border-left: 4px solid {theme.ACCENT};"
+            f"background: {theme.ACCENT}06;"
+        ):
+            with ui.row().classes("items-center gap-2 mb-1"):
+                ui.icon("lightbulb").classes("text-xl").style(
+                    f"color: {theme.ACCENT}"
+                )
+                ui.label("Waarvoor gebruik je een instroom-prognose?").classes(
+                    "text-lg font-medium"
+                )
+            ui.label(
+                "Studielink-aanmeldingen omzetten naar beslissingsklare prognoses "
+                "— maanden vóór 1 september."
+            ).classes("text-sm opacity-60 mb-3")
+
+            self._render_use_cases()
+
+            ui.separator().classes("mt-3 mb-2")
+            with ui.row().classes("items-center justify-between w-full flex-wrap gap-2"):
+                with ui.column().classes("gap-0"):
+                    ui.label(
+                        "Zonder prognose: beslissing in juni op gevoel."
+                    ).classes("text-xs opacity-50")
+                    ui.label(
+                        "Met prognose: beslissing in maart op data."
+                    ).classes("text-xs font-semibold").style(
+                        f"color: {theme.ACCENT}"
+                    )
+                ui.button(
+                    "Meer over het model",
+                    icon="schema",
+                    on_click=lambda: ui.navigate.to("/methodologie"),
+                ).props("flat dense color=accent")
+
+    def _render_use_cases(self) -> None:
+        """Render de vijf use-case-rijen (gedeeld tussen compact en volledig)."""
+        for icon, title, desc in _USE_CASES:
+            with ui.row().classes("items-start gap-3 no-wrap py-1.5"):
+                with ui.element("div").style(
+                    f"width:34px;height:34px;border-radius:8px;"
+                    f"background:{theme.ACCENT}18;"
+                    "display:flex;align-items:center;justify-content:center;"
+                    "flex-shrink:0;margin-top:2px"
+                ):
+                    ui.icon(icon).classes("text-base").style(
+                        f"color: {theme.ACCENT}"
+                    )
+                with ui.column().classes("gap-0"):
+                    ui.label(title).classes("font-semibold text-sm")
+                    ui.label(desc).classes("text-sm leading-snug").style(
+                        "color: #666;"
+                    )
 
     # ── Dashboard (terugkerende gebruiker) ────────────────────────────────────
 
     def _render_dashboard(self) -> None:
-        """Projectdashboard: name, snelkoppelingen en CTA."""
+        """Projectdashboard: naam, snelkoppelingen en CTA."""
         project_name = os.path.basename(STATE.project_dir or "")
 
-        # Project-statuskaart
         with ui.card().classes("w-full"):
             with ui.row().classes("items-center gap-4 no-wrap w-full"):
                 with ui.element("div").style(
                     f"width:52px;height:52px;border-radius:12px;"
                     f"background:{theme.ACCENT}1a;"
-                    f"display:flex;align-items:center;justify-content:center;flex-shrink:0"
+                    "display:flex;align-items:center;justify-content:center;flex-shrink:0"
                 ):
                     ui.icon("folder_open").classes("text-3xl").style(
                         f"color:{theme.ACCENT}"
@@ -126,14 +235,12 @@ class _HomeView:
                     ui.label(project_name).classes("text-xl font-bold")
                 status_badge("ready")
 
-        # Prominente CTA — direct naar de pipeline
         ui.button(
             "Ga naar Uitvoeren",
             icon="play_arrow",
             on_click=lambda: ui.navigate.to("/run"),
         ).props("unelevated")
 
-        # Snelkoppelingen
         with ui.row().classes("w-full gap-3"):
             for icon, label, route, desc in _ACTION_CARDS:
                 with ui.card().classes("flex-1 sp-action-card") as card:
@@ -144,7 +251,7 @@ class _HomeView:
                         with ui.element("div").style(
                             f"width:48px;height:48px;border-radius:50%;"
                             f"background:{theme.ACCENT}18;"
-                            f"display:flex;align-items:center;justify-content:center"
+                            "display:flex;align-items:center;justify-content:center"
                         ):
                             ui.icon(icon).classes("text-2xl").style(
                                 f"color:{theme.ACCENT}"
@@ -152,20 +259,20 @@ class _HomeView:
                         ui.label(label).classes("font-semibold text-sm")
                         ui.label(desc).classes("text-xs opacity-60")
 
-    # ── Tracks-uitleg ─────────────────────────────────────────────────────────
+    # ── Tracks-uitleg (voor analisten) ────────────────────────────────────────
 
     def _render_tracks_explainer(self) -> None:
-        """Leg de drie voorspelsporen uit; knop leidt naar het schema (methodologie)."""
+        """Leg de drie voorspelsporen technisch uit — relevant voor analisten."""
         with ui.card().classes("w-full"):
             with ui.row().classes("items-center gap-2"):
-                ui.icon("alt_route").classes("text-xl").style(f"color: {theme.ACCENT}")
-                ui.label("Hoe werkt het? — drie voorspelsporen").classes(
-                    "text-lg font-medium"
+                ui.icon("alt_route").classes("text-xl").style(
+                    f"color: {theme.ACCENT}"
                 )
+                ui.label("Hoe werkt het model?").classes("text-lg font-medium")
             ui.label(
-                "De tool voorspelt studentinstroom via drie sporen. Kies er één "
-                "bij Uitvoeren:"
-            ).classes("text-sm opacity-70")
+                "Voor analisten: de tool combineert drie modelsporen tot één "
+                "ensemble-prognose. Kies je spoor bij Uitvoeren."
+            ).classes("text-sm opacity-70 mb-1")
             for t in tracks.TRACKS:
                 with ui.row().classes("items-start gap-3 no-wrap w-full"):
                     ui.icon(t.icon).classes("text-xl mt-1").style(
@@ -178,8 +285,8 @@ class _HomeView:
                                 ui.badge("aanbevolen", color="accent").props("outline")
                         ui.label(t.short).classes("text-sm opacity-70")
             ui.button(
-                "Methodologie",
-                icon="schema",
+                "Uitgebreide methodologie",
+                icon="open_in_new",
                 on_click=lambda: ui.navigate.to("/methodologie"),
             ).props("outline color=accent").classes("mt-1")
 
@@ -189,10 +296,10 @@ class _HomeView:
         with ui.card().classes("w-full"):
             with ui.column().classes("w-full items-center text-center gap-3 py-12"):
                 ui.icon("rocket_launch").classes("text-6xl opacity-40")
-                ui.label("Eigen project opzetten").classes("text-xl font-medium")
+                ui.label("Klaar om te starten?").classes("text-xl font-medium")
                 ui.label(
-                    "Werk je met je eigen data? Zet een projectmap op "
-                    "met configuratie en de juiste mappenstructuur."
+                    "Zet een projectmap op met jouw Studielink-data en "
+                    "draai je eerste prognose."
                 ).classes("text-sm opacity-70 max-w-md")
                 ui.button(
                     "Project opzetten",
@@ -215,7 +322,6 @@ class _HomeView:
         self._container.clear()
         with self._container:
             with ui.card().classes("w-full"):
-                # Header
                 with ui.row().classes("items-center gap-3 no-wrap mb-3"):
                     with ui.element("div").style(
                         f"width:44px;height:44px;border-radius:10px;"
@@ -233,13 +339,11 @@ class _HomeView:
 
                 ui.separator().classes("my-1")
 
-                # Stappen
                 self._steps = ui.column().classes("w-full gap-2 my-2")
                 self._progress = ui.linear_progress(value=0.0, show_value=False)
                 self._progress.set_visibility(False)
                 self._pipeline_progress = ProgressCard()
 
-                # Terminal output ingeklapt — analisten hoeven de rauwe log niet te zien
                 with ui.expansion("Uitvoerlog", icon="terminal").props(
                     "dense"
                 ).classes("w-full mt-2"):
@@ -248,22 +352,18 @@ class _HomeView:
                 self._error = ui.column().classes("w-full")
 
         try:
-            # 1. init
             self._step("Projectmap aanmaken…")
             if await panel.run(["init"], cwd=project_dir) != 0:
                 return
 
-            # Scope de filtering zodat de demo snel klaar is (subset).
             filtering_io.save_filtering(
                 os.path.join(project_dir, "configuration", "filtering", "base.json"),
                 _DEMO_FILTERING,
             )
 
-            # 2. demodata
             self._step("Demodata downloaden…")
             await self._download_demodata(project_dir)
 
-            # 3. pipeline — start voortgangsbalk
             self._step("Voorspelling draaien (cumulatief spoor)…")
             self._pipeline_progress.start()
             rc = await panel.run(
@@ -272,7 +372,7 @@ class _HomeView:
                 on_line=self._pipeline_progress.on_line,
             )
             self._pipeline_progress.complete(success=rc == 0)
-        except Exception as exc:  # noqa: BLE001 — nette melding i.p.v. crash
+        except Exception as exc:  # noqa: BLE001
             with self._error:
                 error_banner("De demo kon niet worden voltooid.", f"Details: {exc}")
             return
@@ -281,7 +381,6 @@ class _HomeView:
             self._on_demo_done()
 
     def _on_demo_done(self) -> None:
-        """Toon het succesresultaat met een resultatenknop + auto-navigatie."""
         self._step("Klaar!", done=True)
         with self._steps:
             ui.button(
