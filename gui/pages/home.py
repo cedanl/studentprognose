@@ -205,7 +205,7 @@ class _HomeView:
 
     def _render_use_cases(self) -> None:
         """Render de vijf use-cases als compacte icon-chips met hover-tooltip."""
-        with ui.row().classes("gap-2 flex-wrap my-1"):
+        with ui.row().classes("gap-2 flex-wrap my-1 justify-center"):
             for icon, title, desc in _USE_CASES:
                 with ui.element("div").classes("sp-use-chip"):
                     ui.tooltip(desc).style(
