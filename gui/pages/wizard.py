@@ -609,7 +609,6 @@ class _WizardView:
             self._build_step1()
             self._build_step2()
             self._build_step3()
-            self._build_step4()
 
     # ── Stap 1: map kiezen ──────────────────────────────────────────────────
 
@@ -631,34 +630,17 @@ class _WizardView:
                     on_click=lambda: self._picker.open(self._path_input.value),
                 ).props("outline")
             with ui.stepper_navigation():
-                ui.button("Volgende", on_click=self._goto_confirm)
+                ui.button("Volgende", on_click=self._goto_create)
 
-    # ── Stap 2: bevestigen ──────────────────────────────────────────────────
+    # ── Stap 2: aanmaken ────────────────────────────────────────────────────
 
     def _build_step2(self) -> None:
-        with ui.step("Bevestigen"):
-            self._conflict_slot = ui.column().classes("w-full")
-            ui.label("De volgende structuur wordt aangemaakt:").classes("text-sm opacity-70")
-            self._confirm_path = ui.label().classes("text-sm font-mono")
-            with ui.column().classes("gap-0 ml-2"):
-                for d in _CREATED_DIRS:
-                    with ui.row().classes("items-center gap-1"):
-                        ui.icon("folder").classes("text-amber-8 text-sm")
-                        ui.label(d).classes("text-sm font-mono")
-                with ui.row().classes("items-center gap-1"):
-                    ui.icon("description").classes("opacity-60 text-sm")
-                    ui.label("configuration/configuration.json").classes("text-sm font-mono")
-            with ui.stepper_navigation():
-                ui.button("Terug", on_click=self._stepper.previous).props("flat")
-                ui.button("Volgende", on_click=self._stepper.next)
-
-    # ── Stap 3: aanmaken ────────────────────────────────────────────────────
-
-    def _build_step3(self) -> None:
         with ui.step("Aanmaken"):
+            self._conflict_slot = ui.column().classes("w-full")
+            self._confirm_path = ui.label().classes("text-sm font-mono opacity-60 mb-2")
             with ui.row().classes("items-center gap-4 flex-wrap"):
                 self._demo_checkbox = ui.checkbox(
-                    "Demodata downloaden (≈4 MB, om het model direct te proberen)",
+                    "Demo Studielink-data downloaden (≈4 MB)",
                     value=False,
                 )
                 # Vertikale scheidingslijn
@@ -700,9 +682,9 @@ class _WizardView:
                 )
             self._create_feedback = ui.column().classes("mt-2 w-full")
 
-    # ── Stap 4: modus kiezen + data uploaden ────────────────────────────────
+    # ── Stap 3: modus kiezen + data uploaden ────────────────────────────────
 
-    def _build_step4(self) -> None:
+    def _build_step3(self) -> None:
         with ui.step("Data uploaden"):
 
             # ── Modus-selectie ─────────────────────────────────────────────
@@ -944,7 +926,7 @@ class _WizardView:
 
     # ── Stap-overgangen ─────────────────────────────────────────────────────
 
-    def _goto_confirm(self) -> None:
+    def _goto_create(self) -> None:
         self._project_dir = os.path.abspath(self._path_input.value.strip())
         self._confirm_path.set_text(self._project_dir)
 
@@ -972,6 +954,20 @@ class _WizardView:
         try:
             os.makedirs(self._project_dir, exist_ok=True)
             returncode = await self._panel.run(["init"], cwd=self._project_dir)
+
+            if returncode == 0:
+                with self._create_feedback:
+                    with ui.row().classes("items-center gap-2 mb-1"):
+                        ui.icon("check_circle").style(f"color: {theme.POSITIVE}").classes("text-base")
+                        ui.label("Projectmap aangemaakt").classes("text-sm font-medium").style(f"color: {theme.POSITIVE}")
+                    with ui.column().classes("gap-0 ml-6"):
+                        for d in _CREATED_DIRS:
+                            with ui.row().classes("items-center gap-1"):
+                                ui.icon("folder").classes("text-amber-8 text-sm")
+                                ui.label(d).classes("text-xs font-mono opacity-60")
+                        with ui.row().classes("items-center gap-1"):
+                            ui.icon("description").classes("opacity-40 text-sm")
+                            ui.label("configuration/configuration.json").classes("text-xs font-mono opacity-60")
 
             if returncode == 0 and self._demo_checkbox.value:
                 await self._download_demodata()
