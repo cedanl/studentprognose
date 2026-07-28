@@ -754,7 +754,7 @@ class _WizardView:
 
             self._zone_okt = _UploadZone(
                 title="Oktober-bestand",
-                description="Excel-bestand met studentaantallen — labels voor het model.",
+                description="Werkelijke inschrijvingen per opleiding, peildatum 1 oktober.",
                 hint="Wordt opgeslagen als: oktober_bestand.xlsx",
                 icon="calendar_month",
                 required=True,
