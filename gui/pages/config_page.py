@@ -7,8 +7,11 @@ JSON:        directe bewerking voor experts.
 
 from __future__ import annotations
 
+import csv
 import datetime
+import glob
 import json
+import os
 
 from nicegui import ui
 
@@ -16,6 +19,25 @@ from gui import config_io, nav, theme
 from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
 from gui.state import STATE
+
+
+def _load_brincodes(project_dir: str) -> list[str]:
+    """Lees unieke Brincodes uit de telbestanden van het project, gesorteerd."""
+    tel_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
+    codes: set[str] = set()
+    for path in glob.glob(os.path.join(tel_dir, "*.csv")):
+        try:
+            with open(path, newline="", encoding="utf-8") as fh:
+                reader = csv.DictReader(fh)
+                if "Brincode" not in (reader.fieldnames or []):
+                    continue
+                for row in reader:
+                    code = row.get("Brincode", "").strip()
+                    if code:
+                        codes.add(code)
+        except Exception:
+            continue
+    return sorted(codes)
 
 HELP = {
     "cumulative_timeseries": (
@@ -198,6 +220,11 @@ class _ConfigView:
 
     def _institution_card(self) -> None:
         current = self._config.setdefault("institution_filter", [])
+        available = _load_brincodes(STATE.project_dir or "")
+        # Zorg dat codes die al in config staan maar niet in de telbestanden zitten
+        # toch als optie beschikbaar zijn zodat de chip blijft staan.
+        options = sorted(set(available) | set(current))
+        has_data = bool(available)
 
         with ui.card().classes("w-full mb-4"):
             with ui.row().classes("items-start gap-4 no-wrap"):
@@ -210,18 +237,25 @@ class _ConfigView:
                         ui.label("Jouw instelling").classes("text-base font-medium")
                         ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
                     ui.label(
-                        "Welke instelling(en) analyseer je? Typ een Brincode of korte naam "
-                        "en druk op Enter om toe te voegen. Leeg = alle instellingen."
+                        "Selecteer één of meer Brincodes uit jouw telbestanden. "
+                        "Leeg = alle instellingen in de data."
+                        if has_data else
+                        "Typ een Brincode (bijv. 28DN) en druk op Enter. "
+                        "Upload eerst telbestanden om de lijst automatisch te vullen."
                     ).classes("text-sm opacity-60 mt-1")
 
                     self._inst_select = (
                         ui.select(
-                            options=list(current),
+                            options=options,
                             value=list(current),
                             multiple=True,
-                            label="Instelling(en) — bijv. UvA, HvA, 28DN",
+                            label=(
+                                f"{len(available)} Brincodes gevonden in telbestanden"
+                                if has_data else
+                                "Instelling(en) — bijv. 28DN, 21PB"
+                            ),
                         )
-                        .props("use-chips new-value-mode=add-unique hide-dropdown-icon outlined")
+                        .props("use-chips new-value-mode=add-unique outlined use-input input-debounce=0")
                         .classes("w-full mt-2")
                     )
                     self._inst_select.on_value_change(self._on_institution_change)
