@@ -80,3 +80,20 @@ def all_items() -> list[NavItem]:
 def is_concept(route: str) -> bool:
     """True als de route een concept-feature is."""
     return any(c.route == route for c in CONCEPTS)
+
+
+# Routes die buiten de lineaire wizard-flow terugwijzen naar een vaste pagina.
+_PREV_OVERRIDE: dict[str, str] = {
+    "/benchmark": "/output",
+}
+
+
+def previous_route(active: str) -> str | None:
+    """Return de vorige route voor de gegeven actieve pagina, of None als er geen is."""
+    if active in _PREV_OVERRIDE:
+        return _PREV_OVERRIDE[active]
+    all_routes = [HOME, *WIZARD_FLOW]
+    for i, item in enumerate(all_routes):
+        if item.route == active and i > 0:
+            return all_routes[i - 1].route
+    return None

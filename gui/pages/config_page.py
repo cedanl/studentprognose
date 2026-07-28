@@ -21,6 +21,57 @@ from gui.components.states import empty_state, error_banner, section_title
 from gui.state import STATE
 
 
+def _detect_overlap_years(project_dir: str) -> list[int] | None:
+    """Detecteer jaren waarvoor zowel telbestanden als oktoberbestand aanwezig zijn.
+
+    Leest alleen bestandsnamen voor telbestanden en uitsluitend de Collegejaar-kolom
+    voor het oktoberbestand, zodat dit snel blijft.
+    Geeft None terug als er onvoldoende data aanwezig is.
+    """
+    from studentprognose.utils.telbestand_filenames import (
+        compile_patterns,
+        match_telbestand,
+    )
+
+    tel_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
+    tel_years: set[int] = set()
+    if os.path.isdir(tel_dir):
+        try:
+            patterns = compile_patterns(None)
+            for fname in os.listdir(tel_dir):
+                m = match_telbestand(fname, patterns)
+                if m:
+                    try:
+                        tel_years.add(int(m.group("year")))
+                    except (ValueError, IndexError):
+                        pass
+        except Exception:
+            pass
+
+    okt_path = os.path.join(project_dir, "data", "input_raw", "oktober_bestand.xlsx")
+    okt_years: set[int] = set()
+    if os.path.isfile(okt_path):
+        try:
+            import pandas as pd
+
+            today = datetime.date.today()
+            valid_lo, valid_hi = today.year - 20, today.year + 2
+            df = pd.read_excel(okt_path, usecols=["Collegejaar"], engine="openpyxl")
+            for raw in pd.to_numeric(df["Collegejaar"], errors="coerce").dropna().unique():
+                y = int(raw)
+                if valid_lo <= y <= valid_hi:
+                    okt_years.add(y)
+        except Exception:
+            pass
+
+    if not tel_years and not okt_years:
+        return None
+    if tel_years and okt_years:
+        overlap = sorted(tel_years & okt_years)
+        return overlap if overlap else sorted(tel_years)
+    return sorted(tel_years or okt_years)
+
+
 def _load_brincodes(project_dir: str) -> list[str]:
     """Lees unieke Brincodes uit de telbestanden van het project, gesorteerd."""
     tel_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
@@ -328,8 +379,18 @@ class _ConfigView:
         mc = self._config.setdefault("model_config", {})
         _REC_YEAR = 2022
         _THIS_YEAR = datetime.date.today().year
-        _SLIDER_MAX = _THIS_YEAR - 1  # minstens 1 prognose-jaar nodig
-        current_val = mc.get("min_training_year", _REC_YEAR)
+        _SLIDER_MAX = _THIS_YEAR - 1
+
+        # Bepaal het databereik op basis van aanwezige bestanden.
+        try:
+            project_dir = os.path.dirname(os.path.dirname(self._path))
+            overlap_years = _detect_overlap_years(project_dir)
+        except Exception:
+            overlap_years = None
+        _SLIDER_MIN = min(overlap_years) if overlap_years else 2010
+
+        current_val = int(mc.get("min_training_year", _REC_YEAR))
+        current_val = max(_SLIDER_MIN, min(current_val, _SLIDER_MAX))
 
         def years_back(yr: int) -> int:
             return max(0, _THIS_YEAR - yr)
@@ -354,18 +415,28 @@ class _ConfigView:
                         "huidige situatie minder goed."
                     ).classes("text-sm opacity-60 mt-1")
 
+                    if overlap_years:
+                        with ui.row().classes("items-center gap-1.5 mt-2"):
+                            ui.icon("folder_open").style(
+                                f"color: {theme.INFO}; font-size: 14px;"
+                            )
+                            ui.label(
+                                f"Beschikbare data: {min(overlap_years)}–{max(overlap_years)}"
+                                " (telbestanden ∩ oktoberbestand)"
+                            ).classes("text-xs").style(f"color: {theme.INFO}")
+
                     with ui.row().classes("items-center gap-4 mt-3 w-full"):
                         self._year_lbl = ui.label(
                             f"Vanaf {current_val} · {years_back(current_val)} jaar data"
                         ).classes("text-sm font-medium shrink-0 w-52")
                         yr_slider = ui.slider(
-                            min=2010, max=_SLIDER_MAX, step=1, value=current_val
+                            min=_SLIDER_MIN, max=_SLIDER_MAX, step=1, value=current_val
                         ).props("label-always").classes("grow")
 
                     with ui.row().classes("justify-between w-full -mt-1"):
-                        ui.label(f"2010 ({years_back(2010)} jaar)").classes(
-                            "text-xs opacity-40"
-                        )
+                        ui.label(
+                            f"{_SLIDER_MIN} ({years_back(_SLIDER_MIN)} jaar)"
+                        ).classes("text-xs opacity-40")
                         with ui.row().classes("items-center gap-1"):
                             ui.icon("star").style(
                                 f"color: {theme.ACCENT}; font-size: 11px;"

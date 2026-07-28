@@ -243,6 +243,14 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
     _drawer(active)
 
     with ui.column().classes("w-full max-w-5xl mx-auto p-6 gap-4"):
+        prev = nav.previous_route(active)
+        if prev:
+            with ui.row().classes("items-center -ml-2 -mt-2"):
+                ui.button(
+                    "Terug",
+                    icon="arrow_back",
+                    on_click=lambda r=prev: ui.navigate.to(r),
+                ).props("flat dense color=grey-7").classes("text-sm")
         if show_stepper:
             _stepper(active)
         yield
