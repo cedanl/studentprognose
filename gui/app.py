@@ -40,6 +40,7 @@ def _register_pages() -> None:
         peer_benchmark,
         run,
         scenarios,
+        uxflow,
         wizard,
     )
 
@@ -51,6 +52,8 @@ def _register_pages() -> None:
     output.create()
     benchmark.create()
     methodology.create()
+    # UX Flow
+    uxflow.create()
     # Concept-features
     concept_hub.create()
     scenarios.create()

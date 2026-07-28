@@ -108,8 +108,8 @@ def create() -> None:
         with page_shell(active="/", title="Start", show_stepper=False):
             ui.label("Studentprognose").classes("text-3xl font-bold")
             ui.label(
-                "Grafische interface rond de studentprognose-pipeline. "
-                "Zet een project op, stel de configuratie in en draai voorspellingen."
+                "Voorspel eerstejaars instroom met Studielink-aanmeldingen "
+                "— maanden vóór 1 september."
             ).classes("text-base opacity-70")
             _HomeView()
 
@@ -129,14 +129,9 @@ class _HomeView:
                 self._render_dashboard()
                 self._render_value_proposition(compact=True)
             else:
-                with ui.row().classes("items-center gap-2"):
-                    ui.icon("info").style(f"color: {theme.ACCENT}")
-                    ui.label(
-                        "Nieuw hier? Bekijk wat je ermee kunt of probeer direct de demo."
-                    ).classes("text-sm opacity-70")
                 self._render_value_proposition(compact=False)
-                self._render_tracks_explainer()
                 self._render_cta()
+                self._render_tracks_explainer()
 
     # ── Waardepropositie ──────────────────────────────────────────────────────
 
@@ -180,21 +175,15 @@ class _HomeView:
             self._render_use_cases()
 
             ui.separator().classes("mt-3 mb-2")
-            with ui.row().classes("items-center justify-between w-full flex-wrap gap-2"):
-                with ui.column().classes("gap-0"):
-                    ui.label(
-                        "Zonder prognose: beslissing in juni op gevoel."
-                    ).classes("text-xs opacity-50")
-                    ui.label(
-                        "Met prognose: beslissing in maart op data."
-                    ).classes("text-xs font-semibold").style(
-                        f"color: {theme.ACCENT}"
-                    )
-                ui.button(
-                    "Meer over het model",
-                    icon="schema",
-                    on_click=lambda: ui.navigate.to("/methodologie"),
-                ).props("flat dense color=accent")
+            with ui.column().classes("gap-0"):
+                ui.label(
+                    "Zonder prognose: beslissing in juni op gevoel."
+                ).classes("text-xs opacity-50")
+                ui.label(
+                    "Met prognose: beslissing in maart op data."
+                ).classes("text-xs font-semibold").style(
+                    f"color: {theme.ACCENT}"
+                )
 
     def _render_use_cases(self) -> None:
         """Render de vijf use-case-rijen (gedeeld tussen compact en volledig)."""
