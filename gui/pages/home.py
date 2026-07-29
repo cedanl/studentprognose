@@ -114,6 +114,7 @@ def create() -> None:
     display: flex;
     flex-direction: column;
     align-items: center;
+    justify-content: center;
     gap: 4px;
     min-width: 76px;
     text-align: center;
