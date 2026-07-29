@@ -12,6 +12,7 @@ from nicegui import ui
 from gui import nav, theme, viz
 from gui.components.layout import page_shell
 from gui.components.states import section_title
+from gui.pages.home import _USE_CASES
 
 
 def create() -> None:
@@ -20,7 +21,38 @@ def create() -> None:
 
     @ui.page("/methodologie")
     def methodology_page() -> None:
+        A = theme.ACCENT
         with page_shell(active="/methodologie", title="Methodologie", show_stepper=False):
+
+            # ── Waarvoor gebruik je instroom-prognoses? ───────────────────────
+            section_title(
+                "Waarvoor gebruik je instroom-prognoses?",
+                "Acht concrete toepassingen voor data-analisten en beleidsmakers.",
+            )
+            with ui.card().classes("w-full"):
+                with ui.column().classes("w-full gap-0"):
+                    for i, (icon, title, desc) in enumerate(_USE_CASES):
+                        sep = i < len(_USE_CASES) - 1
+                        with ui.element("div").style(
+                            f"padding: 12px 16px;"
+                            + ("border-bottom: 1px solid #f3f3f3;" if sep else "")
+                        ):
+                            with ui.row().classes("items-start gap-3 no-wrap"):
+                                with ui.element("div").style(
+                                    f"width:34px;height:34px;border-radius:8px;"
+                                    f"background:{A}12;display:flex;"
+                                    "align-items:center;justify-content:center;flex-shrink:0;"
+                                ):
+                                    ui.icon(icon).classes("text-lg").style(
+                                        f"color:{A}"
+                                    )
+                                with ui.column().classes("gap-0"):
+                                    ui.label(title).classes("text-sm font-semibold")
+                                    ui.label(desc).classes(
+                                        "text-xs leading-relaxed"
+                                    ).style("color:#666;")
+
+            # ── Drie voorspelsporen ───────────────────────────────────────────
             section_title(
                 "Methodologie — drie voorspelsporen",
                 "Zo voorspelt de tool studentinstroom. Hover over een spoor voor "
