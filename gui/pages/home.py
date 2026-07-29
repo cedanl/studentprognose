@@ -182,6 +182,18 @@ class _HomeView:
         ):
             with ui.column().classes("w-full items-center text-center gap-3 py-1"):
 
+                # Pill-badge
+                ui.html(
+                    f'<div style="display:inline-flex;align-items:center;gap:5px;'
+                    f'padding:4px 13px;border-radius:20px;font-size:11px;font-weight:600;'
+                    f'letter-spacing:0.055em;text-transform:uppercase;'
+                    f'background:{A}12;color:{A};border:1px solid {A}28;">'
+                    f'<span class="material-icons" style="font-size:13px;line-height:1;'
+                    f'vertical-align:text-bottom;">lightbulb</span>'
+                    f'&thinsp;Instroom-prognose'
+                    f'</div>'
+                )
+
                 # Headline + subtitel
                 ui.label("Weet in maart wat september brengt").classes(
                     "text-2xl font-bold"
@@ -195,6 +207,42 @@ class _HomeView:
 
                 # Use-case chips
                 self._render_use_cases()
+
+                ui.separator().classes("opacity-10 my-1").style("width:60%;")
+
+                # Voor/na-vergelijking — twee visuele kaartjes
+                ui.html(f"""
+                <div style="display:flex;align-items:center;gap:10px;
+                     max-width:380px;margin:4px auto 0;width:100%;">
+                  <div style="flex:1;padding:18px 20px;border-radius:14px;
+                       background:rgba(0,0,0,0.025);border:1px solid rgba(0,0,0,0.08);
+                       text-align:center;">
+                    <div style="display:inline-flex;align-items:center;justify-content:center;
+                         width:22px;height:22px;border-radius:50%;
+                         background:rgba(0,0,0,0.06);margin-bottom:10px;">
+                      <span class="material-icons" style="font-size:13px;color:#c0c0c0;">close</span>
+                    </div>
+                    <div style="font-size:30px;font-weight:800;color:#d8d8d8;
+                         line-height:1;margin-bottom:6px;letter-spacing:-0.5px;">Juni</div>
+                    <div style="font-size:11px;color:#c0c0c0;font-style:italic;">op gevoel</div>
+                  </div>
+                  <div style="flex-shrink:0;display:flex;align-items:center;">
+                    <span style="color:#d0d0d0;font-size:22px;font-weight:300;line-height:1;">→</span>
+                  </div>
+                  <div style="flex:1;padding:18px 20px;border-radius:14px;
+                       background:{A}0f;border:1px solid {A}32;
+                       text-align:center;">
+                    <div style="display:inline-flex;align-items:center;justify-content:center;
+                         width:22px;height:22px;border-radius:50%;
+                         background:{A}20;margin-bottom:10px;">
+                      <span class="material-icons" style="font-size:13px;color:{A};">check</span>
+                    </div>
+                    <div style="font-size:30px;font-weight:800;color:{A};
+                         line-height:1;margin-bottom:6px;letter-spacing:-0.5px;">Maart</div>
+                    <div style="font-size:11px;color:{A}99;font-style:italic;">op data</div>
+                  </div>
+                </div>
+                """).classes("w-full")
 
                 # Methodologie-link
                 ui.button(

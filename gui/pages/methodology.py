@@ -9,10 +9,48 @@ from __future__ import annotations
 
 from nicegui import ui
 
-from gui import nav, theme, viz
+from gui import nav, theme, tracks, viz
 from gui.components.layout import page_shell
 from gui.components.states import section_title
-from gui.pages.home import _USE_CASES
+
+_TRACK_DETAILS: list[tuple[str, str, str | None, str, str]] = [
+    (
+        "show_chart",
+        "Cumulatief",
+        None,
+        "Analyseert de wekelijkse aanmeldcurve en extrapoleert naar de verwachte "
+        "eindinstroom.",
+        "SARIMA modelleert het meerjarige seizoenspatroon in de aanmeldingen; "
+        "XGBoost verfijnt de prognose daarna op basis van opleiding-specifieke "
+        "kenmerken. Robuust voor opleidingen met ≥ 3 jaar aanmeldhistorie en een "
+        "stabiel aanmeldpatroon. Let op bij nieuwe programma's of jaren met een "
+        "structuurbreuk — het model heeft dan te weinig historische basis.",
+    ),
+    (
+        "person_search",
+        "Individueel",
+        None,
+        "Schat per aanmelding de kans dat iemand zich daadwerkelijk inschrijft, "
+        "en telt die kansen op tot een totaalprognose.",
+        "Een XGBoost-classifier weegt kenmerken als herkomst, aanmeldmoment, "
+        "opleidingstype en aanmeldhistorie. Naast het totaal geeft dit spoor "
+        "inzicht in de verwachte samenstelling van de instroom — handig voor "
+        "numerus-fixus-berekeningen en wervingsanalyse. Minder betrouwbaar vroeg "
+        "in het seizoen, wanneer het aantal aanmeldingen nog klein is.",
+    ),
+    (
+        "merge_type",
+        "Beide",
+        "aanbevolen",
+        "Combineert cumulatief en individueel in één ensemble-prognose — de "
+        "standaardkeuze voor de meeste instellingen.",
+        "Twee onafhankelijke modellen compenseren elkaars zwakten: het cumulatieve "
+        "spoor is robuust bij weinig aanmeldingen en stabiele patronen; het "
+        "individuele spoor reageert sneller op plotselinge verschuivingen in de "
+        "samenstelling. Het gewogen gemiddelde is aanpasbaar via de configuratie. "
+        "Kies dit spoor tenzij je bewust één model wil isoleren.",
+    ),
+]
 
 
 def create() -> None:
@@ -24,39 +62,49 @@ def create() -> None:
         A = theme.ACCENT
         with page_shell(active="/methodologie", title="Methodologie", show_stepper=False):
 
-            # ── Waarvoor gebruik je instroom-prognoses? ───────────────────────
+            # ── Drie voorspelsporen — tekstuele uitleg ────────────────────────
             section_title(
-                "Waarvoor gebruik je instroom-prognoses?",
-                "Acht concrete toepassingen voor data-analisten en beleidsmakers.",
+                "Drie voorspelsporen",
+                "Kies hoe de tool instroom voorspelt — of combineer alles in één "
+                "ensemble.",
             )
             with ui.card().classes("w-full"):
                 with ui.column().classes("w-full gap-0"):
-                    for i, (icon, title, desc) in enumerate(_USE_CASES):
-                        sep = i < len(_USE_CASES) - 1
+                    for i, (icon, name, badge, lead, body) in enumerate(_TRACK_DETAILS):
+                        sep = i < len(_TRACK_DETAILS) - 1
                         with ui.element("div").style(
-                            f"padding: 12px 16px;"
+                            "padding: 16px 18px;"
                             + ("border-bottom: 1px solid #f3f3f3;" if sep else "")
                         ):
                             with ui.row().classes("items-start gap-3 no-wrap"):
                                 with ui.element("div").style(
-                                    f"width:34px;height:34px;border-radius:8px;"
+                                    f"width:36px;height:36px;border-radius:9px;"
                                     f"background:{A}12;display:flex;"
-                                    "align-items:center;justify-content:center;flex-shrink:0;"
+                                    "align-items:center;justify-content:center;"
+                                    "flex-shrink:0;margin-top:2px;"
                                 ):
                                     ui.icon(icon).classes("text-lg").style(
                                         f"color:{A}"
                                     )
-                                with ui.column().classes("gap-0"):
-                                    ui.label(title).classes("text-sm font-semibold")
-                                    ui.label(desc).classes(
+                                with ui.column().classes("gap-1"):
+                                    with ui.row().classes("items-center gap-2 no-wrap"):
+                                        ui.label(name).classes("text-sm font-bold")
+                                        if badge:
+                                            ui.badge(badge, color="accent").props(
+                                                "outline"
+                                            )
+                                    ui.label(lead).classes(
+                                        "text-sm font-medium"
+                                    ).style("color:#333; line-height:1.5;")
+                                    ui.label(body).classes(
                                         "text-xs leading-relaxed"
-                                    ).style("color:#666;")
+                                    ).style("color:#666; margin-top:4px;")
 
-            # ── Drie voorspelsporen ───────────────────────────────────────────
+            # ── Visueel sporen-diagram ────────────────────────────────────────
             section_title(
-                "Methodologie — drie voorspelsporen",
-                "Zo voorspelt de tool studentinstroom. Hover over een spoor voor "
-                "uitleg, klik erop voor de uitgebreide documentatie.",
+                "Stroomdiagram",
+                "Hover over een spoor voor uitleg, klik erop voor de uitgebreide "
+                "documentatie.",
             )
             with ui.card().classes("w-full"):
                 ui.html(viz.flow_svg()).classes("w-full")

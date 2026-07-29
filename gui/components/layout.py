@@ -225,12 +225,18 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
     with (
         ui.header()
         .classes("items-center justify-between q-px-md")
-        .style(f"background: {theme.PRIMARY}; border-bottom: 3px solid {theme.ACCENT}")
+        .style(
+            f"background: {theme.PRIMARY}; border-bottom: 3px solid {theme.ACCENT};"
+            "position: relative;"
+        )
     ):
-        with ui.row().classes("items-center gap-3 no-wrap"):
+        with ui.row().classes("items-center gap-2 no-wrap"):
             # Officieel Npuls-logo (wit) — co-branding met de toolnaam.
             ui.image("/gui-assets/npuls-logo-white.svg").classes("w-8 h-8")
-            ui.label("Studentprognose").classes("text-lg font-medium text-white")
+        # Gecentreerde paginatitel — absoluut gepositioneerd zodat links/rechts vrij zijn.
+        ui.label("Studentprognose").classes("text-lg font-medium text-white").style(
+            "position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap;"
+        )
         with ui.row().classes("items-center gap-3 no-wrap"):
             ui.label(title).classes("text-sm text-white opacity-70")
             def _reset() -> None:
