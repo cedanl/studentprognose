@@ -303,8 +303,9 @@ def _check_telbestand(filepath: str, filename: str) -> FileCheckResult:
     if not match:
         hard.append(
             "Bestandsnaam past niet op een herkend Studielink-patroon. "
-            "Verwacht bijv. 'telbestandY2024W10.csv' of "
-            "'telbestand_sl_20241007_v01_2024.csv'. "
+            "Verwacht bijv. 'telbestandY2024W10.csv', "
+            "'telbestand_sl_20241007_v01_2024.csv' of "
+            "'Telbestand_SL_2020_V96_20210802.csv'. "
             "Pas het patroon aan via 'telbestand_filename_patterns' in configuration.json "
             "als jouw instelling een andere naamgeving gebruikt."
         )

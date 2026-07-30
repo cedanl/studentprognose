@@ -50,6 +50,11 @@ _CREATED_DIRS = [
 _TEL_PREVIEW: dict = {
     "title": "Verwacht formaat — Telbestand",
     "note": "CSV · puntkomma- of kommagescheiden · één bestand per rapportageweek",
+    "filenames": [
+        ("telbestandY2024W10.csv",                 "instellingsformaat"),
+        ("telbestand_sl_20241007_v01_2024.csv",    "UvA SQL (datum eerst)"),
+        ("Telbestand_SL_2020_V96_20210802.csv",    "UvA SQL (jaar eerst)"),
+    ],
     "columns": [
         ("Studiejaar",      "Collegejaar (integer)",             "2024"),
         ("Isatcode",        "CROHO-opleidingscode",              "55604"),
@@ -78,6 +83,25 @@ _OKT_PREVIEW: dict = {
 
 def _format_preview_html(preview: dict) -> str:
     """Genereer gestylde HTML-tabel voor de formaatpreview-tooltip."""
+    filenames_html = ""
+    if "filenames" in preview:
+        fname_rows = ""
+        for name, label in preview["filenames"]:
+            fname_rows += (
+                f'<div style="display:flex;align-items:baseline;gap:10px;margin-bottom:3px;">'
+                f'<span style="font-family:monospace;font-size:11px;color:#0070c9;'
+                f'white-space:nowrap;">{name}</span>'
+                f'<span style="font-size:10px;color:#999;">{label}</span>'
+                f'</div>'
+            )
+        filenames_html = (
+            f'<div style="margin-bottom:10px;padding-bottom:8px;border-bottom:1px solid #efefef;">'
+            f'<div style="font-size:10px;color:#aaa;font-weight:500;text-transform:uppercase;'
+            f'letter-spacing:.05em;margin-bottom:5px;">Bestandsnaming</div>'
+            f'{fname_rows}'
+            f'</div>'
+        )
+
     rows = ""
     for col, desc, example in preview["columns"]:
         rows += (
@@ -91,9 +115,10 @@ def _format_preview_html(preview: dict) -> str:
             f'</tr>'
         )
     return (
-        f'<div style="min-width:360px;max-width:500px;font-family:system-ui,sans-serif;">'
+        f'<div style="min-width:360px;max-width:520px;font-family:system-ui,sans-serif;">'
         f'<div style="font-weight:600;font-size:12.5px;color:#111;margin-bottom:10px;'
         f'padding-bottom:7px;border-bottom:1px solid #efefef;">{preview["title"]}</div>'
+        f'{filenames_html}'
         f'<table style="border-collapse:collapse;width:100%;">'
         f'<thead><tr style="border-bottom:1px solid #efefef;">'
         f'<th style="text-align:left;padding:0 14px 5px 0;font-size:10px;color:#aaa;'
@@ -859,7 +884,7 @@ class _WizardView:
                 self._zone_tel = _UploadZone(
                     title="Telbestanden",
                     description="Weekelijkse Studielink-exports (één CSV per week).",
-                    hint="bijv. telbestandY2024W10.csv of telbestand_sl_20241007_v01_2024.csv",
+                    hint="bijv. telbestandY2024W10.csv, telbestand_sl_20241007_v01_2024.csv of Telbestand_SL_2020_V96_20210802.csv",
                     icon="bar_chart",
                     required=True,
                     accept=".csv",

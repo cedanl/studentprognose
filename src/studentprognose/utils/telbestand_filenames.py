@@ -23,11 +23,14 @@ in het patroon worden letterlijk gematcht (punten, streepjes, underscores zijn
 veilig). Elk patroon bevat ``{year}`` en moet een week kunnen opleveren: het
 bevat dus ``{week}`` **of** ``{date}``. Bij ``{date}`` wordt het weeknummer als
 ISO-kalenderweek uit de leverdatum afgeleid (zie :func:`week_from_match`).
+Matching is hoofdletterongevoelig zodat direct geplaatste bestanden met gemengde
+hoofdletters (bijv. ``Telbestand_SL_2020_V96_20210802.csv``) ook herkend worden.
 Voorbeelden:
 
 - ``telbestandY{year}W{week}`` (default, Studielink instellingsformaat)
 - ``VU_telbestand_{year}_W{week}``
-- ``telbestand_sl_{date}_v{volgnummer}_{year}`` (UvA SQL-telbestand)
+- ``telbestand_sl_{date}_v{volgnummer}_{year}`` (UvA SQL, datum eerst)
+- ``telbestand_sl_{year}_v{volgnummer}_{date}`` (UvA SQL, jaar eerst)
 """
 
 from __future__ import annotations
@@ -36,10 +39,11 @@ import datetime
 import re
 from typing import NamedTuple
 
-#: Beide instellingsformaten worden standaard herkend wanneer er geen configuratie is.
+#: Alle bekende Studielink-formaten worden standaard herkend wanneer er geen configuratie is.
 DEFAULT_TELBESTAND_PATTERNS = [
     "telbestandY{year}W{week}",
     "telbestand_sl_{date}_v{volgnummer}_{year}",
+    "telbestand_sl_{year}_v{volgnummer}_{date}",
 ]
 # Alias voor backwards-compatibiliteit met bestaande imports.
 DEFAULT_TELBESTAND_PATTERN = DEFAULT_TELBESTAND_PATTERNS[0]
@@ -148,7 +152,7 @@ def compile_patterns(configuration: dict | None) -> list[TelbestandPattern]:
         raw_patterns = list(raw)
 
     return [
-        TelbestandPattern(raw=p, regex=re.compile(_placeholder_to_regex(p)))
+        TelbestandPattern(raw=p, regex=re.compile(_placeholder_to_regex(p), re.IGNORECASE))
         for p in raw_patterns
     ]
 

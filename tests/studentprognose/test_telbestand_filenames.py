@@ -46,6 +46,61 @@ class TestDatePlaceholder:
             compile_patterns({"telbestand_filename_patterns": ["foo_W{week}"]})
 
 
+class TestYearFirstFormat:
+    """UvA SQL-formaat met jaar eerst: Telbestand_SL_{year}_V{volgnummer}_{date}.csv"""
+
+    def test_default_patterns_match_year_first_lowercase(self):
+        # Na GUI-upload wordt de naam lowercase: telbestand_sl_2020_v96_20210802.csv
+        patterns = compile_patterns(None)
+        match = match_telbestand("telbestand_sl_2020_v96_20210802.csv", patterns)
+        assert match is not None
+        assert match.group("year") == "2020"
+        assert match.group("volgnummer") == "96"
+        assert match.group("date") == "20210802"
+
+    def test_default_patterns_match_year_first_original_case(self):
+        # Direct geplaatst bestand behoudt originele hoofdletters.
+        patterns = compile_patterns(None)
+        match = match_telbestand("Telbestand_SL_2020_V96_20210802.csv", patterns)
+        assert match is not None
+        assert match.group("year") == "2020"
+        assert match.group("volgnummer") == "96"
+        assert match.group("date") == "20210802"
+
+    def test_year_first_derives_correct_iso_week(self):
+        # 2021-08-02 = ISO-week 31.
+        patterns = compile_patterns(None)
+        match = match_telbestand("Telbestand_SL_2020_V96_20210802.csv", patterns)
+        assert match is not None
+        assert week_from_match(match) == 31
+
+    def test_explicit_year_first_pattern(self):
+        patterns = compile_patterns(
+            {"telbestand_filename_patterns": ["telbestand_sl_{year}_v{volgnummer}_{date}"]}
+        )
+        match = match_telbestand("telbestand_sl_2020_v96_20210802.csv", patterns)
+        assert match is not None
+        assert week_from_match(match) == 31
+
+
+class TestCaseInsensitiveMatching:
+    """Patroonmatching is hoofdletterongevoelig (re.IGNORECASE)."""
+
+    def test_uppercase_filename_matches_lowercase_pattern(self):
+        patterns = compile_patterns(None)
+        assert match_telbestand("TELBESTANDY2024W10.CSV", patterns) is not None
+
+    def test_mixed_case_matches(self):
+        patterns = compile_patterns(None)
+        assert match_telbestand("TelbestandY2024W10.csv", patterns) is not None
+
+    def test_original_studielink_case_matches(self):
+        # Originele Studielink-hoofdlettering zoals geleverd.
+        patterns = compile_patterns(None)
+        match = match_telbestand("Telbestand_SL_2020_V96_20210802.csv", patterns)
+        assert match is not None
+
+
 class TestCompilePatterns:
     def test_uses_default_when_config_is_none(self):
         from studentprognose.utils.telbestand_filenames import DEFAULT_TELBESTAND_PATTERNS
