@@ -502,6 +502,23 @@ class _UploadZone:
         self._collapsed = not self._collapsed
         self._refresh_results()
 
+    def _delete_all(self) -> None:
+        filenames = list(self._results.keys())
+        for filename in filenames:
+            if self._delete_fn is not None:
+                try:
+                    self._delete_fn(self._project_dir_getter(), filename)
+                except OSError:
+                    pass
+        self._results.clear()
+        self._refresh_results()
+        self._on_change()
+        n = len(filenames)
+        ui.notify(
+            f"{n} bestand{'en' if n != 1 else ''} verwijderd",
+            type="warning", position="top", close_button=True, timeout=3000,
+        )
+
     def _refresh_results(self) -> None:
         self._results_slot.clear()
         count = len(self._results)
@@ -517,6 +534,13 @@ class _UploadZone:
                     ):
                         self._render_file_row(result)
             else:
+                with ui.row().classes("w-full justify-end"):
+                    (
+                        ui.button("Verwijder alles", icon="delete_sweep",
+                                  on_click=self._delete_all)
+                        .props("flat dense size=xs color=grey-6")
+                        .tooltip("Alle bestanden verwijderen")
+                    )
                 for result in self._results.values():
                     self._render_file_row(result)
 
@@ -550,11 +574,19 @@ class _UploadZone:
             with ui.row().classes("items-center gap-2 no-wrap"):
                 ui.icon(icon_n).classes("text-base flex-none").style(f"color: {color}")
                 ui.label(msg).classes("text-sm font-medium").style(f"color: {color}")
-            ui.button(
-                btn_label,
-                icon=btn_icon,
-                on_click=self._toggle_collapse,
-            ).props("flat dense size=sm color=grey-7").classes("flex-none")
+            with ui.row().classes("items-center gap-1 no-wrap flex-none"):
+                if self._delete_fn is not None:
+                    (
+                        ui.button("Verwijder alles", icon="delete_sweep",
+                                  on_click=self._delete_all)
+                        .props("flat dense size=sm color=grey-6")
+                        .tooltip("Alle bestanden verwijderen")
+                    )
+                ui.button(
+                    btn_label,
+                    icon=btn_icon,
+                    on_click=self._toggle_collapse,
+                ).props("flat dense size=sm color=grey-7")
 
         # Subtiele scheidingslijn vóór de bestandsrijen als die zichtbaar zijn.
         n_visible = (
