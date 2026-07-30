@@ -237,6 +237,27 @@ def save_and_validate_oktober(
     return _check_oktober(dest)
 
 
+def delete_telbestand(project_dir: str, filename: str) -> None:
+    """Verwijder een telbestand van schijf."""
+    path = os.path.join(project_dir, "data", "input_raw", "telbestanden", filename)
+    if os.path.isfile(path):
+        os.remove(path)
+
+
+def delete_individueel(project_dir: str, _filename: str) -> None:
+    """Verwijder het individuele aanmeldbestand van schijf."""
+    path = os.path.join(project_dir, "data", "input_raw", "individuele_aanmelddata.csv")
+    if os.path.isfile(path):
+        os.remove(path)
+
+
+def delete_oktober(project_dir: str, _filename: str) -> None:
+    """Verwijder het oktober-bestand van schijf."""
+    path = os.path.join(project_dir, "data", "input_raw", "oktober_bestand.xlsx")
+    if os.path.isfile(path):
+        os.remove(path)
+
+
 def scan_existing_files(project_dir: str) -> dict:
     """Controleer en valideer bestanden die al aanwezig zijn in het project.
 

@@ -29,6 +29,9 @@ from gui.data_upload import (
     TelCoverage,
     compute_overlap,
     compute_tel_coverage,
+    delete_individueel,
+    delete_oktober,
+    delete_telbestand,
     save_and_validate_individueel,
     save_and_validate_oktober,
     save_and_validate_telbestand,
@@ -360,10 +363,12 @@ class _UploadZone:
         project_dir_getter: Callable[[], str],
         validate_fn: Callable[[str, str, bytes], FileCheckResult],
         on_change: Callable[[], None],
+        delete_fn: Callable[[str, str], None] | None = None,
     ) -> None:
         self._project_dir_getter = project_dir_getter
         self._validate_fn = validate_fn
         self._on_change = on_change
+        self._delete_fn = delete_fn
         self._results: dict[str, FileCheckResult] = {}
         self._collapsed: bool = True
         self._build(title, description, hint, icon, required, accept, multiple)
@@ -476,6 +481,21 @@ class _UploadZone:
         self._refresh_results()
         self._on_change()
 
+    # --- Delete-handler ----------------------------------------------------
+
+    def _delete_file(self, filename: str) -> None:
+        if self._delete_fn is not None:
+            try:
+                self._delete_fn(self._project_dir_getter(), filename)
+            except OSError:
+                pass
+        self._results.pop(filename, None)
+        self._refresh_results()
+        self._on_change()
+        short = filename if len(filename) <= 40 else filename[:37] + "…"
+        ui.notify(f"'{short}' verwijderd", type="warning", position="top",
+                  close_button=True, timeout=3000)
+
     # --- UI-rendering -------------------------------------------------------
 
     def _toggle_collapse(self) -> None:
@@ -566,6 +586,16 @@ class _UploadZone:
                 ui.label(" · ".join(meta_parts)).classes("text-xs flex-none").style(
                     f"color: {color}"
                 )
+                if self._delete_fn is not None and not is_checking:
+                    (
+                        ui.button(
+                            icon="delete_outline",
+                            on_click=lambda fn=result.filename: self._delete_file(fn),
+                        )
+                        .props("flat dense round size=xs")
+                        .style("color: #ccc; flex-shrink: 0;")
+                        .tooltip("Verwijderen")
+                    )
 
             if result.hard_errors or result.soft_errors:
                 with ui.column().classes("ml-6 gap-0.5 mb-1"):
@@ -729,6 +759,7 @@ class _WizardView:
                     project_dir_getter=lambda: self._project_dir,
                     validate_fn=save_and_validate_telbestand,
                     on_change=self._on_tel_change,
+                    delete_fn=delete_telbestand,
                 )
                 self._coverage_slot = ui.column().classes("w-full")
 
@@ -748,6 +779,7 @@ class _WizardView:
                     project_dir_getter=lambda: self._project_dir,
                     validate_fn=save_and_validate_individueel,
                     on_change=self._refresh_summary,
+                    delete_fn=delete_individueel,
                 )
 
             ui.space().classes("h-3")
@@ -763,6 +795,7 @@ class _WizardView:
                 project_dir_getter=lambda: self._project_dir,
                 validate_fn=save_and_validate_oktober,
                 on_change=self._on_okt_change,
+                delete_fn=delete_oktober,
             )
 
             ui.space().classes("h-4")
