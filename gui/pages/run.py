@@ -45,8 +45,6 @@ _DEFAULTS: dict = {
     "yes": True,
 }
 
-#: Aanbevolen waarden — worden visueel gemarkeerd in de UI.
-_RECOMMENDED = {"weeks": "38"}
 
 _WIZARD_MODE_TO_DATASET = {
     "cumulative": "Cumulatief",
@@ -99,39 +97,6 @@ def _max_skip(min_forecast_year: int) -> int:
     Minstens één trainingsjaar (``DATA_START``) moet overblijven.
     """
     return max(0, min_forecast_year - _DATA_START - 1)
-
-
-def _parse_year_range(raw: str, valid: list[int]) -> list[int]:
-    """Zet bereiknotatie (``2023:2025``) of losse jaren (``2023 2024``) om.
-
-    Accepteert: ``2023:2025`` (bereik), ``2023 2024 2025`` (los) en
-    combinaties. Retourneert alleen jaren die in ``valid`` staan.
-    """
-    tokens = raw.strip().replace(":", " ").split()
-    result: list[int] = []
-    i = 0
-    while i < len(tokens):
-        try:
-            val = int(tokens[i])
-        except ValueError:
-            i += 1
-            continue
-        # Kijk of het volgende token ook een jaar is en het vorige een ':'
-        # bevatte (bereik-detectie via ruwe string).
-        result.append(val)
-        i += 1
-
-    # Her-evalueer als bereik als de ruwe string een ':' bevat.
-    if ":" in raw:
-        parts = raw.strip().split(":")
-        if len(parts) == 2:
-            try:
-                start, end = int(parts[0].strip()), int(parts[1].strip())
-                result = list(range(start, end + 1))
-            except ValueError:
-                pass
-
-    return sorted({y for y in result if y in valid})
 
 
 # ---------------------------------------------------------------------------
@@ -248,26 +213,6 @@ class _RunView:
                     self._years_error.set_visibility(False)
                     self._years.on_value_change(lambda _e: self._on_years_change())
 
-                    # Bereik-invoer — bijv. 2023:2025 of 2023 2024 2025
-                    with ui.row().classes("items-center gap-2 mt-1 no-wrap"):
-                        ui.label("of bereik:").classes("text-xs flex-none").style(
-                            f"color:{theme.MUTED};"
-                        )
-                        self._year_range_input = (
-                            ui.input(placeholder="2023:2025")
-                            .props("dense outlined clearable")
-                            .style("width:100px; font-size:13px;")
-                        )
-                        self._year_range_input.tooltip(
-                            "Voer een bereik in (bijv. 2023:2025) of losse jaren "
-                            "(bijv. 2023 2024) en druk op Enter of klik ➕."
-                        )
-                        self._year_range_add_btn = ui.button(
-                            "", icon="add",
-                            on_click=self._add_year_range,
-                        ).props("unelevated dense size=sm color=primary")
-                        self._year_range_add_btn.tooltip("Voeg bereik toe")
-                        self._year_range_input.on("keydown.enter", self._add_year_range)
 
                 # ── Weken (tekstveld + inline validatie + aanbevolen-hint) ──
                 with ui.column().classes("w-full gap-0"):
@@ -282,16 +227,6 @@ class _RunView:
                         "Weeknummer van de aanmeldpeildatum (1–52). "
                         "Gebruik bereiknotatie als 1:38 voor meerdere weken."
                     )
-                    # Aanbevolen-hint (altijd zichtbaar als informatielabel)
-                    with ui.row().classes("items-center gap-1 mt-0.5"):
-                        ui.icon("star").classes("text-xs flex-none").style(
-                            f"color: {theme.ACCENT}; font-size: 12px;"
-                        )
-                        self._weeks_rec_label = ui.label(
-                            f"Aanbevolen: week {_RECOMMENDED['weeks']}"
-                        ).classes("text-xs font-medium").style(
-                            f"color: {theme.ACCENT}; opacity: 0.85"
-                        )
                     self._weeks_error = (
                         ui.label("")
                         .classes("text-xs mt-0.5 font-medium")
@@ -438,32 +373,7 @@ class _RunView:
             self._weeks_error.set_visibility(True)
         else:
             self._weeks_error.set_visibility(False)
-        # Toon hint opvallender (groen) als waarde overeenkomt met aanbeveling.
-        if val == _RECOMMENDED["weeks"]:
-            self._weeks_rec_label.style(
-                f"color: {theme.ACCENT}; opacity: 0.85; font-weight: 600;"
-            )
-        else:
-            self._weeks_rec_label.style(
-                f"color: {theme.ACCENT}; opacity: 0.45;"
-            )
         self._update_preview()
-
-    def _add_year_range(self, _e=None) -> None:
-        """Voeg jaar(bereik) toe aan de jarenselectie vanuit het invoerveld."""
-        raw = (self._year_range_input.value or "").strip()
-        if not raw:
-            return
-        to_add = _parse_year_range(raw, _FORECAST_YEARS)
-        if not to_add:
-            return
-        current = list(self._years.value or [])
-        for y in to_add:
-            if y not in current:
-                current.append(y)
-        self._years.set_value(sorted(current))
-        self._year_range_input.set_value("")
-        self._on_years_change()
 
     # ── Preview + visualisatie ────────────────────────────────────────────────
 
