@@ -90,43 +90,45 @@ def _load_brincodes(project_dir: str) -> list[str]:
             continue
     return sorted(codes)
 
-# Significante Nederlandse HO-instellingen — value = opslaanaam, label = weergave.
-# Prefix "WO · " / "HBO · " geeft visuele groepering in de dropdown.
-# Wordt opgeslagen als naam tot de backend-mapping (naam → Brincode) gereed is.
-_INSTITUTIONS: dict[str, str] = {
-    "Universiteit van Amsterdam":      "WO · Universiteit van Amsterdam (UvA)",
-    "Vrije Universiteit Amsterdam":    "WO · Vrije Universiteit Amsterdam (VU)",
-    "Universiteit Leiden":             "WO · Universiteit Leiden",
-    "Erasmus Universiteit Rotterdam":  "WO · Erasmus Universiteit Rotterdam (EUR)",
-    "Radboud Universiteit":            "WO · Radboud Universiteit",
-    "Rijksuniversiteit Groningen":     "WO · Rijksuniversiteit Groningen (RUG)",
-    "Universiteit Utrecht":            "WO · Universiteit Utrecht (UU)",
-    "Tilburg University":              "WO · Tilburg University",
-    "Universiteit Maastricht":         "WO · Universiteit Maastricht (UM)",
-    "Universiteit Twente":             "WO · Universiteit Twente (UT)",
-    "Technische Universiteit Delft":   "WO · Technische Universiteit Delft (TU Delft)",
-    "Technische Universiteit Eindhoven": "WO · Technische Universiteit Eindhoven (TU/e)",
-    "Wageningen University & Research": "WO · Wageningen University & Research (WUR)",
-    "Hogeschool van Amsterdam":        "HBO · Hogeschool van Amsterdam (HvA)",
-    "Hogeschool Rotterdam":            "HBO · Hogeschool Rotterdam",
-    "Avans Hogeschool":                "HBO · Avans Hogeschool",
-    "Fontys Hogeschool":               "HBO · Fontys Hogeschool",
-    "Saxion Hogeschool":               "HBO · Saxion Hogeschool",
-    "Windesheim":                      "HBO · Windesheim",
-    "Hanze Hogeschool Groningen":      "HBO · Hanze Hogeschool Groningen",
-    "Hogeschool Utrecht":              "HBO · Hogeschool Utrecht (HU)",
-    "InHolland":                       "HBO · InHolland",
-    "NHL Stenden Hogeschool":          "HBO · NHL Stenden Hogeschool",
-    "De Haagse Hogeschool":            "HBO · De Haagse Hogeschool",
-    "Hogeschool Leiden":               "HBO · Hogeschool Leiden",
-    "Zuyd Hogeschool":                 "HBO · Zuyd Hogeschool",
-    "HAN University of Applied Sciences": "HBO · HAN University of Applied Sciences",
-    "HZ University of Applied Sciences":  "HBO · HZ University of Applied Sciences",
-    "Van Hall Larenstein":             "HBO · Van Hall Larenstein",
-    "Christelijke Hogeschool Ede":     "HBO · Christelijke Hogeschool Ede (CHE)",
-    "ArtEZ Hogeschool voor de Kunsten": "HBO · ArtEZ Hogeschool voor de Kunsten",
-    "HKU Hogeschool voor de Kunsten Utrecht": "HBO · HKU – Hogeschool voor de Kunsten Utrecht",
-    "Amsterdamse Hogeschool voor de Kunsten": "HBO · Amsterdamse Hogeschool voor de Kunsten (AHK)",
+# Brincode → leesbare naam voor bekende Nederlandse HO-instellingen.
+# De select gebruikt de Brincode als waarde (wat de backend verwacht na ETL-rename
+# Brincode → "Korte naam instelling"). Labels zijn enkel voor weergave.
+_BRIN_LABELS: dict[str, str] = {
+    # WO
+    "28DN": "WO · Universiteit van Amsterdam (UvA)",
+    "21PQ": "WO · Vrije Universiteit Amsterdam (VU)",
+    "21PG": "WO · Universiteit Leiden",
+    "21PS": "WO · Erasmus Universiteit Rotterdam (EUR)",
+    "21PF": "WO · Radboud Universiteit",
+    "21PE": "WO · Rijksuniversiteit Groningen (RUG)",
+    "21PI": "WO · Universiteit Utrecht (UU)",
+    "21PH": "WO · Tilburg University",
+    "21PJ": "WO · Universiteit Maastricht (UM)",
+    "21PK": "WO · Universiteit Twente (UT)",
+    "21PM": "WO · Technische Universiteit Delft (TU Delft)",
+    "21PL": "WO · Technische Universiteit Eindhoven (TU/e)",
+    "01KI": "WO · Wageningen University & Research (WUR)",
+    # HBO
+    "25DW": "HBO · Hogeschool van Amsterdam (HvA)",
+    "21QD": "HBO · Hogeschool Rotterdam",
+    "25FK": "HBO · Avans Hogeschool",
+    "25LN": "HBO · Fontys Hogeschool",
+    "25MG": "HBO · Saxion Hogeschool",
+    "26MW": "HBO · Windesheim",
+    "22OJ": "HBO · Hanze Hogeschool Groningen",
+    "22AI": "HBO · Hogeschool Utrecht (HU)",
+    "25GH": "HBO · InHolland",
+    "21QJ": "HBO · NHL Stenden Hogeschool",
+    "27PZ": "HBO · De Haagse Hogeschool",
+    "27AS": "HBO · Hogeschool Leiden",
+    "22OH": "HBO · Zuyd Hogeschool",
+    "25GS": "HBO · HAN University of Applied Sciences",
+    "30GB": "HBO · HZ University of Applied Sciences",
+    "30FO": "HBO · Van Hall Larenstein",
+    "08OK": "HBO · Christelijke Hogeschool Ede (CHE)",
+    "30AV": "HBO · ArtEZ Hogeschool voor de Kunsten",
+    "25JX": "HBO · HKU – Hogeschool voor de Kunsten Utrecht",
+    "27DO": "HBO · Amsterdamse Hogeschool voor de Kunsten (AHK)",
 }
 
 HELP = {
@@ -165,9 +167,9 @@ HELP = {
         "maximum afgetopt."
     ),
     "institution_filter": (
-        "Beperk de teldata tot je eigen instelling(en) via Brincode of korte "
-        "naam. Leeg = alle instellingen. De meeste gebruikers zetten hier hun "
-        "eigen instelling."
+        "Beperk de teldata tot je eigen instelling(en) via Brincode. "
+        "Leeg = alle instellingen. De meeste gebruikers zetten hier hun "
+        "eigen Brincode."
     ),
     "excluded_data_points": (
         "Sluit bekende probleemjaren (bijv. een uitzonderlijk coronajaar) uit de "
@@ -309,6 +311,13 @@ class _ConfigView:
 
     def _institution_card(self) -> None:
         current = self._config.setdefault("institution_filter", [])
+        current_code = current[0] if current else None
+
+        try:
+            project_dir = os.path.dirname(os.path.dirname(self._path))
+            data_codes = _load_brincodes(project_dir)
+        except Exception:
+            data_codes = []
 
         with ui.card().classes("w-full mb-4"):
             with ui.row().classes("items-start gap-4 no-wrap"):
@@ -321,32 +330,54 @@ class _ConfigView:
                         ui.label("Jouw instelling").classes("text-base font-medium")
                         ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
                     ui.label(
-                        "Selecteer jouw instelling. De prognose filtert de data automatisch."
+                        "Selecteer je Brincode. De prognose filtert de teldata automatisch op deze code."
                     ).classes("text-sm opacity-60 mt-1")
 
-                    self._inst_select = (
-                        ui.select(
-                            options=_INSTITUTIONS,
-                            value=current[0] if current else None,
-                            label="Selecteer instelling",
+                    if data_codes:
+                        options = {
+                            code: f"{code} — {_BRIN_LABELS[code]}" if code in _BRIN_LABELS else code
+                            for code in data_codes
+                        }
+                        if current_code and current_code not in options:
+                            options = {current_code: current_code, **options}
+
+                        self._inst_select = (
+                            ui.select(
+                                options=options,
+                                value=current_code,
+                                label="Selecteer Brincode",
+                            )
+                            .props("outlined use-input input-debounce=0 clearable")
+                            .classes("w-full mt-2")
                         )
-                        .props("outlined use-input input-debounce=0 clearable")
-                        .classes("w-full mt-2")
-                    )
-                    self._inst_select.on_value_change(self._on_institution_change)
+                        self._inst_select.on_value_change(self._on_institution_change)
 
-                    # Mapping-status banner
-                    with ui.row().classes("items-start gap-2 mt-2 w-full").style(
-                        "background:#f7f7f7;border:1px solid #e8e8e8;"
-                        "border-radius:8px;padding:8px 10px;"
-                    ):
-                        ui.icon("build_circle").style("color:#bbb;font-size:16px;flex-shrink:0;margin-top:1px;")
-                        ui.label(
-                            "Koppeling instelling → Brincode nog te implementeren in de backend. "
-                            "Selectie wordt nu opgeslagen als naam."
-                        ).classes("text-xs").style("color:#aaa;line-height:1.5;")
+                        with ui.row().classes("items-center gap-1.5 mt-2"):
+                            ui.icon("folder_open").style(
+                                f"color: {theme.INFO}; font-size: 14px;"
+                            )
+                            ui.label(
+                                f"{len(data_codes)} instelling(en) gevonden in de telbestanden."
+                            ).classes("text-xs").style(f"color: {theme.INFO}")
+                    else:
+                        self._inst_select = (
+                            ui.input(
+                                value=current_code or "",
+                                label="Brincode (bijv. 25DW)",
+                                placeholder="Voer de Brincode in",
+                            )
+                            .props("outlined clearable")
+                            .classes("w-full mt-2")
+                        )
+                        self._inst_select.on_value_change(self._on_institution_change)
 
-                    if not current:
+                        with ui.row().classes("items-center gap-1.5 mt-2"):
+                            ui.icon("info").style("color: #aaa; font-size: 14px;")
+                            ui.label(
+                                "Upload telbestanden om de beschikbare Brincodes te detecteren."
+                            ).classes("text-xs").style("color: #aaa;")
+
+                    if not current_code:
                         with ui.row().classes("items-center gap-1 mt-2"):
                             ui.icon("warning_amber").style(
                                 f"color: {theme.WARNING}; font-size: 16px;"
