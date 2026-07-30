@@ -46,6 +46,71 @@ _CREATED_DIRS = [
     "data/output/",
 ]
 
+# Formaatpreview per uploadzone: (kolomnaam, beschrijving, voorbeeldwaarde)
+_TEL_PREVIEW: dict = {
+    "title": "Verwacht formaat — Telbestand",
+    "note": "CSV · puntkomma- of kommagescheiden · één bestand per rapportageweek",
+    "columns": [
+        ("Studiejaar",      "Collegejaar (integer)",             "2024"),
+        ("Isatcode",        "CROHO-opleidingscode",              "55604"),
+        ("Aantal",          "Aantal aanmelders / inschrijvingen", "3"),
+        ("meercode_V",      "Meerdere aanmeldingen",             "N / J"),
+        ("Status",          "Aanmeldstatus-code",                "00"),
+        ("Herinschrijving", "Herinschrijving",                   "N / J"),
+        ("Hogerejaars",     "Hogerejaars",                       "N / J"),
+        ("Herkomst",        "Nationaliteitscategorie",           "N / E / R"),
+    ],
+}
+
+_OKT_PREVIEW: dict = {
+    "title": "Verwacht formaat — Oktober-bestand",
+    "note": "Excel (.xlsx) · peildatum 1 oktober · één rij per opleiding × herkomstgroep",
+    "columns": [
+        ("Collegejaar",                "Academisch jaar",             "2024"),
+        ("Isatcode",                   "CROHO-opleidingscode",        "55604"),
+        ("Aantal eerstejaars croho",   "Eerstejaars per opleiding",   "125"),
+        ("EER-NL-nietEER",             "Herkomstgroep",               "NL / EER / niet-EER"),
+        ("Examentype code",            "Type opleiding",              "B / M"),
+        ("Aantal Hoofdinschrijvingen", "Totaal hoofdinschrijvingen",  "438"),
+    ],
+}
+
+
+def _format_preview_html(preview: dict) -> str:
+    """Genereer gestylde HTML-tabel voor de formaatpreview-tooltip."""
+    rows = ""
+    for col, desc, example in preview["columns"]:
+        rows += (
+            f'<tr>'
+            f'<td style="padding:3px 14px 3px 0;font-family:monospace;font-size:11.5px;'
+            f'color:#111;white-space:nowrap;vertical-align:top;">{col}</td>'
+            f'<td style="padding:3px 14px 3px 0;font-size:11px;color:#666;'
+            f'vertical-align:top;">{desc}</td>'
+            f'<td style="padding:3px 0;font-family:monospace;font-size:11px;'
+            f'color:#0070c9;white-space:nowrap;vertical-align:top;">{example}</td>'
+            f'</tr>'
+        )
+    return (
+        f'<div style="min-width:360px;max-width:500px;font-family:system-ui,sans-serif;">'
+        f'<div style="font-weight:600;font-size:12.5px;color:#111;margin-bottom:10px;'
+        f'padding-bottom:7px;border-bottom:1px solid #efefef;">{preview["title"]}</div>'
+        f'<table style="border-collapse:collapse;width:100%;">'
+        f'<thead><tr style="border-bottom:1px solid #efefef;">'
+        f'<th style="text-align:left;padding:0 14px 5px 0;font-size:10px;color:#aaa;'
+        f'font-weight:500;text-transform:uppercase;letter-spacing:.05em;">Kolom</th>'
+        f'<th style="text-align:left;padding:0 14px 5px 0;font-size:10px;color:#aaa;'
+        f'font-weight:500;text-transform:uppercase;letter-spacing:.05em;">Beschrijving</th>'
+        f'<th style="text-align:left;padding:0 0 5px;font-size:10px;color:#aaa;'
+        f'font-weight:500;text-transform:uppercase;letter-spacing:.05em;">Voorbeeld</th>'
+        f'</tr></thead>'
+        f'<tbody>{rows}</tbody>'
+        f'</table>'
+        f'<div style="margin-top:9px;font-size:10px;color:#bbb;border-top:1px solid #efefef;'
+        f'padding-top:7px;">{preview["note"]}</div>'
+        f'</div>'
+    )
+
+
 # Visuele configuratie per FileStatus.
 _STATUS_VISUAL: dict[FileStatus, tuple[str, str, str]] = {
     FileStatus.CHECKING: ("hourglass_top", theme.INFO,     "Controleren…"),
@@ -364,11 +429,13 @@ class _UploadZone:
         validate_fn: Callable[[str, str, bytes], FileCheckResult],
         on_change: Callable[[], None],
         delete_fn: Callable[[str, str], None] | None = None,
+        format_preview: dict | None = None,
     ) -> None:
         self._project_dir_getter = project_dir_getter
         self._validate_fn = validate_fn
         self._on_change = on_change
         self._delete_fn = delete_fn
+        self._format_preview = format_preview
         self._results: dict[str, FileCheckResult] = {}
         self._collapsed: bool = True
         self._build(title, description, hint, icon, required, accept, multiple)
@@ -433,6 +500,15 @@ class _UploadZone:
                     with ui.column().classes("gap-0"):
                         ui.label(title).classes("font-medium")
                         ui.label(description).classes("text-xs opacity-60")
+                    if self._format_preview:
+                        help_icon = ui.icon("help_outline").classes(
+                            "text-base cursor-help flex-none"
+                        ).style("color: #ccc; margin-top: 2px;")
+                        with help_icon:
+                            with ui.tooltip().classes(
+                                "bg-white text-black shadow-4 q-pa-sm"
+                            ).props("max-width=520px anchor='bottom left' self='top left'"):
+                                ui.html(_format_preview_html(self._format_preview))
                 badge_text = "Vereist" if required else "Optioneel"
                 badge_color = "accent" if required else "grey-6"
                 self._badge = ui.badge(badge_text).props(
@@ -792,6 +868,7 @@ class _WizardView:
                     validate_fn=save_and_validate_telbestand,
                     on_change=self._on_tel_change,
                     delete_fn=delete_telbestand,
+                    format_preview=_TEL_PREVIEW,
                 )
                 self._coverage_slot = ui.column().classes("w-full")
 
@@ -828,6 +905,7 @@ class _WizardView:
                 validate_fn=save_and_validate_oktober,
                 on_change=self._on_okt_change,
                 delete_fn=delete_oktober,
+                format_preview=_OKT_PREVIEW,
             )
 
             ui.space().classes("h-4")
