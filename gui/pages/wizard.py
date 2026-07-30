@@ -455,6 +455,7 @@ class _UploadZone:
         on_change: Callable[[], None],
         delete_fn: Callable[[str, str], None] | None = None,
         format_preview: dict | None = None,
+        allow_folder_mode: bool = False,
     ) -> None:
         self._project_dir_getter = project_dir_getter
         self._validate_fn = validate_fn
@@ -463,6 +464,19 @@ class _UploadZone:
         self._format_preview = format_preview
         self._results: dict[str, FileCheckResult] = {}
         self._collapsed: bool = True
+        self._folder_mode: bool = False
+        self._allow_folder_mode = allow_folder_mode
+        self._zone_uid = str(id(self))
+        # Debounce-state voor map-upload samenvatting
+        self._folder_batch_count: int = 0
+        self._folder_batch_task: asyncio.Task | None = None
+        # Placeholders ingevuld in _build
+        self._hint_label = None
+        self._folder_hint_label = None
+        self._file_upload_el = None
+        self._folder_container = None
+        self._btn_files = None
+        self._btn_folder = None
         self._build(title, description, hint, icon, required, accept, multiple)
 
     # --- Public interface ---------------------------------------------------
@@ -514,6 +528,9 @@ class _UploadZone:
         accept: str,
         multiple: bool,
     ) -> None:
+        ui.add_css("""
+            .sp-upload .q-uploader__list { display: none !important; }
+        """)
         with (
             ui.card()
             .classes("w-full")
@@ -540,32 +557,154 @@ class _UploadZone:
                     f"color={badge_color}"
                 ).classes("text-xs self-start mt-1 flex-none")
 
+            # Mode-toggle: bestanden vs. map (alleen bij multiple uploads)
+            if self._allow_folder_mode:
+                with ui.row().classes("items-center gap-2 mb-2"):
+                    ui.label("Uploaden via:").classes("text-xs opacity-50")
+                    self._btn_files = (
+                        ui.button("Bestanden", icon="upload_file",
+                                  on_click=lambda: self._switch_mode(False))
+                        .props("dense no-caps size=sm flat")
+                        .style(f"background:{theme.ACCENT};color:white;border-radius:4px;")
+                    )
+                    self._btn_folder = (
+                        ui.button("Map", icon="folder_open",
+                                  on_click=lambda: self._switch_mode(True))
+                        .props("dense no-caps size=sm flat")
+                        .style("background:#f0f0f0;color:#888;border-radius:4px;")
+                    )
+
+            # Hint-tekst (bestandsmodus)
             if hint:
-                ui.label(hint).classes("text-xs opacity-50 mb-2").style(
-                    "font-family: monospace"
+                self._hint_label = (
+                    ui.label(hint)
+                    .classes("text-xs opacity-50 mb-2")
+                    .style("font-family:monospace")
                 )
 
-            (
+            # Hint-tekst (mapmodus, verborgen bij start)
+            if self._allow_folder_mode:
+                self._folder_hint_label = (
+                    ui.label(
+                        "Selecteer een map — alle CSV-bestanden met 'telbestand' "
+                        "in de naam worden recursief verwerkt."
+                    )
+                    .classes("text-xs opacity-50 mb-2")
+                    .style("font-family:monospace")
+                )
+                self._folder_hint_label.set_visibility(False)
+
+            # Bestandsuploader (standaard zichtbaar)
+            self._file_upload_el = (
                 ui.upload(
                     on_upload=self._handle_upload,
                     multiple=multiple,
                     auto_upload=True,
                 )
                 .props(f"flat color=grey-3 text-color=grey-9 accept='{accept}'")
-                .classes("w-full")
-                .style(
-                    "border: 2px dashed #d0d0d0; border-radius: 6px; min-height: 72px;"
-                )
+                .classes("w-full sp-upload")
+                .style("border:2px dashed #d0d0d0;border-radius:6px;min-height:72px;")
             )
+
+            # Mapuploader (verborgen bij start, alleen aangemaakt indien relevant)
+            if self._allow_folder_mode:
+                container_id = f"folder-upload-{self._zone_uid}"
+                self._folder_container = (
+                    ui.element("div")
+                    .props(f'id="{container_id}"')
+                    .classes("w-full")
+                )
+                with self._folder_container:
+                    (
+                        ui.upload(
+                            on_upload=self._handle_folder_upload,
+                            multiple=True,
+                            auto_upload=True,
+                        )
+                        .props("flat color=grey-3 text-color=grey-9 label='Map kiezen'")
+                        .classes("w-full sp-upload")
+                        .style("border:2px dashed #d0d0d0;border-radius:6px;min-height:72px;")
+                    )
+                self._folder_container.set_visibility(False)
+                # Injecteer webkitdirectory op de inner <input> na mount
+                ui.timer(
+                    0.4,
+                    lambda cid=container_id: self._inject_webkitdirectory(cid),
+                    once=True,
+                )
 
             self._results_slot = ui.column().classes("w-full gap-1 mt-2")
 
-    # --- Upload-handler (async) -------------------------------------------
+    # --- Mode-switch en JavaScript-injectie --------------------------------
+
+    def _switch_mode(self, folder_mode: bool) -> None:
+        self._folder_mode = folder_mode
+        self._file_upload_el.set_visibility(not folder_mode)
+        self._folder_container.set_visibility(folder_mode)
+        if self._hint_label:
+            self._hint_label.set_visibility(not folder_mode)
+        if self._folder_hint_label:
+            self._folder_hint_label.set_visibility(folder_mode)
+        active = f"background:{theme.ACCENT};color:white;border-radius:4px;"
+        inactive = "background:#f5f5f5;color:#888;border-radius:4px;"
+        self._btn_files.style(replace=inactive if folder_mode else active)
+        self._btn_folder.style(replace=active if folder_mode else inactive)
+
+    def _inject_webkitdirectory(self, container_id: str) -> None:
+        ui.run_javascript(f"""
+            (function() {{
+                var c = document.getElementById("{container_id}");
+                if (!c) return;
+                var inp = c.querySelector(".q-uploader__input");
+                if (!inp) return;
+                inp.setAttribute("webkitdirectory", "");
+                inp.setAttribute("mozdirectory", "");
+                inp.removeAttribute("accept");
+            }})();
+        """)
+
+    # --- Upload-handlers (async) ------------------------------------------
 
     async def _handle_upload(self, e) -> None:
         content = await e.file.read()
-        filename = e.file.name
+        await self._process_upload(e.file.name, content)
 
+    async def _handle_folder_upload(self, e) -> None:
+        fname = e.file.name
+        matches = "telbestand" in fname.lower() and fname.lower().endswith(".csv")
+
+        if matches:
+            self._folder_batch_count += 1
+
+        # Debounce: herstart de samenvattingstimer bij elk bestand
+        if self._folder_batch_task and not self._folder_batch_task.done():
+            self._folder_batch_task.cancel()
+        self._folder_batch_task = asyncio.create_task(self._show_folder_summary())
+
+        if not matches:
+            return
+
+        content = await e.file.read()
+        await self._process_upload(fname, content)
+
+    async def _show_folder_summary(self) -> None:
+        try:
+            await asyncio.sleep(1.5)
+            count = self._folder_batch_count
+            self._folder_batch_count = 0
+            if count == 0:
+                ui.notify(
+                    "Geen telbestanden gevonden in de geselecteerde map. "
+                    "Controleer of de bestanden 'telbestand' in de naam hebben en als .csv zijn opgeslagen.",
+                    type="warning",
+                    position="top",
+                    close_button=True,
+                    timeout=6000,
+                )
+        except asyncio.CancelledError:
+            pass
+
+    async def _process_upload(self, filename: str, content: bytes) -> None:
         self._results[filename] = FileCheckResult(
             filename=filename, status=FileStatus.CHECKING
         )
@@ -894,6 +1033,7 @@ class _WizardView:
                     on_change=self._on_tel_change,
                     delete_fn=delete_telbestand,
                     format_preview=_TEL_PREVIEW,
+                    allow_folder_mode=True,
                 )
                 self._coverage_slot = ui.column().classes("w-full")
 
