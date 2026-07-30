@@ -209,6 +209,7 @@ def save_and_validate_telbestand(
     """Sla een telbestand op in data/input_raw/telbestanden/ en valideer het."""
     dest_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
     os.makedirs(dest_dir, exist_ok=True)
+    filename = filename.lower()
     filepath = os.path.join(dest_dir, filename)
     with open(filepath, "wb") as f:
         f.write(content)
