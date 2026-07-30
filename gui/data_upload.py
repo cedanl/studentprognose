@@ -180,14 +180,32 @@ def compute_tel_coverage(results: dict[str, FileCheckResult]) -> TelCoverage | N
 
 
 def _sniff_separator(filepath: str) -> str:
-    """Detecteer het scheidingsteken (`;`, `,` of `\t`) via csv.Sniffer."""
-    try:
-        with open(filepath, newline="", encoding="utf-8", errors="replace") as fh:
-            sample = fh.read(8192)
-        dialect = csv.Sniffer().sniff(sample, delimiters=";,\t")
-        return dialect.delimiter
-    except csv.Error:
-        return ";"
+    """Kies het scheidingsteken dat de meeste kolommen oplevert.
+
+    csv.Sniffer faalt als data-velden het kandidaat-scheidingsteken bevatten
+    (bijv. puntkomma's in tekst terwijl de echte separator een tab is). We
+    proberen alle drie kandidaten en kiezen degene die de breedste tabel geeft.
+    """
+    required = {
+        "Studiejaar", "Isatcode", "Aantal", "meercode_V",
+        "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
+    }
+    best_sep = ";"
+    best_score: tuple[int, int] = (-1, -1)
+    for sep in (";", ",", "\t"):
+        try:
+            import io
+            with open(filepath, encoding="utf-8", errors="replace") as fh:
+                header = fh.readline()
+            cols = set(c.strip().strip('"').strip("'") for c in header.split(sep))
+            # Primair: meeste vereiste kolommen; secundair: meeste kolommen totaal
+            score = (len(cols & required), len(cols))
+            if score > best_score:
+                best_score = score
+                best_sep = sep
+        except Exception:
+            continue
+    return best_sep
 
 
 def _to_status(hard: list, soft: list, warnings: list) -> FileStatus:
