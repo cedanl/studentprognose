@@ -530,6 +530,7 @@ class _UploadZone:
     ) -> None:
         ui.add_css("""
             .sp-upload .q-uploader__list { display: none !important; }
+            .sp-upload .q-uploader__subtitle { display: none !important; }
         """)
         with (
             ui.card()
