@@ -260,3 +260,15 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
         if show_stepper:
             _stepper(active)
         yield
+        # "Volgende"-knop onderaan — alleen voor wizard-flow pagina's die hun
+        # eigen navigatie niet regelen (/wizard heeft stepper, /run heeft runner).
+        _NO_AUTO_NEXT = {"/", "/wizard", "/run", "/output"}
+        nxt = nav.next_route(active)
+        nxt_label = nav.next_label(active)
+        if nxt and active not in _NO_AUTO_NEXT:
+            with ui.row().classes("w-full justify-end mt-2"):
+                ui.button(
+                    nxt_label,
+                    icon="arrow_forward",
+                    on_click=lambda r=nxt: ui.navigate.to(r),
+                ).props("unelevated").style(f"background:{theme.ACCENT};color:#fff;")

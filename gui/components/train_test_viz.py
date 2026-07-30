@@ -48,7 +48,10 @@ def _compute(years_str: str, skip_years: int) -> dict | None:
 
     pred_start = min(years)
     pred_end = max(years)
-    pred_n = pred_end - pred_start + 1
+    # Use actual selected year count — not the range width — so non-contiguous
+    # selections (e.g. 2023 + 2025) get a proportional bar that reflects the
+    # real number of prediction years, not the gap-inflated range.
+    pred_n = len(years)
 
     if skip_years > 0:
         test_start = pred_start - skip_years
@@ -66,10 +69,14 @@ def _compute(years_str: str, skip_years: int) -> dict | None:
     if train_n <= 0:
         return None
 
+    contiguous = (pred_end - pred_start + 1) == pred_n
+
     return {
         "train": (train_start, train_end),
         "test": test,
         "pred": (pred_start, pred_end),
+        "pred_years": years,        # exacte selectie (voor niet-aaneengesloten jaren)
+        "pred_contiguous": contiguous,
         "train_n": train_n,
         "test_n": test_n,
         "pred_n": pred_n,
@@ -96,8 +103,8 @@ def _empty_state(msg: str = "Voer een prognosejaar in om de dataverdeling te zie
 # ── V1 — Horizon ────────────────────────────────────────────────────────────
 
 
-def render_v1(years_str: str, skip_years: int) -> str:
-    """V1 — Horizon: proportionele gesegmenteerde balk."""
+def render_v1(years_str: str, skip_years: int, weeks_str: str = "") -> str:
+    """V1 — Horizon: proportionele gesegmenteerde tijdlijn met week-annotatie."""
     d = _compute(years_str, skip_years)
     if d is None:
         return _empty_state()
@@ -105,72 +112,167 @@ def render_v1(years_str: str, skip_years: int) -> str:
     train_s, train_e = d["train"]
     pred_s, pred_e = d["pred"]
     train_n, test_n, pred_n = d["train_n"], d["test_n"], d["pred_n"]
+    total_n = train_n + test_n + pred_n
 
-    # Bouw sectielijst op
-    sections: list[tuple[str, str, int, int, int]] = [
-        ("Traindata", _T, train_n, train_s, train_e),
-    ]
+    # Eerste weeknummer uit de invoer, voor de peildatum-badge.
+    week_num: int | None = None
+    for tok in (weeks_str or "").strip().split():
+        if tok != ":" and ":" not in tok:
+            try:
+                week_num = int(tok)
+                break
+            except ValueError:
+                pass
+
+    # ── Procentuele grenzen voor tikmarkeringen ──────────────────────────────
+    train_pct = train_n / total_n * 100
+    test_pct = test_n / total_n * 100 if test_n > 0 else 0.0
+
+    # ── Labelrij (boven de balk) ─────────────────────────────────────────────
+    def _label(flex: int, txt: str, color: str, delay: float) -> str:
+        return (
+            f'<div style="flex:{flex}; min-width:0; font-size:9px; font-weight:700;'
+            f' letter-spacing:0.09em; text-transform:uppercase; color:{color};'
+            f' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;'
+            f' animation:sp-v1-up 0.38s {delay:.2f}s cubic-bezier(0.22,1,0.36,1) both;">'
+            f'{txt}</div>'
+        )
+
+    labels_html = _label(train_n, "Traindata", _T, 0.0)
+    if d["test"] is not None:
+        labels_html += _label(test_n, "Backtest", _V, 0.07)
+    labels_html += _label(pred_n, "Prognose", _P, 0.14)
+
+    # ── Balk-segmenten ───────────────────────────────────────────────────────
+    def _seg(flex: int, color: str, label: str, delay: float, glow: bool = False) -> str:
+        shadow = f"box-shadow:0 0 18px {color}66;" if glow else ""
+        return (
+            f'<div style="flex:{flex}; min-width:24px; background:{color};'
+            f' display:flex; align-items:center; justify-content:center; {shadow}'
+            f' animation:sp-v1-grow 0.45s {delay:.2f}s cubic-bezier(0.22,1,0.36,1) both;">'
+            f'<span style="font-size:12px; font-weight:600; color:#fff;'
+            f' letter-spacing:0.01em; text-shadow:0 1px 3px rgba(0,0,0,0.3);">{label}</span>'
+            f'</div>'
+        )
+
+    # Label in de prognose-balk: aaneengesloten → bereiknotatie, anders individuele jaren
+    # (max 3 getoond om overflow te voorkomen).
+    pred_years: list[int] = d["pred_years"]
+    if d["pred_contiguous"]:
+        pred_bar_label = _rng(pred_s, pred_e)
+    elif pred_n <= 3:
+        pred_bar_label = " · ".join(str(y) for y in pred_years)
+    else:
+        pred_bar_label = f"{pred_n} jaar"
+
+    bar_html = _seg(train_n, _T, _rng(train_s, train_e), 0.0)
     if d["test"] is not None:
         ts, te = d["test"]
-        sections.append(("Backtest", _V, test_n, ts, te))
-    sections.append(("Prognose", _P, pred_n, pred_s, pred_e))
-    n_secs = len(sections)
+        bar_html += _seg(test_n, _V, _rng(ts, te), 0.1)
+    bar_html += _seg(pred_n, _P, pred_bar_label, 0.2, glow=True)
 
-    def _seg(idx: int, role: str, color: str, flex: int, s: int, e: int) -> str:
-        is_first = idx == 0
-        is_last = idx == n_secs - 1
-        br = (
-            f"{'8px' if is_first else '0'}"
-            f" {'8px' if is_last else '0'}"
-            f" {'8px' if is_last else '0'}"
-            f" {'8px' if is_first else '0'}"
-        )
-        delay = idx * 0.09
+    # ── Tikmarkeringen op de jaaras ──────────────────────────────────────────
+    # Toont de beginjaren van elk segment + het eindjaar van de prognose als
+    # de prognose meer dan één jaar beslaat.
+    ticks: list[tuple[float, int, str]] = []  # (pct, year, align)
+    ticks.append((0.0, train_s, "left"))
+    if d["test"] is not None:
+        ts, te = d["test"]
+        ticks.append((train_pct, ts, "center"))
+        ticks.append((train_pct + test_pct, pred_s, "center"))
+    else:
+        ticks.append((train_pct, pred_s, "center"))
+    if pred_n > 1:
+        ticks.append((100.0, pred_e, "right"))
+
+    def _tick(pct: float, year: int, align: str, delay: float) -> str:
+        tx = {"left": "0", "center": "-50%", "right": "-100%"}[align]
         return (
-            f'<div style="flex:{flex}; min-width:56px; display:flex; flex-direction:column;'
-            f' animation:sp-v1-slide {0.45:.2f}s {delay:.2f}s cubic-bezier(0.22,1,0.36,1) both;">'
-            f'<div style="font-size:9px; font-weight:700; letter-spacing:0.09em; color:{color};'
-            f' text-transform:uppercase; margin-bottom:5px; padding-left:2px;'
-            f' white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{role}</div>'
-            f'<div style="height:52px; background:{color}; border-radius:{br};'
-            f' display:flex; align-items:center; justify-content:center;">'
-            f'<span style="font-size:13px; font-weight:600; color:#fff;'
-            f' letter-spacing:0.015em; text-shadow:0 1px 4px rgba(0,0,0,0.25);">'
-            f'{_rng(s, e)}</span>'
-            f'</div>'
-            f'<div style="font-size:10px; color:{_MU}; margin-top:5px; padding-left:2px;">'
-            f'{_yr(flex)}</div>'
-            f'</div>'
+            f'<div style="position:absolute; left:{pct:.1f}%; bottom:0;">'
+            f'<div style="width:1px; height:6px; background:#d0d0d0; margin-bottom:2px;"></div>'
+            f'<span style="display:block; font-size:10px; color:{_MU}; white-space:nowrap;'
+            f' transform:translateX({tx});">'
+            f'{year}</span></div>'
         )
 
-    bar_html = "\n".join(_seg(i, *sec) for i, sec in enumerate(sections))
-
-    leg_parts = [
-        (f'{_yr(train_n)} traindata', _T),
-    ]
-    if test_n > 0:
-        leg_parts.append((f'{_yr(test_n)} backtest', _V))
-    leg_parts.append((f'Prognose {_rng(pred_s, pred_e)}', _P))
-
-    legend_html = " &nbsp;<span style='color:#ccc; font-size:10px;'>&#9679;</span>&nbsp; ".join(
-        f'<span style="color:{c}; margin-right:3px; font-size:13px;">&#9679;</span>'
-        f'<span style="font-size:12px; color:#333;">{txt}</span>'
-        for txt, c in leg_parts
+    ticks_html = "".join(
+        _tick(p, y, a, 0.35 + i * 0.05) for i, (p, y, a) in enumerate(ticks)
     )
+
+    # ── Peildatum-badge (week) ───────────────────────────────────────────────
+    week_badge = ""
+    if week_num is not None:
+        week_badge = (
+            f'<span style="flex-shrink:0; display:inline-flex; align-items:center; gap:4px;'
+            f' background:#f4f4f4; border:1px solid #e2e2e2; border-radius:20px;'
+            f' padding:2px 9px 2px 6px; font-size:10px; color:{_MU}; white-space:nowrap;">'
+            f'<span style="font-size:11px;">&#128197;</span> week&nbsp;{week_num}'
+            f'</span>'
+        )
+
+    # ── Legenda ──────────────────────────────────────────────────────────────
+    train_pct_disp = train_n / total_n * 100
+
+    def _dot(color: str, txt: str, pct: float) -> str:
+        return (
+            f'<span style="display:inline-flex; align-items:center; gap:5px;">'
+            f'<span style="width:9px; height:9px; border-radius:50%; background:{color};'
+            f' flex-shrink:0;"></span>'
+            f'<span style="font-size:11px; color:#333;">{txt}</span>'
+            f'<span style="font-size:10px; color:{_MU};">({pct:.0f}%)</span>'
+            f'</span>'
+        )
+
+    if d["pred_contiguous"]:
+        pred_legend_label = f"Prognose {_rng(pred_s, pred_e)}"
+    elif pred_n <= 4:
+        pred_legend_label = "Prognose " + ", ".join(str(y) for y in pred_years)
+    else:
+        pred_legend_label = f"Prognose ({pred_n} jaar)"
+
+    legend_parts = [_dot(_T, f"{_yr(train_n)} traindata", train_pct_disp)]
+    if test_n > 0:
+        legend_parts.append(_dot(_V, f"{_yr(test_n)} backtest", test_n / total_n * 100))
+    legend_parts.append(_dot(_P, pred_legend_label, pred_n / total_n * 100))
+
+    sep = '<span style="color:#ddd; margin:0 3px; font-size:13px;">·</span>'
+    legend_html = sep.join(legend_parts)
 
     return (
         "<style>"
-        "@keyframes sp-v1-slide {"
-        " from { opacity:0; transform:translateY(12px); }"
-        " to   { opacity:1; transform:none; }"
+        "@keyframes sp-v1-up {"
+        " from { opacity:0; transform:translateY(7px); }"
+        " to   { opacity:1; transform:translateY(0); }"
+        "}"
+        "@keyframes sp-v1-grow {"
+        " from { opacity:0; transform:scaleX(0.88); transform-origin:left; }"
+        " to   { opacity:1; transform:scaleX(1); }"
         "}"
         "</style>"
         '<div style="font-family:inherit; padding:4px 0 6px;">'
-        f'  <div style="display:flex; gap:3px; align-items:flex-start;">{bar_html}</div>'
-        '  <div style="margin-top:11px; display:flex; gap:4px; align-items:center;'
-        '   flex-wrap:wrap; opacity:0; animation:sp-v1-slide 0.4s 0.35s ease both;">'
+
+        # Labels + week badge (zelfde flex-verdeling)
+        f'  <div style="display:flex; align-items:flex-end; gap:3px; margin-bottom:5px;">'
+        f'    <div style="flex:1; min-width:0; display:flex; gap:3px;">{labels_html}</div>'
+        f'    {week_badge}'
+        f'  </div>'
+
+        # Gesegmenteerde balk
+        '  <div style="display:flex; height:52px; border-radius:8px;'
+        '   overflow:hidden; gap:2px;">'
+        f'    {bar_html}'
+        '  </div>'
+
+        # Jaaras met tikmarkeringen
+        f'  <div style="position:relative; height:26px; margin-top:1px;">'
+        f'    {ticks_html}'
+        f'  </div>'
+
+        # Legenda — geen opacity-animatie zodat de tekst ook in headless mode zichtbaar is
+        f'  <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">'
         f'    {legend_html}'
-        "  </div>"
+        f'  </div>'
+
         "</div>"
     )
 

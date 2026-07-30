@@ -90,6 +90,45 @@ def _load_brincodes(project_dir: str) -> list[str]:
             continue
     return sorted(codes)
 
+# Significante Nederlandse HO-instellingen — value = opslaanaam, label = weergave.
+# Prefix "WO · " / "HBO · " geeft visuele groepering in de dropdown.
+# Wordt opgeslagen als naam tot de backend-mapping (naam → Brincode) gereed is.
+_INSTITUTIONS: dict[str, str] = {
+    "Universiteit van Amsterdam":      "WO · Universiteit van Amsterdam (UvA)",
+    "Vrije Universiteit Amsterdam":    "WO · Vrije Universiteit Amsterdam (VU)",
+    "Universiteit Leiden":             "WO · Universiteit Leiden",
+    "Erasmus Universiteit Rotterdam":  "WO · Erasmus Universiteit Rotterdam (EUR)",
+    "Radboud Universiteit":            "WO · Radboud Universiteit",
+    "Rijksuniversiteit Groningen":     "WO · Rijksuniversiteit Groningen (RUG)",
+    "Universiteit Utrecht":            "WO · Universiteit Utrecht (UU)",
+    "Tilburg University":              "WO · Tilburg University",
+    "Universiteit Maastricht":         "WO · Universiteit Maastricht (UM)",
+    "Universiteit Twente":             "WO · Universiteit Twente (UT)",
+    "Technische Universiteit Delft":   "WO · Technische Universiteit Delft (TU Delft)",
+    "Technische Universiteit Eindhoven": "WO · Technische Universiteit Eindhoven (TU/e)",
+    "Wageningen University & Research": "WO · Wageningen University & Research (WUR)",
+    "Hogeschool van Amsterdam":        "HBO · Hogeschool van Amsterdam (HvA)",
+    "Hogeschool Rotterdam":            "HBO · Hogeschool Rotterdam",
+    "Avans Hogeschool":                "HBO · Avans Hogeschool",
+    "Fontys Hogeschool":               "HBO · Fontys Hogeschool",
+    "Saxion Hogeschool":               "HBO · Saxion Hogeschool",
+    "Windesheim":                      "HBO · Windesheim",
+    "Hanze Hogeschool Groningen":      "HBO · Hanze Hogeschool Groningen",
+    "Hogeschool Utrecht":              "HBO · Hogeschool Utrecht (HU)",
+    "InHolland":                       "HBO · InHolland",
+    "NHL Stenden Hogeschool":          "HBO · NHL Stenden Hogeschool",
+    "De Haagse Hogeschool":            "HBO · De Haagse Hogeschool",
+    "Hogeschool Leiden":               "HBO · Hogeschool Leiden",
+    "Zuyd Hogeschool":                 "HBO · Zuyd Hogeschool",
+    "HAN University of Applied Sciences": "HBO · HAN University of Applied Sciences",
+    "HZ University of Applied Sciences":  "HBO · HZ University of Applied Sciences",
+    "Van Hall Larenstein":             "HBO · Van Hall Larenstein",
+    "Christelijke Hogeschool Ede":     "HBO · Christelijke Hogeschool Ede (CHE)",
+    "ArtEZ Hogeschool voor de Kunsten": "HBO · ArtEZ Hogeschool voor de Kunsten",
+    "HKU Hogeschool voor de Kunsten Utrecht": "HBO · HKU – Hogeschool voor de Kunsten Utrecht",
+    "Amsterdamse Hogeschool voor de Kunsten": "HBO · Amsterdamse Hogeschool voor de Kunsten (AHK)",
+}
+
 HELP = {
     "cumulative_timeseries": (
         "Tijdreeksmodel voor stap 1 van het cumulatieve spoor: extrapoleert de "
@@ -260,22 +299,16 @@ class _ConfigView:
             with ui.column().classes("gap-0"):
                 ui.label("Begin hier").classes("font-medium text-sm")
                 ui.label(
-                    "Pas deze 3 instellingen aan — de rest werkt prima met de aanbevolen waarden."
+                    "Pas deze 2 instellingen aan — de rest werkt prima met de aanbevolen waarden."
                 ).classes("text-sm opacity-60")
 
         self._institution_card()
         self._week_card()
-        self._year_card()
 
         ui.button("Opslaan", icon="save", on_click=self._save).props("unelevated").classes("mt-3")
 
     def _institution_card(self) -> None:
         current = self._config.setdefault("institution_filter", [])
-        available = _load_brincodes(STATE.project_dir or "")
-        # Zorg dat codes die al in config staan maar niet in de telbestanden zitten
-        # toch als optie beschikbaar zijn zodat de chip blijft staan.
-        options = sorted(set(available) | set(current))
-        has_data = bool(available)
 
         with ui.card().classes("w-full mb-4"):
             with ui.row().classes("items-start gap-4 no-wrap"):
@@ -288,28 +321,30 @@ class _ConfigView:
                         ui.label("Jouw instelling").classes("text-base font-medium")
                         ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
                     ui.label(
-                        "Selecteer één of meer Brincodes uit jouw telbestanden. "
-                        "Leeg = alle instellingen in de data."
-                        if has_data else
-                        "Typ een Brincode (bijv. 28DN) en druk op Enter. "
-                        "Upload eerst telbestanden om de lijst automatisch te vullen."
+                        "Selecteer jouw instelling. De prognose filtert de data automatisch."
                     ).classes("text-sm opacity-60 mt-1")
 
                     self._inst_select = (
                         ui.select(
-                            options=options,
-                            value=list(current),
-                            multiple=True,
-                            label=(
-                                f"{len(available)} Brincodes gevonden in telbestanden"
-                                if has_data else
-                                "Instelling(en) — bijv. 28DN, 21PB"
-                            ),
+                            options=_INSTITUTIONS,
+                            value=current[0] if current else None,
+                            label="Selecteer instelling",
                         )
-                        .props("use-chips new-value-mode=add-unique outlined use-input input-debounce=0")
+                        .props("outlined use-input input-debounce=0 clearable")
                         .classes("w-full mt-2")
                     )
                     self._inst_select.on_value_change(self._on_institution_change)
+
+                    # Mapping-status banner
+                    with ui.row().classes("items-start gap-2 mt-2 w-full").style(
+                        "background:#f7f7f7;border:1px solid #e8e8e8;"
+                        "border-radius:8px;padding:8px 10px;"
+                    ):
+                        ui.icon("build_circle").style("color:#bbb;font-size:16px;flex-shrink:0;margin-top:1px;")
+                        ui.label(
+                            "Koppeling instelling → Brincode nog te implementeren in de backend. "
+                            "Selectie wordt nu opgeslagen als naam."
+                        ).classes("text-xs").style("color:#aaa;line-height:1.5;")
 
                     if not current:
                         with ui.row().classes("items-center gap-1 mt-2"):
@@ -391,9 +426,24 @@ class _ConfigView:
 
         current_val = int(mc.get("min_training_year", _REC_YEAR))
         current_val = max(_SLIDER_MIN, min(current_val, _SLIDER_MAX))
+        state = {"year": current_val}
 
         def years_back(yr: int) -> int:
             return max(0, _THIS_YEAR - yr)
+
+        def build_presets() -> list[tuple[int, int]]:
+            """Geeft lijst van (jaar, jaren-terug) voor de preset-tegels."""
+            candidates = [_THIS_YEAR - n for n in (3, 4, 5, 6, 7, 10)]
+            pts = [(yr, _THIS_YEAR - yr) for yr in candidates
+                   if _SLIDER_MIN <= yr <= _SLIDER_MAX]
+            # Voeg "alles" toe als oudste beschikbare data niet al in de lijst zit
+            if not pts or _SLIDER_MIN < pts[-1][0]:
+                pts.append((_SLIDER_MIN, _THIS_YEAR - _SLIDER_MIN))
+            # Voeg huidige waarde toe als die niet in de presets zit
+            preset_years = {yr for yr, _ in pts}
+            if state["year"] not in preset_years:
+                pts.insert(0, (state["year"], _THIS_YEAR - state["year"]))
+            return pts
 
         with ui.card().classes("w-full mb-4"):
             with ui.row().classes("items-start gap-4 no-wrap"):
@@ -406,9 +456,7 @@ class _ConfigView:
                 with ui.column().classes("gap-1 grow"):
                     with ui.row().classes("items-center gap-2 flex-wrap"):
                         ui.label("Historische data").classes("text-base font-medium")
-                        ui.badge(f"★ Aanbevolen: {_REC_YEAR}").props(
-                            "color=accent outline"
-                        ).classes("text-xs")
+                        ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
                     ui.label(
                         "Hoeveel jaar terugkijken voor de training? Meer jaren geeft een "
                         "stabielere trend, maar heel vroege data weerspiegelt de "
@@ -416,47 +464,64 @@ class _ConfigView:
                     ).classes("text-sm opacity-60 mt-1")
 
                     if overlap_years:
-                        with ui.row().classes("items-center gap-1.5 mt-2"):
+                        with ui.row().classes("items-center gap-1.5 mt-1"):
                             ui.icon("folder_open").style(
                                 f"color: {theme.INFO}; font-size: 14px;"
                             )
                             ui.label(
                                 f"Beschikbare data: {min(overlap_years)}–{max(overlap_years)}"
-                                " (telbestanden ∩ oktoberbestand)"
                             ).classes("text-xs").style(f"color: {theme.INFO}")
 
-                    with ui.row().classes("items-center gap-4 mt-3 w-full"):
-                        self._year_lbl = ui.label(
-                            f"Vanaf {current_val} · {years_back(current_val)} jaar data"
-                        ).classes("text-sm font-medium shrink-0 w-52")
-                        yr_slider = ui.slider(
-                            min=_SLIDER_MIN, max=_SLIDER_MAX, step=1, value=current_val
-                        ).props("label-always").classes("grow")
+                    @ui.refreshable
+                    def _year_tiles() -> None:
+                        A = theme.ACCENT
+                        G = theme.NPULS_GREEN
+                        presets = build_presets()
+                        with ui.row().classes("gap-2 flex-wrap mt-3"):
+                            for yr, yrs in presets:
+                                is_sel = yr == state["year"]
+                                is_rec = yr == _REC_YEAR
+                                border = A if is_sel else ("#e0e0e0" if not is_rec else f"{A}55")
+                                bg = f"{A}12" if is_sel else ("white" if not is_rec else f"{A}06")
+                                label_col = A if is_sel else ("#555" if not is_rec else A)
 
-                    with ui.row().classes("justify-between w-full -mt-1"):
-                        ui.label(
-                            f"{_SLIDER_MIN} ({years_back(_SLIDER_MIN)} jaar)"
-                        ).classes("text-xs opacity-40")
-                        with ui.row().classes("items-center gap-1"):
-                            ui.icon("star").style(
-                                f"color: {theme.ACCENT}; font-size: 11px;"
-                            )
-                            ui.label(f"{_REC_YEAR} (aanbevolen)").classes(
-                                "text-xs font-medium"
-                            ).style(f"color: {theme.ACCENT}; opacity: 0.75")
-                        ui.label(
-                            f"{_SLIDER_MAX} ({years_back(_SLIDER_MAX)} jaar)"
-                        ).classes("text-xs opacity-40")
+                                tile = ui.element("div").style(
+                                    f"padding:10px 16px;border-radius:10px;"
+                                    f"border:2px solid {border};background:{bg};"
+                                    f"cursor:pointer;text-align:center;min-width:72px;"
+                                    f"transition:border-color 0.15s,background 0.15s,"
+                                    f"box-shadow 0.15s;"
+                                    + (f"box-shadow:0 0 0 3px {A}22;" if is_sel else "")
+                                )
 
-                    def on_year(e, mc_=mc):
-                        yr = int(e.value)
-                        mc_["min_training_year"] = yr
-                        self._year_lbl.set_text(
-                            f"Vanaf {yr} · {years_back(yr)} jaar data"
-                        )
-                        self._mark_dirty()
+                                def _pick(y=yr) -> None:
+                                    state["year"] = y
+                                    mc["min_training_year"] = y
+                                    self._mark_dirty()
+                                    _year_tiles.refresh()
 
-                    yr_slider.on_value_change(on_year)
+                                tile.on("click", _pick)
+                                with tile:
+                                    lbl = (
+                                        "Alles"
+                                        if yr == _SLIDER_MIN and yrs >= 10
+                                        else f"{yrs} jaar"
+                                    )
+                                    ui.label(lbl).style(
+                                        f"font-size:15px;font-weight:{'700' if is_sel else '600'};"
+                                        f"color:{label_col};line-height:1.2;"
+                                    )
+                                    ui.label(f"vanaf {yr}").style(
+                                        f"font-size:10px;color:{'#aaa' if not is_sel else A};"
+                                        f"margin-top:2px;"
+                                    )
+                                    if is_rec:
+                                        ui.label("★ aanbevolen").style(
+                                            f"font-size:9px;color:{A};font-weight:600;"
+                                            f"margin-top:3px;letter-spacing:0.03em;"
+                                        )
+
+                    _year_tiles()
 
     def _excl_years_card(self) -> None:
         with ui.card().classes("w-full mb-4"):
@@ -1092,7 +1157,7 @@ class _ConfigView:
         ui.notify("Configuratie opgeslagen.", type="positive", position="top")
 
     def _on_institution_change(self, e) -> None:
-        self._config["institution_filter"] = list(e.value or [])
+        self._config["institution_filter"] = [e.value] if e.value else []
         self._mark_dirty()
 
     # ─── Dirty-tracking ───────────────────────────────────────────────────────

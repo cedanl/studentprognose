@@ -97,3 +97,19 @@ def previous_route(active: str) -> str | None:
         if item.route == active and i > 0:
             return all_routes[i - 1].route
     return None
+
+
+def next_route(active: str) -> str | None:
+    """Return de volgende route in de wizard-flow, of None als er geen is."""
+    for i, item in enumerate(WIZARD_FLOW):
+        if item.route == active and i < len(WIZARD_FLOW) - 1:
+            return WIZARD_FLOW[i + 1].route
+    return None
+
+
+def next_label(active: str) -> str | None:
+    """Return het label van de volgende stap, of None."""
+    for i, item in enumerate(WIZARD_FLOW):
+        if item.route == active and i < len(WIZARD_FLOW) - 1:
+            return WIZARD_FLOW[i + 1].label
+    return None

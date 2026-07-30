@@ -28,6 +28,10 @@ _DATA_START: int = tvz.DATA_START
 _CURRENT_YEAR: int = datetime.date.today().year
 _FORECAST_YEARS: list[int] = list(range(_DATA_START + 1, _CURRENT_YEAR + 4))
 
+def _default_week() -> str:
+    return str(datetime.date.today().isocalendar()[1])
+
+
 _DEFAULTS: dict = {
     "dataset": "Beide",
     "cohort": "Eerstejaars",
@@ -97,6 +101,39 @@ def _max_skip(min_forecast_year: int) -> int:
     return max(0, min_forecast_year - _DATA_START - 1)
 
 
+def _parse_year_range(raw: str, valid: list[int]) -> list[int]:
+    """Zet bereiknotatie (``2023:2025``) of losse jaren (``2023 2024``) om.
+
+    Accepteert: ``2023:2025`` (bereik), ``2023 2024 2025`` (los) en
+    combinaties. Retourneert alleen jaren die in ``valid`` staan.
+    """
+    tokens = raw.strip().replace(":", " ").split()
+    result: list[int] = []
+    i = 0
+    while i < len(tokens):
+        try:
+            val = int(tokens[i])
+        except ValueError:
+            i += 1
+            continue
+        # Kijk of het volgende token ook een jaar is en het vorige een ':'
+        # bevatte (bereik-detectie via ruwe string).
+        result.append(val)
+        i += 1
+
+    # Her-evalueer als bereik als de ruwe string een ':' bevat.
+    if ":" in raw:
+        parts = raw.strip().split(":")
+        if len(parts) == 2:
+            try:
+                start, end = int(parts[0].strip()), int(parts[1].strip())
+                result = list(range(start, end + 1))
+            except ValueError:
+                pass
+
+    return sorted({y for y in result if y in valid})
+
+
 # ---------------------------------------------------------------------------
 # Route-registratie
 # ---------------------------------------------------------------------------
@@ -147,6 +184,10 @@ class _RunView:
 
         self._settings = {**_DEFAULTS, **stored}
 
+        # Gebruik huidige weeknummer als standaard wanneer er nog niets is opgeslagen.
+        if "weeks" not in stored:
+            self._settings["weeks"] = _default_week()
+
         # Als er nog geen opgeslagen instellingen zijn maar de wizard heeft een
         # modus gekozen, gebruik die als standaard voor de dataset-dropdown.
         if not app.storage.general.get(_STORAGE_KEY):
@@ -183,7 +224,7 @@ class _RunView:
                 ).classes("w-full")
                 self._cohort.on_value_change(lambda _e: self._update_preview())
 
-                # ── Prognosejaren (dropdown — alleen geldige jaren) ──────────
+                # ── Prognosejaren (dropdown + bereik-helper) ─────────────────
                 with ui.column().classes("w-full gap-0"):
                     self._years = (
                         ui.select(
@@ -206,6 +247,27 @@ class _RunView:
                     )
                     self._years_error.set_visibility(False)
                     self._years.on_value_change(lambda _e: self._on_years_change())
+
+                    # Bereik-invoer — bijv. 2023:2025 of 2023 2024 2025
+                    with ui.row().classes("items-center gap-2 mt-1 no-wrap"):
+                        ui.label("of bereik:").classes("text-xs flex-none").style(
+                            f"color:{theme.MUTED};"
+                        )
+                        self._year_range_input = (
+                            ui.input(placeholder="2023:2025")
+                            .props("dense outlined clearable")
+                            .style("width:100px; font-size:13px;")
+                        )
+                        self._year_range_input.tooltip(
+                            "Voer een bereik in (bijv. 2023:2025) of losse jaren "
+                            "(bijv. 2023 2024) en druk op Enter of klik ➕."
+                        )
+                        self._year_range_add_btn = ui.button(
+                            "", icon="add",
+                            on_click=self._add_year_range,
+                        ).props("unelevated dense size=sm color=primary")
+                        self._year_range_add_btn.tooltip("Voeg bereik toe")
+                        self._year_range_input.on("keydown.enter", self._add_year_range)
 
                 # ── Weken (tekstveld + inline validatie + aanbevolen-hint) ──
                 with ui.column().classes("w-full gap-0"):
@@ -277,19 +339,31 @@ class _RunView:
             # ── Checkboxen ──────────────────────────────────────────────────
             with ui.row().classes("w-full gap-6 mt-2"):
                 self._noetl = ui.checkbox(
-                    "ETL overslaan (--noetl)", value=self._settings["noetl"]
+                    "ETL overslaan", value=self._settings["noetl"]
+                )
+                self._noetl.tooltip(
+                    "Sla ETL én validatie over (--noetl). "
+                    "Gebruik dit alleen als de data al eerder is verwerkt."
                 )
                 self._dashboard = ui.checkbox(
-                    "Dashboards genereren (--dashboard)",
+                    "Dashboards genereren",
                     value=self._settings["dashboard"],
+                )
+                self._dashboard.tooltip(
+                    "Genereer interactieve Plotly-dashboards in data/output/visualisations/ (--dashboard)."
                 )
                 self._no_warnings = ui.checkbox(
                     "Waarschuwingen onderdrukken", value=self._settings["no_warnings"]
                 )
+                self._no_warnings.tooltip(
+                    "Onderdruk UserWarning-meldingen over historisch realisme en ontbrekende "
+                    "lag-fallback (--no-warnings). Gebruik dit als de warnings bekend zijn."
+                )
                 self._yes = ui.checkbox(
-                    "Validatieprompt overslaan (--yes)", value=self._settings["yes"]
+                    "Validatieprompt overslaan", value=self._settings["yes"]
                 )
                 self._yes.tooltip(
+                    "Sla de interactieve validatieprompt over (--yes). "
                     "Aanbevolen aan: een GUI-run heeft geen interactieve invoer."
                 )
                 for cb in (self._noetl, self._dashboard, self._no_warnings, self._yes):
@@ -375,6 +449,22 @@ class _RunView:
             )
         self._update_preview()
 
+    def _add_year_range(self, _e=None) -> None:
+        """Voeg jaar(bereik) toe aan de jarenselectie vanuit het invoerveld."""
+        raw = (self._year_range_input.value or "").strip()
+        if not raw:
+            return
+        to_add = _parse_year_range(raw, _FORECAST_YEARS)
+        if not to_add:
+            return
+        current = list(self._years.value or [])
+        for y in to_add:
+            if y not in current:
+                current.append(y)
+        self._years.set_value(sorted(current))
+        self._year_range_input.set_value("")
+        self._on_years_change()
+
     # ── Preview + visualisatie ────────────────────────────────────────────────
 
     def _years_as_str(self) -> str:
@@ -409,7 +499,8 @@ class _RunView:
 
     def _update_viz(self) -> None:
         skip = int(self._skip_years.value or 0)
-        self._viz_html.set_content(tvz.render_v1(self._years_as_str(), skip))
+        weeks = self._weeks.value or ""
+        self._viz_html.set_content(tvz.render_v1(self._years_as_str(), skip, weeks))
 
     # ── Validatie ────────────────────────────────────────────────────────────
 

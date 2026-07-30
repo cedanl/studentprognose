@@ -67,6 +67,11 @@ _USE_CASES: list[tuple[str, str, str]] = [
         "Accreditatie",
         "Onderbouw groeiprognoses kwantitatief voor NVAO-visitaties en jaarverslagen.",
     ),
+    (
+        "leaderboard",
+        "Benchmark",
+        "Vergelijk jouw instellingstrend met vergelijkbare instellingen — zie waar je staat.",
+    ),
 ]
 
 
@@ -208,42 +213,6 @@ class _HomeView:
                 # Use-case chips
                 self._render_use_cases()
 
-                ui.separator().classes("opacity-10 my-1").style("width:60%;")
-
-                # Voor/na-vergelijking — twee visuele kaartjes
-                ui.html(f"""
-                <div style="display:flex;align-items:center;gap:10px;
-                     max-width:380px;margin:4px auto 0;width:100%;">
-                  <div style="flex:1;padding:18px 20px;border-radius:14px;
-                       background:rgba(0,0,0,0.025);border:1px solid rgba(0,0,0,0.08);
-                       text-align:center;">
-                    <div style="display:inline-flex;align-items:center;justify-content:center;
-                         width:22px;height:22px;border-radius:50%;
-                         background:rgba(0,0,0,0.06);margin-bottom:10px;">
-                      <span class="material-icons" style="font-size:13px;color:#c0c0c0;">close</span>
-                    </div>
-                    <div style="font-size:30px;font-weight:800;color:#d8d8d8;
-                         line-height:1;margin-bottom:6px;letter-spacing:-0.5px;">Juni</div>
-                    <div style="font-size:11px;color:#c0c0c0;font-style:italic;">op gevoel</div>
-                  </div>
-                  <div style="flex-shrink:0;display:flex;align-items:center;">
-                    <span style="color:#d0d0d0;font-size:22px;font-weight:300;line-height:1;">→</span>
-                  </div>
-                  <div style="flex:1;padding:18px 20px;border-radius:14px;
-                       background:{A}0f;border:1px solid {A}32;
-                       text-align:center;">
-                    <div style="display:inline-flex;align-items:center;justify-content:center;
-                         width:22px;height:22px;border-radius:50%;
-                         background:{A}20;margin-bottom:10px;">
-                      <span class="material-icons" style="font-size:13px;color:{A};">check</span>
-                    </div>
-                    <div style="font-size:30px;font-weight:800;color:{A};
-                         line-height:1;margin-bottom:6px;letter-spacing:-0.5px;">Maart</div>
-                    <div style="font-size:11px;color:{A}99;font-style:italic;">op data</div>
-                  </div>
-                </div>
-                """).classes("w-full")
-
                 # Methodologie-link
                 ui.button(
                     "Hoe werkt het model?",
@@ -273,6 +242,7 @@ class _HomeView:
         "lock":            "350 plaatsen Geneeskunde · omzettingsfactor 67%",
         "trending_down":   "Opleiding Communicatie · instroom 2020–2025",
         "fact_check":      "NVAO-visitatie HBO Informatica · 2025",
+        "leaderboard":     "HBO Informatica · instroom 2021–2025 · 5 vergelijkbare instellingen",
     }
 
     def _open_use_case(self, icon_key: str, title: str) -> None:
@@ -283,6 +253,7 @@ class _HomeView:
             "lock": self._uc_numerus,
             "trending_down": self._uc_early_warning,
             "fact_check": self._uc_accreditatie,
+            "leaderboard": self._uc_benchmark,
         }
         render_fn = render_fns.get(icon_key)
         if not render_fn:
@@ -763,6 +734,114 @@ class _HomeView:
         self._uc_comparison(
             "Groei onderbouwen met alleen historische cijfers → visitatiecommissie vraagt naar toekomstverwachting.",
             "Prognose + trendanalyse als bijlage → commissie ziet kwantitatief bewijs → sterker dossier.",
+        )
+
+    def _uc_benchmark(self) -> None:
+        A = theme.ACCENT
+        POS = theme.POSITIVE
+        NEG = theme.NEGATIVE
+        ui.label(
+            "Groeit jouw instelling sneller of langzamer dan vergelijkbare instellingen? "
+            "Door je eigen prognose naast die van peers te leggen zie je waar je staat "
+            "en wat realistisch is om van te leren."
+        ).classes("text-xs opacity-60 leading-relaxed mb-1")
+
+        self._uc_section("HBO Informatica — instroom 2021–2025")
+        # Fictieve benchmark: 5 instellingen, eigen instelling = HvA
+        bench_data = [
+            ("Jouw instelling (HvA)", 245, 278, 312, 356, 400, True),
+            ("Hogeschool Rotterdam",  220, 241, 259, 271, 280, False),
+            ("Fontys Hogeschool",     310, 328, 345, 370, 395, False),
+            ("Saxion Hogeschool",     180, 188, 195, 204, 210, False),
+            ("Windesheim",            260, 272, 284, 301, 318, False),
+        ]
+        years = [2021, 2022, 2023, 2024, 2025]
+        peak = 400
+        rows_html = ""
+        for inst, *vals, is_own in bench_data:
+            last = vals[-1]
+            growth = round((vals[-1] / vals[0] - 1) * 100)
+            growth_str = f"+{growth}%" if growth >= 0 else f"{growth}%"
+            growth_col = POS if growth >= 10 else (NEG if growth < 0 else "#888")
+            bar_bg = A if is_own else "#c8c8c8"
+            font_w = "700" if is_own else "400"
+            name_col = "#1a1a1a" if is_own else "#555"
+            own_badge = (
+                f'<span style="font-size:9px;padding:1px 6px;border-radius:8px;'
+                f'background:{A}18;color:{A};border:1px solid {A}30;'
+                f'margin-left:5px;font-weight:600;">jij</span>'
+            ) if is_own else ""
+            bar_pct = round(last / peak * 100)
+            rows_html += f"""
+            <div style="margin-bottom:9px;">
+              <div style="display:flex;justify-content:space-between;
+                   align-items:center;margin-bottom:3px;">
+                <span style="font-size:11px;color:{name_col};font-weight:{font_w};">
+                  {inst}{own_badge}
+                </span>
+                <span style="font-size:11px;font-weight:600;color:{growth_col};">
+                  {growth_str}
+                </span>
+              </div>
+              <div style="background:#efefef;border-radius:4px;height:10px;overflow:hidden;">
+                <div style="width:{bar_pct}%;height:100%;background:{bar_bg};
+                     border-radius:4px;{'opacity:0.5;' if not is_own else ''}"></div>
+              </div>
+              <div style="display:flex;justify-content:space-between;
+                   font-size:9px;color:#bbb;margin-top:2px;">
+                {'  '.join(f'<span>{v}</span>' for v in vals)}
+              </div>
+            </div>"""
+
+        ui.html(f"""
+        <div style="background:#fafafa;border:1px solid #efefef;border-radius:10px;
+             padding:14px 16px;margin-bottom:12px;">
+          <div style="display:flex;justify-content:space-between;align-items:center;
+               margin-bottom:12px;">
+            <span style="font-size:12px;font-weight:600;color:#1a1a1a;">
+              Instroom eerstejaars
+            </span>
+            <div style="display:flex;gap:12px;">
+              {'  '.join(f'<span style="font-size:10px;color:#aaa;">{y}</span>' for y in years)}
+            </div>
+          </div>
+          {rows_html}
+        </div>
+        """)
+
+        self._uc_section("Wat zie je?")
+        ui.html(f"""
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;">
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 12px;
+               border-radius:8px;background:{A}08;border:1px solid {A}20;">
+            <span style="font-size:14px;flex-shrink:0;">📈</span>
+            <div style="font-size:11px;color:#444;line-height:1.55;">
+              <strong>Jij groeit het snelst (+63%)</strong> — maar Fontys heeft meer absolute volume.
+              Schaalvoordelen zijn daar mogelijk groter.
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 12px;
+               border-radius:8px;background:#f7f7f7;border:1px solid #e8e8e8;">
+            <span style="font-size:14px;flex-shrink:0;">💡</span>
+            <div style="font-size:11px;color:#555;line-height:1.55;">
+              Windesheim groeit stabiel (+22%) zonder grote pieken — mogelijk een
+              stabieler aanmeldpatroon om van te leren voor prognose-nauwkeurigheid.
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;align-items:flex-start;padding:9px 12px;
+               border-radius:8px;background:#f7f7f7;border:1px solid #e8e8e8;">
+            <span style="font-size:14px;flex-shrink:0;">⚠️</span>
+            <div style="font-size:11px;color:#555;line-height:1.55;">
+              Saxion en Rotterdam groeien nauwelijks — vergelijkbare regio, andere uitkomst.
+              Aanleiding voor strategisch gesprek.
+            </div>
+          </div>
+        </div>
+        """)
+
+        self._uc_comparison(
+            "Jouw groei ziet er sterk uit — maar je weet niet of je achterloopt of voorloopt op peers.",
+            "Benchmarkprognose toont: jij groeit het snelst. Leer van stabiele peers voor betere voorspelkwaliteit.",
         )
 
     # ── Dashboard (terugkerende gebruiker) ────────────────────────────────────
