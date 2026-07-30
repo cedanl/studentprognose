@@ -377,15 +377,6 @@ class _ConfigView:
                                 "Upload telbestanden om de beschikbare Brincodes te detecteren."
                             ).classes("text-xs").style("color: #aaa;")
 
-                    if not current_code:
-                        with ui.row().classes("items-center gap-1 mt-2"):
-                            ui.icon("warning_amber").style(
-                                f"color: {theme.WARNING}; font-size: 16px;"
-                            )
-                            ui.label(
-                                "Nog niet ingesteld — de prognose gebruikt data van alle instellingen."
-                            ).classes("text-xs").style(f"color: {theme.WARNING}")
-
     def _week_card(self) -> None:
         mc = self._config.setdefault("model_config", {})
 
