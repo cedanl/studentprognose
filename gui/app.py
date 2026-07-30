@@ -8,8 +8,10 @@ modules.
 
 from __future__ import annotations
 
+import asyncio
 import os
 
+from fastapi import File, Query, UploadFile
 from nicegui import app, ui
 
 #: Poort waarop de GUI draait. Vast, zodat de gedocumenteerde URL klopt.
@@ -18,6 +20,28 @@ PORT = 8080
 #: Map met huisstijl-assets (logo, hero, favicon), geserveerd op ``/gui-assets``.
 ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
 ASSETS_URL = "/gui-assets"
+
+
+@app.post("/api/upload-telbestand")
+async def _api_upload_telbestand(
+    file: UploadFile = File(...),
+    project_dir: str = Query(...),
+) -> dict:
+    """Verwerk één telbestand-CSV (voor de map-uploadmodus in de wizard)."""
+    from gui.data_upload import save_and_validate_telbestand
+
+    content = await file.read()
+    result = await asyncio.to_thread(
+        save_and_validate_telbestand, project_dir, file.filename, content
+    )
+    return {
+        "filename": result.filename,
+        "status": result.status.value,
+        "hard_errors": result.hard_errors,
+        "soft_errors": result.soft_errors,
+        "warnings": result.warnings,
+        "row_count": result.row_count,
+    }
 
 
 def _register_pages() -> None:

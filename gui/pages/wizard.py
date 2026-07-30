@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import json
 import os
 import tempfile
 from collections.abc import Callable
@@ -467,9 +468,7 @@ class _UploadZone:
         self._folder_mode: bool = False
         self._allow_folder_mode = allow_folder_mode
         self._zone_uid = str(id(self))
-        # Debounce-state voor map-upload samenvatting
-        self._folder_batch_count: int = 0
-        self._folder_batch_task: asyncio.Task | None = None
+        self._folder_input_id: str = f"sp-fi-{id(self)}"
         # Placeholders ingevuld in _build
         self._hint_label = None
         self._folder_hint_label = None
@@ -607,36 +606,79 @@ class _UploadZone:
                 .style("border:2px dashed #d0d0d0;border-radius:6px;min-height:72px;")
             )
 
-            # Mapuploader (verborgen bij start, alleen aangemaakt indien relevant)
+            # Mapuploader: volledig native HTML input (buiten Quasar zodat
+            # webkitdirectory betrouwbaar werkt).
             if self._allow_folder_mode:
-                container_id = f"folder-upload-{self._zone_uid}"
-                self._folder_container = (
-                    ui.element("div")
-                    .props(f'id="{container_id}"')
-                    .classes("w-full")
-                )
+                uid = self._zone_uid
+                fid = self._folder_input_id
+                ui.add_body_html(f"""
+<script>
+async function _spfu{uid}(inp) {{
+  var files = [].slice.call(inp.files).filter(function(f) {{
+    var n = f.name.toLowerCase();
+    return n.indexOf('telbestand') >= 0 && n.slice(-4) === '.csv';
+  }});
+  if (!files.length) {{ emitEvent('sp_fnm_{uid}', {{}}); inp.value = ''; return; }}
+  for (var i = 0; i < files.length; i++) {{
+    var f = files[i];
+    emitEvent('sp_fck_{uid}', {{fn: f.name.toLowerCase()}});
+    var fd = new FormData();
+    fd.append('file', f, f.name);
+    var el = document.getElementById('{fid}');
+    var pd = el ? (el.dataset.pd || '') : '';
+    try {{
+      var r = await fetch('/api/upload-telbestand?project_dir=' + encodeURIComponent(pd), {{method:'POST',body:fd}});
+      emitEvent('sp_fr_{uid}', await r.json());
+    }} catch(e) {{
+      emitEvent('sp_fr_{uid}', {{filename:f.name.toLowerCase(),status:'errors',
+        hard_errors:['Upload mislukt: '+String(e)],soft_errors:[],warnings:[],row_count:null}});
+    }}
+  }}
+  inp.value = '';
+}}
+</script>
+<input type="file" id="{fid}" webkitdirectory multiple style="display:none"
+       onchange="_spfu{uid}(this)">
+""")
+                ui.on(f"sp_fr_{uid}", self._on_folder_result)
+                ui.on(f"sp_fnm_{uid}", lambda _: self._on_folder_no_match())
+                ui.on(f"sp_fck_{uid}", self._on_folder_checking)
+
+                self._folder_container = ui.element("div").classes("w-full")
                 with self._folder_container:
-                    (
-                        ui.upload(
-                            on_upload=self._handle_folder_upload,
-                            multiple=True,
-                            auto_upload=True,
+                    click_zone = (
+                        ui.element("div")
+                        .classes(
+                            "w-full flex flex-col items-center justify-center "
+                            "cursor-pointer gap-2"
                         )
-                        .props("flat color=grey-3 text-color=grey-9 label='Map kiezen'")
-                        .classes("w-full sp-upload")
-                        .style("border:2px dashed #d0d0d0;border-radius:6px;min-height:72px;")
+                        .style(
+                            "border:2px dashed #d0d0d0;border-radius:6px;"
+                            "min-height:72px;padding:20px;"
+                        )
                     )
+                    click_zone.on(
+                        "click",
+                        lambda: ui.run_javascript(
+                            f"document.getElementById('{fid}').click()"
+                        ),
+                    )
+                    with click_zone:
+                        ui.icon("folder_open").classes("text-3xl").style("color:#aaa")
+                        ui.label("Klik om een map te selecteren").classes(
+                            "text-sm font-medium"
+                        ).style("color:#777")
+                        ui.label(
+                            "CSV-bestanden met 'telbestand' in de naam worden "
+                            "automatisch verwerkt"
+                        ).classes("text-xs text-center").style("color:#bbb")
                 self._folder_container.set_visibility(False)
-                # Injecteer webkitdirectory op de inner <input> na mount
-                ui.timer(
-                    0.4,
-                    lambda cid=container_id: self._inject_webkitdirectory(cid),
-                    once=True,
-                )
 
             self._results_slot = ui.column().classes("w-full gap-1 mt-2")
 
     # --- Mode-switch en JavaScript-injectie --------------------------------
+
+    # --- Mode-switch -------------------------------------------------------
 
     def _switch_mode(self, folder_mode: bool) -> None:
         self._folder_mode = folder_mode
@@ -650,60 +692,55 @@ class _UploadZone:
         inactive = "background:#f5f5f5;color:#888;border-radius:4px;"
         self._btn_files.style(replace=inactive if folder_mode else active)
         self._btn_folder.style(replace=active if folder_mode else inactive)
+        if folder_mode:
+            # Schrijf de huidige project_dir in een data-attribuut zodat de
+            # JavaScript fetch-handler het kan ophalen zonder extra roundtrip.
+            pd = json.dumps(self._project_dir_getter() or "")
+            ui.run_javascript(
+                f"var el=document.getElementById('{self._folder_input_id}');"
+                f"if(el)el.dataset.pd={pd};"
+            )
 
-    def _inject_webkitdirectory(self, container_id: str) -> None:
-        ui.run_javascript(f"""
-            (function() {{
-                var c = document.getElementById("{container_id}");
-                if (!c) return;
-                var inp = c.querySelector(".q-uploader__input");
-                if (!inp) return;
-                inp.setAttribute("webkitdirectory", "");
-                inp.setAttribute("mozdirectory", "");
-                inp.removeAttribute("accept");
-            }})();
-        """)
+    # --- Folder-event-handlers (vanuit JavaScript via emitEvent) ----------
 
-    # --- Upload-handlers (async) ------------------------------------------
+    def _on_folder_result(self, e) -> None:
+        data = e.args
+        filename = data.get("filename", "")
+        result = FileCheckResult(
+            filename=filename,
+            status=FileStatus(data.get("status", "errors")),
+            hard_errors=data.get("hard_errors", []),
+            soft_errors=data.get("soft_errors", []),
+            warnings=data.get("warnings", []),
+            row_count=data.get("row_count"),
+        )
+        self._results[filename] = result
+        self._refresh_results()
+        self._on_change()
+
+    def _on_folder_checking(self, e) -> None:
+        filename = e.args.get("fn", "")
+        self._results[filename] = FileCheckResult(
+            filename=filename, status=FileStatus.CHECKING
+        )
+        self._refresh_results()
+
+    def _on_folder_no_match(self) -> None:
+        ui.notify(
+            "Geen telbestanden gevonden in de geselecteerde map. "
+            "Controleer of de bestanden 'telbestand' in de naam hebben "
+            "en als .csv zijn opgeslagen.",
+            type="warning",
+            position="top",
+            close_button=True,
+            timeout=6000,
+        )
+
+    # --- Bestandsupload-handler (async, via Quasar uploader) --------------
 
     async def _handle_upload(self, e) -> None:
         content = await e.file.read()
         await self._process_upload(e.file.name, content)
-
-    async def _handle_folder_upload(self, e) -> None:
-        fname = e.file.name
-        matches = "telbestand" in fname.lower() and fname.lower().endswith(".csv")
-
-        if matches:
-            self._folder_batch_count += 1
-
-        # Debounce: herstart de samenvattingstimer bij elk bestand
-        if self._folder_batch_task and not self._folder_batch_task.done():
-            self._folder_batch_task.cancel()
-        self._folder_batch_task = asyncio.create_task(self._show_folder_summary())
-
-        if not matches:
-            return
-
-        content = await e.file.read()
-        await self._process_upload(fname, content)
-
-    async def _show_folder_summary(self) -> None:
-        try:
-            await asyncio.sleep(1.5)
-            count = self._folder_batch_count
-            self._folder_batch_count = 0
-            if count == 0:
-                ui.notify(
-                    "Geen telbestanden gevonden in de geselecteerde map. "
-                    "Controleer of de bestanden 'telbestand' in de naam hebben en als .csv zijn opgeslagen.",
-                    type="warning",
-                    position="top",
-                    close_button=True,
-                    timeout=6000,
-                )
-        except asyncio.CancelledError:
-            pass
 
     async def _process_upload(self, filename: str, content: bytes) -> None:
         self._results[filename] = FileCheckResult(
