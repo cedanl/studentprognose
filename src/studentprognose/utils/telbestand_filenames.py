@@ -148,7 +148,7 @@ def compile_patterns(configuration: dict | None) -> list[TelbestandPattern]:
         raw_patterns = list(raw)
 
     return [
-        TelbestandPattern(raw=p, regex=re.compile(_placeholder_to_regex(p)))
+        TelbestandPattern(raw=p, regex=re.compile(_placeholder_to_regex(p), re.IGNORECASE))
         for p in raw_patterns
     ]
 
