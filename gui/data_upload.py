@@ -57,7 +57,7 @@ _CFG: dict = {
             "Studiejaar", "Isatcode", "Aantal", "meercode_V",
             "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
         ],
-        "herkomst_allowed": ["N", "E", "R"],
+        "herkomst_allowed": ["N", "E", "R", "O"],
         "herinschrijving_allowed": ["J", "N"],
         "hogerejaars_allowed": ["J", "N"],
     },
