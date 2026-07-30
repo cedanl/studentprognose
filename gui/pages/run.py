@@ -37,7 +37,6 @@ _DEFAULTS: dict = {
     "cohort": "Eerstejaars",
     "years": [_CURRENT_YEAR],
     "weeks": "38",
-    "institutions": [],
     "skip_years": 0,
     "noetl": False,
     "dashboard": False,
@@ -235,20 +234,6 @@ class _RunView:
                     self._weeks_error.set_visibility(False)
                     self._weeks.on_value_change(lambda _e: self._on_weeks_change())
 
-                # ── Instellingsfilter ────────────────────────────────────────
-                self._institutions = (
-                    ui.select(
-                        options=list(self._settings["institutions"]),
-                        value=list(self._settings["institutions"]),
-                        multiple=True,
-                        with_input=True,
-                        label="Instellingsfilter (leeg = alle)",
-                    )
-                    .props("use-chips new-value-mode=add-unique")
-                    .classes("w-full")
-                )
-                self._institutions.on_value_change(lambda _e: self._update_preview())
-
                 # ── Jaren overslaan — max afhankelijk van jarenselectie ──────
                 with ui.column().classes("w-full gap-0"):
                     self._skip_years = ui.number(
@@ -387,7 +372,6 @@ class _RunView:
             cohort=self._cohort.value,
             years=self._years_as_str(),
             weeks=self._weeks.value or "",
-            institutions=list(self._institutions.value or []),
             skip_years=int(self._skip_years.value or 0),
             noetl=self._noetl.value,
             dashboard=self._dashboard.value,
@@ -445,7 +429,6 @@ class _RunView:
             "cohort": self._cohort.value,
             "years": list(self._years.value or []),
             "weeks": self._weeks.value or "",
-            "institutions": list(self._institutions.value or []),
             "skip_years": int(self._skip_years.value or 0),
             "noetl": self._noetl.value,
             "dashboard": self._dashboard.value,
