@@ -95,4 +95,14 @@ We gebruiken **uv**, een snelle Python-pakketbeheerder die virtual environments 
 ??? failure "`python: command not found` of versie te laag"
     Python is niet geïnstalleerd of niet in je PATH. Zie [Voordat je begint](#voordat-je-begint). Op sommige systemen heet het commando `python3`.
 
+??? failure "macOS: `XGBoost Library (libxgboost.dylib) could not be loaded`"
+    XGBoost heeft op macOS een systeembibliotheek nodig die niet via `uv` wordt meegeïnstalleerd. Installeer die eenmalig via Homebrew:
+
+    ```bash
+    brew install libomp
+    ```
+
+    Herstart daarna je terminal. Heb je Homebrew nog niet?  
+    Zie [brew.sh](https://brew.sh) voor de installatiecommando's.
+
 Andere fouten (bijv. `TerminatedWorkerError` tijdens het draaien) staan bij [Draaien & CLI → Veelvoorkomende fouten](aan-de-slag.md#veelvoorkomende-fouten).

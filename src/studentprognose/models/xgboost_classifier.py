@@ -1,5 +1,16 @@
+import platform
+
 import numpy as np
-from xgboost import XGBClassifier
+
+try:
+    from xgboost import XGBClassifier
+except (ImportError, OSError) as _xgb_err:
+    _hint = ""
+    if platform.system() == "Darwin":
+        _hint = "\n\nmacOS: installeer de vereiste OpenMP runtime:\n  brew install libomp\n\nHerstart daarna je terminal."
+    raise ImportError(
+        f"XGBoost kon niet worden geladen: {_xgb_err}{_hint}"
+    ) from _xgb_err
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.compose import ColumnTransformer
 
