@@ -19,6 +19,7 @@ from collections.abc import Callable
 from nicegui import ui
 
 from gui import demodata, nav, theme
+from gui.components.file_picker import DirectoryPicker
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.states import error_banner, info_banner, section_title
@@ -938,86 +939,49 @@ class _WizardView:
 
     def __init__(self) -> None:
         stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        self._project_dir = os.path.join(os.getcwd(), "tmp", f"studentprognose{stamp}")
+        # Default buiten de studentprognose-projectmap: in de home-map van de
+        # gebruiker (bv. /home/gebruiker/tmp/studentprognose20260731170615).
+        self._project_dir = os.path.join(
+            os.path.expanduser("~"), "tmp", f"studentprognose{stamp}"
+        )
         self._mode: str = "cumulative"
+        self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
     def _build(self) -> None:
-        self._build_path_info_card()
         with ui.stepper().props("vertical").classes("w-full") as self._stepper:
+            self._build_step1()
             self._build_step2()
             self._build_step3()
 
-    # ── Projectlocatie-infokaart (buiten stepper) ────────────────────────────
+    # ── Stap 1: map kiezen ──────────────────────────────────────────────────
 
-    def _build_path_info_card(self) -> None:
-        """Toont de automatisch gegenereerde projectlocatie als elegante infokaart."""
-        with (
-            ui.card()
-            .classes("w-full mb-2")
-            .style(
-                "border: 1.5px solid #e3eaf8; border-radius: 12px;"
-                f"background: linear-gradient(135deg, #f7f9ff 0%, #eef3ff 100%);"
-            )
-        ):
-            with ui.row().classes("items-center gap-3 no-wrap w-full"):
-                # Icoon in gekleurde ronde achtergrond
-                with ui.element("div").style(
-                    f"width:40px;height:40px;border-radius:10px;"
-                    f"background:{theme.ACCENT}18;display:flex;"
-                    "align-items:center;justify-content:center;flex-shrink:0;"
-                ):
-                    ui.icon("folder_special").style(
-                        f"color:{theme.ACCENT};font-size:22px;"
-                    )
-
-                with ui.column().classes("gap-0 grow min-w-0"):
-                    ui.label("Projectlocatie").classes("text-xs font-semibold").style(
-                        "color:#8a9bbf;letter-spacing:.04em;text-transform:uppercase;"
-                    )
-                    ui.label(self._project_dir).classes("text-sm font-mono").style(
-                        "color:#1a2540;word-break:break-all;line-height:1.4;"
-                    )
-
-                # Kopieerknop
-                copy_btn = (
-                    ui.button(icon="content_copy")
-                    .props("flat dense round size=sm")
-                    .style("color:#bcc8e0;flex-shrink:0;")
-                    .tooltip("Pad kopiëren")
+    def _build_step1(self) -> None:
+        with ui.step("Projectmap kiezen"):
+            ui.label(
+                "Kies de map waarin het project wordt aangemaakt. "
+                "Een bestaande configuratie wordt niet overschreven."
+            ).classes("text-sm opacity-70")
+            with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                self._path_input = (
+                    ui.input("Projectmap", value=self._project_dir)
+                    .props("outlined dense")
+                    .classes("grow")
                 )
-                copy_btn.on(
-                    "click",
-                    lambda: [
-                        ui.run_javascript(
-                            f"navigator.clipboard.writeText({json.dumps(self._project_dir)})"
-                        ),
-                        ui.notify(
-                            "Pad gekopieerd",
-                            icon="check",
-                            type="positive",
-                            position="top",
-                            timeout=1800,
-                        ),
-                    ],
-                )
+                ui.button(
+                    "Bladeren",
+                    icon="folder_open",
+                    on_click=lambda: self._picker.open(self._path_input.value),
+                ).props("outline")
+            with ui.stepper_navigation():
+                ui.button("Volgende", on_click=self._goto_create)
 
-            # Subtiele info-strip onderaan
-            with ui.row().classes("items-center gap-1.5 mt-0").style(
-                "padding-top:8px;border-top:1px solid #dce6f7;"
-            ):
-                ui.icon("auto_awesome").classes("text-xs").style("color:#b0bfe0;")
-                ui.label(
-                    "Deze locatie is automatisch gegenereerd op basis van de huidige datum en tijd. "
-                    "Je hoeft niets in te stellen."
-                ).classes("text-xs").style("color:#9aaac8;line-height:1.4;")
-
-    # ── Stap 1 (was 2): aanmaken ────────────────────────────────────────────
+    # ── Stap 2: aanmaken ────────────────────────────────────────────────────
 
     def _build_step2(self) -> None:
         with ui.step("Aanmaken"):
             self._conflict_slot = ui.column().classes("w-full")
-            self._refresh_conflict_slot()
+            self._confirm_path = ui.label().classes("text-sm font-mono opacity-60 mb-2")
             with ui.row().classes("items-center gap-4 flex-wrap"):
                 self._demo_checkbox = ui.checkbox(
                     "Demo Studielink-data downloaden (≈4 MB)",
@@ -1054,6 +1018,7 @@ class _WizardView:
             self._demo_progress.set_visibility(False)
             self._panel = ProcessPanel()
             with ui.stepper_navigation():
+                ui.button("Terug", on_click=self._stepper.previous).props("flat")
                 self._create_btn = ui.button(
                     "Project aanmaken",
                     icon="build",
@@ -1061,7 +1026,7 @@ class _WizardView:
                 )
             self._create_feedback = ui.column().classes("mt-2 w-full")
 
-    # ── Stap 2 (was 3): modus kiezen + data uploaden ────────────────────────
+    # ── Stap 3: modus kiezen + data uploaden ────────────────────────────────
 
     def _build_step3(self) -> None:
         with ui.step("Data uploaden"):
@@ -1309,9 +1274,12 @@ class _WizardView:
 
         self._proceed_btn.set_visibility(ready)
 
-    # ── Conflict-check (eenmalig bij build) ─────────────────────────────────
+    # ── Stap-overgangen ─────────────────────────────────────────────────────
 
-    def _refresh_conflict_slot(self) -> None:
+    def _goto_create(self) -> None:
+        self._project_dir = os.path.abspath(self._path_input.value.strip())
+        self._confirm_path.set_text(self._project_dir)
+
         self._conflict_slot.clear()
         if os.path.isfile(
             os.path.join(self._project_dir, "configuration", "configuration.json")
@@ -1322,6 +1290,11 @@ class _WizardView:
                     "De bestaande configuratie blijft behouden — "
                     "er wordt niets overschreven."
                 )
+
+        self._stepper.next()
+
+    def _on_dir_selected(self, path: str) -> None:
+        self._path_input.set_value(path)
 
     # ── Project aanmaken ────────────────────────────────────────────────────
 
