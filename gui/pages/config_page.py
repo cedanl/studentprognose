@@ -1356,8 +1356,14 @@ class _ConfigView:
                 type="negative",
             )
             return
+        filter_errors = filtering_io.validate_filtering(self._filtering_data)
+        if filter_errors:
+            for err in filter_errors:
+                ui.notify(err, type="negative")
+            return
         try:
             config_io.save_config(self._path, self._config)
+            filtering_io.save_filtering(STATE.filtering_path, self._filtering_data)
         except OSError as exc:
             ui.notify(f"Opslaan mislukt: {exc}", type="negative")
             return
