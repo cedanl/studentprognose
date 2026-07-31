@@ -33,9 +33,8 @@ class NavItem:
 WIZARD_FLOW: list[NavItem] = [
     NavItem("/wizard", "1. Project", "folder_open", step=1),
     NavItem("/config", "2. Configuratie", "tune", step=2),
-    NavItem("/filtering", "3. Filteren", "filter_alt", step=3),
-    NavItem("/run", "4. Uitvoeren", "play_arrow", step=4),
-    NavItem("/output", "5. Resultaten", "insights", step=5),
+    NavItem("/run", "3. Uitvoeren", "play_arrow", step=3),
+    NavItem("/output", "4. Resultaten", "insights", step=4),
 ]
 
 #: Losse tools buiten de lineaire flow.

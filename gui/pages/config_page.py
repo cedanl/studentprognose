@@ -15,7 +15,7 @@ import os
 
 from nicegui import ui
 
-from gui import config_io, nav, theme
+from gui import config_io, filtering_io, nav, theme
 from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
 from gui.state import STATE
@@ -265,6 +265,9 @@ class _ConfigView:
         self._excl_rows: list[dict] = [
             dict(item) for item in self._config.setdefault("excluded_data_points", [])
         ]
+        self._filtering_data = filtering_io.load_filtering(STATE.filtering_path)
+        self._filtering = self._filtering_data["filtering"]
+        self._student_df = self._load_student_count_df()
         self._build()
 
     # ─── Hoofd-layout ────────────────────────────────────────────────────────
@@ -671,12 +674,195 @@ class _ConfigView:
                     "Wijzig alleen als je weet wat je doet."
                 ).classes("text-sm opacity-50")
 
+        self._filtering_section()
         self._model_section()
         self._ensemble_section()
         self._nf_section()
         self._excl_section()
         self._runtime_section()
         ui.button("Opslaan", icon="save", on_click=self._save).props("unelevated").classes("mt-3")
+
+    def _load_student_count_df(self):
+        path = os.path.join(
+            STATE.project_dir, "data", "input", "student_count_first-years.xlsx"
+        )
+        if not os.path.isfile(path):
+            return None
+        try:
+            import pandas as pd
+            return pd.read_excel(path)
+        except (OSError, ValueError):
+            return None
+
+    def _filter_programme_options(self) -> list[str]:
+        options = set(self._filtering.get("programme", []))
+        if self._student_df is not None:
+            col = self._config.get("column_roles", {}).get("programme", "Croho groepeernaam")
+            if col in self._student_df.columns:
+                options |= set(self._student_df[col].dropna().astype(str).unique())
+        return sorted(options)
+
+    def _filtering_section(self) -> None:
+        active_count = (
+            len(self._filtering.get("programme", []))
+            + len(self._filtering.get("herkomst", []))
+            + len(self._filtering.get("examentype", []))
+        )
+        header_suffix = f" — {active_count} filter(s) actief" if active_count else " — geen filter (alle data)"
+
+        with ui.expansion(
+            f"Filteren{header_suffix}", icon="filter_alt", value=True
+        ).classes("w-full") as self._filter_expansion:
+            with ui.row().classes("items-center gap-3 mb-4 px-4 py-3 rounded-xl").style(
+                f"background: {theme.ACCENT}09; border: 1px solid {theme.ACCENT}28"
+            ):
+                ui.icon("info").style(f"color: {theme.ACCENT}; font-size: 16px;")
+                ui.label(
+                    "Leeg = geen filter (alle data). Vul alleen in als je de pipeline "
+                    "wilt beperken tot bepaalde opleidingen, herkomsten of examentypes."
+                ).classes("text-sm").style(f"color: {theme.ACCENT}99")
+
+            # --- Opleidingen ---
+            with ui.column().classes("w-full gap-1 mb-4"):
+                with ui.row().classes("items-center gap-2 mb-1"):
+                    ui.label("Opleidingen").classes("text-sm font-semibold")
+                    if self._filtering.get("programme"):
+                        ui.badge(
+                            f"{len(self._filtering['programme'])} geselecteerd"
+                        ).props("color=accent outline").classes("text-xs")
+                    else:
+                        ui.badge("Alle").props("color=positive outline").classes("text-xs")
+                ui.label(
+                    "Leeg = alle opleidingen. Typ om te zoeken of voer handmatig in."
+                ).classes("text-xs opacity-50")
+                prog_opts = self._filter_programme_options()
+                self._filter_programme_select = (
+                    ui.select(
+                        options=prog_opts,
+                        value=list(self._filtering.get("programme", [])),
+                        multiple=True,
+                        with_input=True,
+                        label="Opleidingen selecteren",
+                    )
+                    .props("use-chips new-value-mode=add-unique outlined")
+                    .classes("w-full mt-1")
+                )
+                self._filter_programme_select.on_value_change(
+                    self._on_filter_programme_change
+                )
+
+            # --- Herkomst & Examentype naast elkaar ---
+            with ui.row().classes("w-full gap-4 no-wrap mb-4"):
+                with ui.card().classes("grow").style(
+                    "border: 1px solid #e8e8e8; box-shadow: none;"
+                ):
+                    with ui.row().classes("items-center gap-2 mb-1"):
+                        ui.label("Herkomst").classes("text-sm font-semibold")
+                        selected_h = self._filtering.get("herkomst", [])
+                        if selected_h:
+                            ui.badge(
+                                f"{len(selected_h)} geselecteerd"
+                            ).props("color=accent outline").classes("text-xs")
+                        else:
+                            ui.badge("Alle").props("color=positive outline").classes("text-xs")
+                    ui.label("Leeg = alle herkomsten.").classes("text-xs opacity-50 mb-2")
+                    self._filter_herkomst_boxes = {}
+                    for choice in filtering_io.HERKOMST_CHOICES:
+                        cb = ui.checkbox(
+                            choice,
+                            value=choice in self._filtering.get("herkomst", []),
+                        )
+                        cb.on_value_change(self._on_filter_herkomst_change)
+                        self._filter_herkomst_boxes[choice] = cb
+
+                with ui.card().classes("grow").style(
+                    "border: 1px solid #e8e8e8; box-shadow: none;"
+                ):
+                    with ui.row().classes("items-center gap-2 mb-1"):
+                        ui.label("Examentype").classes("text-sm font-semibold")
+                        selected_e = self._filtering.get("examentype", [])
+                        if selected_e:
+                            ui.badge(
+                                f"{len(selected_e)} geselecteerd"
+                            ).props("color=accent outline").classes("text-xs")
+                        else:
+                            ui.badge("Alle").props("color=positive outline").classes("text-xs")
+                    ui.label("Leeg = alle examentypes.").classes("text-xs opacity-50 mb-2")
+                    self._filter_examentype_boxes = {}
+                    for choice in filtering_io.EXAMENTYPE_CHOICES:
+                        cb = ui.checkbox(
+                            choice,
+                            value=choice in self._filtering.get("examentype", []),
+                        )
+                        cb.on_value_change(self._on_filter_examentype_change)
+                        self._filter_examentype_boxes[choice] = cb
+
+            # --- Live preview ---
+            self._filter_preview = ui.column().classes("w-full")
+            self._update_filter_preview()
+
+    def _on_filter_programme_change(self, e) -> None:
+        self._filtering["programme"] = list(e.value or [])
+        self._mark_dirty()
+        self._update_filter_preview()
+
+    def _on_filter_herkomst_change(self, _e) -> None:
+        self._filtering["herkomst"] = [
+            c for c, box in self._filter_herkomst_boxes.items() if box.value
+        ]
+        self._mark_dirty()
+        self._update_filter_preview()
+
+    def _on_filter_examentype_change(self, _e) -> None:
+        self._filtering["examentype"] = [
+            c for c, box in self._filter_examentype_boxes.items() if box.value
+        ]
+        self._mark_dirty()
+        self._update_filter_preview()
+
+    def _update_filter_preview(self) -> None:
+        self._filter_preview.clear()
+        with self._filter_preview:
+            if self._student_df is None:
+                with ui.row().classes("items-center gap-2 px-3 py-2 rounded-lg").style(
+                    "background: #f5f5f5; border: 1px solid #e0e0e0;"
+                ):
+                    ui.icon("info").style("color: #aaa; font-size: 14px;")
+                    ui.label(
+                        "Live preview niet beschikbaar — "
+                        "draai eerst de pipeline om student_count te genereren."
+                    ).classes("text-xs opacity-60")
+                return
+
+            roles = self._config.get("column_roles", {})
+            remaining, total = filtering_io.count_programmes(
+                self._student_df,
+                programme_col=roles.get("programme", "Croho groepeernaam"),
+                origin_col=roles.get("origin", "Herkomst"),
+                exam_col=roles.get("exam_type", "Examentype"),
+                programme=self._filtering.get("programme", []),
+                herkomst=self._filtering.get("herkomst", []),
+                examentype=self._filtering.get("examentype", []),
+            )
+            if total == 0:
+                return
+
+            pct = remaining / total
+            if pct >= 0.999:
+                color, icon = theme.POSITIVE, "check_circle"
+                msg = f"Alle {total} opleidingen geselecteerd (geen filter actief)."
+            elif remaining > 0:
+                color, icon = theme.ACCENT, "filter_alt"
+                msg = f"{remaining} van {total} opleidingen geselecteerd na filtering."
+            else:
+                color, icon = theme.NEGATIVE, "warning"
+                msg = "Geen opleidingen geselecteerd — controleer je filterinstellingen."
+
+            with ui.row().classes("items-center gap-2 px-4 py-2 rounded-lg").style(
+                f"background: {color}12; border: 1px solid {color}35;"
+            ):
+                ui.icon(icon).style(f"color: {color}; font-size: 16px;")
+                ui.label(msg).classes("text-sm font-medium").style(f"color: {color}")
 
     def _model_section(self) -> None:
         mc = self._config.setdefault("model_config", {})
