@@ -97,6 +97,7 @@ def main() -> None:
     _register_pages()
     ui.run(
         title="Studentprognose",
+        host="127.0.0.1",
         port=PORT,
         reload=False,
         show=False,
