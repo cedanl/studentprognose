@@ -253,6 +253,12 @@ class _ConfigView:
                 self._build_json()
                 tab_json.on("click", self._refresh_json_text)
 
+        with ui.row().classes("w-full justify-end mt-6"):
+            with ui.element("div").on("click", self._on_next_click):
+                self._next_btn = ui.button(
+                    "Volgende", icon="arrow_forward"
+                ).props("unelevated color=accent")
+
     # ─── Basis-tabblad ───────────────────────────────────────────────────────
 
     def _build_basis(self) -> None:
@@ -1527,6 +1533,16 @@ class _ConfigView:
 
     # ─── Dirty-tracking ───────────────────────────────────────────────────────
 
+    def _on_next_click(self) -> None:
+        if self._dirty:
+            ui.notify(
+                "Sla de configuratie eerst op voordat je verder gaat.",
+                type="warning",
+                position="top",
+            )
+            return
+        ui.navigate.to(nav.next_route("/config"))
+
     def _mark_dirty(self) -> None:
         if not self._dirty:
             self._dirty = True
@@ -1534,8 +1550,10 @@ class _ConfigView:
         self._status.set_text("● Niet-opgeslagen wijzigingen").style(
             f"color: {theme.WARNING}"
         )
+        self._next_btn.props(add="disabled")
 
     def _clear_dirty(self) -> None:
         self._dirty = False
         ui.run_javascript("window.__spDirty = false;")
         self._status.set_text("✓ Opgeslagen").style(f"color: {theme.POSITIVE}")
+        self._next_btn.props(remove="disabled")

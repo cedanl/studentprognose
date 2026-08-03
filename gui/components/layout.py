@@ -272,7 +272,7 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
         with ui.row().classes("items-center gap-2 no-wrap"):
             ui.image("/gui-assets/npuls-logo-white.svg").classes("w-8 h-8")
         # Gecentreerde paginatitel — absoluut gepositioneerd zodat links/rechts vrij zijn.
-        ui.label("Studentprognose").classes("text-lg font-medium text-white").style(
+        ui.label("CEDA").classes("text-lg font-medium text-white").style(
             "position: absolute; left: 50%; transform: translateX(-50%); white-space: nowrap;"
         )
         with ui.row().classes("items-center gap-3 no-wrap"):
