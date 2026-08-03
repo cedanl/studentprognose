@@ -90,46 +90,6 @@ def _load_brincodes(project_dir: str) -> list[str]:
             continue
     return sorted(codes)
 
-# Brincode → leesbare naam voor bekende Nederlandse HO-instellingen.
-# De select gebruikt de Brincode als waarde (wat de backend verwacht na ETL-rename
-# Brincode → "Korte naam instelling"). Labels zijn enkel voor weergave.
-_BRIN_LABELS: dict[str, str] = {
-    # WO
-    "28DN": "WO · Universiteit van Amsterdam (UvA)",
-    "21PQ": "WO · Vrije Universiteit Amsterdam (VU)",
-    "21PG": "WO · Universiteit Leiden",
-    "21PS": "WO · Erasmus Universiteit Rotterdam (EUR)",
-    "21PF": "WO · Radboud Universiteit",
-    "21PE": "WO · Rijksuniversiteit Groningen (RUG)",
-    "21PI": "WO · Universiteit Utrecht (UU)",
-    "21PH": "WO · Tilburg University",
-    "21PJ": "WO · Universiteit Maastricht (UM)",
-    "21PK": "WO · Universiteit Twente (UT)",
-    "21PM": "WO · Technische Universiteit Delft (TU Delft)",
-    "21PL": "WO · Technische Universiteit Eindhoven (TU/e)",
-    "01KI": "WO · Wageningen University & Research (WUR)",
-    # HBO
-    "25DW": "HBO · Hogeschool van Amsterdam (HvA)",
-    "21QD": "HBO · Hogeschool Rotterdam",
-    "25FK": "HBO · Avans Hogeschool",
-    "25LN": "HBO · Fontys Hogeschool",
-    "25MG": "HBO · Saxion Hogeschool",
-    "26MW": "HBO · Windesheim",
-    "22OJ": "HBO · Hanze Hogeschool Groningen",
-    "22AI": "HBO · Hogeschool Utrecht (HU)",
-    "25GH": "HBO · InHolland",
-    "21QJ": "HBO · NHL Stenden Hogeschool",
-    "27PZ": "HBO · De Haagse Hogeschool",
-    "27AS": "HBO · Hogeschool Leiden",
-    "22OH": "HBO · Zuyd Hogeschool",
-    "25GS": "HBO · HAN University of Applied Sciences",
-    "30GB": "HBO · HZ University of Applied Sciences",
-    "30FO": "HBO · Van Hall Larenstein",
-    "08OK": "HBO · Christelijke Hogeschool Ede (CHE)",
-    "30AV": "HBO · ArtEZ Hogeschool voor de Kunsten",
-    "25JX": "HBO · HKU – Hogeschool voor de Kunsten Utrecht",
-    "27DO": "HBO · Amsterdamse Hogeschool voor de Kunsten (AHK)",
-}
 
 HELP = {
     "cumulative_timeseries": (
@@ -337,12 +297,7 @@ class _ConfigView:
                     ).classes("text-sm opacity-60 mt-1")
 
                     if data_codes:
-                        options = {
-                            code: f"{code} — {_BRIN_LABELS[code]}" if code in _BRIN_LABELS else code
-                            for code in data_codes
-                        }
-                        if current_code and current_code not in options:
-                            options = {current_code: current_code, **options}
+                        options = data_codes if not (current_code and current_code not in data_codes) else [current_code, *data_codes]
 
                         self._inst_select = (
                             ui.select(
