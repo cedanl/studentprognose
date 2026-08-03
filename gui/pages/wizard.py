@@ -1386,17 +1386,11 @@ class _WizardView:
             with ui.stepper_navigation():
                 if not self._locked_folder:
                     ui.button("Terug", on_click=self._stepper.previous).props("flat")
-                ui.button(
-                    "Overslaan",
-                    icon="skip_next",
-                    on_click=lambda: ui.navigate.to("/config"),
-                ).props("flat color=grey")
                 self._proceed_btn = ui.button(
                     "Naar configuratie",
                     icon="arrow_forward",
                     on_click=lambda: ui.navigate.to("/config"),
-                ).props("unelevated color=accent")
-                self._proceed_btn.set_visibility(False)
+                ).props("unelevated color=accent disabled")
 
             # Initialiseer visuele staat nadat alle elementen bestaan.
             self._apply_mode()
@@ -1603,11 +1597,13 @@ class _WizardView:
                 with ui.row().classes("items-center gap-2"):
                     ui.icon("info").style(f"color: {theme.INFO}").classes("text-base")
                     ui.label(
-                        "Upload de vereiste bestanden of klik 'Overslaan' als je "
-                        "ze al handmatig hebt geplaatst."
+                        "Upload de vereiste bestanden om door te gaan."
                     ).classes("text-xs opacity-70")
 
-        self._proceed_btn.set_visibility(ready)
+        if ready:
+            self._proceed_btn.props(remove="disabled")
+        else:
+            self._proceed_btn.props("disabled")
 
     # ── Stap-overgangen ─────────────────────────────────────────────────────
 
