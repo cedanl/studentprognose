@@ -27,6 +27,10 @@ Open daarna [http://localhost:8080](http://localhost:8080) in je browser.
 
 ## Direct proberen (demo)
 
+De startpagina opent met het beeldmerk van Studentprognose — een diploma-baret
+boven een stijgende pijl — en een korte waardepropositie met de belangrijkste
+toepassingen van instroom-prognoses.
+
 Op de startpagina staat een knop **"Probeer direct met demodata"**. Die zet
 automatisch een tijdelijk project op, downloadt de demodataset en draait de
 pipeline — allemaal met live voortgang. Voor de snelheid beperkt de demo zich tot

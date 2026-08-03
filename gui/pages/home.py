@@ -178,17 +178,18 @@ class _HomeView:
         ):
             with ui.column().classes("w-full items-center text-center gap-3 py-1"):
 
-                # Pill-badge
-                ui.html(
-                    f'<div style="display:inline-flex;align-items:center;gap:5px;'
-                    f'padding:4px 13px;border-radius:20px;font-size:11px;font-weight:600;'
-                    f'letter-spacing:0.055em;text-transform:uppercase;'
-                    f'background:{A}12;color:{A};border:1px solid {A}28;">'
-                    f'<span class="material-icons" style="font-size:13px;line-height:1;'
-                    f'vertical-align:text-bottom;">lightbulb</span>'
-                    f'&thinsp;Instroom-prognose'
-                    f'</div>'
-                )
+                # Logo-lockup: het beeldmerk (baret boven stijgende pijl) met
+                # de woordmerk-tekst. Zet meteen de merkidentiteit neer.
+                with ui.column().classes("items-center gap-1"):
+                    ui.image("/gui-assets/logo.svg").classes("w-16 h-16").style(
+                        "filter: drop-shadow(0 2px 6px rgba(0,0,0,0.10));"
+                    )
+                    ui.html(
+                        '<div style="font-size:20px;font-weight:700;'
+                        'letter-spacing:-0.3px;line-height:1;">'
+                        f'Student<span style="color:{A}">prognose</span>'
+                        "</div>"
+                    )
 
                 # Headline + subtitel
                 ui.label("Weet in maart wat september brengt").classes(

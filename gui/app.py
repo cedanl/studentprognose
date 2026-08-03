@@ -61,7 +61,6 @@ def _register_pages() -> None:
         explainability,
         filtering,
         home,
-        logo,
         methodology,
         output,
         peer_benchmark,
@@ -79,7 +78,6 @@ def _register_pages() -> None:
     output.create()
     benchmark.create()
     methodology.create()
-    logo.create()
     # UX Flow
     uxflow.create()
     # Concept-features
