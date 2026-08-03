@@ -1280,87 +1280,173 @@ class _ConfigView:
     # ─── JSON-tabblad ────────────────────────────────────────────────────────
 
     def _build_json(self) -> None:
+        ui.add_head_html(
+            '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jsoneditor@10'
+            '/dist/jsoneditor.min.css">\n'
+            '<script src="https://cdn.jsdelivr.net/npm/jsoneditor@10'
+            '/dist/jsoneditor.min.js"></script>\n'
+            + f"""<style>
+#sp-json-ed {{height:560px}}
+.jsoneditor {{border:none !important;border-radius:10px !important;overflow:hidden;
+    box-shadow:0 0 0 1px #e0e0e0}}
+.jsoneditor-menu {{background:{theme.PRIMARY} !important;
+    border-bottom:2px solid {theme.ACCENT}44 !important}}
+.jsoneditor-menu button {{color:rgba(255,255,255,.75) !important;
+    border-radius:5px !important;transition:background .15s}}
+.jsoneditor-menu button:hover {{background:rgba(255,255,255,.1) !important}}
+.jsoneditor-menu button.jsoneditor-selected {{background:{theme.ACCENT} !important;
+    color:#fff !important}}
+.jsoneditor-navigation-bar {{background:#f8f9ff !important;
+    border-bottom:1px solid #eaecf5 !important;
+    font-size:11.5px !important;color:#5a607a !important}}
+.jsoneditor-statusbar {{background:#f8f9ff !important;
+    border-top:1px solid #eaecf5 !important;
+    font-size:11px !important;color:#9da3bb !important}}
+.jsoneditor-field {{color:#1a2030 !important;font-weight:500}}
+.jsoneditor-value.jsoneditor-string {{color:{theme.NPULS_GREEN} !important}}
+.jsoneditor-value.jsoneditor-number {{color:{theme.ACCENT} !important;font-weight:600}}
+.jsoneditor-value.jsoneditor-boolean {{color:{theme.SECONDARY} !important;font-weight:600}}
+.jsoneditor-value.jsoneditor-null {{color:#aab !important;font-style:italic}}
+.jsoneditor-search input {{border-radius:4px !important;
+    border:1px solid rgba(255,255,255,.25) !important;
+    background:rgba(255,255,255,.1) !important;color:#fff !important;
+    padding:2px 7px !important}}
+.jsoneditor-search input::placeholder {{color:rgba(255,255,255,.4) !important}}
+.jsoneditor-search .jsoneditor-results {{color:rgba(255,255,255,.6) !important}}
+</style>"""
+        )
+
         with ui.row().classes("items-center gap-3 mb-4 px-4 py-3 rounded-xl").style(
             "background: #1a1a1a08; border: 1px solid #1a1a1a18;"
         ):
             ui.icon("data_object").classes("text-xl opacity-40")
-            with ui.column().classes("gap-0"):
+            with ui.column().classes("gap-0 grow"):
                 ui.label("Directe JSON-bewerking").classes("font-medium text-sm")
                 ui.label(
-                    "Voor gevorderde gebruikers. Elke sleutel is bewerkbaar. "
-                    "Gebruik 'Toepassen' om wijzigingen naar de andere tabbladen te laden."
+                    "Boom-modus: klik ▶ om secties open/dicht te klappen, "
+                    "dubbelklik op een waarde om te bewerken. "
+                    "Schakel linksboven naar Code-modus voor vrije tekstbewerking."
                 ).classes("text-sm opacity-50")
 
-        with ui.row().classes("items-center gap-2 mb-2"):
-            ui.icon("folder_open").classes("text-sm opacity-30")
-            ui.label(self._path).classes("text-xs font-mono opacity-50 break-all")
+        with ui.row().classes("items-center gap-2 mb-3"):
+            ui.icon("folder_open").style("color: #bbb; font-size: 14px;")
+            ui.label(self._path).classes("text-xs font-mono opacity-40 break-all")
 
-        with ui.card().classes("w-full").style("border: 1px solid #e0e0e0; box-shadow: none;"):
-            self._json_area = (
-                ui.textarea(
-                    value=json.dumps(self._config, ensure_ascii=False, indent=4)
-                )
-                .props("outlined borderless")
-                .classes("w-full font-mono")
-                .style("min-height: 22rem; font-size: 12.5px; line-height: 1.5;")
-            )
-            self._json_error = ui.label("").classes("text-sm px-3 pb-1").style(
-                f"color: {theme.NEGATIVE}"
-            )
-            with ui.row().classes("gap-2 px-3 pb-3 flex-wrap items-center").style(
-                "border-top: 1px solid #f0f0f0; padding-top: 12px;"
-            ):
-                ui.button(
-                    "Valideer",
-                    icon="check_circle_outline",
-                    on_click=self._validate_json_only,
-                ).props("outline dense")
-                ui.button(
-                    "Opmaak",
-                    icon="format_indent_increase",
-                    on_click=self._format_json,
-                ).props("flat dense")
-                ui.separator().props("vertical").classes("mx-1").style("height: 28px;")
-                ui.button(
-                    "Toepassen",
-                    icon="check",
-                    on_click=self._apply_json,
-                ).props("unelevated dense")
-                ui.button("Opslaan", icon="save", on_click=self._save).props(
-                    "unelevated dense color=positive"
-                )
+        ui.html('<div id="sp-json-ed"></div>')
 
-    def _refresh_json_text(self) -> None:
-        self._json_area.set_value(
-            json.dumps(self._config, ensure_ascii=False, indent=4)
+        self._json_error = ui.label("").classes("text-sm px-1 mt-1").style(
+            f"color: {theme.NEGATIVE}"
         )
 
-    def _validate_json_only(self) -> None:
+        with ui.row().classes("gap-2 mt-3 flex-wrap items-center").style(
+            "border-top: 1px solid #f0f0f0; padding-top: 12px;"
+        ):
+            ui.button(
+                "Valideer",
+                icon="check_circle_outline",
+                on_click=self._validate_json_editor,
+            ).props("outline dense")
+            ui.button(
+                "Alles uitklappen",
+                icon="unfold_more",
+                on_click=lambda: ui.run_javascript(
+                    "window.__spJE && window.__spJE.expandAll()"
+                ),
+            ).props("flat dense")
+            ui.button(
+                "Alles inklappen",
+                icon="unfold_less",
+                on_click=lambda: ui.run_javascript(
+                    "window.__spJE && window.__spJE.collapseAll()"
+                ),
+            ).props("flat dense")
+            ui.separator().props("vertical").classes("mx-1").style("height: 28px;")
+            ui.button(
+                "Toepassen",
+                icon="check",
+                on_click=self._apply_json_editor,
+            ).props("unelevated dense")
+            ui.button(
+                "Opslaan",
+                icon="save",
+                on_click=self._save_json_editor,
+            ).props("unelevated dense color=positive")
+
+        self._run_json_editor_init()
+
+    def _run_json_editor_init(self) -> None:
+        config_json = json.dumps(self._config, ensure_ascii=False)
+        ui.run_javascript(
+            f"""
+            (function tryInit(n) {{
+                const el = document.getElementById('sp-json-ed');
+                if (!el) return;
+                if (typeof JSONEditor === 'undefined') {{
+                    if (n > 0) {{ setTimeout(() => tryInit(n - 1), 150); return; }}
+                    el.innerHTML = '<p style="color:#c0392b;padding:16px;font-size:13px">'
+                        + '&#9888; JSONEditor kon niet worden geladen'
+                        + ' &#x2014; controleer je internetverbinding.</p>';
+                    return;
+                }}
+                if (window.__spJE) {{ try {{ window.__spJE.destroy(); }} catch (_) {{}} }}
+                window.__spJE = new JSONEditor(el, {{
+                    mode: 'tree',
+                    modes: ['tree', 'code'],
+                    mainMenuBar: true,
+                    navigationBar: true,
+                    statusBar: true,
+                    search: true,
+                    enableSort: false,
+                    enableTransform: false,
+                    onError: function (e) {{ console.error('JSONEditor:', e); }},
+                }});
+                window.__spJE.set({config_json});
+                window.__spJE.expandAll();
+            }})(15);
+            """
+        )
+
+    def _refresh_json_text(self) -> None:
+        config_json = json.dumps(self._config, ensure_ascii=False)
+        ui.run_javascript(
+            f"""
+            if (window.__spJE) {{
+                try {{
+                    window.__spJE.set({config_json});
+                    window.__spJE.expandAll();
+                }} catch (e) {{ console.error('refresh error', e); }}
+            }}
+            """
+        )
+
+    async def _get_editor_json(self) -> str:
+        result = await ui.run_javascript(
+            "try { return JSON.stringify(window.__spJE.get()); }"
+            " catch(e) { return '__ERR__:' + e.message; }",
+            timeout=5.0,
+        )
+        if isinstance(result, str) and result.startswith("__ERR__:"):
+            raise ValueError(result[8:])
+        return result
+
+    async def _validate_json_editor(self) -> None:
         try:
-            config_io.parse_json(self._json_area.value)
+            json_text = await self._get_editor_json()
+            config_io.parse_json(json_text)
             self._json_error.set_text("")
             ui.notify("JSON is geldig.", type="positive", position="top-right")
-        except (json.JSONDecodeError, ValueError) as exc:
+        except Exception as exc:
             self._json_error.set_text(f"Fout: {exc}")
-            ui.notify("Ongeldige JSON — zie de foutmelding hieronder.", type="negative")
+            ui.notify("Ongeldige JSON — zie de melding hieronder.", type="negative")
 
-    def _format_json(self) -> None:
+    async def _apply_json_editor(self) -> bool:
         try:
-            parsed = config_io.parse_json(self._json_area.value)
-            self._json_area.set_value(
-                json.dumps(parsed, ensure_ascii=False, indent=4)
-            )
-            self._json_error.set_text("")
-        except (json.JSONDecodeError, ValueError) as exc:
-            self._json_error.set_text(f"Kan niet opmaken: {exc}")
-
-    def _apply_json(self) -> None:
-        try:
-            parsed = config_io.parse_json(self._json_area.value)
+            json_text = await self._get_editor_json()
+            parsed = config_io.parse_json(json_text)
         except (json.JSONDecodeError, ValueError) as exc:
             self._json_error.set_text(f"Ongeldige JSON: {exc}")
             ui.notify(f"Ongeldige JSON: {exc}", type="negative")
-            return
+            return False
         self._json_error.set_text("")
         self._config = parsed
         self._nf_rows = [
@@ -1371,10 +1457,12 @@ class _ConfigView:
             dict(item) for item in self._config.get("excluded_data_points", [])
         ]
         self._mark_dirty()
-        ui.notify(
-            "JSON toegepast. Sla op om de wijzigingen te bewaren.",
-            type="positive",
-        )
+        ui.notify("JSON toegepast. Sla op om de wijzigingen te bewaren.", type="positive")
+        return True
+
+    async def _save_json_editor(self) -> None:
+        if await self._apply_json_editor():
+            self._save()
 
     # ─── Validatie & opslaan ──────────────────────────────────────────────────
 
