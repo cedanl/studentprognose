@@ -337,37 +337,93 @@ class _ConfigView:
 
     def _week_card(self) -> None:
         mc = self._config.setdefault("model_config", {})
+        _REC_WEEK = 38
+        _PRESET_WEEKS = [36, 37, 38, 39, 40]
+        _SUBTITLES = {36: "UvA-aanmeldfase", 38: "Meeste instellingen"}
+        _MIN_WEEK, _MAX_WEEK = 1, 52
+        # Holder zodat een tegelklik het vrije-invoerveld kan meebewegen zonder
+        # het (buiten de refreshable levende) invoerveld te herbouwen.
+        custom_ref: dict[str, object] = {}
+
+        def _current() -> int:
+            return int(mc.get("final_academic_week", _REC_WEEK))
+
+        def _start_week(final: int) -> int:
+            """Eerste week van het academisch jaar (reset-week net na ``final``)."""
+            return final + 1 if final < _MAX_WEEK else 1
+
+        def _apply(week: int) -> None:
+            """Zet de eindweek, houd de UI in sync en markeer als gewijzigd."""
+            week = max(_MIN_WEEK, min(_MAX_WEEK, week))
+            mc["final_academic_week"] = week
+            inp = custom_ref.get("input")
+            if inp is not None and int(inp.value or 0) != week:  # type: ignore[union-attr]
+                inp.value = week  # type: ignore[union-attr]
+            self._mark_dirty()
+            _week_tiles.refresh()
+            _horizon_hint.refresh()
 
         @ui.refreshable
-        def _week_options() -> None:
-            current = mc.get("final_academic_week", 38)
-            with ui.grid(columns=2).classes("gap-3 mt-3 max-w-sm"):
-                for week, subtitle, recommended in [
-                    (36, "Typisch UvA", False),
-                    (38, "Meeste instellingen", True),
-                ]:
-                    selected = current == week
-                    border = theme.ACCENT if selected else "#e0e0e0"
-                    bg = f"{theme.ACCENT}0e" if selected else "white"
-                    col = theme.ACCENT if selected else "#333"
+        def _week_tiles() -> None:
+            A = theme.ACCENT
+            current = _current()
+            # Toon de vaste presets; valt de huidige waarde erbuiten, voeg hem toe
+            # zodat een handmatig gekozen week ook als geselecteerde tegel oplicht.
+            weeks = sorted(set(_PRESET_WEEKS) | {current})
+            with ui.row().classes("gap-2 flex-wrap mt-3"):
+                for wk in weeks:
+                    is_sel = wk == current
+                    is_rec = wk == _REC_WEEK
+                    border = A if is_sel else ("#e0e0e0" if not is_rec else f"{A}55")
+                    bg = f"{A}12" if is_sel else ("white" if not is_rec else f"{A}06")
+                    label_col = A if is_sel else ("#555" if not is_rec else A)
+                    subtitle = _SUBTITLES.get(wk, "")
 
-                    def _pick(w=week) -> None:
-                        mc["final_academic_week"] = w
-                        _week_options.refresh()
-                        self._mark_dirty()
-
-                    with ui.card().classes("cursor-pointer p-3 text-center").style(
-                        f"border: 2px solid {border}; background: {bg};"
-                    ).on("click", _pick):
-                        with ui.column().classes("items-center gap-0.5"):
-                            ui.label(f"Week {week}").classes("font-semibold text-base").style(
-                                f"color: {col}"
+                    tile = ui.element("div").style(
+                        f"padding:10px 16px;border-radius:10px;"
+                        f"border:2px solid {border};background:{bg};"
+                        f"cursor:pointer;text-align:center;min-width:72px;"
+                        f"transition:border-color 0.15s,background 0.15s,box-shadow 0.15s;"
+                        + (f"box-shadow:0 0 0 3px {A}22;" if is_sel else "")
+                    )
+                    tile.on("click", lambda w=wk: _apply(w))
+                    with tile:
+                        ui.label(f"Week {wk}").style(
+                            f"font-size:15px;font-weight:{'700' if is_sel else '600'};"
+                            f"color:{label_col};line-height:1.2;"
+                        )
+                        if subtitle:
+                            ui.label(subtitle).style(
+                                f"font-size:10px;color:{'#aaa' if not is_sel else A};"
+                                f"margin-top:2px;"
                             )
-                            ui.label(subtitle).classes("text-xs opacity-60")
-                            if recommended:
-                                ui.badge("★ Aanbevolen").props(
-                                    "color=accent outline"
-                                ).classes("text-xs mt-1")
+                        if is_rec:
+                            ui.label("★ aanbevolen").style(
+                                f"font-size:9px;color:{A};font-weight:600;"
+                                f"margin-top:3px;letter-spacing:0.03em;"
+                            )
+
+        @ui.refreshable
+        def _horizon_hint() -> None:
+            current = _current()
+            start = _start_week(current)
+            with ui.row().classes("items-center gap-1.5 mt-3"):
+                ui.icon("timeline").style(f"color:{theme.INFO};font-size:14px;")
+                ui.label(
+                    f"Het academisch jaar loopt dan van week {start} tot en met "
+                    f"week {current} (het jaar erop)."
+                ).classes("text-xs").style(f"color:{theme.INFO}")
+
+        def _on_custom(e) -> None:
+            if e.value is None or e.value == "":
+                return
+            try:
+                week = int(e.value)
+            except (TypeError, ValueError):
+                return
+            if week == _current():
+                return
+            _apply(week)
 
         with ui.card().classes("w-full mb-4"):
             with ui.row().classes("items-start gap-4 no-wrap"):
@@ -384,11 +440,23 @@ class _ConfigView:
                         "Dit bepaalt de seizoensvolgorde en de voorspelhorizon."
                     ).classes("text-sm opacity-60 mt-1")
 
-                    _week_options()
+                    _week_tiles()
+                    _horizon_hint()
 
-                    ui.label(
-                        "Andere waarde? Pas dit aan in het Geavanceerd-tabblad."
-                    ).classes("text-xs opacity-40 mt-2")
+                    with ui.row().classes("items-center gap-2 mt-3"):
+                        custom_ref["input"] = (
+                            ui.number(
+                                label="Andere week",
+                                value=_current(),
+                                min=_MIN_WEEK,
+                                max=_MAX_WEEK,
+                                step=1,
+                                on_change=_on_custom,
+                            )
+                            .props("dense outlined debounce=500")
+                            .classes("w-36")
+                        )
+                        ui.label("wk 1–52").classes("text-xs opacity-40")
 
     def _year_card(self) -> None:
         mc = self._config.setdefault("model_config", {})
@@ -1027,6 +1095,7 @@ class _ConfigView:
     def _runtime_section(self) -> None:
         ci = self._config.setdefault("cumulative_input", {})
         runtime = self._config.setdefault("runtime", {})
+        max_cores = os.cpu_count() or 1
         with ui.expansion("Runtime", icon="settings", value=False).classes("w-full"):
             ui.label("Verwerkingsopties voor de pipeline.").classes(
                 "text-sm opacity-60 mb-3"
@@ -1046,14 +1115,38 @@ class _ConfigView:
                     True,
                     help=HELP["drop_deleted"],
                 )
-            self._adv_number(
-                "CPU-cores (leeg = automatisch)",
-                runtime,
-                "cpu_count",
-                None,
-                allow_none=True,
-                help=HELP["cpu_count"],
-            )
+            with ui.column().classes("gap-1 mt-2"):
+                current_cpu = runtime.get("cpu_count", None)
+                cpu_inp = (
+                    ui.number(
+                        label="CPU-cores (leeg = automatisch)",
+                        value=current_cpu,
+                        min=1,
+                        max=max_cores,
+                        step=1,
+                    )
+                    .props("outlined clearable")
+                    .classes("w-full max-w-xs")
+                )
+                cpu_inp.tooltip(HELP["cpu_count"])
+                with ui.row().classes("items-center gap-1.5"):
+                    ui.icon("memory").style("color: #aaa; font-size: 14px;")
+                    ui.label(f"{max_cores} cores beschikbaar op deze machine").classes(
+                        "text-xs"
+                    ).style("color: #aaa;")
+
+                def _on_cpu_change(e) -> None:
+                    val = e.value
+                    if val is None:
+                        runtime["cpu_count"] = None
+                    else:
+                        clamped = max(1, min(int(val), max_cores))
+                        runtime["cpu_count"] = clamped
+                        if int(val) != clamped:
+                            cpu_inp.set_value(clamped)
+                    self._mark_dirty()
+
+                cpu_inp.on_value_change(_on_cpu_change)
 
     def _adv_switch(self, label, target, key, default, *, help=None) -> None:
         sw = ui.switch(label, value=target.get(key, default))
