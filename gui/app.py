@@ -41,6 +41,8 @@ async def _api_upload_telbestand(
         "soft_errors": result.soft_errors,
         "warnings": result.warnings,
         "row_count": result.row_count,
+        "actual_columns": result.actual_columns,
+        "missing_required": result.missing_required,
     }
 
 
@@ -59,6 +61,7 @@ def _register_pages() -> None:
         explainability,
         filtering,
         home,
+        logo,
         methodology,
         output,
         peer_benchmark,
@@ -76,6 +79,7 @@ def _register_pages() -> None:
     output.create()
     benchmark.create()
     methodology.create()
+    logo.create()
     # UX Flow
     uxflow.create()
     # Concept-features
