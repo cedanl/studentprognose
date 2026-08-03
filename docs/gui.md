@@ -39,6 +39,9 @@ De interface leidt je langs vijf stappen, in volgorde:
 
 1. **Project** — kies of maak een projectmap met de juiste structuur. Je kunt
    hier optioneel de demodataset downloaden om het model direct te proberen.
+   Bij het uploaden van telbestanden of het oktober-bestand verschijnt onderaan
+   de uploadzone een klikbare link **"Verwacht formaat"**: klik die uit om een
+   tabel te zien met verwachte kolomnamen, beschrijvingen en voorbeeldwaarden.
 2. **Configuratie** — stel de modelparameters en paden in.
 3. **Filteren** — bepaal op welke opleidingen, herkomst en examentypes je draait.
 4. **Uitvoeren** — start de voorspelling en volg de voortgang live.
@@ -48,6 +51,23 @@ Nieuwe gebruikers volgen deze stappen van boven naar beneden; de stap-indicator
 bovenaan toont waar je bent. Terugkerende gebruikers springen via de zijbalk
 direct naar de gewenste pagina. Stappen die een project vereisen zijn
 uitgeschakeld tot je er een hebt gekozen, zodat je nooit vastloopt.
+
+De zijbalk laat bovendien zien hoe ver je bent: **afgeronde** stappen staan zwart
+met een vinkje; stappen die je **nog moet doen** en losse hulpmiddelen (zoals
+*Benchmark & tune*) staan grijs, maar blijven klikbaar. Alleen *Start* en reeds
+afgeronde stappen zijn dus zwart. Een stap geldt als afgerond zodra hij zijn
+resultaat heeft opgeleverd — *Project* na het aanmaken, *Configuratie* nadat je
+hebt opgeslagen, en *Uitvoeren* en *Resultaten* zodra er een voorspelling is
+gedraaid.
+
+Er kan maar één project tegelijk actief zijn. Zodra je een projectmap hebt
+opgezet, staan de start-knoppen (**"Project opzetten"** en **"Probeer direct met
+demodata"**) uitgeschakeld — een klik legt uit dat er al een project loopt. Om
+dezelfde reden ligt in stap 1 (**"Project"**) de projectmap vast nadat je die hebt
+aangemaakt: de mapkiezer verdwijnt, maar je kunt er nog wél je modus kiezen en
+databestanden uploaden of vervangen. Een andere projectmap kiezen of opnieuw
+beginnen doe je via de knop **"Reset"** rechtsboven (of de reset-knop in dat
+uitlegvenster).
 
 Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de

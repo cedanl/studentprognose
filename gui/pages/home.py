@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import os
 import tempfile
+from collections.abc import Callable
 
 from nicegui import ui
 
@@ -18,7 +19,7 @@ from gui import demodata, filtering_io, nav, theme
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.progress_card import ProgressCard
-from gui.components.states import error_banner, section_title, status_badge
+from gui.components.states import error_banner
 from gui.state import STATE
 
 #: Jaar/week voor de demo-voorspelling (de demodata dekt 2020–2026).
@@ -30,12 +31,6 @@ _DEMO_WEEK = "6"
 _DEMO_FILTERING = {
     "filtering": {"programme": [], "herkomst": ["Niet-EER"], "examentype": ["Master"]}
 }
-
-_ACTION_CARDS = [
-    ("tune", "Configuratie", "/config", "Model- en pipelineparameters"),
-    ("play_circle", "Uitvoeren", "/run", "Voorspelling draaien"),
-    ("insights", "Resultaten", "/output", "Bekijk de laatste uitvoer"),
-]
 
 #: Vijf concrete toepassingen van instroom-prognoses — op volgorde van
 #: herkenbaarheid voor een beleidsmaker.
@@ -104,6 +99,25 @@ def create() -> None:
     box-shadow: 0 10px 28px rgba(0,0,0,0.14) !important;
     transform: translateY(-3px);
 }
+/* Uitgeschakelde CTA-knop: ziet er inactief uit maar blijft klikbaar zodat
+   een klik uitlegt waarom (er is al een project actief). De dubbele
+   .q-btn-selector verhoogt de specificiteit zodat deze wint van Quasar's
+   eigen bg-/text-classes ongeacht de laadvolgorde van de stylesheets. */
+.q-btn.sp-btn-locked {
+    background: #e4e4e4 !important;
+    color: #9a9a9a !important;
+    box-shadow: none !important;
+    cursor: not-allowed !important;
+    opacity: 1 !important;
+    animation: none !important;
+}
+.q-btn.sp-btn-locked:hover {
+    background: #dcdcdc !important;
+    box-shadow: none !important;
+}
+.q-btn.sp-btn-locked .q-icon {
+    color: #9a9a9a !important;
+}
 .sp-demo-step-dot {
     width: 26px; height: 26px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
@@ -146,41 +160,18 @@ class _HomeView:
     def _render_intro(self) -> None:
         self._container.clear()
         with self._container:
-            if STATE.is_initialised:
-                self._render_dashboard()
-                self._render_value_proposition(compact=True)
-            else:
-                self._render_value_proposition(compact=False)
-                self._render_cta()
+            # De startpagina toont altijd dezelfde waardepropositie + CTA.
+            # Bestaat er al een actief project, dan blijven de CTA-knoppen
+            # zichtbaar maar uitgeschakeld: een klik legt uit dat er eerst
+            # gereset moet worden (via de Reset-knop rechtsboven).
+            self._render_value_proposition()
+            self._render_cta(locked=STATE.is_initialised)
 
     # ── Waardepropositie ──────────────────────────────────────────────────────
 
-    def _render_value_proposition(self, *, compact: bool = False) -> None:
-        """Toon de vijf zakelijke toepassingen van instroom-prognoses.
-
-        Args:
-            compact: Ingeklapte variant voor terugkerende gebruikers die de
-                informatie al kennen.
-        """
+    def _render_value_proposition(self) -> None:
+        """Toon de vijf zakelijke toepassingen van instroom-prognoses (hero-variant)."""
         A = theme.ACCENT
-        if compact:
-            with ui.card().classes("w-full").style(
-                f"border: 1px solid {A}20; background: {A}04;"
-            ):
-                with ui.expansion(
-                    "Waarvoor gebruik je instroom-prognoses?",
-                    icon="lightbulb",
-                ).props("dense").classes("w-full"):
-                    ui.space().classes("h-1")
-                    self._render_use_cases()
-                    ui.button(
-                        "Hoe werkt het model?",
-                        icon="alt_route",
-                        on_click=lambda: ui.navigate.to("/methodologie"),
-                    ).props("flat dense color=accent").classes("mt-1 -ml-2 text-xs")
-            return
-
-        # ── Prominente hero-variant voor nieuwe gebruikers ────────────────────
         with ui.card().classes("w-full").style(
             f"background: radial-gradient(ellipse at 50% -5%, {A}11 0%, transparent 62%);"
             "border: 1px solid rgba(0,0,0,0.07);"
@@ -844,53 +835,16 @@ class _HomeView:
             "Benchmarkprognose toont: jij groeit het snelst. Leer van stabiele peers voor betere voorspelkwaliteit.",
         )
 
-    # ── Dashboard (terugkerende gebruiker) ────────────────────────────────────
+    # ── CTA (start / al-actief) ───────────────────────────────────────────────
 
-    def _render_dashboard(self) -> None:
-        """Projectdashboard: naam, snelkoppelingen en CTA."""
-        project_name = os.path.basename(STATE.project_dir or "")
+    def _render_cta(self, *, locked: bool = False) -> None:
+        """Toon de start-CTA.
 
-        with ui.card().classes("w-full"):
-            with ui.row().classes("items-center gap-4 no-wrap w-full"):
-                with ui.element("div").style(
-                    f"width:52px;height:52px;border-radius:12px;"
-                    f"background:{theme.ACCENT}1a;"
-                    "display:flex;align-items:center;justify-content:center;flex-shrink:0"
-                ):
-                    ui.icon("folder_open").classes("text-3xl").style(
-                        f"color:{theme.ACCENT}"
-                    )
-                with ui.column().classes("gap-0 flex-1 overflow-hidden"):
-                    ui.label(project_name).classes("text-xl font-bold")
-                status_badge("ready")
-
-        ui.button(
-            "Ga naar Uitvoeren",
-            icon="play_arrow",
-            on_click=lambda: ui.navigate.to("/run"),
-        ).props("unelevated")
-
-        with ui.row().classes("w-full gap-3"):
-            for icon, label, route, desc in _ACTION_CARDS:
-                with ui.card().classes("flex-1 sp-action-card") as card:
-                    card.on("click", lambda r=route: ui.navigate.to(r))
-                    with ui.column().classes(
-                        "items-center text-center gap-2 py-5 px-3"
-                    ):
-                        with ui.element("div").style(
-                            f"width:48px;height:48px;border-radius:50%;"
-                            f"background:{theme.ACCENT}18;"
-                            "display:flex;align-items:center;justify-content:center"
-                        ):
-                            ui.icon(icon).classes("text-2xl").style(
-                                f"color:{theme.ACCENT}"
-                            )
-                        ui.label(label).classes("font-semibold text-sm")
-                        ui.label(desc).classes("text-xs opacity-60")
-
-    # ── CTA (nieuwe gebruiker) ────────────────────────────────────────────────
-
-    def _render_cta(self) -> None:
+        Args:
+            locked: Is er al een project actief, dan blijven de knoppen zichtbaar
+                maar uitgeschakeld; een klik opent een uitleg-dialoog dat er eerst
+                gereset moet worden.
+        """
         with ui.card().classes("w-full"):
             with ui.column().classes("w-full items-center text-center gap-3 py-12"):
                 ui.icon("rocket_launch").classes("text-6xl opacity-40")
@@ -899,15 +853,124 @@ class _HomeView:
                     "Zet een projectmap op met jouw Studielink-data en "
                     "draai je eerste prognose."
                 ).classes("text-sm opacity-70 max-w-md")
-                ui.button(
-                    "Project opzetten",
-                    on_click=lambda: ui.navigate.to("/wizard"),
-                ).props("unelevated")
-                ui.button(
-                    "Probeer direct met demodata",
-                    icon="bolt",
-                    on_click=self._run_demo,
-                ).props("unelevated").classes("sp-demo-btn")
+                with ui.row().classes(
+                    "gap-3 items-center justify-center flex-wrap"
+                ):
+                    self._cta_button(
+                        "Project opzetten",
+                        icon=None,
+                        locked=locked,
+                        on_click=lambda: ui.navigate.to("/wizard"),
+                    )
+                    self._cta_button(
+                        "Probeer direct met demodata",
+                        icon="bolt",
+                        locked=locked,
+                        on_click=self._run_demo,
+                        active_classes="sp-demo-btn",
+                    )
+                if locked:
+                    self._render_active_project_hint()
+
+    def _cta_button(
+        self,
+        label: str,
+        *,
+        icon: str | None,
+        locked: bool,
+        on_click: Callable[[], object],
+        active_classes: str = "",
+    ) -> None:
+        """Bouw één CTA-knop — normaal, of uitgeschakeld-maar-klikbaar bij ``locked``."""
+        if locked:
+            btn = ui.button(
+                label, icon=icon, on_click=self._warn_project_active
+            ).props("unelevated")
+            # Inline !important omdat Quasar de knopkleur in een CSS-@layer zet;
+            # inline stijl wint gegarandeerd van een gelaagde stylesheet-regel.
+            btn.classes("sp-btn-locked")
+            btn.style(
+                "background:#e4e4e4 !important;color:#9a9a9a !important;"
+                "box-shadow:none !important;cursor:not-allowed !important;"
+            )
+            btn.tooltip("Er is al een project actief — reset eerst om opnieuw te beginnen")
+            return
+        btn = ui.button(label, icon=icon, on_click=on_click).props("unelevated")
+        if active_classes:
+            btn.classes(active_classes)
+
+    def _render_active_project_hint(self) -> None:
+        """Subtiele regel onder de knoppen die het actieve project benoemt."""
+        A = theme.ACCENT
+        project_name = os.path.basename(STATE.project_dir or "") or "Naamloos project"
+        with ui.row().classes("items-center gap-2 no-wrap mt-1 px-3 py-1 rounded-lg").style(
+            f"background:{A}0d;border:1px solid {A}22;"
+        ):
+            ui.icon("lock").classes("text-sm").style(f"color:{A}")
+            ui.html(
+                f'Project <strong>{project_name}</strong> is actief · reset via '
+                f'de knop <span style="white-space:nowrap;">'
+                f'<span class="material-icons" style="font-size:13px;'
+                f'vertical-align:text-bottom;">restart_alt</span> Reset</span> '
+                f"rechtsboven om opnieuw te beginnen."
+            ).classes("text-xs").style("color:#666;")
+
+    def _warn_project_active(self) -> None:
+        """Uitleg-dialoog: er is al een project actief; eerst resetten."""
+        A = theme.ACCENT
+        project_name = os.path.basename(STATE.project_dir or "") or "je huidige project"
+        with ui.dialog() as dialog, ui.card().style(
+            "width:460px;max-width:95vw;border-radius:16px;overflow:hidden;padding:0;"
+        ):
+            # Header
+            with ui.row().classes(
+                "w-full items-center justify-between px-5 pt-4 pb-3"
+            ).style("border-bottom:1px solid #f0f0f0;"):
+                with ui.row().classes("items-center gap-2 no-wrap"):
+                    with ui.element("div").style(
+                        f"width:32px;height:32px;border-radius:8px;background:{A}15;"
+                        "display:flex;align-items:center;justify-content:center;"
+                    ):
+                        ui.icon("lock").classes("text-lg").style(f"color:{A}")
+                    ui.label("Er is al een project actief").classes(
+                        "font-semibold text-base"
+                    )
+                ui.button(icon="close", on_click=dialog.close).props(
+                    "flat round dense color=grey-6"
+                )
+            # Body
+            with ui.column().classes("w-full px-5 pt-4 pb-5 gap-3"):
+                ui.html(
+                    f"Je werkt op dit moment in het project "
+                    f"<strong>{project_name}</strong>. Er kan maar één project "
+                    f"tegelijk open zijn. Wil je een nieuw project opzetten of de "
+                    f"demo draaien, reset dan eerst het huidige project."
+                ).classes("text-sm leading-relaxed").style("color:#555;")
+                with ui.element("div").classes("w-full").style(
+                    f"padding:10px 12px;border-radius:8px;background:{A}0a;"
+                    f"border:1px solid {A}25;"
+                ):
+                    with ui.row().classes("items-center gap-2 no-wrap"):
+                        ui.icon("restart_alt").classes("text-lg").style(f"color:{A}")
+                        ui.label(
+                            "Gebruik de knop “Reset” rechtsboven, of reset "
+                            "direct hieronder."
+                        ).classes("text-xs leading-relaxed").style("color:#555;")
+                with ui.row().classes("w-full justify-end gap-2 no-wrap mt-1"):
+                    ui.button("Sluiten", on_click=dialog.close).props(
+                        "flat color=grey-7"
+                    )
+
+                    def _reset() -> None:
+                        STATE.project_dir = None
+                        STATE.config_saved = False
+                        dialog.close()
+                        ui.navigate.to("/")
+
+                    ui.button(
+                        "Project resetten", icon="restart_alt", on_click=_reset
+                    ).props("unelevated color=accent")
+        dialog.open()
 
     # ── Demo-uitvoering ───────────────────────────────────────────────────────
 

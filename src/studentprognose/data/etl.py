@@ -172,6 +172,16 @@ def _rowbind_and_reformat(telbestanden_dir, output_path, configuration):
     # per definitie 0 en horen aantallen semantisch niet bij vooraanmelders.
     # Geverifieerd op het echte UvA-anker: na deze filter blijft geen meercode_V
     # == 0 over, dus de deling hieronder kan niet door nul gaan.
+    # Pas instelling-specifieke kolomnamen toe → canonieke telbestand-namen.
+    # Conventie spiegelt columns.oktober: canonical → institution in config.
+    tel_col_map = (configuration or {}).get("columns", {}).get("telbestand", {})
+    if tel_col_map:
+        institution_to_canonical = {
+            inst: canon for canon, inst in tel_col_map.items() if inst != canon
+        }
+        if institution_to_canonical:
+            data.rename(columns=institution_to_canonical, inplace=True)
+
     data = data[data["Status"] != "A"].copy()
 
     data["Gewogen vooraanmelders"] = data["Aantal"] / data["meercode_V"]

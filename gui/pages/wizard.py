@@ -33,9 +33,13 @@ from gui.data_upload import (
     delete_individueel,
     delete_oktober,
     delete_telbestand,
+    load_project_col_map,
+    revalidate_oktober,
+    revalidate_telbestand,
     save_and_validate_individueel,
     save_and_validate_oktober,
     save_and_validate_telbestand,
+    save_project_col_map,
     scan_existing_files,
 )
 from gui.state import STATE
@@ -71,6 +75,11 @@ _TEL_PREVIEW: dict = {
 _OKT_PREVIEW: dict = {
     "title": "Verwacht formaat — Oktober-bestand",
     "note": "Excel (.xlsx) · peildatum 1 oktober · één rij per opleiding × herkomstgroep",
+    "filenames": [
+        ("studentaantallen_2024.xlsx",    "generiek (eigen export)"),
+        ("1CHO_instroom_2024.xlsx",       "1CHO-export"),
+        ("osiris_eerstejaars_2024.xlsx",  "Osiris / Usis-export"),
+    ],
     "columns": [
         ("Collegejaar",                "Academisch jaar",             "2024"),
         ("Isatcode",                   "CROHO-opleidingscode",        "55604"),
@@ -82,8 +91,8 @@ _OKT_PREVIEW: dict = {
 }
 
 
-def _format_preview_html(preview: dict) -> str:
-    """Genereer gestylde HTML-tabel voor de formaatpreview-tooltip."""
+def _format_preview_html(preview: dict, *, inline: bool = False) -> str:
+    """Genereer gestylde HTML-tabel voor de formaatpreview."""
     filenames_html = ""
     if "filenames" in preview:
         fname_rows = ""
@@ -115,8 +124,9 @@ def _format_preview_html(preview: dict) -> str:
             f'color:#0070c9;white-space:nowrap;vertical-align:top;">{example}</td>'
             f'</tr>'
         )
+    width_style = "width:100%;" if inline else "min-width:360px;max-width:520px;"
     return (
-        f'<div style="min-width:360px;max-width:520px;font-family:system-ui,sans-serif;">'
+        f'<div style="{width_style}font-family:system-ui,sans-serif;">'
         f'<div style="font-weight:600;font-size:12.5px;color:#111;margin-bottom:10px;'
         f'padding-bottom:7px;border-bottom:1px solid #efefef;">{preview["title"]}</div>'
         f'{filenames_html}'
@@ -424,11 +434,23 @@ def create() -> None:
     @ui.page("/wizard")
     def wizard_page() -> None:
         with page_shell(active="/wizard", title="Project opzetten"):
-            section_title(
-                "Nieuw project",
-                "Zet een projectmap op en upload je inputbestanden.",
-            )
-            _WizardView()
+            # Zodra er een project bestaat ligt de projectmap vast: kiezen of
+            # aanmaken kan niet meer (alleen via Reset). De overige stappen van
+            # "1. Project" — modus kiezen en bestanden uploaden — blijven wél
+            # gewoon uitvoerbaar.
+            if STATE.is_initialised:
+                section_title(
+                    "Project",
+                    "Je projectmap ligt vast — kies je modus en beheer je "
+                    "databestanden.",
+                )
+                _WizardView(locked_folder=True)
+            else:
+                section_title(
+                    "Nieuw project",
+                    "Zet een projectmap op en upload je inputbestanden.",
+                )
+                _WizardView()
 
 
 # ---------------------------------------------------------------------------
@@ -476,6 +498,8 @@ class _UploadZone:
         self._folder_container = None
         self._btn_files = None
         self._btn_folder = None
+        self._format_expanded: bool = False
+        self._format_panel = None
         self._build(title, description, hint, icon, required, accept, multiple)
 
     # --- Public interface ---------------------------------------------------
@@ -488,6 +512,11 @@ class _UploadZone:
             self._results = dict(existing)
         elif existing is not None:
             self._results[existing.filename] = existing
+        self._refresh_results()
+
+    def update_result(self, filename: str, result: FileCheckResult) -> None:
+        """Vervang het validatieresultaat voor *filename* en herrender de lijst."""
+        self._results[filename] = result
         self._refresh_results()
 
     def set_required(self, required: bool) -> None:
@@ -527,9 +556,28 @@ class _UploadZone:
         accept: str,
         multiple: bool,
     ) -> None:
-        ui.add_css("""
-            .sp-upload .q-uploader__list { display: none !important; }
-            .sp-upload .q-uploader__subtitle { display: none !important; }
+        uid = self._zone_uid
+        ui.add_css(f"""
+            .sp-upload .q-uploader__list {{ display: none !important; }}
+            .sp-upload .q-uploader__subtitle {{ display: none !important; }}
+            .sp-fmtchev-{uid} {{ border-radius: 4px; transition: background 0.15s ease; }}
+            .sp-fmtchev-{uid}:hover {{ background: rgba(0,0,0,0.03); }}
+            .sp-fmtchev-{uid} .material-icons {{
+                color: #bbb;
+                transition: transform 0.2s ease, color 0.15s ease;
+            }}
+            .sp-fmtchev-{uid}:hover .material-icons {{ color: #666; }}
+            .sp-fmtchev-{uid}.open .material-icons {{
+                transform: rotate(90deg);
+                color: #555;
+            }}
+            .sp-fmtlbl-{uid} {{
+                color: #999;
+                font-size: 11px;
+                transition: color 0.15s ease;
+            }}
+            .sp-fmtchev-{uid}:hover .sp-fmtlbl-{uid},
+            .sp-fmtchev-{uid}.open .sp-fmtlbl-{uid} {{ color: #555; }}
         """)
         with (
             ui.card()
@@ -542,15 +590,6 @@ class _UploadZone:
                     with ui.column().classes("gap-0"):
                         ui.label(title).classes("font-medium")
                         ui.label(description).classes("text-xs opacity-60")
-                    if self._format_preview:
-                        help_icon = ui.icon("help_outline").classes(
-                            "text-base cursor-help flex-none"
-                        ).style("color: #ccc; margin-top: 2px;")
-                        with help_icon:
-                            with ui.tooltip().classes(
-                                "bg-white text-black shadow-4 q-pa-sm"
-                            ).props("max-width=520px anchor='bottom left' self='top left'"):
-                                ui.html(_format_preview_html(self._format_preview))
                 badge_text = "Vereist" if required else "Optioneel"
                 badge_color = "accent" if required else "grey-6"
                 self._badge = ui.badge(badge_text).props(
@@ -676,6 +715,29 @@ async function _spfu{uid}(inp) {{
 
             self._results_slot = ui.column().classes("w-full gap-1 mt-2")
 
+            if self._format_preview:
+                ui.separator().classes("mt-3 opacity-20")
+                with (
+                    ui.element("div")
+                    .classes(f"w-full cursor-pointer sp-fmtchev-{self._zone_uid}")
+                    .on("click", self._toggle_format)
+                ):
+                    with ui.row().classes("items-center gap-1.5 py-1.5 select-none"):
+                        ui.icon("chevron_right").classes("text-sm")
+                        ui.label("Verwacht formaat").classes(
+                            f"sp-fmtlbl-{self._zone_uid}"
+                        )
+                self._format_panel = ui.column().classes("w-full pb-1")
+                self._format_panel.set_visibility(False)
+                with self._format_panel:
+                    ui.html(
+                        '<div style="display:block;width:100%;box-sizing:border-box;'
+                        'background:#f8f9fa;border-radius:6px;'
+                        'padding:14px 16px;border:1px solid #eeeeee;margin-top:2px;">'
+                        + _format_preview_html(self._format_preview, inline=True)
+                        + '</div>'
+                    ).classes("w-full block")
+
     # --- Mode-switch en JavaScript-injectie --------------------------------
 
     # --- Mode-switch -------------------------------------------------------
@@ -779,6 +841,15 @@ async function _spfu{uid}(inp) {{
     def _toggle_collapse(self) -> None:
         self._collapsed = not self._collapsed
         self._refresh_results()
+
+    def _toggle_format(self) -> None:
+        self._format_expanded = not self._format_expanded
+        self._format_panel.set_visibility(self._format_expanded)
+        action = "add" if self._format_expanded else "remove"
+        ui.run_javascript(
+            f"var el=document.querySelector('.sp-fmtchev-{self._zone_uid}');"
+            f"if(el)el.classList.{action}('open');"
+        )
 
     def _delete_all(self) -> None:
         filenames = list(self._results.keys())
@@ -931,28 +1002,199 @@ async function _spfu{uid}(inp) {{
 
 
 # ---------------------------------------------------------------------------
+# Kolom-mapper component
+# ---------------------------------------------------------------------------
+
+_TEL_REQUIRED = [
+    "Studiejaar", "Isatcode", "Aantal", "meercode_V",
+    "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
+]
+_OKT_REQUIRED = [
+    "Collegejaar", "Isatcode", "Aantal eerstejaars croho",
+    "EER-NL-nietEER", "Examentype code", "Aantal Hoofdinschrijvingen",
+]
+
+
+def _build_column_mapper(
+    *,
+    title: str,
+    required_columns: list[str],
+    actual_columns: list[str],
+    current_map: dict[str, str],
+    on_apply: Callable[[dict[str, str]], None],
+) -> None:
+    """Rendert een kolomnamen-koppelingskaart op de huidige UI-locatie.
+
+    Args:
+        title: Bestandstype-label ("Telbestanden" / "Oktober-bestand").
+        required_columns: Canonieke namen die de pipeline verwacht.
+        actual_columns: Namen die daadwerkelijk in het bestand staan.
+        current_map: Huidige canonical→institution mapping uit configuration.json.
+        on_apply: Callback die de nieuwe mapping ontvangt bij opslaan.
+    """
+    actual_set = set(actual_columns)
+    actual_lower = {c.lower(): c for c in actual_columns}
+    selects: dict[str, ui.select] = {}
+
+    # Bepaal welke canonieke kolommen ontbreken (na huidige mapping)
+    mapped_set = {current_map.get(c, c) for c in required_columns}
+    missing_canonical = [
+        c for c in required_columns
+        if current_map.get(c, c) not in actual_set
+    ]
+
+    if not missing_canonical:
+        return  # alles al gekoppeld — mapper niet tonen
+
+    with (
+        ui.card()
+        .classes("w-full")
+        .style(
+            f"border: 2px solid {theme.WARNING}33;"
+            "border-radius: 8px; background: #fffbf5;"
+        )
+    ):
+        # ── Header ─────────────────────────────────────────────────────────
+        with ui.row().classes("items-center gap-2 mb-1"):
+            ui.icon("link").classes("text-xl").style(f"color: {theme.WARNING}")
+            ui.label(f"Kolomnamen koppelen — {title}").classes("font-semibold text-sm")
+        ui.label(
+            "De volgende verwachte kolommen zijn niet gevonden in jouw bestand. "
+            "Selecteer per kolom de overeenkomende naam uit jouw bestand. "
+            "De koppeling wordt opgeslagen in configuration.json."
+        ).classes("text-xs opacity-60 mb-3 leading-relaxed")
+
+        # ── Mapping-rijen ───────────────────────────────────────────────────
+        options_with_empty = ["— niet aanwezig —"] + sorted(actual_columns)
+
+        for canonical in missing_canonical:
+            institution = current_map.get(canonical, canonical)
+            # Auto-selecteer: exacte match → case-insensitive match → leeg
+            if institution in actual_set:
+                default_val = institution
+            elif canonical.lower() in actual_lower:
+                default_val = actual_lower[canonical.lower()]
+            else:
+                default_val = "— niet aanwezig —"
+
+            with ui.row().classes("items-center gap-3 w-full py-1"):
+                # Canonieke naam (verwacht)
+                with ui.column().classes("gap-0 flex-none").style("min-width:180px"):
+                    ui.label(canonical).classes("text-sm font-mono font-medium")
+                    ui.label("verwacht").classes("text-xs opacity-40")
+
+                ui.icon("arrow_forward").classes(
+                    "text-base flex-none opacity-30"
+                )
+
+                # Dropdown met actuele kolomnamen
+                sel = (
+                    ui.select(
+                        options=options_with_empty,
+                        value=default_val,
+                        label="Jouw kolomnaam",
+                    )
+                    .props("dense outlined")
+                    .classes("grow")
+                )
+                selects[canonical] = sel
+
+        # ── Toepassen-knop ──────────────────────────────────────────────────
+        ui.space().classes("h-1")
+
+        async def _do_apply() -> None:
+            apply_btn.props("loading disabled")
+            try:
+                new_map = dict(current_map)  # start vanuit bestaande mapping
+                for canon, sel in selects.items():
+                    val = sel.value
+                    if val and val != "— niet aanwezig —":
+                        new_map[canon] = val
+                    else:
+                        new_map[canon] = canon  # reset naar identity
+                result = on_apply(new_map)
+                if asyncio.iscoroutine(result):
+                    await result
+            finally:
+                apply_btn.props(remove="loading disabled")
+
+        with ui.row().classes("items-center gap-2 mt-1"):
+            apply_btn = ui.button(
+                "Toepassen en opnieuw valideren",
+                icon="check_circle",
+                on_click=_do_apply,
+            ).props("unelevated color=accent no-caps")
+            ui.label(
+                "Slaat op in configuration.json en hervalideert direct."
+            ).classes("text-xs opacity-40")
+
+
+# ---------------------------------------------------------------------------
 # Wizard
 # ---------------------------------------------------------------------------
 
 class _WizardView:
     """Houdt de wizard-state en rendert de vier stappen."""
 
-    def __init__(self) -> None:
-        stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
-        # Default buiten de studentprognose-projectmap: in de home-map van de
-        # gebruiker (bv. /home/gebruiker/tmp/studentprognose20260731170615).
-        self._project_dir = os.path.join(
-            os.path.expanduser("~"), "tmp", f"studentprognose{stamp}"
-        )
+    def __init__(self, *, locked_folder: bool = False) -> None:
+        # locked_folder: er bestaat al een project. De map kiezen/aanmaken kan
+        # dan niet meer (alleen via Reset), maar modus kiezen en bestanden
+        # uploaden blijft gewoon mogelijk — we starten direct bij die stap.
+        self._locked_folder = locked_folder
+        if locked_folder and STATE.project_dir:
+            self._project_dir = STATE.project_dir
+        else:
+            stamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+            # Default buiten de studentprognose-projectmap: in de home-map van de
+            # gebruiker (bv. /home/gebruiker/tmp/studentprognose20260731170615).
+            self._project_dir = os.path.join(
+                os.path.expanduser("~"), "tmp", f"studentprognose{stamp}"
+            )
         self._mode: str = "cumulative"
         self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
     def _build(self) -> None:
-        with ui.stepper().props("vertical").classes("w-full") as self._stepper:
-            self._build_step1()
-            self._build_step2()
-            self._build_step3()
+        if self._locked_folder:
+            # Vergrendelde map + directe upload-stap: geen map-kiezen/aanmaken.
+            self._render_locked_header()
+            with ui.stepper().props("vertical").classes("w-full") as self._stepper:
+                self._build_step3()
+            # Laad reeds aanwezige bestanden zodra de UI gerenderd is.
+            ui.timer(0.05, self._load_existing, once=True)
+        else:
+            with ui.stepper().props("vertical").classes("w-full") as self._stepper:
+                self._build_step1()
+                self._build_step2()
+                self._build_step3()
+
+    def _render_locked_header(self) -> None:
+        """Toon de vergrendelde projectkaart: de map ligt vast, alleen Reset wijzigt hem."""
+        project_name = os.path.basename(self._project_dir or "")
+        path = self._project_dir or ""
+        with ui.card().classes("w-full gap-3 mb-3").style(
+            "border-radius: 14px; border: 1px solid #ececec; box-shadow: none;"
+        ):
+            with ui.row().classes("w-full items-center justify-between no-wrap"):
+                with ui.row().classes("items-center gap-3 no-wrap"):
+                    ui.icon("folder_open").classes("text-2xl").style(
+                        f"color: {theme.ACCENT}"
+                    )
+                    with ui.column().classes("gap-0"):
+                        ui.label(project_name).classes("text-base font-semibold")
+                        ui.label(path).classes("text-xs font-mono opacity-50")
+                ui.badge("✓ Aangemaakt").props("color=positive").classes("px-2 py-1")
+            with ui.row().classes("w-full items-start gap-3 no-wrap").style(
+                f"background:{theme.ACCENT}0d; border-radius:10px; padding:10px 14px;"
+            ):
+                ui.icon("lock").classes("text-lg").style(f"color:{theme.ACCENT}")
+                with ui.column().classes("gap-0"):
+                    ui.label("De projectmap ligt vast").classes("text-sm font-medium")
+                    ui.label(
+                        "Kies hieronder je modus en upload of wijzig je bestanden. "
+                        "Een andere projectmap kiezen kan alleen via de Reset-knop "
+                        "rechtsboven."
+                    ).classes("text-sm opacity-70 leading-relaxed")
 
     # ── Stap 1: map kiezen ──────────────────────────────────────────────────
 
@@ -1016,7 +1258,9 @@ class _WizardView:
                     )
             self._demo_progress = ui.linear_progress(value=0.0, show_value=False)
             self._demo_progress.set_visibility(False)
-            self._panel = ProcessPanel()
+            # Geen log/statusbadge: de wizard toont zelf voortgang (demo-balk)
+            # en resultaat (_create_feedback / foutbanner).
+            self._panel = ProcessPanel(show_log=False, show_status=False)
             with ui.stepper_navigation():
                 ui.button("Terug", on_click=self._stepper.previous).props("flat")
                 self._create_btn = ui.button(
@@ -1077,6 +1321,7 @@ class _WizardView:
                     format_preview=_TEL_PREVIEW,
                     allow_folder_mode=True,
                 )
+                self._tel_mapper_slot = ui.column().classes("w-full")
                 self._coverage_slot = ui.column().classes("w-full")
 
             # Ruimte tussen tel en ind: alleen zichtbaar als beide secties actief zijn.
@@ -1114,6 +1359,7 @@ class _WizardView:
                 delete_fn=delete_oktober,
                 format_preview=_OKT_PREVIEW,
             )
+            self._okt_mapper_slot = ui.column().classes("w-full")
 
             ui.space().classes("h-4")
 
@@ -1128,7 +1374,8 @@ class _WizardView:
             )
 
             with ui.stepper_navigation():
-                ui.button("Terug", on_click=self._stepper.previous).props("flat")
+                if not self._locked_folder:
+                    ui.button("Terug", on_click=self._stepper.previous).props("flat")
                 ui.button(
                     "Overslaan",
                     icon="skip_next",
@@ -1147,13 +1394,91 @@ class _WizardView:
     # ── Telbestand-dekking ───────────────────────────────────────────────────
 
     def _on_tel_change(self) -> None:
+        self._refresh_tel_mapper()
         self._refresh_coverage()
         self._refresh_summary()
         self._refresh_overlap()
 
     def _on_okt_change(self) -> None:
+        self._refresh_okt_mapper()
         self._refresh_summary()
         self._refresh_overlap()
+
+    # ── Kolom-mapper ────────────────────────────────────────────────────────
+
+    def _refresh_tel_mapper(self) -> None:
+        """Toon de kolom-mapper als telbestanden ontbrekende kolommen hebben."""
+        self._tel_mapper_slot.clear()
+        results = list(self._zone_tel._results.values())
+        missing = {c for r in results for c in r.missing_required}
+        if not missing:
+            return
+        actual = sorted({c for r in results for c in r.actual_columns})
+        if not actual:
+            return
+        current_map = load_project_col_map(self._project_dir, "telbestand")
+        with self._tel_mapper_slot:
+            _build_column_mapper(
+                title="Telbestanden",
+                required_columns=_TEL_REQUIRED,
+                actual_columns=actual,
+                current_map=current_map,
+                on_apply=self._apply_tel_mapping,
+            )
+
+    def _refresh_okt_mapper(self) -> None:
+        """Toon de kolom-mapper als het oktober-bestand ontbrekende kolommen heeft."""
+        self._okt_mapper_slot.clear()
+        results = list(self._zone_okt._results.values())
+        missing = {c for r in results for c in r.missing_required}
+        if not missing:
+            return
+        actual = sorted({c for r in results for c in r.actual_columns})
+        if not actual:
+            return
+        current_map = load_project_col_map(self._project_dir, "oktober")
+        with self._okt_mapper_slot:
+            _build_column_mapper(
+                title="Oktober-bestand",
+                required_columns=_OKT_REQUIRED,
+                actual_columns=actual,
+                current_map=current_map,
+                on_apply=self._apply_okt_mapping,
+            )
+
+    async def _apply_tel_mapping(self, mapping: dict[str, str]) -> None:
+        """Sla telbestand-kolomkoppeling op en hervalideer alle telbestanden."""
+        save_project_col_map(self._project_dir, "telbestand", mapping)
+        for filename in list(self._zone_tel._results.keys()):
+            result = await asyncio.to_thread(
+                revalidate_telbestand, self._project_dir, filename
+            )
+            self._zone_tel.update_result(filename, result)
+        self._refresh_tel_mapper()
+        self._refresh_coverage()
+        self._refresh_summary()
+        self._refresh_overlap()
+        ui.notify(
+            "Kolomkoppeling opgeslagen en bestanden hergevalideerd.",
+            type="positive",
+            position="top",
+            timeout=3000,
+        )
+
+    async def _apply_okt_mapping(self, mapping: dict[str, str]) -> None:
+        """Sla oktober-kolomkoppeling op en hervalideer het oktober-bestand."""
+        save_project_col_map(self._project_dir, "oktober", mapping)
+        result = await asyncio.to_thread(revalidate_oktober, self._project_dir)
+        self._zone_okt.update_result("oktober_bestand.xlsx", result)
+        self._refresh_okt_mapper()
+        self._refresh_summary()
+        self._refresh_overlap()
+        ui.notify(
+            "Kolomkoppeling opgeslagen en oktober-bestand hergevalideerd.",
+            type="positive",
+            position="top",
+            timeout=3000,
+        )
 
     def _refresh_coverage(self) -> None:
         cov = compute_tel_coverage(self._zone_tel._results)
@@ -1330,10 +1655,21 @@ class _WizardView:
 
     async def _goto_upload_step(self) -> None:
         self._stepper.next()
+        await self._load_existing()
+
+    async def _load_existing(self) -> None:
+        """Laad reeds aanwezige inputbestanden in de upload-zones en ververs.
+
+        Gedeeld door de aanmaak-flow (na ``init``) en de vergrendelde modus
+        (bestaand project), zodat eerder geüploade bestanden meteen zichtbaar
+        zijn.
+        """
         existing = await asyncio.to_thread(scan_existing_files, self._project_dir)
         self._zone_tel.load_existing(existing["telbestanden"])
         self._zone_ind.load_existing(existing["individueel"])
         self._zone_okt.load_existing(existing["oktober"])
+        self._refresh_tel_mapper()
+        self._refresh_okt_mapper()
         self._refresh_coverage()
         self._refresh_summary()
         self._refresh_overlap()

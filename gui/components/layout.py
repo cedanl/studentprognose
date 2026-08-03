@@ -34,6 +34,25 @@ def _requires_project(route: str) -> bool:
     return route not in ("/", "/wizard")
 
 
+def _step_completed(route: str) -> bool:
+    """True als de wizard-stap voor deze route zijn resultaat al heeft opgeleverd.
+
+    "Afgerond" betekent: er is een blijvend artefact van die stap.
+
+    * ``/wizard`` — het project is aangemaakt (configuratie bestaat).
+    * ``/config`` — de configuratie is deze sessie opgeslagen, óf er is al een
+      voorspelling gedraaid (die veronderstelt een geldige configuratie).
+    * ``/run`` / ``/output`` — er staat minstens één outputbestand klaar.
+    """
+    if route == "/wizard":
+        return STATE.is_initialised
+    if route == "/config":
+        return STATE.is_initialised and (STATE.config_saved or STATE.has_output)
+    if route in ("/run", "/output"):
+        return STATE.has_output
+    return False
+
+
 def _drawer(active: str) -> None:
     """Render de zijbalk met projectcontext, navigatie-items en feedbacklink."""
     feedback = _feedback_dialog()
@@ -69,20 +88,35 @@ def _drawer(active: str) -> None:
             locked = _requires_project(item.route) and not STATE.is_initialised
             enabled = built and not locked
 
+            # Een wizard-stap (item.step) is óf afgerond óf nog te doen. Afgeronde
+            # stappen tonen we zwart met een vinkje; nog-te-doen stappen grijs maar
+            # klikbaar, zodat de gebruiker in één oogopslag ziet wat er nog rest.
+            is_step = item.step is not None
+            is_home = item.route == nav.HOME.route
+            completed = _step_completed(item.route)
+            todo = enabled and is_step and not completed and item.route != active
+            # Losse tools (bijv. Benchmark & tune) horen niet bij de lineaire
+            # voortgang; ook die tonen we grijs. Alleen afgeronde stappen en Start
+            # blijven zwart.
+            is_tool = enabled and not is_step and not is_home
+            greyed = (todo or is_tool) and item.route != active
+
             # Visuele scheiding tussen beschikbare en uitgeschakelde items.
             if not enabled and prev_was_enabled:
                 ui.separator().classes("mx-3 my-1 opacity-30")
             prev_was_enabled = enabled
 
-            # Kleur draagt de betekenis: accent (oranje) = actief, donkergrijs =
-            # klikbaar, lichtgrijs = uitgeschakeld. Op een uitgeschakelde q-btn
-            # (opacity 0.7) leest lichtgrijs duidelijk als "nu niet beschikbaar".
+            # Kleur draagt de betekenis: accent (oranje) = actief, zwart = afgerond
+            # of altijd-beschikbaar (Start), middengrijs = nog te doen / los
+            # hulpmiddel (klikbaar), lichtgrijs = uitgeschakeld.
             if item.route == active:
                 color = "accent"
-            elif enabled:
-                color = "grey-9"
-            else:
+            elif not enabled:
                 color = "grey-5"
+            elif greyed:
+                color = "grey-6"
+            else:
+                color = "grey-9"
 
             classes = "w-full justify-start"
             if item.route == active:
@@ -109,11 +143,16 @@ def _drawer(active: str) -> None:
                     .props(f"flat align=left color={color}")
                     .classes(classes)
                 )
+                # Vinkje rechts op een afgeronde stap (niet op de actieve pagina).
+                if is_step and completed and item.route != active:
+                    btn.props("icon-right=check")
                 if item.route == active:
                     btn.style(
                         f"background: {theme.ACCENT}1a; "
                         f"border-left: 3px solid {theme.ACCENT}"
                     )
+                if todo:
+                    wrapper.tooltip("Nog te doen — klik om deze stap uit te voeren")
                 if not enabled:
                     btn.props("disable")
                     btn.style("font-size: 12px; opacity: 0.55;")
@@ -241,6 +280,7 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
             ui.label(title).classes("text-sm text-white opacity-70")
             def _reset() -> None:
                 STATE.project_dir = None
+                STATE.config_saved = False
                 ui.navigate.to("/")
             ui.button("Reset", icon="restart_alt", on_click=_reset).props(
                 "flat dense color=white"

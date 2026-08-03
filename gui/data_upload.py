@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import csv
 import datetime
+import json
 import os
 from dataclasses import dataclass, field
 from enum import Enum
@@ -39,6 +40,8 @@ class FileCheckResult:
     warnings: list[str] = field(default_factory=list)
     row_count: int | None = None
     years: list[int] | None = None  # unieke jaren in het bestand (bijv. Collegejaar)
+    actual_columns: list[str] = field(default_factory=list)   # kolommen in het bestand vóór mapping
+    missing_required: list[str] = field(default_factory=list) # verwachte kolommen die ontbreken
 
 
 # Validatie-defaults gespiegeld van validation.py — geen import om
@@ -221,6 +224,41 @@ def _to_status(hard: list, soft: list, warnings: list) -> FileStatus:
 # zodat _UploadZone een uniforme aanroepconventie kan gebruiken.
 # ---------------------------------------------------------------------------
 
+def load_project_col_map(project_dir: str, key: str) -> dict[str, str]:
+    """Lees de kolomnaam-mapping voor *key* uit de projectconfiguratie.
+
+    Geeft een lege dict terug als het bestand niet bestaat of niet leesbaar is.
+    """
+    cfg_path = os.path.join(project_dir, "configuration", "configuration.json")
+    if not os.path.isfile(cfg_path):
+        return {}
+    try:
+        with open(cfg_path, encoding="utf-8") as f:
+            cfg = json.load(f)
+        return dict(cfg.get("columns", {}).get(key, {}))
+    except Exception:
+        return {}
+
+
+def save_project_col_map(project_dir: str, key: str, mapping: dict[str, str]) -> None:
+    """Sla de kolomnaam-mapping voor *key* op in configuration.json van het project.
+
+    Overschrijft alleen het relevante sub-sleutel; andere config blijft intact.
+    """
+    cfg_path = os.path.join(project_dir, "configuration", "configuration.json")
+    if not os.path.isfile(cfg_path):
+        return
+    try:
+        with open(cfg_path, encoding="utf-8") as f:
+            cfg = json.load(f)
+        cfg.setdefault("columns", {})[key] = mapping
+        with open(cfg_path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=4)
+            f.write("\n")
+    except Exception:
+        pass
+
+
 def save_and_validate_telbestand(
     project_dir: str, filename: str, content: bytes
 ) -> FileCheckResult:
@@ -231,7 +269,8 @@ def save_and_validate_telbestand(
     filepath = os.path.join(dest_dir, filename)
     with open(filepath, "wb") as f:
         f.write(content)
-    return _check_telbestand(filepath, filename)
+    column_map = load_project_col_map(project_dir, "telbestand")
+    return _check_telbestand(filepath, filename, column_map)
 
 
 def save_and_validate_individueel(
@@ -253,12 +292,28 @@ def save_and_validate_oktober(
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     with open(dest, "wb") as f:
         f.write(content)
-    return _check_oktober(dest)
+    column_map = load_project_col_map(project_dir, "oktober")
+    return _check_oktober(dest, column_map)
+
+
+def revalidate_telbestand(project_dir: str, filename: str) -> FileCheckResult:
+    """Hervalideer een bestaand telbestand op schijf met de huidige kolomnaam-mapping."""
+    saved_filename = filename.lower()  # opgeslagen als lowercase (zie save_and_validate_telbestand)
+    filepath = os.path.join(project_dir, "data", "input_raw", "telbestanden", saved_filename)
+    column_map = load_project_col_map(project_dir, "telbestand")
+    return _check_telbestand(filepath, filename, column_map)
+
+
+def revalidate_oktober(project_dir: str) -> FileCheckResult:
+    """Hervalideer het bestaande oktober-bestand op schijf met de huidige kolomnaam-mapping."""
+    filepath = os.path.join(project_dir, "data", "input_raw", "oktober_bestand.xlsx")
+    column_map = load_project_col_map(project_dir, "oktober")
+    return _check_oktober(filepath, column_map)
 
 
 def delete_telbestand(project_dir: str, filename: str) -> None:
     """Verwijder een telbestand van schijf."""
-    path = os.path.join(project_dir, "data", "input_raw", "telbestanden", filename)
+    path = os.path.join(project_dir, "data", "input_raw", "telbestanden", filename.lower())
     if os.path.isfile(path):
         os.remove(path)
 
@@ -286,13 +341,16 @@ def scan_existing_files(project_dir: str) -> dict:
     """
     out: dict = {"telbestanden": {}, "individueel": None, "oktober": None}
 
+    tel_col_map = load_project_col_map(project_dir, "telbestand")
+    okt_col_map = load_project_col_map(project_dir, "oktober")
+
     tel_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
     if os.path.isdir(tel_dir):
         patterns = compile_patterns(None)
         for fname in sorted(os.listdir(tel_dir)):
             if match_telbestand(fname, patterns):
                 out["telbestanden"][fname] = _check_telbestand(
-                    os.path.join(tel_dir, fname), fname
+                    os.path.join(tel_dir, fname), fname, tel_col_map
                 )
 
     ind = os.path.join(project_dir, "data", "input_raw", "individuele_aanmelddata.csv")
@@ -301,7 +359,7 @@ def scan_existing_files(project_dir: str) -> dict:
 
     okt = os.path.join(project_dir, "data", "input_raw", "oktober_bestand.xlsx")
     if os.path.isfile(okt):
-        out["oktober"] = _check_oktober(okt)
+        out["oktober"] = _check_oktober(okt, okt_col_map)
 
     return out
 
@@ -310,7 +368,11 @@ def scan_existing_files(project_dir: str) -> dict:
 # Validators
 # ---------------------------------------------------------------------------
 
-def _check_telbestand(filepath: str, filename: str) -> FileCheckResult:
+def _check_telbestand(
+    filepath: str,
+    filename: str,
+    column_map: dict[str, str] | None = None,
+) -> FileCheckResult:
     hard: list[str] = []
     soft: list[str] = []
     warn: list[str] = []
@@ -347,14 +409,28 @@ def _check_telbestand(filepath: str, filename: str) -> FileCheckResult:
         )
         return FileCheckResult(filename=filename, status=FileStatus.ERRORS, hard_errors=hard)
 
+    actual_columns = list(df.columns)
+
+    # Pas kolomnaam-mapping toe: institutienaam → canonieke naam
+    if column_map:
+        rename_map = {inst: canon for canon, inst in column_map.items() if inst != canon}
+        if rename_map:
+            df.rename(columns=rename_map, inplace=True)
+
     missing = [c for c in tel["required_columns"] if c not in df.columns]
     if missing:
         hard.append(
             f"Vereiste kolommen ontbreken: {', '.join(missing)}. "
             f"Herkend scheidingsteken: '{sep}'. "
-            "Controleer of dit een Studielink-export is."
+            "Controleer of dit een Studielink-export is of koppel de kolomnamen hieronder."
         )
-        return FileCheckResult(filename=filename, status=FileStatus.ERRORS, hard_errors=hard)
+        return FileCheckResult(
+            filename=filename,
+            status=FileStatus.ERRORS,
+            hard_errors=hard,
+            actual_columns=actual_columns,
+            missing_required=missing,
+        )
 
     current_year = datetime.date.today().year
     y_min = current_year - _CFG["collegejaar_min_offset"]
@@ -404,6 +480,7 @@ def _check_telbestand(filepath: str, filename: str) -> FileCheckResult:
         soft_errors=soft,
         warnings=warn,
         row_count=len(df),
+        actual_columns=actual_columns,
     )
 
 
@@ -445,7 +522,10 @@ def _check_individueel(filepath: str) -> FileCheckResult:
     )
 
 
-def _check_oktober(filepath: str) -> FileCheckResult:
+def _check_oktober(
+    filepath: str,
+    column_map: dict[str, str] | None = None,
+) -> FileCheckResult:
     hard: list[str] = []
     soft: list[str] = []
     warn: list[str] = []
@@ -460,15 +540,28 @@ def _check_oktober(filepath: str) -> FileCheckResult:
         )
         return FileCheckResult(filename=filename, status=FileStatus.ERRORS, hard_errors=hard)
 
+    actual_columns = list(df.columns)
+
+    # Pas kolomnaam-mapping toe: institutienaam → canonieke naam
+    if column_map:
+        rename_map = {inst: canon for canon, inst in column_map.items() if inst != canon}
+        if rename_map:
+            df.rename(columns=rename_map, inplace=True)
+
     critical = _CFG["oktober"]["critical_columns"]
     missing = [c for c in critical if c not in df.columns]
     if missing:
         hard.append(
             f"Vereiste kolommen ontbreken: {', '.join(missing)}. "
-            "Pas de kolomnamen aan via 'columns.oktober' in configuration.json "
-            "als jouw instelling andere namen gebruikt."
+            "Koppel de kolomnamen hieronder of pas 'columns.oktober' aan in configuration.json."
         )
-        return FileCheckResult(filename=filename, status=FileStatus.ERRORS, hard_errors=hard)
+        return FileCheckResult(
+            filename=filename,
+            status=FileStatus.ERRORS,
+            hard_errors=hard,
+            actual_columns=actual_columns,
+            missing_required=missing,
+        )
 
     current_year = datetime.date.today().year
     y_min = current_year - _CFG["collegejaar_min_offset"]
@@ -498,6 +591,7 @@ def _check_oktober(filepath: str) -> FileCheckResult:
         warnings=warn,
         row_count=len(df),
         years=valid_years,
+        actual_columns=actual_columns,
     )
 
 

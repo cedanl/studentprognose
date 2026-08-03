@@ -1368,6 +1368,7 @@ class _ConfigView:
             ui.notify(f"Opslaan mislukt: {exc}", type="negative")
             return
         self._clear_dirty()
+        STATE.config_saved = True
         ui.notify("Configuratie opgeslagen.", type="positive", position="top")
 
     def _on_institution_change(self, e) -> None:

@@ -7,6 +7,7 @@ editor en runner naar hetzelfde project verwijzen.
 
 from __future__ import annotations
 
+import glob
 import os
 from dataclasses import dataclass
 
@@ -22,10 +23,14 @@ class AppState:
         wizard_mode: Modus gekozen in wizard-stap 4 (``"cumulative"``,
             ``"individual"`` of ``"both"``). ``None`` als de wizard nog niet
             doorlopen is. Wordt door de run-pagina als standaardwaarde gebruikt.
+        config_saved: True zodra de gebruiker de configuratie deze sessie heeft
+            opgeslagen. Voedt de "afgerond"-markering van stap 2 in de zijbalk;
+            een gedraaide voorspelling (:attr:`has_output`) impliceert dit ook.
     """
 
     project_dir: str | None = None
     wizard_mode: str | None = None
+    config_saved: bool = False
 
     # --- Afgeleide paden (relatief aan project_dir) ----------------------------
 
@@ -54,6 +59,23 @@ class AppState:
     def is_initialised(self) -> bool:
         """True als het gekozen project een geldige configuratie bevat."""
         return self.config_path is not None and os.path.isfile(self.config_path)
+
+    @property
+    def has_output(self) -> bool:
+        """True als er minstens één definitief outputbestand in het project staat.
+
+        Bepaalt of de stappen "Uitvoeren" en "Resultaten" als afgerond gelden:
+        een gedraaide voorspelling laat een ``output_*.xlsx`` in ``data/output``
+        achter (prelim-/testbestanden tellen niet mee).
+        """
+        if self.output_dir is None or not os.path.isdir(self.output_dir):
+            return False
+        for path in glob.glob(os.path.join(self.output_dir, "output_*.xlsx")):
+            name = os.path.basename(path)
+            if name.startswith("output_prelim") or "_ci_test" in name:
+                continue
+            return True
+        return False
 
 
 #: Enkelvoudige, module-brede state. De GUI is een lokale single-session app

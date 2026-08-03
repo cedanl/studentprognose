@@ -114,6 +114,16 @@
         }
     },
     "columns": {
+        "telbestand": {
+            "Studiejaar": "Studiejaar",
+            "Isatcode": "Isatcode",
+            "Aantal": "Aantal",
+            "meercode_V": "meercode_V",
+            "Status": "Status",
+            "Herinschrijving": "Herinschrijving",
+            "Hogerejaars": "Hogerejaars",
+            "Herkomst": "Herkomst"
+        },
         "individual": {
             "Sleutel": "Sleutel",
             "Datum Verzoek Inschr": "Datum Verzoek Inschr",

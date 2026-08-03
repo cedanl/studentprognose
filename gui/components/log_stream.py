@@ -33,9 +33,20 @@ class ProcessPanel:
         await panel.run(["init"], cwd=project_dir, on_success=go_next)
     """
 
-    def __init__(self) -> None:
+    def __init__(self, *, show_log: bool = True, show_status: bool = True) -> None:
+        """Maak een procespaneel.
+
+        Args:
+            show_log: Toon de live-log (dark scrollbox). Zet uit als de
+                aanroeper zelf al voortgang/feedback toont (bv. de wizard).
+            show_status: Toon de statusbadge ('Nog niet gestart', 'Bezig…', …)
+                met stop-knop.
+        """
+        self._show_log = show_log
+        self._show_status = show_status
         self._process: asyncio.subprocess.Process | None = None
         self._error_slot: ui.element
+        self._log: ui.log | None = None
         self._all_lines: list[str] = []
         self._build()
 
@@ -45,20 +56,24 @@ class ProcessPanel:
 
     def _build(self) -> None:
         with ui.column().classes("w-full gap-2"):
-            with ui.row().classes("w-full items-center justify-between"):
-                with ui.row().classes("items-center gap-2 no-wrap"):
-                    self._icon = ui.icon("radio_button_unchecked")
-                    self._label = ui.label("Nog niet gestart").classes("text-sm")
-                self._stop_btn = ui.button(
-                    "Stop", icon="stop", on_click=self.stop
-                ).props("flat color=negative")
-                self._stop_btn.set_visibility(False)
-            self._log = ui.log(max_lines=2000).classes(
-                "w-full h-64 bg-grey-10 text-white rounded p-2 text-xs"
-            )
+            if self._show_status:
+                with ui.row().classes("w-full items-center justify-between"):
+                    with ui.row().classes("items-center gap-2 no-wrap"):
+                        self._icon = ui.icon("radio_button_unchecked")
+                        self._label = ui.label("Nog niet gestart").classes("text-sm")
+                    self._stop_btn = ui.button(
+                        "Stop", icon="stop", on_click=self.stop
+                    ).props("flat color=negative")
+                    self._stop_btn.set_visibility(False)
+            if self._show_log:
+                self._log = ui.log(max_lines=2000).classes(
+                    "w-full h-64 bg-grey-10 text-white rounded p-2 text-xs"
+                )
             self._error_slot = ui.column().classes("w-full")
 
     def _set_status(self, state: str) -> None:
+        if not self._show_status:
+            return
         label, color, icon = _STATUS[state]
         self._label.set_text(label)
         self._icon.props(f"name={icon}")
@@ -70,7 +85,8 @@ class ProcessPanel:
         """Beëindig het lopende subprocess (zo mogelijk)."""
         if self._process is not None and self._process.returncode is None:
             self._process.terminate()
-            self._log.push("— gestopt door gebruiker —")
+            if self._log is not None:
+                self._log.push("— gestopt door gebruiker —")
 
     async def run(
         self,
@@ -91,7 +107,8 @@ class ProcessPanel:
             De exitcode van het proces (of ``-1`` bij een startfout).
         """
         self._error_slot.clear()
-        self._log.clear()
+        if self._log is not None:
+            self._log.clear()
         self._all_lines = []
         self._set_status("running")
 
@@ -120,7 +137,8 @@ class ProcessPanel:
         tail: list[str] = []
         async for raw in self._process.stdout:
             line = raw.decode("utf-8", errors="replace").rstrip("\n")
-            self._log.push(line)
+            if self._log is not None:
+                self._log.push(line)
             self._all_lines.append(line)
             tail.append(line)
             if on_line is not None:
