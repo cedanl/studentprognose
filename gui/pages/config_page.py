@@ -339,11 +339,8 @@ class _ConfigView:
         mc = self._config.setdefault("model_config", {})
         _REC_WEEK = 38
         _PRESET_WEEKS = [36, 37, 38, 39, 40]
-        _SUBTITLES = {36: "UvA-aanmeldfase", 38: "Meeste instellingen"}
+        _SUBTITLES = {38: "Meeste instellingen"}
         _MIN_WEEK, _MAX_WEEK = 1, 52
-        # Holder zodat een tegelklik het vrije-invoerveld kan meebewegen zonder
-        # het (buiten de refreshable levende) invoerveld te herbouwen.
-        custom_ref: dict[str, object] = {}
 
         def _current() -> int:
             return int(mc.get("final_academic_week", _REC_WEEK))
@@ -356,9 +353,6 @@ class _ConfigView:
             """Zet de eindweek, houd de UI in sync en markeer als gewijzigd."""
             week = max(_MIN_WEEK, min(_MAX_WEEK, week))
             mc["final_academic_week"] = week
-            inp = custom_ref.get("input")
-            if inp is not None and int(inp.value or 0) != week:  # type: ignore[union-attr]
-                inp.value = week  # type: ignore[union-attr]
             self._mark_dirty()
             _week_tiles.refresh()
             _horizon_hint.refresh()
@@ -414,17 +408,6 @@ class _ConfigView:
                     f"week {current} (het jaar erop)."
                 ).classes("text-xs").style(f"color:{theme.INFO}")
 
-        def _on_custom(e) -> None:
-            if e.value is None or e.value == "":
-                return
-            try:
-                week = int(e.value)
-            except (TypeError, ValueError):
-                return
-            if week == _current():
-                return
-            _apply(week)
-
         with ui.card().classes("w-full mb-4"):
             with ui.row().classes("items-start gap-4 no-wrap"):
                 with ui.element("div").classes(
@@ -442,21 +425,6 @@ class _ConfigView:
 
                     _week_tiles()
                     _horizon_hint()
-
-                    with ui.row().classes("items-center gap-2 mt-3"):
-                        custom_ref["input"] = (
-                            ui.number(
-                                label="Andere week",
-                                value=_current(),
-                                min=_MIN_WEEK,
-                                max=_MAX_WEEK,
-                                step=1,
-                                on_change=_on_custom,
-                            )
-                            .props("dense outlined debounce=500")
-                            .classes("w-36")
-                        )
-                        ui.label("wk 1–52").classes("text-xs opacity-40")
 
     def _year_card(self) -> None:
         mc = self._config.setdefault("model_config", {})
@@ -687,15 +655,19 @@ class _ConfigView:
 
     def _build_advanced(self) -> None:
         with ui.row().classes("items-center gap-3 mb-5 px-4 py-3 rounded-xl").style(
-            "background: #f5f5f5; border: 1px solid #e0e0e0;"
+            f"background: linear-gradient(135deg, {theme.ACCENT}18, {theme.SECONDARY}0a); "
+            f"border: 1px solid {theme.ACCENT}35;"
         ):
-            ui.icon("tune").classes("text-xl opacity-50")
-            with ui.column().classes("gap-0"):
-                ui.label("Geavanceerde instellingen").classes("font-medium text-sm")
+            with ui.element("div").classes(
+                "w-10 h-10 rounded-xl flex items-center justify-center flex-none"
+            ).style(f"background: {theme.ACCENT}38;"):
+                ui.icon("tune").style(f"color: {theme.ACCENT}; font-size: 20px;")
+            with ui.column().classes("gap-0.5 grow"):
+                ui.label("Geavanceerde instellingen").classes("font-semibold text-sm")
                 ui.label(
                     "Modellen, ensemble-gewichten en uitsluitingsregels. "
                     "Wijzig alleen als je weet wat je doet."
-                ).classes("text-sm opacity-50")
+                ).classes("text-sm opacity-55")
 
         self._filtering_section()
         self._model_section()
@@ -703,7 +675,7 @@ class _ConfigView:
         self._nf_section()
         self._excl_section()
         self._runtime_section()
-        ui.button("Opslaan", icon="save", on_click=self._save).props("unelevated").classes("mt-3")
+        ui.button("Opslaan", icon="save", on_click=self._save).props("unelevated").classes("mt-4")
 
     def _load_student_count_df(self):
         path = os.path.join(
@@ -734,16 +706,20 @@ class _ConfigView:
         header_suffix = f" — {active_count} filter(s) actief" if active_count else " — geen filter (alle data)"
 
         with ui.expansion(
-            f"Filteren{header_suffix}", icon="filter_alt", value=True
-        ).classes("w-full") as self._filter_expansion:
+            f"Filteren{header_suffix}", icon="filter_alt", value=False
+        ).classes("w-full mb-3").style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.INFO}20; border-left: 4px solid {theme.INFO}; "
+            f"box-shadow: 0 1px 6px rgba(61,104,236,0.08);"
+        ) as self._filter_expansion:
             with ui.row().classes("items-center gap-3 mb-4 px-4 py-3 rounded-xl").style(
-                f"background: {theme.ACCENT}09; border: 1px solid {theme.ACCENT}28"
+                f"background: {theme.INFO}08; border: 1px solid {theme.INFO}25"
             ):
-                ui.icon("info").style(f"color: {theme.ACCENT}; font-size: 16px;")
+                ui.icon("info").style(f"color: {theme.INFO}; font-size: 16px;")
                 ui.label(
                     "Leeg = geen filter (alle data). Vul alleen in als je de pipeline "
                     "wilt beperken tot bepaalde opleidingen, herkomsten of examentypes."
-                ).classes("text-sm").style(f"color: {theme.ACCENT}99")
+                ).classes("text-sm").style(f"color: {theme.INFO}99")
 
             # --- Opleidingen ---
             with ui.column().classes("w-full gap-1 mb-4"):
@@ -889,7 +865,14 @@ class _ConfigView:
 
     def _model_section(self) -> None:
         mc = self._config.setdefault("model_config", {})
-        with ui.expansion("Modelkeuze", icon="model_training", value=True).classes("w-full"):
+        ts = mc.get("cumulative_timeseries", "sarima")
+        with ui.expansion(f"Modelkeuze — {ts}", icon="model_training", value=False).classes(
+            "w-full mb-3"
+        ).style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.ACCENT}20; border-left: 4px solid {theme.ACCENT}; "
+            f"box-shadow: 0 1px 6px rgba(221,120,75,0.08);"
+        ):
             ui.label(
                 "Welke algoritmen worden gebruikt voor tijdreeks, regressie en classificatie? "
                 "Vergelijk alternatieven via de Benchmark-pagina."
@@ -944,7 +927,11 @@ class _ConfigView:
     def _ensemble_section(self) -> None:
         weights = self._config.setdefault("ensemble_weights", {})
         with ui.expansion("Ensemble-gewichten", icon="balance", value=False).classes(
-            "w-full"
+            "w-full mb-3"
+        ).style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.NPULS_GREEN}20; border-left: 4px solid {theme.NPULS_GREEN}; "
+            f"box-shadow: 0 1px 6px rgba(0,175,129,0.08);"
         ):
             with ui.row().classes("items-start justify-between flex-wrap gap-2 mb-3"):
                 ui.label(
@@ -1021,7 +1008,16 @@ class _ConfigView:
             self._validate_ensemble()
 
     def _nf_section(self) -> None:
-        with ui.expansion("Numerus fixus", icon="lock", value=False).classes("w-full"):
+        nf_label = (
+            f"Numerus fixus — {len(self._nf_rows)} opleiding(en)"
+            if self._nf_rows
+            else "Numerus fixus — geen"
+        )
+        with ui.expansion(nf_label, icon="lock", value=False).classes("w-full mb-3").style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.WARNING}25; border-left: 4px solid {theme.WARNING}; "
+            f"box-shadow: 0 1px 6px rgba(230,160,32,0.08);"
+        ):
             ui.label(
                 "Opleidingen met een capaciteitslimiet. Gebruik exact dezelfde "
                 "programmasleutel als in je data — de voorspelling wordt op dit maximum afgetopt."
@@ -1031,8 +1027,20 @@ class _ConfigView:
             ui.button("Rij toevoegen", icon="add", on_click=self._add_nf_row).props("flat")
 
     def _excl_section(self) -> None:
-        with ui.expansion("Uitsluitingsregels", icon="block", value=False).classes(
-            "w-full"
+        excl_year_count = len({
+            str(r.get("year")) for r in self._excl_rows if r.get("year") is not None
+        })
+        excl_label = (
+            f"Uitsluitingsregels — {excl_year_count} jaar/jaren"
+            if excl_year_count
+            else "Uitsluitingsregels — geen"
+        )
+        with ui.expansion(excl_label, icon="block", value=False).classes(
+            "w-full mb-3"
+        ).style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.NEGATIVE}18; border-left: 4px solid {theme.NEGATIVE}; "
+            f"box-shadow: 0 1px 6px rgba(192,57,43,0.07);"
         ):
             ui.label(
                 "Sluit bekende probleemjaren (bijv. COVID) of specifieke deelpopulaties "
@@ -1096,7 +1104,13 @@ class _ConfigView:
         ci = self._config.setdefault("cumulative_input", {})
         runtime = self._config.setdefault("runtime", {})
         max_cores = os.cpu_count() or 1
-        with ui.expansion("Runtime", icon="settings", value=False).classes("w-full"):
+        cpu_val = self._config.get("runtime", {}).get("cpu_count", None)
+        runtime_label = f"Runtime — {cpu_val} cores" if cpu_val else "Runtime — standaard"
+        with ui.expansion(runtime_label, icon="settings", value=False).classes("w-full mb-3").style(
+            "background: white; border-radius: 10px; overflow: hidden; "
+            "border: 1px solid #e0e0e0; border-left: 4px solid #9e9e9e; "
+            "box-shadow: 0 1px 5px rgba(0,0,0,0.04);"
+        ):
             ui.label("Verwerkingsopties voor de pipeline.").classes(
                 "text-sm opacity-60 mb-3"
             )

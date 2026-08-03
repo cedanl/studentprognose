@@ -205,6 +205,8 @@ De **laatste week van het academisch jaar** in de Studielink-cyclus. Bepaalt de 
 - Het legacy instellingsformaat loopt tot **week 38** (eind september) — dit is de standaard.
 - Het UvA SQL-telbestand levert de aanmeldfase tot **week 36**; er zijn geen leveringen in de weken 37–39. Zet daarvoor `final_academic_week` op `36`.
 
+In de grafische interface (tabblad **Configuratie → Basis**) kies je deze week met één klik uit de veelgebruikte weken **36 t/m 40**. Onder de keuze toont de interface live welke seizoensspanne daaruit volgt (bijv. "week 39 tot en met week 38 het jaar erop"). Een afwijkende week buiten dit bereik stel je in via het tabblad **JSON**.
+
 Een verkeerde waarde laat de cumulatieve voorspelling crashen (de pipeline slicet kolommen tot deze week) of geeft een onjuiste voorspelhorizon. De waarde geldt voor het **cumulatieve spoor**; het individuele spoor gebruikt de vaste Studielink-kalender.
 
 ## `cumulative_input` — UvA SQL-telbestand omzetten
