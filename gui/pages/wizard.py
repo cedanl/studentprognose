@@ -54,6 +54,7 @@ _CREATED_DIRS = [
 # Formaatpreview per uploadzone: (kolomnaam, beschrijving, voorbeeldwaarde)
 _TEL_PREVIEW: dict = {
     "title": "Verwacht formaat — Telbestand",
+    "description": "Weekelijkse Studielink-export met vooraanmeldingen per opleiding, aanmeldstatus en herkomst. Één CSV-bestand per rapportageweek.",
     "note": "CSV · puntkomma- of kommagescheiden · één bestand per rapportageweek",
     "filenames": [
         ("telbestandY2024W10.csv",                 "instellingsformaat"),
@@ -74,11 +75,10 @@ _TEL_PREVIEW: dict = {
 
 _OKT_PREVIEW: dict = {
     "title": "Verwacht formaat — Oktober-bestand",
+    "description": "Werkelijke eerstejaars inschrijvingen per opleiding en herkomstgroep, peildatum 1 oktober. Aangeleverd door de instelling vanuit SIS/datawarehouse (Osiris, Usis of vergelijkbaar).",
     "note": "Excel (.xlsx) · peildatum 1 oktober · één rij per opleiding × herkomstgroep",
     "filenames": [
-        ("studentaantallen_2024.xlsx",    "generiek (eigen export)"),
-        ("1CHO_instroom_2024.xlsx",       "1CHO-export"),
-        ("osiris_eerstejaars_2024.xlsx",  "Osiris / Usis-export"),
+        ("oktober_bestand.xlsx", "elke .xlsx-naam is toegestaan — wordt hernoemd bij upload"),
     ],
     "columns": [
         ("Collegejaar",                "Academisch jaar",             "2024"),
@@ -124,11 +124,19 @@ def _format_preview_html(preview: dict, *, inline: bool = False) -> str:
             f'color:#0070c9;white-space:nowrap;vertical-align:top;">{example}</td>'
             f'</tr>'
         )
+    description_html = ""
+    if "description" in preview:
+        description_html = (
+            f'<div style="font-size:11px;color:#555;line-height:1.5;margin-bottom:12px;">'
+            f'{preview["description"]}'
+            f'</div>'
+        )
     width_style = "width:100%;" if inline else "min-width:360px;max-width:520px;"
     return (
         f'<div style="{width_style}font-family:system-ui,sans-serif;">'
-        f'<div style="font-weight:600;font-size:12.5px;color:#111;margin-bottom:10px;'
+        f'<div style="font-weight:600;font-size:12.5px;color:#111;margin-bottom:8px;'
         f'padding-bottom:7px;border-bottom:1px solid #efefef;">{preview["title"]}</div>'
+        f'{description_html}'
         f'{filenames_html}'
         f'<table style="border-collapse:collapse;width:100%;">'
         f'<thead><tr style="border-bottom:1px solid #efefef;">'
@@ -775,6 +783,8 @@ async function _spfu{uid}(inp) {{
             soft_errors=data.get("soft_errors", []),
             warnings=data.get("warnings", []),
             row_count=data.get("row_count"),
+            actual_columns=data.get("actual_columns", []),
+            missing_required=data.get("missing_required", []),
         )
         self._results[filename] = result
         self._refresh_results()
