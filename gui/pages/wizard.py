@@ -54,7 +54,7 @@ _CREATED_DIRS = [
 # Formaatpreview per uploadzone: (kolomnaam, beschrijving, voorbeeldwaarde)
 _TEL_PREVIEW: dict = {
     "title": "Verwacht formaat — Telbestand",
-    "description": "Weekelijkse Studielink-export met vooraanmeldingen per opleiding, aanmeldstatus en herkomst. Één CSV-bestand per rapportageweek.",
+    "description": "Wekelijkse Studielink-export met vooraanmeldingen per opleiding, aanmeldstatus en herkomst. Één CSV-bestand per rapportageweek.",
     "note": "CSV · puntkomma- of kommagescheiden · één bestand per rapportageweek",
     "filenames": [
         ("telbestandY2024W10.csv",                 "instellingsformaat"),
@@ -71,6 +71,30 @@ _TEL_PREVIEW: dict = {
         ("Hogerejaars",     "Hogerejaars",                       "N / J"),
         ("Herkomst",        "Nationaliteitscategorie",           "N / E / R"),
     ],
+}
+
+# Herkomst per uploadzone: waar de eindgebruiker het bestand vandaan haalt.
+# label = leverancier, detail = korte instructie, url = optionele externe link.
+_TEL_SOURCE: dict = {
+    "label": "Studielink",
+    "icon": "cloud_download",
+    "detail": (
+        "Wekelijkse telbestanden — op te vragen bij je Studielink-aansluitpunt "
+        "of -beheerder binnen je instelling."
+    ),
+    "url": "https://www.tignl.eu/downloads/studielink/pvl%20telbestand%20studielink.pdf",
+    "url_label": "Leveringsspecificatie (PvL)",
+}
+
+_OKT_SOURCE: dict = {
+    "label": "Je eigen instelling",
+    "icon": "account_balance",
+    "detail": (
+        "Genereer dit uit je SIS/datawarehouse — bijvoorbeeld Osiris, Usis "
+        "of een vergelijkbaar bronsysteem."
+    ),
+    "url": None,
+    "url_label": None,
 }
 
 _OKT_PREVIEW: dict = {
@@ -486,6 +510,7 @@ class _UploadZone:
         on_change: Callable[[], None],
         delete_fn: Callable[[str, str], None] | None = None,
         format_preview: dict | None = None,
+        source: dict | None = None,
         allow_folder_mode: bool = False,
     ) -> None:
         self._project_dir_getter = project_dir_getter
@@ -493,6 +518,7 @@ class _UploadZone:
         self._on_change = on_change
         self._delete_fn = delete_fn
         self._format_preview = format_preview
+        self._source = source
         self._results: dict[str, FileCheckResult] = {}
         self._collapsed: bool = True
         self._folder_mode: bool = False
@@ -554,6 +580,40 @@ class _UploadZone:
 
     # --- Build -------------------------------------------------------------
 
+    def _render_source(self, src: dict) -> None:
+        """Toon een subtiele 'Bron'-strip: leverancier + hoe te verkrijgen."""
+        C = theme.INFO
+        with ui.row().classes(
+            "w-full items-start gap-2.5 mb-3 px-3 py-2 rounded-lg no-wrap"
+        ).style(f"background:{C}0d;border:1px solid {C}2b;"):
+            ui.icon(src.get("icon", "source")).classes("text-base flex-none").style(
+                f"color:{C};margin-top:1px;"
+            )
+            with ui.column().classes("gap-0 grow min-w-0"):
+                with ui.row().classes("items-baseline gap-1 no-wrap"):
+                    ui.label("Bron").classes("text-xs font-medium").style(
+                        "color:#8a8fa3;text-transform:uppercase;letter-spacing:.04em;"
+                    )
+                    ui.label(src["label"]).classes("text-xs font-semibold").style(
+                        f"color:{theme.INK}"
+                    )
+                if src.get("detail"):
+                    ui.label(src["detail"]).classes("text-xs leading-snug mt-0.5").style(
+                        "color:#6b7280;"
+                    )
+                if src.get("url"):
+                    with ui.row().classes("items-center gap-1 no-wrap mt-1"):
+                        ui.icon("open_in_new").classes("flex-none").style(
+                            f"color:{C};font-size:13px;"
+                        )
+                        ui.link(
+                            src.get("url_label") or src["url"],
+                            src["url"],
+                            new_tab=True,
+                        ).classes("text-xs font-medium").style(
+                            f"color:{C};text-decoration:none;"
+                        )
+
     def _build(
         self,
         title: str,
@@ -603,6 +663,10 @@ class _UploadZone:
                 self._badge = ui.badge(badge_text).props(
                     f"color={badge_color}"
                 ).classes("text-xs self-start mt-1 flex-none")
+
+            # Herkomst-strip: waar de gebruiker dit bestand vandaan haalt.
+            if self._source:
+                self._render_source(self._source)
 
             # Mode-toggle: bestanden vs. map (alleen bij multiple uploads)
             if self._allow_folder_mode:
@@ -1318,7 +1382,7 @@ class _WizardView:
             with self._tel_wrapper:
                 self._zone_tel = _UploadZone(
                     title="Telbestanden",
-                    description="Weekelijkse Studielink-exports (één CSV per week).",
+                    description="Wekelijkse exports met vooraanmeldingen (één CSV per week).",
                     hint="bijv. telbestandY2024W10.csv, telbestand_sl_20241007_v01_2024.csv of Telbestand_SL_2020_V96_20210802.csv",
                     icon="bar_chart",
                     required=True,
@@ -1329,6 +1393,7 @@ class _WizardView:
                     on_change=self._on_tel_change,
                     delete_fn=delete_telbestand,
                     format_preview=_TEL_PREVIEW,
+                    source=_TEL_SOURCE,
                     allow_folder_mode=True,
                 )
                 self._tel_mapper_slot = ui.column().classes("w-full")
@@ -1368,6 +1433,7 @@ class _WizardView:
                 on_change=self._on_okt_change,
                 delete_fn=delete_oktober,
                 format_preview=_OKT_PREVIEW,
+                source=_OKT_SOURCE,
             )
             self._okt_mapper_slot = ui.column().classes("w-full")
 

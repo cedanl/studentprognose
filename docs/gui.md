@@ -43,8 +43,12 @@ De interface leidt je langs vijf stappen, in volgorde:
 
 1. **Project** — kies of maak een projectmap met de juiste structuur. Je kunt
    hier optioneel de demodataset downloaden om het model direct te proberen.
-   Bij het uploaden van telbestanden of het oktober-bestand verschijnt onderaan
-   de uploadzone een klikbare link **"Verwacht formaat"**: klik die uit om een
+   Elke uploadzone toont een **"Bron"**-strip die aangeeft waar je het bestand
+   vandaan haalt: telbestanden komen van **Studielink** (op te vragen bij je
+   Studielink-aansluitpunt of -beheerder, met een link naar de
+   leveringsspecificatie), en het oktober-bestand komt uit je **eigen
+   instelling** (SIS/datawarehouse zoals Osiris of Usis). Onderaan de uploadzone
+   staat daarnaast een klikbare link **"Verwacht formaat"**: klik die uit om een
    tabel te zien met verwachte kolomnamen, beschrijvingen en voorbeeldwaarden.
 2. **Configuratie** — stel de modelparameters en paden in.
 3. **Filteren** — bepaal op welke opleidingen, herkomst en examentypes je draait.
