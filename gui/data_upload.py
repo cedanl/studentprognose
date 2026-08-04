@@ -127,6 +127,134 @@ def compute_overlap(
     )
 
 
+@dataclass
+class DataYearBounds:
+    """Effectief traindata-bereik afgeleid uit de aanwezige projectbestanden.
+
+    Attributes:
+        train_start: Vroegste trainingsjaar — ``max(config-ondergrens,
+            eerste overlap-jaar)``. Dit is het eerste jaar waarvoor zowel
+            aanmeld- (telbestand) als realisatiedata (oktober) bestaat.
+        train_end: Laatste jaar met realisatiedata (laatste overlap-jaar).
+            Training kan niet verder reiken dan dit jaar.
+        tel_years: Jaren waarvoor telbestanden aanwezig zijn.
+        okt_years: Jaren in het oktober-bestand.
+        overlap: Doorsnede van ``tel_years`` en ``okt_years`` (gesorteerd).
+    """
+
+    train_start: int
+    train_end: int
+    tel_years: list[int]
+    okt_years: list[int]
+    overlap: list[int]
+
+
+def _config_min_training_year(project_dir: str) -> int | None:
+    """Lees ``model_config.min_training_year`` uit de projectconfiguratie."""
+    cfg_path = os.path.join(project_dir, "configuration", "configuration.json")
+    if not os.path.isfile(cfg_path):
+        return None
+    try:
+        with open(cfg_path, encoding="utf-8") as f:
+            cfg = json.load(f)
+        val = cfg.get("model_config", {}).get("min_training_year")
+        return int(val) if val is not None else None
+    except Exception:
+        return None
+
+
+def _telbestand_years(project_dir: str) -> set[int]:
+    """Leid telbestand-jaren af uit bestandsnamen (leest geen CSV-inhoud)."""
+    tel_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
+    if not os.path.isdir(tel_dir):
+        return set()
+    patterns = compile_patterns(None)
+    years: set[int] = set()
+    for fname in os.listdir(tel_dir):
+        match = match_telbestand(fname, patterns)
+        if match is None:
+            continue
+        try:
+            years.add(int(match.group("year")))
+        except (ValueError, IndexError):
+            continue
+    return years
+
+
+def _oktober_years(project_dir: str) -> set[int]:
+    """Leid de collegejaren uit het oktober-bestand af.
+
+    Leest alleen de ``Collegejaar``-kolom (met kolomnaam-mapping toegepast) en
+    filtert op een plausibel bereik. Bewust losgekoppeld van de volledige
+    bestandsvalidatie: het jaarbereik is ook bruikbaar wanneer andere vereiste
+    kolommen (nog) ontbreken of anders heten.
+    """
+    okt_path = os.path.join(project_dir, "data", "input_raw", "oktober_bestand.xlsx")
+    if not os.path.isfile(okt_path):
+        return set()
+    try:
+        df = pd.read_excel(okt_path)
+    except Exception:
+        return set()
+
+    column_map = load_project_col_map(project_dir, "oktober")
+    if column_map:
+        rename_map = {inst: canon for canon, inst in column_map.items() if inst != canon}
+        if rename_map:
+            df.rename(columns=rename_map, inplace=True)
+
+    if "Collegejaar" not in df.columns:
+        return set()
+
+    current_year = datetime.date.today().year
+    y_min = current_year - _CFG["collegejaar_min_offset"]
+    y_max = current_year + _CFG["collegejaar_max_offset"]
+    collegejaar = pd.to_numeric(df["Collegejaar"], errors="coerce")
+    return {
+        int(y) for y in collegejaar[collegejaar.between(y_min, y_max)].dropna().unique()
+    }
+
+
+def scan_data_year_bounds(project_dir: str) -> DataYearBounds | None:
+    """Bepaal het effectieve traindata-bereik uit de aanwezige projectbestanden.
+
+    Telbestand-jaren komen (goedkoop) uit de bestandsnamen; oktober-jaren uit
+    het gevalideerde Excel-bestand. Het traindata-bereik is de doorsnede van
+    beide, met de config-ondergrens (``min_training_year``) als vloer voor het
+    startjaar.
+
+    Returns:
+        ``DataYearBounds`` als beide datasets aanwezig zijn en overlappen,
+        anders ``None`` (bijv. wanneer de data nog niet is geüpload).
+    """
+    tel_years = _telbestand_years(project_dir)
+    if not tel_years:
+        return None
+
+    okt_years = _oktober_years(project_dir)
+    if not okt_years:
+        return None
+
+    overlap = sorted(tel_years & okt_years)
+    if not overlap:
+        return None
+
+    floor = _config_min_training_year(project_dir)
+    train_start = max(overlap[0], floor) if floor is not None else overlap[0]
+    train_end = overlap[-1]
+    if train_start > train_end:
+        # Config-vloer ligt voorbij alle overlap-jaren — geen bruikbaar bereik.
+        return None
+
+    return DataYearBounds(
+        train_start=train_start,
+        train_end=train_end,
+        tel_years=sorted(tel_years),
+        okt_years=sorted(okt_years),
+        overlap=overlap,
+    )
+
+
 def compute_tel_coverage(results: dict[str, FileCheckResult]) -> TelCoverage | None:
     """Leid week/jaar-dekking af uit de verzameling telbestand-resultaten.
 

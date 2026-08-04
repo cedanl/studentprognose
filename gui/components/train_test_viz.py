@@ -8,6 +8,10 @@ volledig zelfstandige HTML-string terug die via
 
 from __future__ import annotations
 
+#: Fallback-startjaar voor training wanneer het echte databereik (nog) niet
+#: uit de projectbestanden afgeleid kan worden. In de praktijk overschrijft de
+#: run-pagina dit met het werkelijke overlap-bereik tussen telbestanden en het
+#: oktober-bestand (zie ``gui.data_upload.scan_data_year_bounds``).
 DATA_START: int = 2016
 
 _T = "#3D68EC"   # traindata — Npuls blauw
@@ -30,13 +34,23 @@ def _parse(raw: str) -> list[int]:
     return sorted(years)
 
 
-def _compute(years_str: str, skip_years: int) -> dict | None:
+def _compute(
+    years_str: str,
+    skip_years: int,
+    data_start: int = DATA_START,
+    data_end: int | None = None,
+) -> dict | None:
     """Bereken train-/test-/prognose-verdeling.
 
     Args:
         years_str: Prognosejaren als spatie-gescheiden string, bijv. "2024"
             of "2023 2024".
         skip_years: Aantal backtest-jaren vóór de prognose.
+        data_start: Eerste jaar met trainingsdata (overlap tussen telbestanden
+            en oktober-bestand). Standaard :data:`DATA_START` als fallback.
+        data_end: Laatste jaar met realisatiedata (laatste overlap-jaar).
+            Training reikt nooit verder dan dit jaar; ``None`` = onbekend
+            (geen bovengrens).
 
     Returns:
         Dict met ``train``, ``test``, ``pred`` tuples en bijbehorende
@@ -53,18 +67,27 @@ def _compute(years_str: str, skip_years: int) -> dict | None:
     # real number of prediction years, not the gap-inflated range.
     pred_n = len(years)
 
+    test: tuple[int, int] | None = None
+    test_n: int = 0
     if skip_years > 0:
         test_start = pred_start - skip_years
         test_end = pred_start - 1
-        test: tuple[int, int] | None = (test_start, test_end)
-        test_n: int = skip_years
+        # Backtest kan alleen jaren beslaan waarvoor realisatiedata (truth)
+        # bestaat — dus nooit voorbij het laatste overlap-jaar.
+        if data_end is not None:
+            test_end = min(test_end, data_end)
+        if test_end >= test_start:
+            test = (test_start, test_end)
+            test_n = test_end - test_start + 1
         train_end = test_start - 1
     else:
-        test = None
-        test_n = 0
         train_end = pred_start - 1
 
-    train_start = DATA_START
+    train_start = data_start
+    # Training kan niet verder reiken dan het laatste jaar met realisatiedata:
+    # zonder telbestand + oktober-overlap valt er niets te leren.
+    if data_end is not None:
+        train_end = min(train_end, data_end)
     train_n = train_end - train_start + 1
     if train_n <= 0:
         return None
@@ -103,9 +126,15 @@ def _empty_state(msg: str = "Voer een prognosejaar in om de dataverdeling te zie
 # ── V1 — Horizon ────────────────────────────────────────────────────────────
 
 
-def render_v1(years_str: str, skip_years: int, weeks_str: str = "") -> str:
+def render_v1(
+    years_str: str,
+    skip_years: int,
+    weeks_str: str = "",
+    data_start: int = DATA_START,
+    data_end: int | None = None,
+) -> str:
     """V1 — Horizon: proportionele gesegmenteerde tijdlijn met week-annotatie."""
-    d = _compute(years_str, skip_years)
+    d = _compute(years_str, skip_years, data_start, data_end)
     if d is None:
         return _empty_state()
 
@@ -280,9 +309,14 @@ def render_v1(years_str: str, skip_years: int, weeks_str: str = "") -> str:
 # ── V2 — Jaar-chips ──────────────────────────────────────────────────────────
 
 
-def render_v2(years_str: str, skip_years: int) -> str:
+def render_v2(
+    years_str: str,
+    skip_years: int,
+    data_start: int = DATA_START,
+    data_end: int | None = None,
+) -> str:
     """V2 — Jaar-chips: elk jaar als individuele pil."""
-    d = _compute(years_str, skip_years)
+    d = _compute(years_str, skip_years, data_start, data_end)
     if d is None:
         return _empty_state()
 
@@ -400,9 +434,14 @@ def render_v2(years_str: str, skip_years: int) -> str:
 # ── V3 — Stat Cards ───────────────────────────────────────────────────────────
 
 
-def render_v3(years_str: str, skip_years: int) -> str:
+def render_v3(
+    years_str: str,
+    skip_years: int,
+    data_start: int = DATA_START,
+    data_end: int | None = None,
+) -> str:
     """V3 — Stat Cards: dashboard-metriekkaarten."""
-    d = _compute(years_str, skip_years)
+    d = _compute(years_str, skip_years, data_start, data_end)
     if d is None:
         return _empty_state()
 
@@ -489,9 +528,14 @@ def render_v3(years_str: str, skip_years: int) -> str:
 # ── V4 — Dark Timeline ───────────────────────────────────────────────────────
 
 
-def render_v4(years_str: str, skip_years: int) -> str:
+def render_v4(
+    years_str: str,
+    skip_years: int,
+    data_start: int = DATA_START,
+    data_end: int | None = None,
+) -> str:
     """V4 — Dark Timeline: premium donker tijdlijnkaart."""
-    d = _compute(years_str, skip_years)
+    d = _compute(years_str, skip_years, data_start, data_end)
     if d is None:
         return (
             '<div style="background:#0d1117; border-radius:10px; padding:20px 24px;">'

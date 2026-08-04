@@ -16,17 +16,20 @@ from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
 from gui.components.progress_card import ProgressCard
 from gui.components.states import empty_state, section_title
+from gui.data_upload import DataYearBounds, scan_data_year_bounds
 from gui.state import STATE
 
 #: Sleutel waaronder de laatst gebruikte parameters bewaard worden.
 _STORAGE_KEY = "run_settings"
 
-# Jaarbereik voor prognosejaren: DATA_START is het eerste trainingsjaar
-# (gedefinieerd in de vizmodule). Een geldig prognosejaar heeft ten minste
-# één trainingsjaar nodig, dus de ondergrens is DATA_START+1.
-_DATA_START: int = tvz.DATA_START
 _CURRENT_YEAR: int = datetime.date.today().year
-_FORECAST_YEARS: list[int] = list(range(_DATA_START + 1, _CURRENT_YEAR + 4))
+
+#: Fallback-startjaar voor training wanneer het echte databereik (nog) niet uit
+#: de projectbestanden afgeleid kan worden — bijv. voordat de data geüpload is.
+#: Zodra telbestanden én het oktober-bestand aanwezig zijn, wordt dit vervangen
+#: door het werkelijke overlap-bereik (zie ``scan_data_year_bounds``).
+_FALLBACK_DATA_START: int = _CURRENT_YEAR - 8
+
 
 def _default_week() -> str:
     return str(datetime.date.today().isocalendar()[1])
@@ -90,12 +93,12 @@ def _validate_weeks(raw: str) -> str | None:
     return None
 
 
-def _max_skip(min_forecast_year: int) -> int:
+def _max_skip(min_forecast_year: int, data_start: int) -> int:
     """Bereken het maximum aantal te overslaan jaren voor backtesting.
 
-    Minstens één trainingsjaar (``DATA_START``) moet overblijven.
+    Minstens één trainingsjaar (vanaf ``data_start``) moet overblijven.
     """
-    return max(0, min_forecast_year - _DATA_START - 1)
+    return max(0, min_forecast_year - data_start - 1)
 
 
 # ---------------------------------------------------------------------------
@@ -134,17 +137,28 @@ class _RunView:
     """Rendert het parameterformulier, de preview en de runner."""
 
     def __init__(self) -> None:
+        # Leid het echte traindata-bereik af uit de projectbestanden (overlap
+        # tussen telbestanden en oktober-bestand). Valt terug op een generiek
+        # bereik zolang de data nog niet is geüpload.
+        self._bounds: DataYearBounds | None = self._scan_bounds()
+        self._data_start, self._data_end, self._forecast_years = self._resolve_years()
+        self._default_year: int = (
+            self._data_end + 1
+            if self._data_end is not None and (self._data_end + 1) in self._forecast_years
+            else self._forecast_years[-1]
+        )
+
         stored = dict(app.storage.general.get(_STORAGE_KEY, {}))
 
         # Achterwaartse compatibiliteit: years was vroeger een string.
-        raw_years = stored.get("years", _DEFAULTS["years"])
+        raw_years = stored.get("years", [self._default_year])
         if isinstance(raw_years, str):
             parsed = [int(x) for x in raw_years.strip().split() if x.isdigit()]
-            raw_years = parsed if parsed else list(_DEFAULTS["years"])
+            raw_years = parsed if parsed else [self._default_year]
         # Filter opgeslagen jaren tot het geldige bereik.
-        stored["years"] = [y for y in raw_years if y in _FORECAST_YEARS] or list(
-            _DEFAULTS["years"]
-        )
+        stored["years"] = [y for y in raw_years if y in self._forecast_years] or [
+            self._default_year
+        ]
 
         self._settings = {**_DEFAULTS, **stored}
 
@@ -162,6 +176,53 @@ class _RunView:
                 )
 
         self._build()
+
+    # ── Databereik afleiden ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _scan_bounds() -> DataYearBounds | None:
+        """Bepaal het traindata-bereik uit de projectbestanden (of ``None``)."""
+        if not STATE.project_dir:
+            return None
+        try:
+            return scan_data_year_bounds(STATE.project_dir)
+        except Exception:
+            # Onleesbare of half-geüploade data mag de pagina nooit breken.
+            return None
+
+    def _resolve_years(self) -> tuple[int, int | None, list[int]]:
+        """Leid (start-jaar, eind-jaar, prognosejaar-opties) af.
+
+        Zonder gedetecteerd databereik wordt teruggevallen op een generiek
+        bereik rond het huidige jaar. ``data_end`` is dan ``None`` (geen
+        bovengrens op de training in de visualisatie).
+        """
+        if self._bounds is None:
+            data_start = _FALLBACK_DATA_START
+            return data_start, None, list(range(data_start + 1, _CURRENT_YEAR + 4))
+
+        data_start = self._bounds.train_start
+        data_end = self._bounds.train_end
+        # Prognosejaren lopen van het eerste voorspelbare jaar (minstens één
+        # trainingsjaar ervoor) t/m ruim voorbij de laatste beschikbare data,
+        # zodat ook meerjarige planning mogelijk blijft.
+        tel_max = self._bounds.tel_years[-1] if self._bounds.tel_years else data_end
+        upper = max(tel_max, _CURRENT_YEAR) + 2
+        return data_start, data_end, list(range(data_start + 1, upper + 1))
+
+    def _range_caption(self) -> str:
+        """Leesbare toelichting op het gedetecteerde traindata-bereik."""
+        if self._bounds is None:
+            return (
+                "Databereik nog niet gedetecteerd — upload telbestanden én het "
+                "oktober-bestand om het traindata-bereik automatisch af te leiden."
+            )
+        b = self._bounds
+        return (
+            f"Traindata-bereik {b.train_start}–{b.train_end}, automatisch afgeleid "
+            f"uit de overlap tussen telbestanden ({b.tel_years[0]}–{b.tel_years[-1]}) "
+            f"en het oktober-bestand ({b.okt_years[0]}–{b.okt_years[-1]})."
+        )
 
     # ── UI-opbouw ────────────────────────────────────────────────────────────
 
@@ -192,7 +253,7 @@ class _RunView:
                 with ui.column().classes("w-full gap-0"):
                     self._years = (
                         ui.select(
-                            options=_FORECAST_YEARS,
+                            options=self._forecast_years,
                             value=list(self._settings["years"]),
                             multiple=True,
                             label="Prognosejaren",
@@ -293,6 +354,15 @@ class _RunView:
         with ui.card().classes("w-full pr-16"):
             section_title("Dataverdeling", "Traindata · backtest · prognose")
             self._viz_html = ui.html("").classes("w-full")
+            with ui.row().classes("items-start gap-1.5 mt-2 no-wrap"):
+                ui.icon(
+                    "info" if self._bounds is not None else "warning_amber"
+                ).classes("text-sm flex-none mt-0.5").style(
+                    f"color: {theme.ACCENT if self._bounds is not None else theme.WARNING}"
+                )
+                ui.label(self._range_caption()).classes(
+                    "text-xs opacity-70 leading-snug"
+                )
 
         # ── Live command-preview ──────────────────────────────────────────────
         with ui.card().classes("w-full bg-grey-2"):
@@ -329,22 +399,27 @@ class _RunView:
             self._skip_hint.set_text("")
         else:
             self._years_error.set_visibility(False)
-            mx = _max_skip(min(selected))
+            mx = _max_skip(min(selected), self._data_start)
             # Pas de max-prop aan zodat het veld zelf ook klaagt bij overschrijding.
             self._skip_years.props(f"max={mx}")
             # Klem de huidige waarde als die nu buiten het geldige bereik valt.
             cur = int(self._skip_years.value or 0)
             if cur > mx:
                 self._skip_years.set_value(mx)
+            # Trainingsdata eindigt vlak vóór de prognose, maar nooit voorbij het
+            # laatste jaar met realisatiedata (overlap-eindjaar).
+            train_end = min(selected) - 1
+            if self._data_end is not None:
+                train_end = min(train_end, self._data_end)
             # Informatieve hint over het backtesting-bereik.
             if mx == 0:
                 self._skip_hint.set_text(
                     f"Backtest niet mogelijk — prognose {min(selected)} "
-                    f"ligt direct na traindata ({_DATA_START})."
+                    f"ligt direct na traindata ({self._data_start})."
                 )
             else:
                 self._skip_hint.set_text(
-                    f"Max. {mx} jaar  ·  traindata {_DATA_START}–{min(selected) - 1}."
+                    f"Max. {mx} jaar  ·  traindata {self._data_start}–{train_end}."
                 )
 
         self._update_preview()
@@ -394,7 +469,11 @@ class _RunView:
     def _update_viz(self) -> None:
         skip = int(self._skip_years.value or 0)
         weeks = self._weeks.value or ""
-        self._viz_html.set_content(tvz.render_v1(self._years_as_str(), skip, weeks))
+        self._viz_html.set_content(
+            tvz.render_v1(
+                self._years_as_str(), skip, weeks, self._data_start, self._data_end
+            )
+        )
 
     # ── Validatie ────────────────────────────────────────────────────────────
 
@@ -407,12 +486,12 @@ class _RunView:
             errors.append("Selecteer minstens één prognosejaar.")
         else:
             skip = int(self._skip_years.value or 0)
-            mx = _max_skip(min(selected))
+            mx = _max_skip(min(selected), self._data_start)
             if skip > mx:
                 errors.append(
                     f"Jaren overslaan ({skip}) is te groot voor prognosejaar"
                     f" {min(selected)}. Maximum is {mx}"
-                    f" (traindata begint in {_DATA_START})."
+                    f" (traindata begint in {self._data_start})."
                 )
 
         weeks_err = _validate_weeks(self._weeks.value or "")

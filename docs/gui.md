@@ -73,6 +73,19 @@ databestanden uploaden of vervangen. Een andere projectmap kiezen of opnieuw
 beginnen doe je via de knop **"Reset"** rechtsboven (of de reset-knop in dat
 uitlegvenster).
 
+Op de **Uitvoeren**-pagina toont een **Dataverdeling**-kaart hoe je jaren
+verdeeld worden over traindata, backtest en prognose. Het traindata-bereik is
+geen vaste waarde maar wordt automatisch afgeleid uit je eigen data: het is de
+**overlap tussen de jaren in je telbestanden en die in het oktober-bestand** —
+de jaren waarvoor zowel aanmeld- als realisatiecijfers bestaan. De ondergrens
+`min_training_year` uit de configuratie geldt daarbij als vloer. Een bijschrift
+onder de kaart benoemt het gedetecteerde bereik expliciet (bijv. *"Traindata-bereik
+2020–2025, afgeleid uit de overlap …"*). Zolang je nog geen telbestanden én
+oktober-bestand hebt geüpload, valt de kaart terug op een generiek bereik en
+meldt het bijschrift dat expliciet. De backtest-jaren (via *Jaren overslaan*)
+worden uit de staart van dit bereik gehaald, zodat er altijd realisatiedata is om
+tegen af te zetten; de training reikt nooit voorbij het laatste overlap-jaar.
+
 Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de
 gevonden parameters met één klik naar de configuratie kopieert.
