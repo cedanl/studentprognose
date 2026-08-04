@@ -204,10 +204,10 @@ class _RunView:
         data_start = self._bounds.train_start
         data_end = self._bounds.train_end
         # Prognosejaren lopen van het eerste voorspelbare jaar (minstens één
-        # trainingsjaar ervoor) t/m ruim voorbij de laatste beschikbare data,
-        # zodat ook meerjarige planning mogelijk blijft.
-        tel_max = self._bounds.tel_years[-1] if self._bounds.tel_years else data_end
-        upper = max(tel_max, _CURRENT_YEAR) + 2
+        # trainingsjaar ervoor) t/m één jaar voorbij het laatste jaar in het
+        # oktober-bestand. Dat laatste jaar is het eerste zonder realisatie en
+        # dus het verste jaar dat je zinvol kunt voorspellen.
+        upper = self._bounds.okt_years[-1] + 1
         return data_start, data_end, list(range(data_start + 1, upper + 1))
 
     def _range_caption(self) -> str:
