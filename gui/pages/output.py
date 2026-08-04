@@ -164,25 +164,34 @@ class _ResultsView:
                 on_change=self._on_file_change,
             ).classes("w-full max-w-md")
 
-        try:
-            df = results_io.load_output(self._path)
-        except Exception as exc:  # noqa: BLE001
-            error_banner(
-                "Het resultaatbestand kon niet worden gelezen.",
-                f"Bestand: {self._path}. Details: {exc}",
-            )
-            return
+        # Het overzicht rendert in een eigen container zodat een andere bestands-
+        # keuze in-place kan herladen zonder de pagina (en de selectie) te resetten.
+        self._body = ui.column().classes("w-full")
+        self._render_body()
 
-        self._render_kpis(df)
-        self._render_model_comparison(df)
-        self._render_programme_table(df)
-        with ui.row().classes("items-center gap-2"):
-            self._render_audit_button()
-            self._render_share_button()
+    def _render_body(self) -> None:
+        self._body.clear()
+        with self._body:
+            try:
+                df = results_io.load_output(self._path)
+            except (OSError, ValueError, KeyError) as exc:
+                error_banner(
+                    "Het resultaatbestand kon niet worden gelezen.",
+                    f"Bestand: {self._path}. Details: {exc}",
+                )
+                return
+
+            self._render_kpis(df)
+            self._render_model_comparison(df)
+            self._render_programme_table(df)
+            with ui.row().classes("items-center gap-2"):
+                self._render_audit_button()
+                self._render_share_button()
 
     def _on_file_change(self, e) -> None:
+        # Herlaad het overzicht voor het gekozen bestand, mét behoud van de keuze.
         self._path = e.value
-        ui.navigate.to("/output")  # herlaad met het gekozen bestand als nieuwste
+        self._render_body()
 
     # --- KPI-tiles ------------------------------------------------------------
 
@@ -427,7 +436,14 @@ class _ResultsView:
         dialog.open()
 
     def _totaal_path(self) -> str | None:
-        """Leid het bijbehorende ``_totaal``-auditbestand af van het outputpad."""
+        """Leid het bijbehorende ``_totaal``-auditbestand af van het outputpad.
+
+        Geeft ``None`` als het bestand niet de verwachte ``output_``-prefix heeft,
+        zodat een onverwachte naam geen misvormd pad oplevert.
+        """
         name = os.path.basename(self._path)  # output_first-years_cumulatief.xlsx
-        totaal = "_totaal_" + name[len("output_") :]
+        prefix = "output_"
+        if not name.startswith(prefix):
+            return None
+        totaal = "_totaal_" + name[len(prefix) :]
         return os.path.join(os.path.dirname(self._path), totaal)

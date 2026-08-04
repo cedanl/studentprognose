@@ -177,7 +177,7 @@ def create() -> None:
             concept_banner()
             section_title(
                 "API & integraties",
-                f"Embed prognoses in Power BI, Tableau of je eigen systemen via REST.",
+                "Embed prognoses in Power BI, Tableau of je eigen systemen via REST.",
             )
             _ApiView()
 
@@ -205,13 +205,10 @@ class _ApiView:
         # ── Endpoints ────────────────────────────────────────────────────────
         ui.label("Endpoints").classes("font-medium mt-2")
         for ep in _ENDPOINTS:
-            method_color = {"GET": "#2196F3", "POST": _GREEN, "DELETE": theme.NEGATIVE}.get(
-                ep["method"], _MUTED
-            )
             with ui.expansion(
                 f'{ep["method"]}  {ep["path"]}',
             ).classes("w-full").style(
-                f"border:1px solid #e8e8e8;border-radius:8px;margin-bottom:8px;"
+                "border:1px solid #e8e8e8;border-radius:8px;margin-bottom:8px;"
             ):
                 ui.label(ep["summary"]).classes("text-sm opacity-70 mb-3")
 

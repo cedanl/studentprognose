@@ -6,7 +6,7 @@ nooit ``sys.exit()`` aan — in de GUI worden fouten teruggegeven als datastruct
 
 from __future__ import annotations
 
-import csv
+import copy
 import datetime
 import json
 import os
@@ -15,6 +15,7 @@ from enum import Enum
 
 import pandas as pd
 
+from studentprognose.data.validation import _DEFAULT_VALIDATION_CFG
 from studentprognose.utils.telbestand_filenames import (
     compile_patterns,
     match_telbestand,
@@ -44,38 +45,36 @@ class FileCheckResult:
     missing_required: list[str] = field(default_factory=list) # verwachte kolommen die ontbreken
 
 
-# Validatie-defaults gespiegeld van validation.py — geen import om
-# circulaire afhankelijkheden en sys.exit()-aanroepen te vermijden.
-_CFG: dict = {
-    "collegejaar_min_offset": 15,
-    "collegejaar_max_offset": 2,
-    "weeknummer_min": 1,
-    "weeknummer_max": 53,
-    "nan_warning_threshold": 0.05,
-    "nan_error_threshold": 0.30,
-    "telbestand": {
-        # Groepeernaam ontbreekt in het UvA SQL (SL) formaat — de ETL genereert
-        # die kolom zelf op basis van Isatcode (#232). Geen vereiste kolom.
-        "required_columns": [
-            "Studiejaar", "Isatcode", "Aantal", "meercode_V",
-            "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
-        ],
-        "herkomst_allowed": ["N", "E", "R", "O"],
-        "herinschrijving_allowed": ["J", "N"],
-        "hogerejaars_allowed": ["J", "N"],
-    },
-    "individueel": {
-        "critical_columns": [
-            "Collegejaar", "Croho", "Inschrijfstatus", "Datum Verzoek Inschr",
-        ],
-    },
-    "oktober": {
-        "critical_columns": [
-            "Collegejaar", "Isatcode", "Aantal eerstejaars croho",
-            "EER-NL-nietEER", "Examentype code", "Aantal Hoofdinschrijvingen",
-        ],
-    },
-}
+def _build_gui_validation_cfg() -> dict:
+    """Bouw de validatie-config van de upload-wizard.
+
+    De **enige bron van waarheid** voor drempels en kolomlijsten is
+    ``studentprognose.data.validation._DEFAULT_VALIDATION_CFG``; door daaruit af
+    te leiden kunnen de GUI-drempels (NaN-drempels, jaar-offsets, weekbereik)
+    niet stil uiteendrijven met de pipeline. Daarop passen we twee **bewuste**
+    versoepelingen toe, omdat de wizard *ruwe* bestanden vóór de ETL valideert:
+
+    * ``Groepeernaam`` is niet vereist — het UvA SQL (SL) formaat levert die niet
+      en de ETL genereert de kolom zelf uit ``Isatcode`` (#232).
+    * ``Herkomst`` mag ook ``"O"`` (onbekend) bevatten naast ``N``/``E``/``R``;
+      de pipeline normaliseert dat verderop.
+
+    Returns:
+        Een diepe kopie van de canonieke config met de GUI-versoepelingen.
+    """
+    cfg = copy.deepcopy(_DEFAULT_VALIDATION_CFG)
+    tel = cfg["telbestand"]
+    tel["required_columns"] = [
+        c for c in tel["required_columns"] if c != "Groepeernaam"
+    ]
+    if "O" not in tel["herkomst_allowed"]:
+        tel["herkomst_allowed"] = [*tel["herkomst_allowed"], "O"]
+    return cfg
+
+
+#: Validatie-config afgeleid uit de canonieke pipeline-bron (zie
+#: :func:`_build_gui_validation_cfg`).
+_CFG: dict = _build_gui_validation_cfg()
 
 
 @dataclass
@@ -159,7 +158,7 @@ def _config_min_training_year(project_dir: str) -> int | None:
             cfg = json.load(f)
         val = cfg.get("model_config", {}).get("min_training_year")
         return int(val) if val is not None else None
-    except Exception:
+    except (OSError, json.JSONDecodeError, ValueError, TypeError):
         return None
 
 
@@ -194,7 +193,7 @@ def _oktober_years(project_dir: str) -> set[int]:
         return set()
     try:
         df = pd.read_excel(okt_path)
-    except Exception:
+    except (OSError, ValueError, KeyError):
         return set()
 
     column_map = load_project_col_map(project_dir, "oktober")
@@ -317,25 +316,21 @@ def _sniff_separator(filepath: str) -> str:
     (bijv. puntkomma's in tekst terwijl de echte separator een tab is). We
     proberen alle drie kandidaten en kiezen degene die de breedste tabel geeft.
     """
-    required = {
-        "Studiejaar", "Isatcode", "Aantal", "meercode_V",
-        "Status", "Herinschrijving", "Hogerejaars", "Herkomst",
-    }
+    required = set(_CFG["telbestand"]["required_columns"])
     best_sep = ";"
     best_score: tuple[int, int] = (-1, -1)
     for sep in (";", ",", "\t"):
         try:
-            import io
             with open(filepath, encoding="utf-8", errors="replace") as fh:
                 header = fh.readline()
-            cols = set(c.strip().strip('"').strip("'") for c in header.split(sep))
-            # Primair: meeste vereiste kolommen; secundair: meeste kolommen totaal
-            score = (len(cols & required), len(cols))
-            if score > best_score:
-                best_score = score
-                best_sep = sep
-        except Exception:
+        except OSError:
             continue
+        cols = {c.strip().strip('"').strip("'") for c in header.split(sep)}
+        # Primair: meeste vereiste kolommen; secundair: meeste kolommen totaal
+        score = (len(cols & required), len(cols))
+        if score > best_score:
+            best_score = score
+            best_sep = sep
     return best_sep
 
 
@@ -352,6 +347,32 @@ def _to_status(hard: list, soft: list, warnings: list) -> FileStatus:
 # zodat _UploadZone een uniforme aanroepconventie kan gebruiken.
 # ---------------------------------------------------------------------------
 
+def safe_telbestand_name(filename: str) -> str:
+    """Normaliseer een geüploade telbestand-naam tot een veilige basisnaam.
+
+    Verwijdert padcomponenten (``os.path.basename``) zodat een naam als
+    ``../../etc/passwd`` nooit buiten de ``telbestanden``-map kan schrijven of
+    verwijderen (padtraversal). Backslashes worden ook als scheidingsteken
+    behandeld zodat Windows-paden op een POSIX-server niet doorlekken. De naam
+    wordt daarna lowercase gemaakt — de conventie waarmee bestanden worden
+    opgeslagen.
+
+    Args:
+        filename: De door de client aangeleverde bestandsnaam.
+
+    Returns:
+        Een pad-loze, lowercase bestandsnaam.
+
+    Raises:
+        ValueError: Als er na normalisatie geen geldige naam overblijft (leeg,
+            of ``.``/``..``).
+    """
+    base = os.path.basename(filename.replace("\\", "/")).lower().strip()
+    if not base or base in {".", ".."}:
+        raise ValueError(f"Ongeldige bestandsnaam: {filename!r}")
+    return base
+
+
 def load_project_col_map(project_dir: str, key: str) -> dict[str, str]:
     """Lees de kolomnaam-mapping voor *key* uit de projectconfiguratie.
 
@@ -364,7 +385,7 @@ def load_project_col_map(project_dir: str, key: str) -> dict[str, str]:
         with open(cfg_path, encoding="utf-8") as f:
             cfg = json.load(f)
         return dict(cfg.get("columns", {}).get(key, {}))
-    except Exception:
+    except (OSError, json.JSONDecodeError, TypeError):
         return {}
 
 
@@ -383,7 +404,7 @@ def save_project_col_map(project_dir: str, key: str, mapping: dict[str, str]) ->
         with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(cfg, f, ensure_ascii=False, indent=4)
             f.write("\n")
-    except Exception:
+    except (OSError, json.JSONDecodeError):
         pass
 
 
@@ -393,7 +414,7 @@ def save_and_validate_telbestand(
     """Sla een telbestand op in data/input_raw/telbestanden/ en valideer het."""
     dest_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
     os.makedirs(dest_dir, exist_ok=True)
-    filename = filename.lower()
+    filename = safe_telbestand_name(filename)
     filepath = os.path.join(dest_dir, filename)
     with open(filepath, "wb") as f:
         f.write(content)
@@ -426,7 +447,7 @@ def save_and_validate_oktober(
 
 def revalidate_telbestand(project_dir: str, filename: str) -> FileCheckResult:
     """Hervalideer een bestaand telbestand op schijf met de huidige kolomnaam-mapping."""
-    saved_filename = filename.lower()  # opgeslagen als lowercase (zie save_and_validate_telbestand)
+    saved_filename = safe_telbestand_name(filename)  # zoals opgeslagen (zie save_and_validate_telbestand)
     filepath = os.path.join(project_dir, "data", "input_raw", "telbestanden", saved_filename)
     column_map = load_project_col_map(project_dir, "telbestand")
     return _check_telbestand(filepath, filename, column_map)
@@ -441,7 +462,11 @@ def revalidate_oktober(project_dir: str) -> FileCheckResult:
 
 def delete_telbestand(project_dir: str, filename: str) -> None:
     """Verwijder een telbestand van schijf."""
-    path = os.path.join(project_dir, "data", "input_raw", "telbestanden", filename.lower())
+    try:
+        saved_filename = safe_telbestand_name(filename)
+    except ValueError:
+        return
+    path = os.path.join(project_dir, "data", "input_raw", "telbestanden", saved_filename)
     if os.path.isfile(path):
         os.remove(path)
 
@@ -530,7 +555,7 @@ def _check_telbestand(
     sep = _sniff_separator(filepath)
     try:
         df = pd.read_csv(filepath, sep=sep, low_memory=False)
-    except Exception as exc:
+    except (OSError, ValueError, UnicodeDecodeError, pd.errors.ParserError) as exc:
         hard.append(
             f"Bestand kan niet worden gelezen: {exc}. "
             "Controleer of het een geldige CSV is (puntkomma- of kommagescheiden)."
@@ -620,7 +645,7 @@ def _check_individueel(filepath: str) -> FileCheckResult:
 
     try:
         df = pd.read_csv(filepath, sep=";", low_memory=False)
-    except Exception as exc:
+    except (OSError, ValueError, UnicodeDecodeError, pd.errors.ParserError) as exc:
         hard.append(
             f"Bestand kan niet worden gelezen: {exc}. "
             "Controleer of het een geldige CSV is met puntkomma (;) als scheidingsteken."
@@ -661,7 +686,7 @@ def _check_oktober(
 
     try:
         df = pd.read_excel(filepath)
-    except Exception as exc:
+    except (OSError, ValueError, UnicodeDecodeError, pd.errors.ParserError) as exc:
         hard.append(
             f"Bestand kan niet worden gelezen: {exc}. "
             "Controleer of het een geldig Excel-bestand (.xlsx) is."

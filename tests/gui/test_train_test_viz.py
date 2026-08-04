@@ -5,7 +5,6 @@ hardgecodeerd startjaar) en dat de training nooit voorbij het laatste jaar met
 realisatiedata reikt.
 """
 
-import os
 
 import pandas as pd
 

@@ -427,9 +427,9 @@ def _overlap_html(info: OverlapInfo) -> str:
         f'<div style="display:flex;flex-direction:column;gap:6px;">'
         + _row("Telbestanden", tel_blocks)
         + _row("Oktober", okt_blocks)
-        + f'<div style="border-top:1px dashed #e8e8e8;margin:3px 0 3px 103px;"></div>'
+        + '<div style="border-top:1px dashed #e8e8e8;margin:3px 0 3px 103px;"></div>'
         + _row("Overlap", ovl_blocks, bold=True)
-        + f'</div>'
+        + '</div>'
 
         # ── Advies ───────────────────────────────────────────────────────────
         + f'<div style="margin-top:12px;padding-top:10px;border-top:1px solid #f0f0f0;'
@@ -1111,7 +1111,6 @@ def _build_column_mapper(
     selects: dict[str, ui.select] = {}
 
     # Bepaal welke canonieke kolommen ontbreken (na huidige mapping)
-    mapped_set = {current_map.get(c, c) for c in required_columns}
     missing_canonical = [
         c for c in required_columns
         if current_map.get(c, c) not in actual_set

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from nicegui import ui
 
-from gui import nav, theme, tracks, viz
+from gui import nav, theme, viz
 from gui.components.layout import page_shell
 from gui.components.states import section_title
 

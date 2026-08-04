@@ -8,7 +8,6 @@ JSON:        directe bewerking voor experts.
 from __future__ import annotations
 
 import csv
-import datetime
 import glob
 import json
 import os
@@ -20,56 +19,9 @@ from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
 from gui.state import STATE
 
-
-def _detect_overlap_years(project_dir: str) -> list[int] | None:
-    """Detecteer jaren waarvoor zowel telbestanden als oktoberbestand aanwezig zijn.
-
-    Leest alleen bestandsnamen voor telbestanden en uitsluitend de Collegejaar-kolom
-    voor het oktoberbestand, zodat dit snel blijft.
-    Geeft None terug als er onvoldoende data aanwezig is.
-    """
-    from studentprognose.utils.telbestand_filenames import (
-        compile_patterns,
-        match_telbestand,
-    )
-
-    tel_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
-    tel_years: set[int] = set()
-    if os.path.isdir(tel_dir):
-        try:
-            patterns = compile_patterns(None)
-            for fname in os.listdir(tel_dir):
-                m = match_telbestand(fname, patterns)
-                if m:
-                    try:
-                        tel_years.add(int(m.group("year")))
-                    except (ValueError, IndexError):
-                        pass
-        except Exception:
-            pass
-
-    okt_path = os.path.join(project_dir, "data", "input_raw", "oktober_bestand.xlsx")
-    okt_years: set[int] = set()
-    if os.path.isfile(okt_path):
-        try:
-            import pandas as pd
-
-            today = datetime.date.today()
-            valid_lo, valid_hi = today.year - 20, today.year + 2
-            df = pd.read_excel(okt_path, usecols=["Collegejaar"], engine="openpyxl")
-            for raw in pd.to_numeric(df["Collegejaar"], errors="coerce").dropna().unique():
-                y = int(raw)
-                if valid_lo <= y <= valid_hi:
-                    okt_years.add(y)
-        except Exception:
-            pass
-
-    if not tel_years and not okt_years:
-        return None
-    if tel_years and okt_years:
-        overlap = sorted(tel_years & okt_years)
-        return overlap if overlap else sorted(tel_years)
-    return sorted(tel_years or okt_years)
+#: Vertraging (s) waarmee een wijziging naar de auto-save wordt gedebounced, zodat
+#: snel typen niet bij elke toetsaanslag valideert en naar schijf schrijft.
+_AUTOSAVE_DELAY_S = 0.6
 
 
 def _load_brincodes(project_dir: str) -> list[str]:
@@ -86,7 +38,7 @@ def _load_brincodes(project_dir: str) -> list[str]:
                     code = row.get("Brincode", "").strip()
                     if code:
                         codes.add(code)
-        except Exception:
+        except (OSError, csv.Error, UnicodeDecodeError):
             continue
     return sorted(codes)
 
@@ -198,6 +150,8 @@ class _ConfigView:
 
     def __init__(self, path: str) -> None:
         self._path = path
+        #: Generatieteller voor de debounced auto-save (zie :meth:`_mark_dirty`).
+        self._dirty_gen = 0
         try:
             self._config = config_io.load_config(path)
         except (FileNotFoundError, json.JSONDecodeError) as exc:
@@ -412,163 +366,6 @@ class _ConfigView:
 
                     _week_tiles()
                     _horizon_hint()
-
-    def _year_card(self) -> None:
-        mc = self._config.setdefault("model_config", {})
-        _REC_YEAR = 2022
-        _THIS_YEAR = datetime.date.today().year
-        _SLIDER_MAX = _THIS_YEAR - 1
-
-        # Bepaal het databereik op basis van aanwezige bestanden.
-        try:
-            project_dir = os.path.dirname(os.path.dirname(self._path))
-            overlap_years = _detect_overlap_years(project_dir)
-        except Exception:
-            overlap_years = None
-        _SLIDER_MIN = min(overlap_years) if overlap_years else 2010
-
-        current_val = int(mc.get("min_training_year", _REC_YEAR))
-        current_val = max(_SLIDER_MIN, min(current_val, _SLIDER_MAX))
-        state = {"year": current_val}
-
-        def years_back(yr: int) -> int:
-            return max(0, _THIS_YEAR - yr)
-
-        def build_presets() -> list[tuple[int, int]]:
-            """Geeft lijst van (jaar, jaren-terug) voor de preset-tegels."""
-            candidates = [_THIS_YEAR - n for n in (3, 4, 5, 6, 7, 10)]
-            pts = [(yr, _THIS_YEAR - yr) for yr in candidates
-                   if _SLIDER_MIN <= yr <= _SLIDER_MAX]
-            # Voeg "alles" toe als oudste beschikbare data niet al in de lijst zit
-            if not pts or _SLIDER_MIN < pts[-1][0]:
-                pts.append((_SLIDER_MIN, _THIS_YEAR - _SLIDER_MIN))
-            # Voeg huidige waarde toe als die niet in de presets zit
-            preset_years = {yr for yr, _ in pts}
-            if state["year"] not in preset_years:
-                pts.insert(0, (state["year"], _THIS_YEAR - state["year"]))
-            return pts
-
-        with ui.card().classes("w-full mb-4"):
-            with ui.row().classes("items-start gap-4 no-wrap"):
-                with ui.element("div").classes(
-                    "w-12 h-12 rounded-xl flex items-center justify-center flex-none mt-1"
-                ).style(f"background: {theme.NPULS_GREEN}18"):
-                    ui.icon("history").style(
-                        f"color: {theme.NPULS_GREEN}; font-size: 22px;"
-                    )
-                with ui.column().classes("gap-1 grow"):
-                    with ui.row().classes("items-center gap-2 flex-wrap"):
-                        ui.label("Historische data").classes("text-base font-medium")
-                        ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
-                    ui.label(
-                        "Hoeveel jaar terugkijken voor de training? Meer jaren geeft een "
-                        "stabielere trend, maar heel vroege data weerspiegelt de "
-                        "huidige situatie minder goed."
-                    ).classes("text-sm opacity-60 mt-1")
-
-                    if overlap_years:
-                        with ui.row().classes("items-center gap-1.5 mt-1"):
-                            ui.icon("folder_open").style(
-                                f"color: {theme.INFO}; font-size: 14px;"
-                            )
-                            ui.label(
-                                f"Beschikbare data: {min(overlap_years)}–{max(overlap_years)}"
-                            ).classes("text-xs").style(f"color: {theme.INFO}")
-
-                    @ui.refreshable
-                    def _year_tiles() -> None:
-                        A = theme.ACCENT
-                        G = theme.NPULS_GREEN
-                        presets = build_presets()
-                        with ui.row().classes("gap-2 flex-wrap mt-3"):
-                            for yr, yrs in presets:
-                                is_sel = yr == state["year"]
-                                is_rec = yr == _REC_YEAR
-                                border = A if is_sel else ("#e0e0e0" if not is_rec else f"{A}55")
-                                bg = f"{A}12" if is_sel else ("white" if not is_rec else f"{A}06")
-                                label_col = A if is_sel else ("#555" if not is_rec else A)
-
-                                tile = ui.element("div").style(
-                                    f"padding:10px 16px;border-radius:10px;"
-                                    f"border:2px solid {border};background:{bg};"
-                                    f"cursor:pointer;text-align:center;min-width:72px;"
-                                    f"transition:border-color 0.15s,background 0.15s,"
-                                    f"box-shadow 0.15s;"
-                                    + (f"box-shadow:0 0 0 3px {A}22;" if is_sel else "")
-                                )
-
-                                def _pick(y=yr) -> None:
-                                    state["year"] = y
-                                    mc["min_training_year"] = y
-                                    self._mark_dirty()
-                                    _year_tiles.refresh()
-
-                                tile.on("click", _pick)
-                                with tile:
-                                    lbl = (
-                                        "Alles"
-                                        if yr == _SLIDER_MIN and yrs >= 10
-                                        else f"{yrs} jaar"
-                                    )
-                                    ui.label(lbl).style(
-                                        f"font-size:15px;font-weight:{'700' if is_sel else '600'};"
-                                        f"color:{label_col};line-height:1.2;"
-                                    )
-                                    ui.label(f"vanaf {yr}").style(
-                                        f"font-size:10px;color:{'#aaa' if not is_sel else A};"
-                                        f"margin-top:2px;"
-                                    )
-                                    if is_rec:
-                                        ui.label("★ aanbevolen").style(
-                                            f"font-size:9px;color:{A};font-weight:600;"
-                                            f"margin-top:3px;letter-spacing:0.03em;"
-                                        )
-
-                    _year_tiles()
-
-    def _excl_years_card(self) -> None:
-        with ui.card().classes("w-full mb-4"):
-            with ui.row().classes("items-start gap-4 no-wrap"):
-                with ui.element("div").classes(
-                    "w-12 h-12 rounded-xl flex items-center justify-center flex-none mt-1"
-                ).style(f"background: {theme.WARNING}18"):
-                    ui.icon("block").style(f"color: {theme.WARNING}; font-size: 22px;")
-                with ui.column().classes("gap-1 grow"):
-                    ui.label("Uitzonderlijke jaren").classes("text-base font-medium")
-                    ui.label(
-                        "Sluit jaren met buitengewone instroom uit de trainingsdata. "
-                        "Bijv. 2020–2021 (COVID). Het voorspeljaar zelf is altijd beschermd."
-                    ).classes("text-sm opacity-60 mt-1")
-
-                    self._excl_years_chips = ui.row().classes("gap-2 flex-wrap mt-3 min-h-8")
-                    self._render_excl_year_chips()
-
-                    with ui.row().classes("items-center gap-2 mt-3"):
-                        self._new_year_input = ui.number(
-                            label="Jaar toevoegen",
-                            value=2020,
-                            min=2010,
-                            max=2030,
-                            step=1,
-                        ).props("dense outlined").classes("w-40")
-                        ui.button(
-                            "Toevoegen",
-                            icon="add",
-                            on_click=self._add_excl_year,
-                        ).props("outline dense")
-
-                    adv_count = sum(
-                        1 for r in self._excl_rows if set(r.keys()) - {"year"}
-                    )
-                    if adv_count:
-                        with ui.row().classes("items-center gap-1 mt-2"):
-                            ui.icon("info").style(
-                                f"color: {theme.INFO}; font-size: 14px;"
-                            )
-                            ui.label(
-                                f"{adv_count} geavanceerde uitsluitingsregel(s) — "
-                                "beheer ze in het Geavanceerd-tabblad."
-                            ).classes("text-xs").style(f"color: {theme.INFO}")
 
     def _render_excl_year_chips(self) -> None:
         self._excl_years_chips.clear()
@@ -1159,23 +956,6 @@ class _ConfigView:
 
         sw.on_value_change(_on_change)
 
-    def _adv_number(
-        self, label, target, key, default, *, allow_none=False, help=None
-    ) -> None:
-        value = target.get(key, default)
-        inp = ui.number(label=label, value=value).classes("w-full max-w-xs")
-        if help:
-            inp.tooltip(help)
-
-        def _on_change(e) -> None:
-            val = e.value
-            if val is None and not allow_none:
-                return
-            target[key] = int(val) if val is not None else None
-            self._mark_dirty()
-
-        inp.on_value_change(_on_change)
-
     # ─── Dynamische tabellen ──────────────────────────────────────────────────
 
     def _render_nf_rows(self) -> None:
@@ -1386,28 +1166,43 @@ class _ConfigView:
                 cleaned.append(item)
         self._config["excluded_data_points"] = cleaned
 
-    def _save(self) -> None:
+    def _save(self, *, notify: bool = True) -> bool:
+        """Valideer en schrijf configuratie + filtering naar schijf.
+
+        Args:
+            notify: Toon een notificatie bij validatiefouten of schrijffouten.
+                De debounced auto-save geeft ``False`` mee, zodat tussentijdse
+                (nog onvolledige) waarden tijdens het typen geen foutmeldingen
+                opleveren; alleen een expliciete opslag ('Volgende') is luid.
+
+        Returns:
+            ``True`` als er daadwerkelijk is opgeslagen, anders ``False``.
+        """
         self._sync_dynamic_into_config()
         errors = config_io.validate_config(self._config)
         if errors:
-            self._validate_ensemble()
-            ui.notify(
-                "Kan niet opslaan: los eerst de validatiefouten op.",
-                type="negative",
-            )
-            return
+            if notify:
+                self._validate_ensemble()
+                ui.notify(
+                    "Kan niet opslaan: los eerst de validatiefouten op.",
+                    type="negative",
+                )
+            return False
         filter_errors = filtering_io.validate_filtering(self._filtering_data)
         if filter_errors:
-            for err in filter_errors:
-                ui.notify(err, type="negative")
-            return
+            if notify:
+                for err in filter_errors:
+                    ui.notify(err, type="negative")
+            return False
         try:
             config_io.save_config(self._path, self._config)
             filtering_io.save_filtering(STATE.filtering_path, self._filtering_data)
         except OSError as exc:
-            ui.notify(f"Opslaan mislukt: {exc}", type="negative")
-            return
+            if notify:
+                ui.notify(f"Opslaan mislukt: {exc}", type="negative")
+            return False
         STATE.config_saved = True
+        return True
 
     def _on_institution_change(self, e) -> None:
         self._config["institution_filter"] = [e.value] if e.value else []
@@ -1416,8 +1211,25 @@ class _ConfigView:
     # ─── Dirty-tracking ───────────────────────────────────────────────────────
 
     def _on_next_click(self) -> None:
-        self._save()
+        # Expliciete opslag: luid (toont eventuele validatiefouten). Invalideer
+        # een eventueel geplande auto-save zodat die niet dubbel schrijft.
+        self._dirty_gen += 1
+        self._save(notify=True)
         ui.navigate.to(nav.next_route("/config"))
 
     def _mark_dirty(self) -> None:
-        self._save()
+        """Markeer de config als gewijzigd en plan een stille, debounced auto-save.
+
+        Elke wijziging verschuift de save ``_AUTOSAVE_DELAY_S`` seconden naar
+        achteren via een generatieteller: alleen de laatste geplande save van een
+        reeks snelle wijzigingen voert daadwerkelijk uit. Zo valideert en schrijft
+        de editor niet langer bij élke slider-tick of toetsaanslag.
+        """
+        self._dirty_gen += 1
+        gen = self._dirty_gen
+        ui.timer(_AUTOSAVE_DELAY_S, lambda: self._flush_autosave(gen), once=True)
+
+    def _flush_autosave(self, gen: int) -> None:
+        """Voer de auto-save uit als er ondertussen geen nieuwere wijziging kwam."""
+        if gen == self._dirty_gen:
+            self._save(notify=False)

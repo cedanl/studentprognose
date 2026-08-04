@@ -243,8 +243,8 @@ def _chart_legend_html(hist_year: int | None, target: int | None) -> str:
         )
 
     return (
-        f'<div style="display:flex;flex-wrap:wrap;gap:8px 14px;'
-        f'padding:4px 2px;">' + "".join(parts) + "</div>"
+        '<div style="display:flex;flex-wrap:wrap;gap:8px 14px;'
+        'padding:4px 2px;">' + "".join(parts) + "</div>"
     )
 
 

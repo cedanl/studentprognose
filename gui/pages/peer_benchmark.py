@@ -223,10 +223,10 @@ def _comparison_bars_html(own_pct: int, peer_pct: int, peer_label: str) -> str:
     delta_txt = "boven peer" if delta >= 0 else "onder peer"
 
     return (
-        f'<div style="background:#fafafa;border:1px solid #efefef;'
-        f'border-radius:10px;padding:16px 20px;">'
-        f'<div style="font-size:11px;color:#999;margin-bottom:14px;font-weight:500;">'
-        f'% van historisch doel — week 14 · 2025</div>'
+        '<div style="background:#fafafa;border:1px solid #efefef;'
+        'border-radius:10px;padding:16px 20px;">'
+        '<div style="font-size:11px;color:#999;margin-bottom:14px;font-weight:500;">'
+        '% van historisch doel — week 14 · 2025</div>'
         + bar("Uw instelling", own_pct, own_color, bold=True)
         + bar(peer_label, peer_pct, peer_color)
         + f'<div style="font-size:11px;color:{delta_col};font-weight:600;'
@@ -517,7 +517,7 @@ class _PeerBenchmarkView:
             for label, val, color, sub in [
                 ("Uw instelling",   f"{own_pct}%",  own_color,  "% van historisch doel (W14)"),
                 ("Gat (procentpunt)", f"{delta_s}pp", own_color, "uw positie t.o.v. peer"),
-                (self._instelling,  f"{peer_pct}%", _ACCENT,  f"% van historisch doel (W14)"),
+                (self._instelling,  f"{peer_pct}%", _ACCENT,  "% van historisch doel (W14)"),
             ]:
                 with ui.card().classes("flex-1").style(f"border-top:3px solid {color};"):
                     ui.label(label).classes("text-xs opacity-50 font-medium uppercase tracking-wide")

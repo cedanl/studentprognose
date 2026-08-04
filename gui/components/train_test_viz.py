@@ -539,8 +539,8 @@ def render_v4(
     if d is None:
         return (
             '<div style="background:#0d1117; border-radius:10px; padding:20px 24px;">'
-            f'<div style="text-align:center; color:rgba(255,255,255,0.35); font-size:13px;'
-            f' font-style:italic;">'
+            '<div style="text-align:center; color:rgba(255,255,255,0.35); font-size:13px;'
+            ' font-style:italic;">'
             'Voer een prognosejaar in om de dataverdeling te zien.'
             '</div></div>'
         )

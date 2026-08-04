@@ -50,7 +50,9 @@ De interface leidt je langs vijf stappen, in volgorde:
    instelling** (SIS/datawarehouse zoals Osiris of Usis). Onderaan de uploadzone
    staat daarnaast een klikbare link **"Verwacht formaat"**: klik die uit om een
    tabel te zien met verwachte kolomnamen, beschrijvingen en voorbeeldwaarden.
-2. **Configuratie** — stel de modelparameters en paden in.
+2. **Configuratie** — stel de modelparameters en paden in. Wijzigingen worden
+   kort na het typen automatisch bewaard; met **"Volgende"** sla je expliciet op
+   en ga je door naar de volgende stap.
 3. **Filteren** — bepaal op welke opleidingen, herkomst en examentypes je draait.
 4. **Uitvoeren** — start de voorspelling en volg de voortgang live.
 5. **Resultaten** — bekijk een overzicht van de voorspellingen.

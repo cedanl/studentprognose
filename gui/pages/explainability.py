@@ -171,12 +171,12 @@ def _factor_bar_html(weight: float, color: str) -> str:
 
 def _history_html(rows: list[tuple]) -> str:
     header = (
-        f'<tr style="background:#fafafa;">'
-        f'<th style="padding:6px 10px;text-align:left;font-size:11px;color:#999;font-weight:500;">Jaar</th>'
-        f'<th style="padding:6px 10px;text-align:right;font-size:11px;color:#999;font-weight:500;">Model (w14)</th>'
-        f'<th style="padding:6px 10px;text-align:right;font-size:11px;color:#999;font-weight:500;">Werkelijk</th>'
-        f'<th style="padding:6px 10px;text-align:right;font-size:11px;color:#999;font-weight:500;">Afwijking</th>'
-        f'</tr>'
+        '<tr style="background:#fafafa;">'
+        '<th style="padding:6px 10px;text-align:left;font-size:11px;color:#999;font-weight:500;">Jaar</th>'
+        '<th style="padding:6px 10px;text-align:right;font-size:11px;color:#999;font-weight:500;">Model (w14)</th>'
+        '<th style="padding:6px 10px;text-align:right;font-size:11px;color:#999;font-weight:500;">Werkelijk</th>'
+        '<th style="padding:6px 10px;text-align:right;font-size:11px;color:#999;font-weight:500;">Afwijking</th>'
+        '</tr>'
     )
     body = ""
     for year, model, actual, pct in rows:

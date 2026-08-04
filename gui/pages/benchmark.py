@@ -21,6 +21,9 @@ from gui.state import STATE
 _DATASET_CODE = {"Cumulatief": "c", "Individueel": "i"}
 _TUNE_CODE = {"Regressor": "regressor", "SARIMA": "sarima", "Beide": "both"}
 
+#: Aanbevolen predict-week — ook de fallback als het invoerveld leeg is.
+_RECOMMENDED_WEEK = 38
+
 
 def create() -> None:
     """Registreer de route ``/benchmark``."""
@@ -78,14 +81,14 @@ class _BenchmarkSection:
             ).classes("w-48")
             self._dataset.tooltip(tracks.dataset_tooltip(["Cumulatief", "Individueel"]))
             with ui.column().classes("gap-0"):
-                self._week = ui.number("Predict week", value=38, min=1, max=52).classes(
+                self._week = ui.number("Predict week", value=_RECOMMENDED_WEEK, min=1, max=52).classes(
                     "w-40"
                 )
                 with ui.row().classes("items-center gap-1 mt-0.5"):
                     ui.icon("star").style(
                         f"color: {theme.ACCENT}; font-size: 11px;"
                     )
-                    ui.label("Aanbevolen: 38").classes("text-xs font-medium").style(
+                    ui.label(f"Aanbevolen: {_RECOMMENDED_WEEK}").classes("text-xs font-medium").style(
                         f"color: {theme.ACCENT}; opacity: 0.8"
                     )
             self._start = ui.button(
@@ -143,7 +146,7 @@ class _BenchmarkSection:
         self._start.props("loading")
         try:
             code = _DATASET_CODE[self._dataset.value]
-            week = int(self._week.value or 12)
+            week = int(self._week.value or _RECOMMENDED_WEEK)
             rc = await self._panel.run(
                 ["benchmark", "-d", code, "-w", str(week)], cwd=STATE.project_dir
             )
@@ -162,14 +165,14 @@ class _TuneSection:
                 ["Regressor", "SARIMA", "Beide"], value="Regressor", label="Tune-doel"
             ).classes("w-48")
             with ui.column().classes("gap-0"):
-                self._week = ui.number("Predict week", value=38, min=1, max=52).classes(
+                self._week = ui.number("Predict week", value=_RECOMMENDED_WEEK, min=1, max=52).classes(
                     "w-40"
                 )
                 with ui.row().classes("items-center gap-1 mt-0.5"):
                     ui.icon("star").style(
                         f"color: {theme.ACCENT}; font-size: 11px;"
                     )
-                    ui.label("Aanbevolen: 38").classes("text-xs font-medium").style(
+                    ui.label(f"Aanbevolen: {_RECOMMENDED_WEEK}").classes("text-xs font-medium").style(
                         f"color: {theme.ACCENT}; opacity: 0.8"
                     )
             self._start = ui.button(
@@ -186,7 +189,7 @@ class _TuneSection:
         self._snippet_slot.clear()
         try:
             target = _TUNE_CODE[self._target.value]
-            week = int(self._week.value or 12)
+            week = int(self._week.value or _RECOMMENDED_WEEK)
             rc = await self._panel.run(
                 ["tune", "-d", "c", "-w", str(week), "--tune-target", target],
                 cwd=STATE.project_dir,
