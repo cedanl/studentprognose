@@ -196,19 +196,8 @@ def create() -> None:
 class _ConfigView:
     """Drie-tabbladen configuratie-editor: Basis · Geavanceerd · JSON."""
 
-    _GUARD_JS = """
-        if (!window.__spUnloadGuard) {
-            window.__spDirty = false;
-            window.__spUnloadGuard = (e) => {
-                if (window.__spDirty) { e.preventDefault(); e.returnValue = ''; }
-            };
-            window.addEventListener('beforeunload', window.__spUnloadGuard);
-        }
-    """
-
     def __init__(self, path: str) -> None:
         self._path = path
-        self._dirty = False
         try:
             self._config = config_io.load_config(path)
         except (FileNotFoundError, json.JSONDecodeError) as exc:
@@ -233,12 +222,6 @@ class _ConfigView:
     # ─── Hoofd-layout ────────────────────────────────────────────────────────
 
     def _build(self) -> None:
-        with ui.row().classes("w-full items-center justify-between mb-3"):
-            self._status = ui.label("").classes("text-sm font-medium")
-            self._save_btn = ui.button(
-                "Opslaan", icon="save", on_click=self._save
-            ).props("unelevated")
-
         with ui.tabs().props("indicator-color=accent align=left").classes("w-full") as tabs:
             tab_basis = ui.tab("Basis", icon="rocket_launch")
             tab_adv = ui.tab("Geavanceerd", icon="tune")
@@ -254,10 +237,10 @@ class _ConfigView:
                 tab_json.on("click", self._refresh_json_text)
 
         with ui.row().classes("w-full justify-end mt-6"):
-            with ui.element("div").on("click", self._on_next_click):
-                self._next_btn = ui.button(
-                    "Volgende", icon="arrow_forward"
-                ).props("unelevated color=accent")
+            ui.button(
+                "Volgende", icon="arrow_forward",
+                on_click=self._on_next_click,
+            ).props("unelevated color=accent")
 
     # ─── Basis-tabblad ───────────────────────────────────────────────────────
 
@@ -275,8 +258,6 @@ class _ConfigView:
 
         self._institution_card()
         self._week_card()
-
-        ui.button("Opslaan", icon="save", on_click=self._save).props("unelevated").classes("mt-3")
 
     def _institution_card(self) -> None:
         current = self._config.setdefault("institution_filter", [])
@@ -681,7 +662,6 @@ class _ConfigView:
         self._nf_section()
         self._excl_section()
         self._runtime_section()
-        ui.button("Opslaan", icon="save", on_click=self._save).props("unelevated").classes("mt-4")
 
     def _load_student_count_df(self):
         path = os.path.join(
@@ -1370,13 +1350,8 @@ class _ConfigView:
             ui.button(
                 "Toepassen",
                 icon="check",
-                on_click=self._apply_json_editor,
-            ).props("unelevated dense")
-            ui.button(
-                "Opslaan",
-                icon="save",
                 on_click=self._save_json_editor,
-            ).props("unelevated dense color=positive")
+            ).props("unelevated dense")
 
         self._run_json_editor_init()
 
@@ -1462,13 +1437,12 @@ class _ConfigView:
         self._excl_rows = [
             dict(item) for item in self._config.get("excluded_data_points", [])
         ]
-        self._mark_dirty()
-        ui.notify("JSON toegepast. Sla op om de wijzigingen te bewaren.", type="positive")
         return True
 
     async def _save_json_editor(self) -> None:
         if await self._apply_json_editor():
             self._save()
+            ui.notify("Configuratie opgeslagen.", type="positive", position="top-right")
 
     # ─── Validatie & opslaan ──────────────────────────────────────────────────
 
@@ -1523,9 +1497,7 @@ class _ConfigView:
         except OSError as exc:
             ui.notify(f"Opslaan mislukt: {exc}", type="negative")
             return
-        self._clear_dirty()
         STATE.config_saved = True
-        ui.notify("Configuratie opgeslagen.", type="positive", position="top")
 
     def _on_institution_change(self, e) -> None:
         self._config["institution_filter"] = [e.value] if e.value else []
@@ -1534,26 +1506,8 @@ class _ConfigView:
     # ─── Dirty-tracking ───────────────────────────────────────────────────────
 
     def _on_next_click(self) -> None:
-        if self._dirty:
-            ui.notify(
-                "Sla de configuratie eerst op voordat je verder gaat.",
-                type="warning",
-                position="top",
-            )
-            return
+        self._save()
         ui.navigate.to(nav.next_route("/config"))
 
     def _mark_dirty(self) -> None:
-        if not self._dirty:
-            self._dirty = True
-            ui.run_javascript(self._GUARD_JS + "window.__spDirty = true;")
-        self._status.set_text("● Niet-opgeslagen wijzigingen").style(
-            f"color: {theme.WARNING}"
-        )
-        self._next_btn.props(add="disabled")
-
-    def _clear_dirty(self) -> None:
-        self._dirty = False
-        ui.run_javascript("window.__spDirty = false;")
-        self._status.set_text("✓ Opgeslagen").style(f"color: {theme.POSITIVE}")
-        self._next_btn.props(remove="disabled")
+        self._save()
