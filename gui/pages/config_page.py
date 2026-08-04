@@ -234,7 +234,7 @@ class _ConfigView:
                 self._build_advanced()
             with ui.tab_panel(tab_json):
                 self._build_json()
-                tab_json.on("click", self._refresh_json_text)
+                tab_json.on("click", self._run_json_editor_init)
 
         with ui.row().classes("w-full justify-end mt-6"):
             ui.button(
@@ -1361,10 +1361,10 @@ class _ConfigView:
             f"""
             (function tryInit(n) {{
                 const el = document.getElementById('sp-json-ed');
-                if (!el) return;
-                if (typeof JSONEditor === 'undefined') {{
+                if (!el || typeof JSONEditor === 'undefined') {{
                     if (n > 0) {{ setTimeout(() => tryInit(n - 1), 150); return; }}
-                    el.innerHTML = '<p style="color:#c0392b;padding:16px;font-size:13px">'
+                    if (el) el.innerHTML =
+                        '<p style="color:#c0392b;padding:16px;font-size:13px">'
                         + '&#9888; JSONEditor kon niet worden geladen'
                         + ' &#x2014; controleer je internetverbinding.</p>';
                     return;
@@ -1384,19 +1384,6 @@ class _ConfigView:
                 window.__spJE.set({config_json});
                 window.__spJE.expandAll();
             }})(15);
-            """
-        )
-
-    def _refresh_json_text(self) -> None:
-        config_json = json.dumps(self._config, ensure_ascii=False)
-        ui.run_javascript(
-            f"""
-            if (window.__spJE) {{
-                try {{
-                    window.__spJE.set({config_json});
-                    window.__spJE.expandAll();
-                }} catch (e) {{ console.error('refresh error', e); }}
-            }}
             """
         )
 
