@@ -1307,11 +1307,11 @@ class _ConfigView:
         ):
             ui.icon("data_object").classes("text-xl opacity-40")
             with ui.column().classes("gap-0 grow"):
-                ui.label("Directe JSON-bewerking").classes("font-medium text-sm")
+                ui.label("JSON-overzicht").classes("font-medium text-sm")
                 ui.label(
-                    "Boom-modus: klik ▶ om secties open/dicht te klappen, "
-                    "dubbelklik op een waarde om te bewerken. "
-                    "Schakel linksboven naar Code-modus voor vrije tekstbewerking."
+                    "Bekijk je volledige configuratie als boom: klik ▶ om secties "
+                    "open/dicht te klappen. Wijzigingen doe je in de tabbladen "
+                    "Basis en Geavanceerd — die worden direct opgeslagen."
                 ).classes("text-sm opacity-50")
 
         with ui.row().classes("items-center gap-2 mb-3"):
@@ -1319,39 +1319,6 @@ class _ConfigView:
             ui.label(self._path).classes("text-xs font-mono opacity-40 break-all")
 
         ui.html('<div id="sp-json-ed"></div>')
-
-        self._json_error = ui.label("").classes("text-sm px-1 mt-1").style(
-            f"color: {theme.NEGATIVE}"
-        )
-
-        with ui.row().classes("gap-2 mt-3 flex-wrap items-center").style(
-            "border-top: 1px solid #f0f0f0; padding-top: 12px;"
-        ):
-            ui.button(
-                "Valideer",
-                icon="check_circle_outline",
-                on_click=self._validate_json_editor,
-            ).props("outline dense")
-            ui.button(
-                "Alles uitklappen",
-                icon="unfold_more",
-                on_click=lambda: ui.run_javascript(
-                    "window.__spJE && window.__spJE.expandAll()"
-                ),
-            ).props("flat dense")
-            ui.button(
-                "Alles inklappen",
-                icon="unfold_less",
-                on_click=lambda: ui.run_javascript(
-                    "window.__spJE && window.__spJE.collapseAll()"
-                ),
-            ).props("flat dense")
-            ui.separator().props("vertical").classes("mx-1").style("height: 28px;")
-            ui.button(
-                "Toepassen",
-                icon="check",
-                on_click=self._save_json_editor,
-            ).props("unelevated dense")
 
         self._run_json_editor_init()
 
@@ -1386,50 +1353,6 @@ class _ConfigView:
             }})(15);
             """
         )
-
-    async def _get_editor_json(self) -> str:
-        result = await ui.run_javascript(
-            "try { return JSON.stringify(window.__spJE.get()); }"
-            " catch(e) { return '__ERR__:' + e.message; }",
-            timeout=5.0,
-        )
-        if isinstance(result, str) and result.startswith("__ERR__:"):
-            raise ValueError(result[8:])
-        return result
-
-    async def _validate_json_editor(self) -> None:
-        try:
-            json_text = await self._get_editor_json()
-            config_io.parse_json(json_text)
-            self._json_error.set_text("")
-            ui.notify("JSON is geldig.", type="positive", position="top-right")
-        except Exception as exc:
-            self._json_error.set_text(f"Fout: {exc}")
-            ui.notify("Ongeldige JSON — zie de melding hieronder.", type="negative")
-
-    async def _apply_json_editor(self) -> bool:
-        try:
-            json_text = await self._get_editor_json()
-            parsed = config_io.parse_json(json_text)
-        except (json.JSONDecodeError, ValueError) as exc:
-            self._json_error.set_text(f"Ongeldige JSON: {exc}")
-            ui.notify(f"Ongeldige JSON: {exc}", type="negative")
-            return False
-        self._json_error.set_text("")
-        self._config = parsed
-        self._nf_rows = [
-            {"key": k, "value": v}
-            for k, v in self._config.get("numerus_fixus", {}).items()
-        ]
-        self._excl_rows = [
-            dict(item) for item in self._config.get("excluded_data_points", [])
-        ]
-        return True
-
-    async def _save_json_editor(self) -> None:
-        if await self._apply_json_editor():
-            self._save()
-            ui.notify("Configuratie opgeslagen.", type="positive", position="top-right")
 
     # ─── Validatie & opslaan ──────────────────────────────────────────────────
 

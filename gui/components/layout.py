@@ -300,8 +300,9 @@ def page_shell(active: str, title: str, *, show_stepper: bool = True) -> Iterato
             _stepper(active)
         yield
         # "Volgende"-knop onderaan — alleen voor wizard-flow pagina's die hun
-        # eigen navigatie niet regelen (/wizard heeft stepper, /run heeft runner).
-        _NO_AUTO_NEXT = {"/", "/wizard", "/run", "/output"}
+        # eigen navigatie niet regelen (/wizard heeft stepper, /config heeft een
+        # eigen Volgende-knop, /run heeft de runner).
+        _NO_AUTO_NEXT = {"/", "/wizard", "/config", "/run", "/output"}
         nxt = nav.next_route(active)
         nxt_label = nav.next_label(active)
         if nxt and active not in _NO_AUTO_NEXT:
