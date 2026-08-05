@@ -37,6 +37,14 @@
 
 </div>
 
+Zo start je de interface hierboven (vanuit een clone van deze repository):
+
+```bash
+uv run --extra gui python -m gui
+```
+
+Open daarna [http://localhost:8080](http://localhost:8080) in je browser. Zie [Grafische interface](https://cedanl.github.io/studentprognose/gui/) voor de volledige uitleg — of gebruik de CLI hieronder.
+
 ---
 
 ## 📦 Aan de slag
