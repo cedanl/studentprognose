@@ -11,12 +11,99 @@ import json
 
 import pandas as pd
 
+from studentprognose.utils.programme_key import (
+    normalize_programme_series,
+    normalize_programme_values,
+)
+
 #: Toegestane herkomst- en examentype-waarden (spiegelen de pipeline).
 HERKOMST_CHOICES = ["NL", "EER", "Niet-EER"]
 EXAMENTYPE_CHOICES = ["Bachelor", "Master", "Pre-master"]
 
 #: Lege filtering = geen filters (alle data).
 DEFAULT_FILTERING = {"filtering": {"programme": [], "herkomst": [], "examentype": []}}
+
+
+def isatcode_str(value) -> str:
+    """Canonieke string-weergave van een programmesleutel (isatcode of naam).
+
+    De programmesleutel is sinds de isatcode-migratie een numerieke CROHO-code.
+    Ingelezen uit Excel/CSV kan die als ``int`` (``30008``) of als ``float``
+    (``30008.0``) binnenkomen; beide moeten dezelfde canonieke sleutel opleveren
+    zodat dropdown-waarden, opgeslagen filters en de datakolom matchen. Legacy
+    leesbare namen (``"B Psychologie"``) blijven ongewijzigd.
+
+    Args:
+        value: Een ruwe sleutelwaarde (int, float, str of ``None``).
+
+    Returns:
+        De sleutel als string; ``""`` voor ``None``/leeg.
+    """
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ""
+    if isinstance(value, float) and value.is_integer():
+        return str(int(value))
+    text = str(value).strip()
+    # "30008.0" -> "30008": isatcode die als float is ingelezen.
+    if text.endswith(".0") and text[:-2].isdigit():
+        return text[:-2]
+    return text
+
+
+def programme_name_map(df: pd.DataFrame, *, code_col: str, name_col: str) -> dict[str, str]:
+    """Bouw een ``{isatcode_str: opleidingsnaam}``-map uit een bronframe.
+
+    Args:
+        df: Bronframe met zowel de isatcode- als de naamkolom.
+        code_col: Kolomnaam met de isatcode (programmesleutel).
+        name_col: Kolomnaam met de leesbare opleidingsnaam.
+
+    Returns:
+        Mapping van canonieke isatcode-string naar naam; leeg als een kolom
+        ontbreekt.
+    """
+    if code_col not in df.columns or name_col not in df.columns:
+        return {}
+    pairs = df[[code_col, name_col]].dropna().drop_duplicates()
+    mapping: dict[str, str] = {}
+    for code, name in zip(pairs[code_col], pairs[name_col]):
+        key = isatcode_str(code)
+        if key:
+            mapping.setdefault(key, str(name).strip())
+    return mapping
+
+
+def build_programme_options(codes, name_map: dict[str, str] | None = None) -> dict[str, str]:
+    """Bouw een ``{isatcode_str: label}``-dropdownmap, numeriek gesorteerd.
+
+    Het label is ``"<code> — <naam>"`` als de naam bekend is, anders alleen de
+    code. De dict-vorm laat een NiceGUI-``select`` de leesbare labels tonen maar
+    de isatcode als waarde opslaan.
+
+    Args:
+        codes: Iterable met ruwe isatcodes (bijv. de programmakolom van het
+            student_count-frame, plus reeds geconfigureerde sleutels).
+        name_map: Optionele ``{isatcode_str: naam}``-verrijking.
+
+    Returns:
+        Geordende ``{isatcode_str: label}``-map (dubbelen samengevoegd).
+    """
+    name_map = name_map or {}
+    normalized = {
+        key for key in (isatcode_str(c) for c in codes) if key
+    }
+
+    def _sort_key(code: str):
+        try:
+            return (0, int(code), "")
+        except ValueError:
+            return (1, 0, code)
+
+    options: dict[str, str] = {}
+    for code in sorted(normalized, key=_sort_key):
+        name = name_map.get(code)
+        options[code] = f"{code} — {name}" if name else code
+    return options
 
 
 def load_filtering(path: str) -> dict:
@@ -97,7 +184,11 @@ def count_programmes(
 
     mask = pd.Series(True, index=df.index)
     if programme:
-        mask &= df[programme_col].isin(programme)
+        # De datakolom en de opgeslagen filters kunnen in dtype verschillen
+        # (Int64-isatcode vs. string): normaliseer beide kanten via dezelfde
+        # pipeline-regel zodat de match niet stil leegloopt op int-vs-str.
+        col_norm = normalize_programme_series(df[programme_col])
+        mask &= col_norm.isin(normalize_programme_values(programme))
     if herkomst and origin_col in df.columns:
         mask &= df[origin_col].isin(herkomst)
     if examentype and exam_col in df.columns:

@@ -17,6 +17,7 @@ from nicegui import ui
 from gui import config_io, filtering_io, nav, theme
 from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
+from gui.data_upload import scan_data_year_bounds, selectable_exclusion_years
 from gui.state import STATE
 
 #: Vertraging (s) waarmee een wijziging naar de auto-save wordt gedebounced, zodat
@@ -168,9 +169,19 @@ class _ConfigView:
         self._excl_rows: list[dict] = [
             dict(item) for item in self._config.setdefault("excluded_data_points", [])
         ]
+        #: Kiesbare uitsluitingsjaren = overlap tussen telbestand en oktober-bestand.
+        try:
+            project_dir = os.path.dirname(os.path.dirname(path))
+            self._selectable_years = selectable_exclusion_years(
+                scan_data_year_bounds(project_dir)
+            )
+        except Exception:
+            self._selectable_years = []
         self._filtering_data = filtering_io.load_filtering(STATE.filtering_path)
         self._filtering = self._filtering_data["filtering"]
         self._student_df = self._load_student_count_df()
+        #: {isatcode_str: label} voor de opleiding-dropdowns (filter + numerus fixus).
+        self._programme_options = self._build_programme_options()
         self._build()
 
     # ─── Hoofd-layout ────────────────────────────────────────────────────────
@@ -398,16 +409,53 @@ class _ConfigView:
                         f"color: {theme.WARNING}; width: 20px; height: 20px;"
                     )
 
+    def _available_year_options(self) -> list[int]:
+        """Kiesbare jaren minus de reeds uitgesloten jaren (oplopend)."""
+        excluded = {
+            str(r.get("year")) for r in self._excl_rows if r.get("year") is not None
+        }
+        return [y for y in self._selectable_years if str(y) not in excluded]
+
+    def _refresh_year_input(self) -> None:
+        """Werk de select-opties bij nadat de uitsluitingslijst is veranderd."""
+        inp = getattr(self, "_new_year_input", None)
+        if inp is None:
+            return
+        opts = self._available_year_options()
+        inp.set_options(opts, value=(opts[0] if opts else None))
+
     def _add_excl_year(self) -> None:
-        yr = int(self._new_year_input.value or 2020)
+        if self._new_year_input is None:
+            return
+        raw = self._new_year_input.value
+        if raw is None:
+            ui.notify("Kies eerst een jaar.", type="warning")
+            return
+        try:
+            yr = int(raw)
+        except (TypeError, ValueError):
+            ui.notify("Ongeldig jaar.", type="warning")
+            return
+        if yr not in self._selectable_years:
+            rng = (
+                f" ({self._selectable_years[0]}–{self._selectable_years[-1]})"
+                if self._selectable_years
+                else ""
+            )
+            ui.notify(
+                f"Jaar {yr} valt buiten de beschikbare data{rng}.",
+                type="warning",
+            )
+            return
         existing = {str(r.get("year", "")) for r in self._excl_rows}
-        if str(yr) not in existing:
-            self._excl_rows.append({"year": yr})
-            self._config["excluded_data_points"] = self._excl_rows
-            self._render_excl_year_chips()
-            self._mark_dirty()
-        else:
+        if str(yr) in existing:
             ui.notify(f"Jaar {yr} is al uitgesloten.", type="warning")
+            return
+        self._excl_rows.append({"year": yr})
+        self._config["excluded_data_points"] = self._excl_rows
+        self._render_excl_year_chips()
+        self._refresh_year_input()
+        self._mark_dirty()
 
     def _remove_excl_year(self, yr_str: str) -> None:
         self._excl_rows = [
@@ -415,25 +463,31 @@ class _ConfigView:
         ]
         self._config["excluded_data_points"] = self._excl_rows
         self._render_excl_year_chips()
+        self._refresh_year_input()
         self._mark_dirty()
 
     def _add_covid_years(self) -> None:
+        # Alleen COVID-jaren die de data dekt (de knop verschijnt sowieso
+        # alleen dan) en nog niet uitgesloten zijn.
         existing = {str(r.get("year", "")) for r in self._excl_rows}
-        added = []
-        for yr in (2020, 2021):
-            if str(yr) not in existing:
-                self._excl_rows.append({"year": yr})
-                added.append(yr)
+        added = [
+            yr
+            for yr in (2020, 2021)
+            if yr in self._selectable_years and str(yr) not in existing
+        ]
+        for yr in added:
+            self._excl_rows.append({"year": yr})
         if added:
             self._config["excluded_data_points"] = self._excl_rows
             self._render_excl_year_chips()
+            self._refresh_year_input()
             self._mark_dirty()
             ui.notify(
                 f"COVID-jaren toegevoegd: {', '.join(str(y) for y in added)}.",
                 type="positive",
             )
         else:
-            ui.notify("2020 en 2021 zijn al uitgesloten.", type="info")
+            ui.notify("De beschikbare COVID-jaren staan al in de lijst.", type="info")
 
     # ─── Geavanceerd-tabblad ─────────────────────────────────────────────────
 
@@ -472,13 +526,49 @@ class _ConfigView:
         except (OSError, ValueError):
             return None
 
-    def _filter_programme_options(self) -> list[str]:
-        options = set(self._filtering.get("programme", []))
+    def _programme_col(self) -> str:
+        """Naam van de isatcode-/programmakolom (config-driven)."""
+        return self._config.get("column_roles", {}).get("programme", "Croho groepeernaam")
+
+    def _load_programme_name_map(self) -> dict[str, str]:
+        """Isatcode → opleidingsnaam uit het 1cijferho-bestand, indien aanwezig.
+
+        Het student_count-bestand bevat alleen isatcodes; het 1cijferho-bestand
+        levert de bijbehorende leesbare namen (kolom ``groepeernaam_croho``). Zo
+        toont de dropdown ``<isatcode> — <naam>`` maar blijft de waarde de code.
+        """
+        path = os.path.join(
+            STATE.project_dir, "data", "input",
+            "1cijferho_student_count_first-years.csv",
+        )
+        if not os.path.isfile(path):
+            return {}
+        try:
+            import pandas as pd
+            df = pd.read_csv(path, sep=";")
+        except (OSError, ValueError):
+            return {}
+        return filtering_io.programme_name_map(
+            df, code_col=self._programme_col(), name_col="groepeernaam_croho"
+        )
+
+    def _build_programme_options(self) -> dict[str, str]:
+        """{isatcode_str: label} voor de opleiding-dropdowns.
+
+        Combineert de isatcodes uit het student_count-bestand, de bekende
+        isatcode→naam-map (1cijferho) en reeds geconfigureerde sleutels (filter +
+        numerus fixus), zodat de dropdown gevuld is en bestaande selecties
+        zichtbaar blijven ook als het student_count-bestand ze (nog) niet bevat.
+        """
+        name_map = self._load_programme_name_map()
+        codes: list = list(name_map.keys())
         if self._student_df is not None:
-            col = self._config.get("column_roles", {}).get("programme", "Croho groepeernaam")
+            col = self._programme_col()
             if col in self._student_df.columns:
-                options |= set(self._student_df[col].dropna().astype(str).unique())
-        return sorted(options)
+                codes += self._student_df[col].dropna().tolist()
+        codes += list(self._filtering.get("programme", []))
+        codes += [r.get("key") for r in self._nf_rows]
+        return filtering_io.build_programme_options(codes, name_map)
 
     def _filtering_section(self) -> None:
         active_count = (
@@ -515,16 +605,19 @@ class _ConfigView:
                     else:
                         ui.badge("Alle").props("color=positive outline").classes("text-xs")
                 ui.label(
-                    "Leeg = alle opleidingen. Typ om te zoeken of voer handmatig in."
+                    "Leeg = alle opleidingen. Typ om te zoeken op isatcode of naam, "
+                    "of voer een isatcode handmatig in."
                 ).classes("text-xs opacity-50")
-                prog_opts = self._filter_programme_options()
                 self._filter_programme_select = (
                     ui.select(
-                        options=prog_opts,
-                        value=list(self._filtering.get("programme", [])),
+                        options=dict(self._programme_options),
+                        value=[
+                            filtering_io.isatcode_str(c)
+                            for c in self._filtering.get("programme", [])
+                        ],
                         multiple=True,
                         with_input=True,
-                        label="Opleidingen selecteren",
+                        label="Opleidingen selecteren (isatcode)",
                     )
                     .props("use-chips new-value-mode=add-unique outlined")
                     .classes("w-full mt-1")
@@ -584,7 +677,11 @@ class _ConfigView:
             self._update_filter_preview()
 
     def _on_filter_programme_change(self, e) -> None:
-        self._filtering["programme"] = list(e.value or [])
+        # Normaliseer naar canonieke isatcode-strings (ook handmatig getypte
+        # waarden), zodat opslag en pipeline-filter matchen.
+        self._filtering["programme"] = [
+            filtering_io.isatcode_str(v) for v in (e.value or []) if filtering_io.isatcode_str(v)
+        ]
         self._mark_dirty()
         self._update_filter_preview()
 
@@ -830,41 +927,72 @@ class _ConfigView:
                 "uit de trainingsdata. Het voorspeljaar zelf is altijd beschermd."
             ).classes("text-sm opacity-60 mb-3")
 
-            # Aanbevolen: COVID-jaren snel toevoegen
-            with ui.row().classes(
-                "items-center gap-3 px-4 py-3 rounded-xl mb-4"
-            ).style(f"background: {theme.ACCENT}09; border: 1px solid {theme.ACCENT}28"):
-                ui.icon("star").style(f"color: {theme.ACCENT}; font-size: 18px;")
-                with ui.column().classes("gap-0 grow"):
-                    ui.label("Aanbevolen: COVID-jaren uitsluiten").classes(
-                        "text-sm font-medium"
-                    ).style(f"color: {theme.ACCENT}")
-                    ui.label(
-                        "2020 en 2021 veroorzaakten atypische aanmeldpatronen. "
-                        "Uitsluiten verbetert de modelnauwkeurigheid voor de meeste instellingen."
-                    ).classes("text-xs opacity-70")
-                ui.button(
-                    "Voeg 2020 & 2021 toe",
-                    icon="add_circle",
-                    on_click=self._add_covid_years,
-                ).props("outline dense color=accent").classes("shrink-0")
+            # Aanbevolen: COVID-jaren snel toevoegen — alleen tonen als de
+            # data die jaren ook daadwerkelijk dekt (anders zou de knop
+            # jaren toevoegen die niet in de training zitten).
+            covid_selectable = [y for y in (2020, 2021) if y in self._selectable_years]
+            if covid_selectable:
+                covid_label = (
+                    "Voeg 2020 & 2021 toe"
+                    if len(covid_selectable) == 2
+                    else f"Voeg {covid_selectable[0]} toe"
+                )
+                with ui.row().classes(
+                    "items-center gap-3 px-4 py-3 rounded-xl mb-4"
+                ).style(f"background: {theme.ACCENT}09; border: 1px solid {theme.ACCENT}28"):
+                    ui.icon("star").style(f"color: {theme.ACCENT}; font-size: 18px;")
+                    with ui.column().classes("gap-0 grow"):
+                        ui.label("Aanbevolen: COVID-jaren uitsluiten").classes(
+                            "text-sm font-medium"
+                        ).style(f"color: {theme.ACCENT}")
+                        ui.label(
+                            "2020 en 2021 veroorzaakten atypische aanmeldpatronen. "
+                            "Uitsluiten verbetert de modelnauwkeurigheid voor de meeste instellingen."
+                        ).classes("text-xs opacity-70")
+                    ui.button(
+                        covid_label,
+                        icon="add_circle",
+                        on_click=self._add_covid_years,
+                    ).props("outline dense color=accent").classes("shrink-0")
 
             # Eenvoudige jaar-chips (quick add/remove)
             self._excl_years_chips = ui.row().classes("gap-2 flex-wrap mb-3 min-h-8")
             self._render_excl_year_chips()
-            with ui.row().classes("items-center gap-2 mb-4"):
-                self._new_year_input = ui.number(
-                    label="Jaar toevoegen",
-                    value=2020,
-                    min=2010,
-                    max=2030,
-                    step=1,
-                ).props("dense outlined").classes("w-40")
-                ui.button(
-                    "Toevoegen",
-                    icon="add",
-                    on_click=self._add_excl_year,
-                ).props("outline dense")
+            if self._selectable_years:
+                with ui.row().classes("items-center gap-2 mb-1"):
+                    opts = self._available_year_options()
+                    self._new_year_input = (
+                        ui.select(
+                            options=opts,
+                            value=(opts[0] if opts else None),
+                            label="Jaar toevoegen",
+                        )
+                        .props("dense outlined")
+                        .classes("w-40")
+                    )
+                    ui.button(
+                        "Toevoegen",
+                        icon="add",
+                        on_click=self._add_excl_year,
+                    ).props("outline dense")
+                ui.label(
+                    "Alleen jaren met zowel tel- als oktoberdata "
+                    f"({self._selectable_years[0]}–{self._selectable_years[-1]}) "
+                    "kunnen worden uitgesloten."
+                ).classes("text-xs opacity-50 mb-4")
+            else:
+                # Geen bruikbaar traindata-bereik bekend (data nog niet
+                # geüpload): geen vrije invoer, zodat er geen jaar buiten de
+                # data gekozen kan worden.
+                self._new_year_input = None
+                with ui.row().classes(
+                    "items-center gap-2 mb-4 px-3 py-2 rounded-lg"
+                ).style(f"background: {theme.INFO}0e; border: 1px solid {theme.INFO}30"):
+                    ui.icon("info").style(f"color: {theme.INFO}; font-size: 16px;")
+                    ui.label(
+                        "Upload eerst tel- en oktoberbestanden; daarna kun je "
+                        "uitsluitingsjaren kiezen binnen de beschikbare data."
+                    ).classes("text-xs").style(f"color: {theme.INFO}")
 
             ui.separator().classes("mb-3")
             ui.label("Gedetailleerde regels (per jaar, herkomst, examentype of opleiding)").classes(
@@ -968,14 +1096,26 @@ class _ConfigView:
                 return
             for row in self._nf_rows:
                 with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    key_val = filtering_io.isatcode_str(row.get("key"))
+                    key_opts = dict(self._programme_options)
+                    if key_val and key_val not in key_opts:
+                        key_opts[key_val] = key_val
                     key_in = (
-                        ui.input(value=row["key"], placeholder="Programmasleutel")
-                        .props("dense outlined")
+                        ui.select(
+                            options=key_opts,
+                            value=key_val or None,
+                            with_input=True,
+                            label="Programmasleutel (isatcode)",
+                        )
+                        .props("dense outlined new-value-mode=add-unique")
                         .classes("grow")
                     )
                     key_in.tooltip(HELP["numerus_fixus"])
                     key_in.on_value_change(
-                        lambda e, r=row: (r.update(key=e.value), self._mark_dirty())
+                        lambda e, r=row: (
+                            r.update(key=filtering_io.isatcode_str(e.value)),
+                            self._mark_dirty(),
+                        )
                     )
                     val_in = (
                         ui.number(value=row["value"], placeholder="Max. plaatsen")

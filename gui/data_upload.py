@@ -254,6 +254,29 @@ def scan_data_year_bounds(project_dir: str) -> DataYearBounds | None:
     )
 
 
+def selectable_exclusion_years(bounds: DataYearBounds | None) -> list[int]:
+    """Jaren die als uitsluitingsregel gekozen mogen worden.
+
+    Alleen jaren in de overlap tussen telbestanden en het oktober-bestand
+    komen in aanmerking, begrensd door de config-ondergrens
+    (``train_start``): dat zijn de enige jaren die daadwerkelijk in de
+    trainingsdata terechtkomen en dus zinvol zijn om uit te sluiten. Een jaar
+    zonder overlap (of onder de ondergrens) zit sowieso niet in de training —
+    het als uitsluiting aanbieden zou misleidend zijn.
+
+    Args:
+        bounds: Het gescande traindata-bereik, of ``None`` wanneer de data nog
+            niet (volledig) is geüpload.
+
+    Returns:
+        Oplopend gesorteerde lijst van kiesbare jaren. Leeg wanneer er geen
+        bruikbaar traindata-bereik bekend is.
+    """
+    if bounds is None:
+        return []
+    return [y for y in bounds.overlap if bounds.train_start <= y <= bounds.train_end]
+
+
 def compute_tel_coverage(results: dict[str, FileCheckResult]) -> TelCoverage | None:
     """Leid week/jaar-dekking af uit de verzameling telbestand-resultaten.
 

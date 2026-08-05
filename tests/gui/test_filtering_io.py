@@ -82,3 +82,81 @@ def test_count_combined_filter():
 
 def test_count_programme_filter():
     assert _count(_sample_df(), programme=["B A", "M B"]) == (2, 3)
+
+
+# ── isatcode_str ──────────────────────────────────────────────────────────────
+
+
+def test_isatcode_str_int_and_float():
+    assert filtering_io.isatcode_str(30008) == "30008"
+    # Uit Excel/CSV komt de code soms als float binnen.
+    assert filtering_io.isatcode_str(30008.0) == "30008"
+    assert filtering_io.isatcode_str("30008.0") == "30008"
+    assert filtering_io.isatcode_str("30008") == "30008"
+
+
+def test_isatcode_str_keeps_legacy_name():
+    assert filtering_io.isatcode_str("B Psychologie") == "B Psychologie"
+
+
+def test_isatcode_str_empty_for_none():
+    assert filtering_io.isatcode_str(None) == ""
+
+
+# ── programme_name_map ──────────────────────────────────────────────────────────
+
+
+def test_programme_name_map_builds_code_to_name():
+    df = pd.DataFrame(
+        {
+            "Croho groepeernaam": [30008, 30008, 56553.0],
+            "groepeernaam_croho": ["B Psychologie", "B Psychologie", "B Gezondheid"],
+        }
+    )
+    mapping = filtering_io.programme_name_map(
+        df, code_col="Croho groepeernaam", name_col="groepeernaam_croho"
+    )
+    assert mapping == {"30008": "B Psychologie", "56553": "B Gezondheid"}
+
+
+def test_programme_name_map_missing_column_returns_empty():
+    df = pd.DataFrame({"Croho groepeernaam": [30008]})
+    assert (
+        filtering_io.programme_name_map(
+            df, code_col="Croho groepeernaam", name_col="groepeernaam_croho"
+        )
+        == {}
+    )
+
+
+# ── build_programme_options ─────────────────────────────────────────────────────
+
+
+def test_build_programme_options_labels_and_numeric_sort():
+    options = filtering_io.build_programme_options(
+        [56553, 30008, 30008.0],
+        name_map={"30008": "B Psychologie"},
+    )
+    # Numeriek gesorteerd, dubbelen samengevoegd, naam als label indien bekend.
+    assert list(options.keys()) == ["30008", "56553"]
+    assert options["30008"] == "30008 — B Psychologie"
+    assert options["56553"] == "56553"
+
+
+def test_build_programme_options_handles_legacy_names_and_blanks():
+    options = filtering_io.build_programme_options([30008, "B A", None, ""])
+    assert set(options.keys()) == {"30008", "B A"}
+    # Numerieke codes sorteren vóór leesbare namen.
+    assert list(options.keys()) == ["30008", "B A"]
+
+
+def test_count_programme_filter_matches_across_dtype():
+    # Datakolom is numeriek (isatcode), filter komt als string binnen: moet toch matchen.
+    df = pd.DataFrame(
+        {
+            "Croho groepeernaam": [30008, 30008, 56553],
+            "Herkomst": ["NL", "EER", "NL"],
+            "Examentype": ["Bachelor", "Bachelor", "Master"],
+        }
+    )
+    assert _count(df, programme=["30008"]) == (1, 2)

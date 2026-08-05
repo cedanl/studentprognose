@@ -186,6 +186,47 @@ def test_compute_overlap_none_without_oktober_years():
     assert compute_overlap(_coverage([2021]), _okt_result(None)) is None
 
 
+# ── selectable_exclusion_years ──────────────────────────────────────────────
+
+
+def _bounds(train_start, train_end, overlap):
+    return du.DataYearBounds(
+        train_start=train_start,
+        train_end=train_end,
+        tel_years=overlap,
+        okt_years=overlap,
+        overlap=overlap,
+    )
+
+
+def test_selectable_years_none_bounds_is_empty():
+    assert du.selectable_exclusion_years(None) == []
+
+
+def test_selectable_years_equals_overlap_within_range():
+    bounds = _bounds(2018, 2023, [2018, 2019, 2020, 2021, 2022, 2023])
+    assert du.selectable_exclusion_years(bounds) == [2018, 2019, 2020, 2021, 2022, 2023]
+
+
+def test_selectable_years_respects_config_floor():
+    # train_start (config-ondergrens) sluit de vroegste overlap-jaren uit.
+    bounds = _bounds(2020, 2023, [2017, 2018, 2019, 2020, 2021, 2022, 2023])
+    assert du.selectable_exclusion_years(bounds) == [2020, 2021, 2022, 2023]
+
+
+def test_selectable_years_excludes_gaps_outside_intersection():
+    # Een jaar zonder overlap (2020) is niet kiesbaar, ook al ligt het in het bereik.
+    bounds = _bounds(2018, 2022, [2018, 2019, 2021, 2022])
+    assert du.selectable_exclusion_years(bounds) == [2018, 2019, 2021, 2022]
+
+
+def test_selectable_years_covid_out_of_range():
+    # Data dekt 2020/2021 niet → COVID-jaren zijn niet kiesbaar.
+    bounds = _bounds(2015, 2019, [2015, 2016, 2017, 2018, 2019])
+    selectable = du.selectable_exclusion_years(bounds)
+    assert 2020 not in selectable and 2021 not in selectable
+
+
 # ── compute_tel_coverage: gaten binnen het bereik ───────────────────────────
 
 

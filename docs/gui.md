@@ -106,6 +106,28 @@ meldt het bijschrift dat expliciet. De backtest-jaren (via *Jaren overslaan*)
 worden uit de staart van dit bereik gehaald, zodat er altijd realisatiedata is om
 tegen af te zetten; de training reikt nooit voorbij het laatste overlap-jaar.
 
+Ditzelfde overlap-bereik bepaalt welke jaren je kunt **uitsluiten** van de
+training. In de configuratie (tab **Geavanceerd** → *Uitsluitingsregels*) biedt
+de keuzelijst *Jaar toevoegen* uitsluitend de jaren aan die daadwerkelijk in de
+trainingsdata zitten — de overlap tussen tel- en oktober-jaren, begrensd door
+`min_training_year`. Zo kun je geen jaar buiten je data kiezen (een jaar zonder
+tel- óf oktober-data zit sowieso niet in de training, dus uitsluiten heeft daar
+geen effect). Ook de snelknop *COVID-jaren uitsluiten* verschijnt alleen als je
+data 2020 of 2021 dekt. Zolang je nog geen tel- én oktober-bestand hebt
+geüpload, is er geen bereik bekend en meldt de sectie dat je die bestanden eerst
+moet uploaden.
+
+In dezelfde tab **Geavanceerd** kun je op twee plekken een opleiding kiezen via
+een **zoekbare keuzelijst op Isatcode**. Bij *Filteren → Opleidingen* en bij
+*Numerus fixus → Programmasleutel* toont de lijst de opleidingen die in je data
+voorkomen; typ een **Isatcode** of een **opleidingsnaam** om te zoeken. Waar de
+naam bekend is (uit het 1cijferho-bestand) staat die achter de code — bijv.
+`56604 — B Geneeskunde` — maar de opgeslagen waarde is altijd de **Isatcode**,
+zodat de sleutel op het cumulatieve spoor aangrijpt. Staat een opleiding niet in
+de lijst, dan kun je de Isatcode ook handmatig typen en toevoegen. De
+filter-keuzelijst laat meerdere opleidingen tegelijk toe; de
+numerus-fixus-keuzelijst kiest er één per rij.
+
 Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de
 gevonden parameters met één klik naar de configuratie kopieert.
