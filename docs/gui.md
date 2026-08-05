@@ -8,6 +8,17 @@ De GUI is een *schil* rond de CLI. Ze bevat geen eigen modellogica: elke actie
 bouwt hetzelfde `studentprognose`-commando dat je ook zelf zou typen en voert dat
 uit. Alles wat in de GUI kan, kan dus ook op de opdrachtregel — en omgekeerd.
 
+<figure class="app-preview">
+  <div class="app-preview__chrome">
+    <span class="app-preview__dot app-preview__dot--red"></span>
+    <span class="app-preview__dot app-preview__dot--yellow"></span>
+    <span class="app-preview__dot app-preview__dot--green"></span>
+    <span class="app-preview__bar">localhost:8080</span>
+  </div>
+  <img src="assets/studentprognose-walkthrough.gif" alt="Walkthrough van de grafische interface: van startpagina naar project, configuratie, uitvoeren en resultaten">
+  <figcaption>Van startpagina tot prognose — de vijf stappen in de grafische interface.</figcaption>
+</figure>
+
 ## Installeren en starten
 
 De interface gebruikt [NiceGUI](https://nicegui.io/), een optionele
