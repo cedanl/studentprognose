@@ -31,9 +31,7 @@
 
 <br>
 
-<a href="https://cedanl.github.io/studentprognose/gui/">
-  <img src="doc/studentprognose-walkthrough.gif" alt="Walkthrough van de grafische interface: project opzetten, configureren en een prognose draaien" width="760">
-</a>
+<img src="doc/studentprognose-walkthrough.gif" alt="Walkthrough van de grafische interface: project opzetten, configureren en een prognose draaien" width="760">
 
 <sub>▶︎ De optionele <a href="https://cedanl.github.io/studentprognose/gui/">grafische interface</a> — zet een project op, stel je configuratie in en draai je eerste prognose, zonder één regel terminal.</sub>
 

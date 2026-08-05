@@ -15,7 +15,10 @@ uit. Alles wat in de GUI kan, kan dus ook op de opdrachtregel — en omgekeerd.
     <span class="app-preview__dot app-preview__dot--green"></span>
     <span class="app-preview__bar">localhost:8080</span>
   </div>
-  <img src="assets/studentprognose-walkthrough.gif" alt="Walkthrough van de grafische interface: van startpagina naar project, configuratie, uitvoeren en resultaten">
+  <video autoplay muted loop playsinline controls preload="metadata" poster="assets/studentprognose-walkthrough.gif" aria-label="Walkthrough van de grafische interface: van startpagina naar project, configuratie, uitvoeren en resultaten">
+    <source src="assets/studentprognose-walkthrough.mp4" type="video/mp4">
+    <img src="assets/studentprognose-walkthrough.gif" alt="Walkthrough van de grafische interface">
+  </video>
   <figcaption>Van startpagina tot prognose — de vijf stappen in de grafische interface.</figcaption>
 </figure>
 
