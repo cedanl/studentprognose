@@ -530,44 +530,81 @@ class _ConfigView:
         """Naam van de isatcode-/programmakolom (config-driven)."""
         return self._config.get("column_roles", {}).get("programme", "Croho groepeernaam")
 
-    def _load_programme_name_map(self) -> dict[str, str]:
-        """Isatcode → opleidingsnaam uit het 1cijferho-bestand, indien aanwezig.
-
-        Het student_count-bestand bevat alleen isatcodes; het 1cijferho-bestand
-        levert de bijbehorende leesbare namen (kolom ``groepeernaam_croho``). Zo
-        toont de dropdown ``<isatcode> — <naam>`` maar blijft de waarde de code.
-        """
-        path = os.path.join(
-            STATE.project_dir, "data", "input",
-            "1cijferho_student_count_first-years.csv",
-        )
+    @staticmethod
+    def _read_table(path: str, *, sep: str | None = None):
+        """Lees een CSV/XLSX defensief; ``None`` bij ontbreken of leesfout."""
         if not os.path.isfile(path):
-            return {}
+            return None
         try:
             import pandas as pd
-            df = pd.read_csv(path, sep=";")
+            if path.lower().endswith((".xlsx", ".xls")):
+                return pd.read_excel(path)
+            return pd.read_csv(path, sep=sep or ";")
         except (OSError, ValueError):
-            return {}
-        return filtering_io.programme_name_map(
-            df, code_col=self._programme_col(), name_col="groepeernaam_croho"
-        )
+            return None
 
     def _build_programme_options(self) -> dict[str, str]:
         """{isatcode_str: label} voor de opleiding-dropdowns.
 
-        Combineert de isatcodes uit het student_count-bestand, de bekende
-        isatcode→naam-map (1cijferho) en reeds geconfigureerde sleutels (filter +
-        numerus fixus), zodat de dropdown gevuld is en bestaande selecties
-        zichtbaar blijven ook als het student_count-bestand ze (nog) niet bevat.
+        Haalt de opleidingen (isatcodes, en de naam waar bekend) uit álle
+        beschikbare bronnen, zodat de dropdown al gevuld is zodra de gebruiker
+        data heeft geüpload — ook vóór de eerste pipeline-run. Bronnen, in
+        prioriteitsvolgorde voor de naam:
+
+        1. het ruwe **oktober-bestand** (``Isatcode`` + ``Groepeernaam Croho``);
+        2. de ruwe **telbestanden** (``Isatcode`` + ``Groepeernaam``);
+        3. het bewerkte **1cijferho**-bestand (isatcode + naam);
+        4. het bewerkte **student_count**-bestand (alleen isatcodes);
+        5. reeds geconfigureerde sleutels (filter + numerus fixus),
+
+        zodat bestaande selecties zichtbaar blijven ook als de data ze (nog) niet
+        bevat.
         """
-        name_map = self._load_programme_name_map()
-        codes: list = list(name_map.keys())
-        if self._student_df is not None:
-            col = self._programme_col()
-            if col in self._student_df.columns:
-                codes += self._student_df[col].dropna().tolist()
+        import glob
+
+        prog_col = self._programme_col()
+        project = STATE.project_dir or ""
+        input_dir = os.path.join(project, "data", "input")
+        raw_dir = os.path.join(project, "data", "input_raw")
+        okt_cols = self._config.get("columns", {}).get("oktober", {})
+
+        name_map: dict[str, str] = {}
+        codes: list = []
+
+        def _harvest(df, code_col: str, name_col: str | None) -> None:
+            if df is None or code_col not in df.columns:
+                return
+            codes.extend(df[code_col].dropna().tolist())
+            if name_col and name_col in df.columns:
+                for key, name in filtering_io.programme_name_map(
+                    df, code_col=code_col, name_col=name_col
+                ).items():
+                    # setdefault: eerste bron (hoogste prioriteit) wint de naam.
+                    name_map.setdefault(key, name)
+
+        # 1. Oktober-bestand — beschikbaar vóór de run, met naam.
+        _harvest(
+            self._read_table(os.path.join(raw_dir, "oktober_bestand.xlsx")),
+            okt_cols.get("Isatcode", "Isatcode"),
+            okt_cols.get("Groepeernaam Croho", "Groepeernaam Croho"),
+        )
+        # 2. Telbestanden — beschikbaar vóór de run; naam waar aanwezig.
+        for path in sorted(glob.glob(os.path.join(raw_dir, "telbestanden", "*.csv"))):
+            _harvest(self._read_table(path), "Isatcode", "Groepeernaam")
+        # 3. 1cijferho — bewerkt, met naam.
+        _harvest(
+            self._read_table(
+                os.path.join(input_dir, "1cijferho_student_count_first-years.csv")
+            ),
+            prog_col,
+            "groepeernaam_croho",
+        )
+        # 4. student_count — bewerkt, alleen isatcodes.
+        _harvest(self._student_df, prog_col, None)
+        # 5. Reeds geconfigureerde sleutels.
         codes += list(self._filtering.get("programme", []))
         codes += [r.get("key") for r in self._nf_rows]
+
         return filtering_io.build_programme_options(codes, name_map)
 
     def _filtering_section(self) -> None:

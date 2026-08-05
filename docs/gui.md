@@ -119,10 +119,13 @@ moet uploaden.
 
 In dezelfde tab **Geavanceerd** kun je op twee plekken een opleiding kiezen via
 een **zoekbare keuzelijst op Isatcode**. Bij *Filteren → Opleidingen* en bij
-*Numerus fixus → Programmasleutel* toont de lijst de opleidingen die in je data
-voorkomen; typ een **Isatcode** of een **opleidingsnaam** om te zoeken. Waar de
-naam bekend is (uit het 1cijferho-bestand) staat die achter de code — bijv.
-`56604 — B Geneeskunde` — maar de opgeslagen waarde is altijd de **Isatcode**,
+*Numerus fixus → Programmasleutel* toont de lijst de opleidingen die in je
+geüploade data voorkomen — al vóór de eerste run, gelezen uit het
+oktober-bestand en de telbestanden (aangevuld met de bewerkte bestanden zodra
+die er zijn). Typ een **Isatcode** of een **opleidingsnaam** om te zoeken. Waar
+de naam bekend is (uit het oktober-bestand of de telbestanden) staat die achter
+de code — bijv. `56604 — B Geneeskunde` — maar de opgeslagen waarde is altijd de
+**Isatcode**,
 zodat de sleutel op het cumulatieve spoor aangrijpt. Staat een opleiding niet in
 de lijst, dan kun je de Isatcode ook handmatig typen en toevoegen. De
 filter-keuzelijst laat meerdere opleidingen tegelijk toe; de
