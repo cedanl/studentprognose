@@ -68,8 +68,13 @@ def programme_name_map(df: pd.DataFrame, *, code_col: str, name_col: str) -> dic
     mapping: dict[str, str] = {}
     for code, name in zip(pairs[code_col], pairs[name_col]):
         key = isatcode_str(code)
-        if key:
-            mapping.setdefault(key, str(name).strip())
+        label = str(name).strip()
+        # Sla zelf-refererende "namen" over: sinds de isatcode-migratie bevat de
+        # naamkolom (bijv. ``Groepeernaam Croho``) in sommige leveringen óók de
+        # isatcode. Zo'n "naam" (``30008`` bij code ``30008``) voegt niets toe en
+        # zou een label ``30008 — 30008`` opleveren.
+        if key and label and isatcode_str(label) != key:
+            mapping.setdefault(key, label)
     return mapping
 
 
@@ -102,7 +107,11 @@ def build_programme_options(codes, name_map: dict[str, str] | None = None) -> di
     options: dict[str, str] = {}
     for code in sorted(normalized, key=_sort_key):
         name = name_map.get(code)
-        options[code] = f"{code} — {name}" if name else code
+        # Toon alleen een naam als die iets toevoegt (niet de code zelf).
+        if name and isatcode_str(name) != code:
+            options[code] = f"{code} — {name}"
+        else:
+            options[code] = code
     return options
 
 

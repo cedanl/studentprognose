@@ -532,16 +532,54 @@ class _ConfigView:
 
     @staticmethod
     def _read_table(path: str, *, sep: str | None = None):
-        """Lees een CSV/XLSX defensief; ``None`` bij ontbreken of leesfout."""
+        """Lees een CSV/XLSX defensief; ``None`` bij ontbreken of leesfout.
+
+        Voor CSV's zonder expliciete ``sep`` wordt de scheidingstekens
+        automatisch bepaald: telbestanden komen zowel puntkomma-gescheiden
+        (legacy Studielink) als komma-gescheiden (UvA SQL-export) voor. We
+        proberen beide en kiezen de variant die meer dan één kolom oplevert.
+        """
         if not os.path.isfile(path):
             return None
         try:
             import pandas as pd
             if path.lower().endswith((".xlsx", ".xls")):
                 return pd.read_excel(path)
-            return pd.read_csv(path, sep=sep or ";")
+            if sep is not None:
+                return pd.read_csv(path, sep=sep)
+            best = None
+            for candidate in (";", ","):
+                try:
+                    df = pd.read_csv(path, sep=candidate)
+                except (OSError, ValueError):
+                    continue
+                if df.shape[1] > 1:
+                    return df
+                best = df if best is None else best
+            return best
         except (OSError, ValueError):
             return None
+
+    @staticmethod
+    def _detect_csv_sep(path: str) -> str:
+        """Bepaal ``;`` of ``,`` als scheidingsteken voor een telbestand-CSV.
+
+        Leest alleen de kop van het bestand met elk kandidaat-scheidingsteken en
+        kiest degene die de meeste kolommen oplevert. Valt terug op ``;`` (het
+        legacy Studielink-formaat) als niets uitsluitsel geeft.
+        """
+        if not os.path.isfile(path):
+            return ";"
+        import pandas as pd
+        best_sep, best_cols = ";", 0
+        for candidate in (";", ","):
+            try:
+                head = pd.read_csv(path, sep=candidate, nrows=1)
+            except (OSError, ValueError):
+                continue
+            if head.shape[1] > best_cols:
+                best_sep, best_cols = candidate, head.shape[1]
+        return best_sep
 
     def _build_programme_options(self) -> dict[str, str]:
         """{isatcode_str: label} voor de opleiding-dropdowns.
@@ -589,8 +627,14 @@ class _ConfigView:
             okt_cols.get("Groepeernaam Croho", "Groepeernaam Croho"),
         )
         # 2. Telbestanden — beschikbaar vóór de run; naam waar aanwezig.
-        for path in sorted(glob.glob(os.path.join(raw_dir, "telbestanden", "*.csv"))):
-            _harvest(self._read_table(path), "Isatcode", "Groepeernaam")
+        # Telbestanden komen puntkomma- (legacy Studielink) én komma-gescheiden
+        # (UvA SQL-export, o.a. de demodataset) voor. Bepaal het scheidingsteken
+        # één keer uit het eerste bestand en hergebruik dat, zodat we niet elk van
+        # honderden bestanden twee keer hoeven te lezen.
+        tel_paths = sorted(glob.glob(os.path.join(raw_dir, "telbestanden", "*.csv")))
+        tel_sep = self._detect_csv_sep(tel_paths[0]) if tel_paths else ";"
+        for path in tel_paths:
+            _harvest(self._read_table(path, sep=tel_sep), "Isatcode", "Groepeernaam")
         # 3. 1cijferho — bewerkt, met naam.
         _harvest(
             self._read_table(

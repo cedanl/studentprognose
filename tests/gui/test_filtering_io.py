@@ -119,6 +119,21 @@ def test_programme_name_map_builds_code_to_name():
     assert mapping == {"30008": "B Psychologie", "56553": "B Gezondheid"}
 
 
+def test_programme_name_map_skips_self_referential_names():
+    # Demodata: de "naam"-kolom bevat óók de isatcode. Zo'n zelf-refererende
+    # naam voegt niets toe en mag niet als naam worden opgeslagen.
+    df = pd.DataFrame(
+        {
+            "Croho groepeernaam": [30008, 56553],
+            "groepeernaam_croho": [30008, "B Gezondheid"],
+        }
+    )
+    mapping = filtering_io.programme_name_map(
+        df, code_col="Croho groepeernaam", name_col="groepeernaam_croho"
+    )
+    assert mapping == {"56553": "B Gezondheid"}
+
+
 def test_programme_name_map_missing_column_returns_empty():
     df = pd.DataFrame({"Croho groepeernaam": [30008]})
     assert (
@@ -141,6 +156,14 @@ def test_build_programme_options_labels_and_numeric_sort():
     assert list(options.keys()) == ["30008", "56553"]
     assert options["30008"] == "30008 — B Psychologie"
     assert options["56553"] == "56553"
+
+
+def test_build_programme_options_skips_self_referential_label():
+    # Als de "naam" gelijk is aan de code, toon alleen de code (geen "30008 — 30008").
+    options = filtering_io.build_programme_options(
+        [30008], name_map={"30008": "30008"}
+    )
+    assert options == {"30008": "30008"}
 
 
 def test_build_programme_options_handles_legacy_names_and_blanks():
