@@ -10,10 +10,6 @@ from studentprognose.utils.programme_key import normalize_programme_keys
 
 _VALID_RULE_KEYS = {"year", "year_before", "year_after", "herkomst", "examentype", "opleiding"}
 
-_VALID_TIMESERIES_MODELS = {"sarima", "ets", "theta", "auto_arima"}
-_VALID_REGRESSOR_MODELS = {"xgboost", "ridge", "random_forest", "gradient_boosting", "extra_trees"}
-_VALID_CLASSIFIER_MODELS = {"xgboost", "random_forest", "logistic_regression", "gradient_boosting", "extra_trees"}
-
 
 def _deep_merge(base: dict, override: dict) -> dict:
     """Deep-merge override into base. override wins on conflicts."""
@@ -175,32 +171,48 @@ def _validate_excluded_data_points(rules, file_path):
 
 
 def _validate_model_config(cfg, file_path):
+    # De geldige modelnamen komen uit de model-registries (single source of
+    # truth): dezelfde dicts die de pipeline gebruikt om modellen te
+    # instantiëren. Function-local import omdat dit de enige plek in config.py
+    # is die de registries nodig heeft, en het models-pakket config.py terug
+    # importeert (models -> xgboost_regressor -> config); lokaal importeren
+    # houdt config.py's module-surface los van die cyclus.
+    from studentprognose.models import (
+        CLASSIFIER_REGISTRY,
+        FORECASTER_REGISTRY,
+        REGRESSOR_REGISTRY,
+    )
+
+    valid_timeseries = set(FORECASTER_REGISTRY)
+    valid_regressor = set(REGRESSOR_REGISTRY)
+    valid_classifier = set(CLASSIFIER_REGISTRY)
+
     model_config = cfg.get("model_config", {})
 
     ts_model = model_config.get("cumulative_timeseries")
-    if ts_model is not None and ts_model not in _VALID_TIMESERIES_MODELS:
+    if ts_model is not None and ts_model not in valid_timeseries:
         print(
             f"Configuratiefout in {file_path}: "
             f"'model_config.cumulative_timeseries' is '{ts_model}'. "
-            f"Geldige opties: {sorted(_VALID_TIMESERIES_MODELS)}."
+            f"Geldige opties: {sorted(valid_timeseries)}."
         )
         sys.exit(1)
 
     reg_model = model_config.get("cumulative_regressor")
-    if reg_model is not None and reg_model not in _VALID_REGRESSOR_MODELS:
+    if reg_model is not None and reg_model not in valid_regressor:
         print(
             f"Configuratiefout in {file_path}: "
             f"'model_config.cumulative_regressor' is '{reg_model}'. "
-            f"Geldige opties: {sorted(_VALID_REGRESSOR_MODELS)}."
+            f"Geldige opties: {sorted(valid_regressor)}."
         )
         sys.exit(1)
 
     clf_model = model_config.get("individual_classifier")
-    if clf_model is not None and clf_model not in _VALID_CLASSIFIER_MODELS:
+    if clf_model is not None and clf_model not in valid_classifier:
         print(
             f"Configuratiefout in {file_path}: "
             f"'model_config.individual_classifier' is '{clf_model}'. "
-            f"Geldige opties: {sorted(_VALID_CLASSIFIER_MODELS)}."
+            f"Geldige opties: {sorted(valid_classifier)}."
         )
         sys.exit(1)
 
@@ -214,11 +226,11 @@ def _validate_model_config(cfg, file_path):
             )
             sys.exit(1)
         for reg_name, params in reg_params.items():
-            if reg_name not in _VALID_REGRESSOR_MODELS:
+            if reg_name not in valid_regressor:
                 print(
                     f"Configuratiefout in {file_path}: "
                     f"'model_config.regressor_params' bevat onbekende regressor '{reg_name}'. "
-                    f"Geldige opties: {sorted(_VALID_REGRESSOR_MODELS)}."
+                    f"Geldige opties: {sorted(valid_regressor)}."
                 )
                 sys.exit(1)
             if not isinstance(params, dict):
@@ -248,11 +260,11 @@ def _validate_model_config(cfg, file_path):
             )
             sys.exit(1)
         for fc_name, params in fc_params.items():
-            if fc_name not in _VALID_TIMESERIES_MODELS:
+            if fc_name not in valid_timeseries:
                 print(
                     f"Configuratiefout in {file_path}: "
                     f"'model_config.forecaster_params' bevat onbekende forecaster '{fc_name}'. "
-                    f"Geldige opties: {sorted(_VALID_TIMESERIES_MODELS)}."
+                    f"Geldige opties: {sorted(valid_timeseries)}."
                 )
                 sys.exit(1)
             if not isinstance(params, dict):

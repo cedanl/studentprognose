@@ -5,6 +5,27 @@ import json
 import pytest
 
 from gui import config_io
+from studentprognose.config import load_defaults
+from studentprognose.models import (
+    CLASSIFIER_REGISTRY,
+    FORECASTER_REGISTRY,
+    REGRESSOR_REGISTRY,
+)
+
+
+def test_model_choices_derive_from_registries():
+    """De GUI-keuzelijsten moeten de package-registries spiegelen (single source
+    of truth), zodat een nieuw model niet op twee plekken onderhouden hoeft."""
+    assert config_io.TIMESERIES_CHOICES == list(FORECASTER_REGISTRY)
+    assert config_io.REGRESSOR_CHOICES == list(REGRESSOR_REGISTRY)
+    assert config_io.CLASSIFIER_CHOICES == list(CLASSIFIER_REGISTRY)
+
+
+def test_ensemble_groups_derive_from_default_config():
+    """De ensemble-groepen komen uit de gebundelde default-configuratie."""
+    assert config_io.ENSEMBLE_GROUPS == list(
+        load_defaults().get("ensemble_weights", {})
+    )
 
 
 def test_roundtrip_load_save(tmp_path):

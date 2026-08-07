@@ -8,25 +8,24 @@ from __future__ import annotations
 
 import json
 
-#: Keuzelijsten voor de modelkeuzes (spiegelen de opties die de pipeline kent).
-TIMESERIES_CHOICES = ["sarima", "ets", "theta", "auto_arima"]
-REGRESSOR_CHOICES = [
-    "xgboost",
-    "ridge",
-    "random_forest",
-    "gradient_boosting",
-    "extra_trees",
-]
-CLASSIFIER_CHOICES = [
-    "xgboost",
-    "random_forest",
-    "logistic_regression",
-    "gradient_boosting",
-    "extra_trees",
-]
+from studentprognose.config import load_defaults
+from studentprognose.models import (
+    CLASSIFIER_REGISTRY,
+    FORECASTER_REGISTRY,
+    REGRESSOR_REGISTRY,
+)
 
-#: De vier verwachte ensemble-gewichtgroepen.
-ENSEMBLE_GROUPS = ["master_week_17_23", "week_30_34", "week_35_37", "default"]
+#: Keuzelijsten voor de modelkeuzes. Afgeleid uit de model-registries in de
+#: package (single source of truth): voeg je daar een model toe, dan verschijnt
+#: het automatisch in de GUI-dropdowns — geen tweede lijst om te onderhouden.
+TIMESERIES_CHOICES = list(FORECASTER_REGISTRY)
+REGRESSOR_CHOICES = list(REGRESSOR_REGISTRY)
+CLASSIFIER_CHOICES = list(CLASSIFIER_REGISTRY)
+
+#: De ensemble-gewichtgroepen uit de gebundelde default-configuratie (single
+#: source of truth). Dient als fallback zodat de editor de verwachte groepen
+#: toont wanneer een config ze nog niet bevat.
+ENSEMBLE_GROUPS = list(load_defaults().get("ensemble_weights", {}))
 
 #: Tolerantie waarbinnen een gewichtsgroep als "telt op tot 1.0" geldt.
 _WEIGHT_TOLERANCE = 1e-6
