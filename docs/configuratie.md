@@ -79,6 +79,9 @@ Als de gesommeerde voorspelling het maximum overschrijdt, wordt het overschot af
 
     Het dtype maakt niet uit: een numerieke sleutel wordt automatisch als getal geïnterpreteerd (`"56604"` en `56604` zijn equivalent). JSON kent geen inline-commentaar, dus noteer de leesbare naam bij voorkeur in je eigen documentatie of changelog naast de Isatcode.
 
+!!! tip "In de grafische interface kies je de sleutel uit een keuzelijst"
+    Werk je via de [grafische interface](gui.md), dan biedt de tab **Geavanceerd** zowel bij *Numerus fixus → Programmasleutel* als bij *Filteren → Opleidingen* een zoekbare keuzelijst met de Isatcodes uit je data (met de opleidingsnaam erachter waar bekend). Je kunt op Isatcode of naam zoeken; de opgeslagen waarde is altijd de Isatcode. Een code die nog niet in je data zit kun je ook handmatig typen en toevoegen.
+
 !!! warning "Sleutelruimtes van de twee sporen overlappen niet (#238)"
     Het cumulatieve spoor keyt op Isatcodes, het individuele spoor op namen. Eén sleutel kan daardoor maar één van beide sporen matchen. Draai je `-d both`, dan grijpt een Isatcode-sleutel wél aan in het cumulatieve spoor maar niet in het individuele — je krijgt hierover een **waarschuwing**. Tot #238 is opgelost is er geen sleutel die beide sporen tegelijk bedient.
 

@@ -16,7 +16,8 @@
     },
     "telbestand_filename_patterns": [
         "telbestandY{year}W{week}",
-        "telbestand_sl_{date}_v{volgnummer}_{year}"
+        "telbestand_sl_{date}_v{volgnummer}_{year}",
+        "telbestand_sl_{year}_v{volgnummer}_{date}"
     ],
     "cumulative_input": {
         "separator": ",",
@@ -113,6 +114,16 @@
         }
     },
     "columns": {
+        "telbestand": {
+            "Studiejaar": "Studiejaar",
+            "Isatcode": "Isatcode",
+            "Aantal": "Aantal",
+            "meercode_V": "meercode_V",
+            "Status": "Status",
+            "Herinschrijving": "Herinschrijving",
+            "Hogerejaars": "Hogerejaars",
+            "Herkomst": "Herkomst"
+        },
         "individual": {
             "Sleutel": "Sleutel",
             "Datum Verzoek Inschr": "Datum Verzoek Inschr",

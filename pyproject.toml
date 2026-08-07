@@ -41,6 +41,14 @@ dependencies = [
     "plotly>=6.7.0",
 ]
 
+[project.optional-dependencies]
+# Optionele grafische interface (NiceGUI). Niet nodig om de CLI te draaien.
+# De GUI-code (map gui/) draait vanuit een broncode-checkout; deze extra levert
+# alleen de runtime-afhankelijkheid. Starten:  uv run --extra gui python -m gui
+gui = [
+    "nicegui>=2.0.0",
+]
+
 [project.urls]
 Homepage = "https://github.com/cedanl/studentprognose"
 Repository = "https://github.com/cedanl/studentprognose"

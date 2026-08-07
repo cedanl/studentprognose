@@ -2,3 +2,93 @@
 .md-tabs__list {
   justify-content: center;
 }
+
+/* ---------------------------------------------------------------------------
+   App-preview — browservenster-frame rond schermopnames (GIF/screenshot)
+   Geeft een walkthrough een strakke, herkenbare "vensterlook" met macOS-stijl
+   verkeerslichten, afgeronde hoeken en een zachte schaduw. Werkt in licht
+   én donker thema via de Material-designtokens.
+--------------------------------------------------------------------------- */
+.app-preview {
+  margin: 2.25rem auto;
+  max-width: 780px;
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  box-shadow:
+    0 18px 48px rgba(0, 0, 0, 0.18),
+    0 4px 12px rgba(0, 0, 0, 0.10);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.app-preview:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 26px 64px rgba(0, 0, 0, 0.22),
+    0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Titelbalk met verkeerslichten */
+.app-preview__chrome {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 15px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--md-default-fg-color--lightest) 55%, var(--md-default-bg-color)),
+      var(--md-default-bg-color));
+  border-bottom: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.app-preview__dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: none;
+}
+.app-preview__dot--red    { background: #ff5f57; }
+.app-preview__dot--yellow { background: #febc2e; }
+.app-preview__dot--green  { background: #28c840; }
+
+/* URL-pil in het midden van de balk */
+.app-preview__bar {
+  margin: 0 auto;
+  padding: 3px 14px;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  color: var(--md-default-fg-color--light);
+  background: var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 999px;
+  max-width: 60%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Balans-element rechts, zodat de URL-pil optisch gecentreerd staat */
+.app-preview__chrome::after {
+  content: "";
+  width: 42px;
+  flex: none;
+}
+
+.app-preview img,
+.app-preview video {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+}
+
+.app-preview figcaption {
+  margin: 0;
+  padding: 0.65rem 1rem 0.85rem;
+  font-size: 0.75rem;
+  text-align: center;
+  color: var(--md-default-fg-color--light);
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+  background: var(--md-default-bg-color);
+}

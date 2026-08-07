@@ -27,6 +27,24 @@
 > [!TIP]
 > **Zie het in actie:** bekijk een [voorbeeld-dashboard en een uitgewerkte prognose](https://cedanl.github.io/studentprognose/) op de documentatiesite — van vooraanmelders op een peilmoment naar het verwachte aantal inschrijvingen, met demodata.
 
+<div align="center">
+
+<br>
+
+<img src="doc/studentprognose-walkthrough.gif" alt="Walkthrough van de grafische interface: project opzetten, configureren en een prognose draaien" width="760">
+
+<sub>▶︎ De optionele <a href="https://cedanl.github.io/studentprognose/gui/">grafische interface</a> — zet een project op, stel je configuratie in en draai je eerste prognose, zonder één regel terminal.</sub>
+
+</div>
+
+Zo start je de interface hierboven (vanuit een clone van deze repository):
+
+```bash
+uv run --extra gui python -m gui
+```
+
+Open daarna [http://localhost:8080](http://localhost:8080) in je browser. Zie [Grafische interface](https://cedanl.github.io/studentprognose/gui/) voor de volledige uitleg — of gebruik de CLI hieronder.
+
 ---
 
 ## 📦 Aan de slag
@@ -103,6 +121,18 @@ uv run studentprognose -w 6 -y 2020
 
 > [!NOTE]
 > Demodata is meegeleverd in `data/input_raw/`, zodat je direct kunt starten. Gebruik `-y 2020` t/m `-y 2024` en `-w 1` t/m `-w 52`.
+
+---
+
+## 🖥️ Grafische interface (optioneel)
+
+Liever klikken dan typen? Er is een optionele webinterface (NiceGUI) die de CLI omhult — een project opzetten, de configuratie instellen en voorspellingen draaien, zonder terminalkennis. Je draait haar vanuit een clone van deze repository:
+
+```bash
+uv run --extra gui python -m gui
+```
+
+Open daarna [http://localhost:8080](http://localhost:8080) in je browser. De interface is een schil rond dezelfde CLI; alles wat je in de GUI doet kun je ook op de opdrachtregel doen. Zie [Grafische interface](https://cedanl.github.io/studentprognose/gui/) in de documentatie.
 
 ---
 

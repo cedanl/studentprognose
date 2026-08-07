@@ -641,14 +641,17 @@ class DashboardBuilder:
         # Rename columns to display names
         df.columns = [_display(c) for c in df.columns]
 
-        # Mark best model per programme with ★
-        best_per_prog = df.idxmin(axis=1)
+        # Mark best model per programme with ★ (NaN-safe: rows with only NaN get no best)
+        has_any = df.notna().any(axis=1)
+        best_per_prog = df[has_any].idxmin(axis=1)
+        best_per_prog = best_per_prog.reindex(df.index)
         hover = np.empty(df.shape, dtype=object)
         annotations = []
         for i, prog in enumerate(df.index):
             for j, model in enumerate(df.columns):
                 val = df.iloc[i, j]
-                is_best = model == best_per_prog[prog]
+                best = best_per_prog[prog]
+                is_best = pd.notna(best) and model == best
                 if pd.notna(val):
                     label = f"★ {val:.1%}" if is_best else f"{val:.1%}"
                     hover[i, j] = f"MAPE: {val:.1%}" + (" ★ best" if is_best else "")
