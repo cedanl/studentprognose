@@ -86,3 +86,17 @@ def test_parse_json_rejects_invalid():
 def test_validate_config_aggregates_ensemble_errors():
     config = {"ensemble_weights": {"default": {"individual": 0.9, "cumulative": 0.9}}}
     assert len(config_io.validate_config(config)) == 1
+
+
+def test_excluded_years_dedupes_and_sorts():
+    rules = [{"year": 2021}, {"year": 2020}, {"year": 2020, "herkomst": "NL"}]
+    assert config_io.excluded_years(rules) == [2020, 2021]
+
+
+def test_excluded_years_ignores_rules_without_year():
+    rules = [{"herkomst": "NL"}, {"year_before": 2019}]
+    assert config_io.excluded_years(rules) == []
+
+
+def test_excluded_years_empty_input():
+    assert config_io.excluded_years([]) == []

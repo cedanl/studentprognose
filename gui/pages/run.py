@@ -10,7 +10,7 @@ import datetime
 
 from nicegui import app, ui
 
-from gui import nav, process, theme, tracks
+from gui import config_io, nav, process, theme, tracks
 from gui.components import train_test_viz as tvz
 from gui.components.layout import page_shell
 from gui.components.log_stream import ProcessPanel
@@ -142,6 +142,7 @@ class _RunView:
         # bereik zolang de data nog niet is geüpload.
         self._bounds: DataYearBounds | None = self._scan_bounds()
         self._data_start, self._data_end, self._forecast_years = self._resolve_years()
+        self._excluded_years: list[int] = self._load_excluded_years()
         self._default_year: int = (
             self._data_end + 1
             if self._data_end is not None and (self._data_end + 1) in self._forecast_years
@@ -190,6 +191,18 @@ class _RunView:
             # Onleesbare of half-geüploade data mag de pagina nooit breken.
             return None
 
+    @staticmethod
+    def _load_excluded_years() -> list[int]:
+        """Lees de uitgesloten jaren uit ``excluded_data_points`` in de config."""
+        if not STATE.config_path:
+            return []
+        try:
+            config = config_io.load_config(STATE.config_path)
+        except Exception:
+            # Onleesbare of nog niet opgeslagen configuratie mag de pagina nooit breken.
+            return []
+        return config_io.excluded_years(config.get("excluded_data_points", []))
+
     def _resolve_years(self) -> tuple[int, int | None, list[int]]:
         """Leid (start-jaar, eind-jaar, prognosejaar-opties) af.
 
@@ -224,9 +237,56 @@ class _RunView:
             f"en het oktober-bestand ({b.okt_years[0]}–{b.okt_years[-1]})."
         )
 
+    def _excl_years_banner(self) -> None:
+        """Toon welke jaren de actieve configuratie van de trainingsdata uitsluit."""
+        years = self._excluded_years
+        label = (
+            f"Uitgesloten jaren — {len(years)} jaar/jaren"
+            if years
+            else "Uitgesloten jaren — geen"
+        )
+        border_color = theme.NEGATIVE if years else "#e0e0e0"
+        with ui.expansion(label, icon="block" if years else "check_circle").classes(
+            "w-full mb-4"
+        ).style(
+            "background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {border_color}30; border-left: 4px solid {border_color}; "
+            "box-shadow: 0 1px 5px rgba(0,0,0,0.05);"
+        ):
+            if years:
+                ui.label(
+                    "Deze jaren zijn uitgesloten van de trainingsdata (via "
+                    "Configuratie › Geavanceerd › Uitsluitingsregels). Het "
+                    "prognosejaar zelf wordt hierbij altijd beschermd."
+                ).classes("text-sm opacity-60 mb-2")
+                with ui.row().classes("gap-2 flex-wrap"):
+                    for y in years:
+                        with ui.row().classes(
+                            "items-center gap-1 px-3 py-1 rounded-full no-wrap"
+                        ).style(
+                            f"background: {theme.WARNING}18; "
+                            f"border: 1px solid {theme.WARNING}40;"
+                        ):
+                            ui.label(str(y)).classes(
+                                "text-sm font-medium font-mono"
+                            ).style(f"color: {theme.WARNING}")
+            else:
+                ui.label(
+                    "Er zijn geen probleemjaren (bijv. COVID) uitgesloten van de "
+                    "trainingsdata."
+                ).classes("text-sm opacity-60")
+            if nav.is_available("/config"):
+                ui.button(
+                    "Wijzig in Configuratie",
+                    icon="tune",
+                    on_click=lambda: ui.navigate.to("/config"),
+                ).props("flat dense color=accent").classes("mt-2")
+
     # ── UI-opbouw ────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
+        self._excl_years_banner()
+
         with ui.card().classes("w-full"):
             with ui.grid(columns=2).classes("w-full gap-4"):
 
@@ -471,7 +531,12 @@ class _RunView:
         weeks = self._weeks.value or ""
         self._viz_html.set_content(
             tvz.render_v1(
-                self._years_as_str(), skip, weeks, self._data_start, self._data_end
+                self._years_as_str(),
+                skip,
+                weeks,
+                self._data_start,
+                self._data_end,
+                self._excluded_years,
             )
         )
 

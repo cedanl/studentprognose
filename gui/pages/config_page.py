@@ -380,19 +380,15 @@ class _ConfigView:
 
     def _render_excl_year_chips(self) -> None:
         self._excl_years_chips.clear()
-        years_seen: dict[str, list[int]] = {}
-        for i, row in enumerate(self._excl_rows):
-            yr = row.get("year")
-            if yr is not None:
-                years_seen.setdefault(str(yr), []).append(i)
+        years = config_io.excluded_years(self._excl_rows)
 
-        if not years_seen:
+        if not years:
             with self._excl_years_chips:
                 ui.label("Geen jaren uitgesloten.").classes("text-sm opacity-40 italic")
             return
 
         with self._excl_years_chips:
-            for yr_str in sorted(years_seen.keys()):
+            for yr_str in (str(y) for y in years):
                 with ui.row().classes(
                     "items-center gap-1 px-3 py-1 rounded-full no-wrap"
                 ).style(
@@ -411,10 +407,8 @@ class _ConfigView:
 
     def _available_year_options(self) -> list[int]:
         """Kiesbare jaren minus de reeds uitgesloten jaren (oplopend)."""
-        excluded = {
-            str(r.get("year")) for r in self._excl_rows if r.get("year") is not None
-        }
-        return [y for y in self._selectable_years if str(y) not in excluded]
+        excluded = set(config_io.excluded_years(self._excl_rows))
+        return [y for y in self._selectable_years if y not in excluded]
 
     def _refresh_year_input(self) -> None:
         """Werk de select-opties bij nadat de uitsluitingslijst is veranderd."""
@@ -988,9 +982,7 @@ class _ConfigView:
             ui.button("Rij toevoegen", icon="add", on_click=self._add_nf_row).props("flat")
 
     def _excl_section(self) -> None:
-        excl_year_count = len({
-            str(r.get("year")) for r in self._excl_rows if r.get("year") is not None
-        })
+        excl_year_count = len(config_io.excluded_years(self._excl_rows))
         excl_label = (
             f"Uitsluitingsregels — {excl_year_count} jaar/jaren"
             if excl_year_count
