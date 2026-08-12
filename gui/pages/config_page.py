@@ -1305,10 +1305,16 @@ class _ConfigView:
             ).classes("text-sm opacity-60 mb-3")
 
             with ui.row().classes("w-full gap-4 flex-wrap mb-4"):
+                current_sep = telbestand_cfg.get("separator", ";")
+                sep_options = {";": "; (legacy Studielink)", ",": ", (UvA SQL)"}
+                # Het scheidingsteken is vrije tekst in configuration.json — een
+                # afwijkende waarde (niet ';' of ',') tonen we alsnog als optie,
+                # zodat de keuzelijst hem niet stilzwijgend overschrijft.
+                sep_options.setdefault(current_sep, current_sep)
                 sep_select = (
                     ui.select(
-                        options={";": "; (legacy Studielink)", ",": ", (UvA SQL)"},
-                        value=telbestand_cfg.get("separator", ";"),
+                        options=sep_options,
+                        value=current_sep,
                         label="Scheidingsteken",
                     )
                     .props("outlined")
