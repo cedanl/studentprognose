@@ -89,6 +89,36 @@ HELP = {
         "trainingsdata. Het voorspeljaar zelf wordt altijd beschermd en nooit "
         "uitgesloten."
     ),
+    "ensemble_override_cumulative": (
+        "Opleidingen waarvoor het ensemble altijd het cumulatieve SARIMA-model "
+        "gebruikt, ongeacht weeknummer of examentype. Gebruik dit voor "
+        "numerus-fixus-opleidingen of sterk afwijkende aanmeldpatronen waarbij "
+        "het cumulatieve spoor aantoonbaar beter presteert."
+    ),
+    "exclude_from_combined": (
+        "Opleidingen die worden overgeslagen in de combined-modus ('beide "
+        "sporen'). Gebruik dit als de combined-voorspelling voor deze "
+        "opleiding aantoonbaar slechter presteert dan het cumulatieve spoor "
+        "alleen."
+    ),
+    "validation_separator": (
+        "Scheidingsteken waarmee de validatie het ruwe telbestand inleest. "
+        "';' voor het legacy Studielink-formaat, ',' voor het UvA SQL-formaat "
+        "— moet gelijk zijn aan cumulative_input.separator."
+    ),
+    "validation_programme_column": (
+        "Kolom waarop validatiefouten worden gegroepeerd. Meestal "
+        "'Groepeernaam'; zet dit op 'Isatcode' als je databron die kolom niet "
+        "levert (bijv. UvA)."
+    ),
+    "validation_herkomst_allowed": (
+        "Toegestane waarden in de Herkomst-kolom van het telbestand. Een "
+        "andere waarde levert een validatiefout op."
+    ),
+    "validation_required_columns": (
+        "Kolommen die verplicht in het ruwe telbestand moeten staan. "
+        "Ontbreekt er één, dan stopt de validatie met een foutmelding."
+    ),
     "aggregate": (
         "Tel fijnmazige invoerrijen op naar de canonieke grain. Nodig voor o.a. de "
         "UvA-levering (bereken 'Gewogen' per rij, sommeer daarna); anders crasht "
@@ -510,9 +540,75 @@ class _ConfigView:
         self._filtering_section()
         self._model_section()
         self._ensemble_section()
+        self._programme_multiselect_section(
+            config_key="ensemble_override_cumulative",
+            title="Ensemble-uitzondering",
+            icon="rule",
+            color=theme.SECONDARY,
+            help=HELP["ensemble_override_cumulative"],
+            select_label="Opleidingen (altijd cumulatief spoor)",
+        )
+        self._programme_multiselect_section(
+            config_key="exclude_from_combined",
+            title="Uitgesloten van combined-modus",
+            icon="block",
+            color=theme.NEGATIVE,
+            help=HELP["exclude_from_combined"],
+            select_label="Opleidingen (overslaan in combined-modus)",
+        )
         self._nf_section()
         self._excl_section()
+        self._validation_section()
         self._runtime_section()
+
+    def _programme_multiselect_section(
+        self,
+        *,
+        config_key: str,
+        title: str,
+        icon: str,
+        color: str,
+        help: str,
+        select_label: str,
+    ) -> None:
+        """Herbruikbare kaart voor een lijst van programmasleutels (isatcode of naam).
+
+        Gebruikt dezelfde zoekbare opleiding-keuzelijst als *Filteren* en
+        *Numerus fixus* (:attr:`_programme_options`), maar staat ook vrij
+        getypte waarden toe — sommige secties (bijv. ``ensemble_override_cumulative``)
+        keyen historisch op de leesbare opleidingsnaam in plaats van de isatcode.
+        """
+        values = self._config.setdefault(config_key, [])
+        label = f"{title} — {len(values)} opleiding(en)" if values else f"{title} — geen"
+        with ui.expansion(label, icon=icon, value=False).classes("w-full mb-3").style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {color}20; border-left: 4px solid {color}; "
+            f"box-shadow: 0 1px 6px rgba(0,0,0,0.06);"
+        ):
+            ui.label(help).classes("text-sm opacity-60 mb-2")
+
+            current = [filtering_io.isatcode_str(v) or str(v) for v in values]
+            opts = dict(self._programme_options)
+            for raw, key in zip(values, current):
+                opts.setdefault(key, str(raw))
+
+            sel = (
+                ui.select(
+                    options=opts,
+                    value=current,
+                    multiple=True,
+                    with_input=True,
+                    label=select_label,
+                )
+                .props("use-chips new-value-mode=add-unique outlined")
+                .classes("w-full")
+            )
+
+            def _on_change(e, key=config_key) -> None:
+                self._config[key] = list(e.value or [])
+                self._mark_dirty()
+
+            sel.on_value_change(_on_change)
 
     def _load_student_count_df(self):
         path = os.path.join(
@@ -867,6 +963,30 @@ class _ConfigView:
                     recommend="xgboost",
                 )
 
+            ui.separator().classes("my-3")
+            with ui.row().classes("items-end gap-4 flex-wrap"):
+                my_inp = (
+                    ui.number(
+                        label="Vroegste trainingsjaar (min_training_year)",
+                        value=int(mc.get("min_training_year", 2016)),
+                        min=1990,
+                        max=2100,
+                        step=1,
+                        precision=0,
+                    )
+                    .props("outlined")
+                    .classes("w-64")
+                )
+                my_inp.tooltip(HELP["min_training_year"])
+
+                def _on_min_training_year(e) -> None:
+                    if e.value is None:
+                        return
+                    mc["min_training_year"] = int(e.value)
+                    self._mark_dirty()
+
+                my_inp.on_value_change(_on_min_training_year)
+
     def _adv_select(
         self, label, choices, target, key, default, *, help=None, recommend=None
     ) -> None:
@@ -1165,6 +1285,154 @@ class _ConfigView:
 
         sw.on_value_change(_on_change)
 
+    def _validation_section(self) -> None:
+        telbestand_cfg = self._config.setdefault("validation", {}).setdefault(
+            "telbestand", {}
+        )
+        sep_val = telbestand_cfg.get("separator", ";")
+        with ui.expansion(
+            f"Validatie — telbestand ({sep_val})", icon="fact_check", value=False
+        ).classes("w-full mb-3").style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.INFO}20; border-left: 4px solid {theme.INFO}; "
+            f"box-shadow: 0 1px 6px rgba(61,104,236,0.08);"
+        ):
+            ui.label(
+                "Datakwaliteitscontrole vóór de pipeline start. Deze instellingen "
+                "overschrijven de ingebouwde validatiedefaults voor telbestanden — "
+                "handig als je databron een afwijkend formaat levert (bijv. UvA "
+                "SQL i.p.v. legacy Studielink)."
+            ).classes("text-sm opacity-60 mb-3")
+
+            with ui.row().classes("w-full gap-4 flex-wrap mb-4"):
+                sep_select = (
+                    ui.select(
+                        options={";": "; (legacy Studielink)", ",": ", (UvA SQL)"},
+                        value=telbestand_cfg.get("separator", ";"),
+                        label="Scheidingsteken",
+                    )
+                    .props("outlined")
+                    .classes("w-64")
+                )
+                sep_select.tooltip(HELP["validation_separator"])
+
+                def _on_sep(e) -> None:
+                    telbestand_cfg["separator"] = e.value
+                    self._mark_dirty()
+
+                sep_select.on_value_change(_on_sep)
+
+                col_input = (
+                    ui.input(
+                        value=telbestand_cfg.get("programme_column", "Groepeernaam"),
+                        label="Programmakolom",
+                        placeholder="bijv. Isatcode",
+                    )
+                    .props("outlined")
+                    .classes("w-64")
+                )
+                col_input.tooltip(HELP["validation_programme_column"])
+
+                def _on_col(e) -> None:
+                    telbestand_cfg["programme_column"] = e.value
+                    self._mark_dirty()
+
+                col_input.on_value_change(_on_col)
+
+            self._render_string_list_field(
+                title="Toegestane herkomstcodes",
+                help=HELP["validation_herkomst_allowed"],
+                items=telbestand_cfg.setdefault("herkomst_allowed", ["N", "E", "R"]),
+                placeholder="bijv. N",
+            )
+            self._render_string_list_field(
+                title="Verplichte kolommen",
+                help=HELP["validation_required_columns"],
+                items=telbestand_cfg.setdefault(
+                    "required_columns",
+                    [
+                        "Studiejaar", "Isatcode", "Groepeernaam", "Aantal",
+                        "meercode_V", "Status", "Herinschrijving", "Hogerejaars",
+                        "Herkomst",
+                    ],
+                ),
+                placeholder="bijv. Isatcode",
+            )
+
+    def _render_string_list_field(
+        self, *, title: str, help: str, items: list[str], placeholder: str
+    ) -> None:
+        """Bewerkbare lijst van strings: chips + een toevoeg-invoerveld.
+
+        ``items`` is de *levende* lijst uit de configuratie zelf — muteren
+        houdt ``self._config`` meteen in sync, zonder aparte write-back stap.
+        """
+        with ui.column().classes("w-full gap-1 mb-4"):
+            with ui.row().classes("items-center gap-2 mb-1"):
+                ui.label(title).classes("text-sm font-semibold")
+                count_badge = (
+                    ui.badge(str(len(items)))
+                    .props("color=accent outline")
+                    .classes("text-xs")
+                )
+            chips_container = ui.row().classes("gap-2 flex-wrap mb-2 min-h-8")
+
+            def _render_chips() -> None:
+                chips_container.clear()
+                count_badge.set_text(str(len(items)))
+                with chips_container:
+                    if not items:
+                        ui.label(
+                            "Leeg — gebruikt de ingebouwde standaard."
+                        ).classes("text-sm opacity-40 italic")
+                    for val in list(items):
+                        with ui.row().classes(
+                            "items-center gap-1 px-3 py-1 rounded-full no-wrap"
+                        ).style(
+                            f"background: {theme.INFO}12; "
+                            f"border: 1px solid {theme.INFO}35;"
+                        ):
+                            ui.label(val).classes("text-sm font-mono")
+                            ui.button(
+                                icon="close",
+                                on_click=lambda _e, v=val: _remove(v),
+                            ).props("flat round dense").style(
+                                f"color: {theme.INFO}; width: 20px; height: 20px;"
+                            )
+
+            def _remove(val: str) -> None:
+                if val in items:
+                    items.remove(val)
+                _render_chips()
+                self._mark_dirty()
+
+            def _add() -> None:
+                val = (new_input.value or "").strip()
+                if not val:
+                    return
+                if val in items:
+                    ui.notify(f"'{val}' staat al in de lijst.", type="warning")
+                    return
+                items.append(val)
+                new_input.set_value("")
+                _render_chips()
+                self._mark_dirty()
+
+            _render_chips()
+
+            with ui.row().classes("items-center gap-2"):
+                new_input = (
+                    ui.input(placeholder=placeholder)
+                    .props("dense outlined")
+                    .classes("w-56")
+                )
+                new_input.on("keydown.enter", _add)
+                ui.button("Toevoegen", icon="add", on_click=_add).props(
+                    "dense outline"
+                )
+            if help:
+                ui.label(help).classes("text-xs opacity-45 mt-1")
+
     # ─── Dynamische tabellen ──────────────────────────────────────────────────
 
     def _render_nf_rows(self) -> None:
@@ -1308,11 +1576,14 @@ class _ConfigView:
         ):
             ui.icon("data_object").classes("text-xl opacity-40")
             with ui.column().classes("gap-0 grow"):
-                ui.label("JSON-overzicht").classes("font-medium text-sm")
+                ui.label("JSON-editor").classes("font-medium text-sm")
                 ui.label(
-                    "Bekijk je volledige configuratie als boom: klik ▶ om secties "
-                    "open/dicht te klappen. Wijzigingen doe je in de tabbladen "
-                    "Basis en Geavanceerd — die worden direct opgeslagen."
+                    "Bewerk de volledige configuratie rechtstreeks — ook secties "
+                    "zonder eigen formulierkaart (bijv. model_features, columns, "
+                    "cumulative_input). Klik ▶ om secties open/dicht te klappen. "
+                    "Wijzigingen in de tabbladen Basis en Geavanceerd verschijnen "
+                    "pas hier zodra je die kant op navigeert (of de pagina "
+                    "herlaadt) — schrijf dus niet in beide tabbladen tegelijk."
                 ).classes("text-sm opacity-50")
 
         with ui.row().classes("items-center gap-2 mb-3"):
@@ -1320,6 +1591,12 @@ class _ConfigView:
             ui.label(self._path).classes("text-xs font-mono opacity-40 break-all")
 
         ui.html('<div id="sp-json-ed"></div>')
+
+        self._json_save_error = ui.column().classes("w-full items-end gap-1 mt-3")
+        with ui.row().classes("w-full justify-end mt-2"):
+            ui.button(
+                "Opslaan vanuit JSON", icon="save", on_click=self._save_json_tab
+            ).props("unelevated color=accent")
 
         self._run_json_editor_init()
 
@@ -1354,6 +1631,63 @@ class _ConfigView:
             }})(15);
             """
         )
+
+    async def _save_json_tab(self) -> None:
+        """Lees de JSON-editor uit, valideer en schrijf naar ``configuration.json``.
+
+        De editor leeft alleen client-side (JSONEditor is een JS-widget), dus
+        de inhoud moet via ``run_javascript`` worden opgehaald. Bij succes
+        herladen we de pagina zodat alle tabbladen (Basis/Geavanceerd) de
+        nieuw opgeslagen waarden tonen in plaats van hun oude in-memory state.
+        """
+        self._json_save_error.clear()
+        try:
+            raw = await ui.run_javascript(
+                "try { return JSON.stringify(window.__spJE.get()); } "
+                "catch (e) { return '__SP_JSON_ERROR__:' + e.message; }",
+                timeout=5.0,
+            )
+        except TimeoutError:
+            ui.notify(
+                "JSON-editor reageert niet — herlaad de pagina en probeer opnieuw.",
+                type="negative",
+            )
+            return
+
+        if raw is None:
+            ui.notify("JSON-editor is nog niet geladen.", type="warning")
+            return
+        if isinstance(raw, str) and raw.startswith("__SP_JSON_ERROR__:"):
+            self._show_json_error(f"Ongeldige JSON: {raw.removeprefix('__SP_JSON_ERROR__:')}")
+            return
+
+        try:
+            parsed = config_io.parse_json(raw)
+        except (json.JSONDecodeError, ValueError) as exc:
+            self._show_json_error(f"Ongeldige JSON: {exc}")
+            return
+
+        errors = config_io.validate_config(parsed)
+        if errors:
+            for err in errors:
+                self._show_json_error(err)
+            return
+
+        try:
+            config_io.save_config(self._path, parsed)
+        except OSError as exc:
+            ui.notify(f"Opslaan mislukt: {exc}", type="negative")
+            return
+
+        STATE.config_saved = True
+        ui.notify("Configuratie opgeslagen vanuit JSON.", type="positive")
+        ui.navigate.reload()
+
+    def _show_json_error(self, message: str) -> None:
+        with self._json_save_error:
+            with ui.row().classes("items-center gap-1"):
+                ui.icon("error").style(f"color: {theme.NEGATIVE}; font-size: 16px;")
+                ui.label(message).classes("text-sm").style(f"color: {theme.NEGATIVE}")
 
     # ─── Validatie & opslaan ──────────────────────────────────────────────────
 

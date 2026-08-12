@@ -131,6 +131,39 @@ de lijst, dan kun je de Isatcode ook handmatig typen en toevoegen. De
 filter-keuzelijst laat meerdere opleidingen tegelijk toe; de
 numerus-fixus-keuzelijst kiest er één per rij.
 
+De tab **Geavanceerd** bevat verder kaarten voor secties die eerder alleen via
+het JSON-tabblad te bewerken waren:
+
+- **Modelkeuze** bevat naast de drie modelkeuzes ook het **vroegste
+  trainingsjaar** (`min_training_year`) — de ondergrens voor het
+  traindata-bereik dat de Uitvoeren-pagina hierboven beschrijft.
+- **Ensemble-uitzondering** (`ensemble_override_cumulative`) en **Uitgesloten
+  van combined-modus** (`exclude_from_combined`) gebruiken dezelfde zoekbare
+  opleiding-keuzelijst als *Filteren* en *Numerus fixus*, met dit verschil: je
+  kunt hier zowel een Isatcode als een vrij getypte opleidingsnaam invoeren,
+  omdat deze twee secties historisch op de leesbare naam kunnen keyen (zie
+  [Configuratie → `ensemble_override_cumulative`](configuratie.md#ensemble_override_cumulative-ensemble-uitzondering-per-opleiding)).
+- **Validatie — telbestand** stelt de datakwaliteitscontrole in die vóór de
+  pipeline start draait: het scheidingsteken, de kolom waarop validatiefouten
+  worden gegroepeerd, de toegestane herkomstcodes en de verplichte kolommen.
+  Zonder deze kaart gebruikte de GUI altijd de ingebouwde package-defaults en
+  negeerde ze een eventueel `validation`-blok in je `configuration.json`.
+  Toegestane herkomstcodes en verplichte kolommen bewerk je als een lijst
+  chips: typ een waarde en klik *Toevoegen*, of klik de **×** op een chip om
+  hem te verwijderen.
+
+Het tabblad **JSON** toont niet alleen je volledige configuratie als
+doorzoekbare boom, maar is ook **direct bewerkbaar** — inclusief secties zonder
+eigen formulierkaart (bijv. `model_features`, `columns`, `cumulative_input`).
+Wijzig de boom of schakel naar de code-weergave, en klik **"Opslaan vanuit
+JSON"** om weg te schrijven naar `configuration.json`. Dezelfde validatie als
+de andere tabbladen geldt hier ook (bijv. moeten de ensemble-gewichten per
+groep optellen tot 1,0): bij een fout verschijnt een melding onder de
+JSON-boom en wordt er niets opgeslagen. Na een geslaagde opslag herlaadt de
+pagina, zodat de tabbladen Basis en Geavanceerd de nieuwe waarden tonen.
+Bewerk daarom niet gelijktijdig in de JSON-tab en de andere tabbladen — wat je
+laatst opslaat wint.
+
 Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de
 gevonden parameters met één klik naar de configuratie kopieert.
