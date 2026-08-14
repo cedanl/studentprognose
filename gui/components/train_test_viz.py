@@ -18,6 +18,7 @@ _T = "#3D68EC"   # traindata — Npuls blauw
 _V = "#E6A020"   # backtest  — amber
 _P = "#DD784B"   # prognose  — Npuls oranje
 _MU = "#6b6b6b"  # muted tekst
+_EXCL = "#C0392B"  # uitgesloten jaar — warm rood (theme.NEGATIVE)
 
 
 # ── Gedeelde hulpfuncties ──────────────────────────────────────────────────
@@ -132,8 +133,16 @@ def render_v1(
     weeks_str: str = "",
     data_start: int = DATA_START,
     data_end: int | None = None,
+    excluded_years: list[int] | None = None,
 ) -> str:
-    """V1 — Horizon: proportionele gesegmenteerde tijdlijn met week-annotatie."""
+    """V1 — Horizon: proportionele gesegmenteerde tijdlijn met week-annotatie.
+
+    Args:
+        excluded_years: Jaren die via ``excluded_data_points`` uit de
+            trainingsdata zijn gesloten (configuratie). Jaren die binnen het
+            traindata-bereik vallen worden als gearceerde marker op de balk
+            getoond.
+    """
     d = _compute(years_str, skip_years, data_start, data_end)
     if d is None:
         return _empty_state()
@@ -199,6 +208,29 @@ def render_v1(
         ts, te = d["test"]
         bar_html += _seg(test_n, _V, _rng(ts, te), 0.1)
     bar_html += _seg(pred_n, _P, pred_bar_label, 0.2, glow=True)
+
+    # ── Uitgesloten-jaren markers (over de traindata-balk) ───────────────────
+    # Alleen jaren binnen het traindata-bereik worden gemarkeerd: dat is waar
+    # ``excluded_data_points`` daadwerkelijk op toepast (zie configuratie).
+    excl_in_train = sorted(
+        y for y in (excluded_years or []) if train_s <= y <= train_e
+    )
+
+    def _excl_marker(year: int, delay: float) -> str:
+        left = train_pct * (year - train_s) / train_n
+        width = max(train_pct / train_n, 1.2)
+        return (
+            f'<div title="Jaar {year} uitgesloten van training" '
+            f'style="position:absolute; left:{left:.2f}%; width:{width:.2f}%; top:0; bottom:0;'
+            f' background:repeating-linear-gradient(45deg, {_EXCL}66, {_EXCL}66 3px,'
+            f' transparent 3px, transparent 7px); border-left:1px solid {_EXCL};'
+            f' border-right:1px solid {_EXCL};'
+            f' animation:sp-v1-up 0.3s {delay:.2f}s ease both;"></div>'
+        )
+
+    excl_overlay_html = "".join(
+        _excl_marker(y, 0.3 + i * 0.05) for i, y in enumerate(excl_in_train)
+    )
 
     # ── Tikmarkeringen op de jaaras ──────────────────────────────────────────
     # Toont de beginjaren van elk segment + het eindjaar van de prognose als
@@ -267,6 +299,17 @@ def render_v1(
     sep = '<span style="color:#ddd; margin:0 3px; font-size:13px;">·</span>'
     legend_html = sep.join(legend_parts)
 
+    excl_note_html = ""
+    if excl_in_train:
+        excl_years_lbl = ", ".join(str(y) for y in excl_in_train)
+        excl_note_html = (
+            f'  <div style="margin-top:6px; display:flex; align-items:center; gap:5px;">'
+            f'<span style="font-size:11px; color:{_EXCL};">&#9888;</span>'
+            f'<span style="font-size:11px; color:{_EXCL};">'
+            f'Uitgesloten van training: {excl_years_lbl}</span>'
+            f'  </div>'
+        )
+
     return (
         "<style>"
         "@keyframes sp-v1-up {"
@@ -286,10 +329,13 @@ def render_v1(
         f'    {week_badge}'
         f'  </div>'
 
-        # Gesegmenteerde balk
-        '  <div style="display:flex; height:52px; border-radius:8px;'
-        '   overflow:hidden; gap:2px;">'
-        f'    {bar_html}'
+        # Gesegmenteerde balk (+ uitgesloten-jaren overlay)
+        '  <div style="position:relative;">'
+        '    <div style="display:flex; height:52px; border-radius:8px;'
+        '     overflow:hidden; gap:2px;">'
+        f'      {bar_html}'
+        '    </div>'
+        f'    {excl_overlay_html}'
         '  </div>'
 
         # Jaaras met tikmarkeringen
@@ -301,6 +347,8 @@ def render_v1(
         f'  <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:10px; align-items:center;">'
         f'    {legend_html}'
         f'  </div>'
+
+        f'{excl_note_html}'
 
         "</div>"
     )

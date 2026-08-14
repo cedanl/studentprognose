@@ -117,6 +117,14 @@ data 2020 of 2021 dekt. Zolang je nog geen tel- én oktober-bestand hebt
 geüpload, is er geen bereik bekend en meldt de sectie dat je die bestanden eerst
 moet uploaden.
 
+Die uitsluiting is ook zichtbaar op het moment dat je de voorspelling start:
+bovenaan de **Uitvoeren**-pagina staat een uitklapbare sectie **"Uitgesloten
+jaren"** met de actieve jaren (of expliciet "geen") en een link terug naar de
+configuratie om ze te wijzigen. In de **Dataverdeling**-kaart eronder krijgen
+uitgesloten jaren die binnen het traindata-bereik vallen bovendien een
+gearceerde markering op de tijdlijn, zodat je vóór het starten van een run in
+één oogopslag ziet welke jaren buiten de training vallen.
+
 In dezelfde tab **Geavanceerd** kun je op twee plekken een opleiding kiezen via
 een **zoekbare keuzelijst op Isatcode**. Bij *Filteren → Opleidingen* en bij
 *Numerus fixus → Programmasleutel* toont de lijst de opleidingen die in je
