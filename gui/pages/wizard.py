@@ -903,12 +903,15 @@ async function _spfu{uid}(inp) {{
                 self._delete_fn(self._project_dir_getter(), filename)
             except OSError:
                 pass
-        self._results.pop(filename, None)
-        self._refresh_results()
-        self._on_change()
+        # Notificeren vóórdat _refresh_results() de rij (en dus de slot van de
+        # knop die deze handler triggerde) verwijdert — anders zoekt ui.notify()
+        # naar een client via een al vernietigde slot en crasht de verbinding.
         short = filename if len(filename) <= 40 else filename[:37] + "…"
         ui.notify(f"'{short}' verwijderd", type="warning", position="top",
                   close_button=True, timeout=3000)
+        self._results.pop(filename, None)
+        self._refresh_results()
+        self._on_change()
 
     # --- UI-rendering -------------------------------------------------------
 
@@ -933,14 +936,16 @@ async function _spfu{uid}(inp) {{
                     self._delete_fn(self._project_dir_getter(), filename)
                 except OSError:
                     pass
-        self._results.clear()
-        self._refresh_results()
-        self._on_change()
+        # Zie toelichting in _delete_file: notify vóór _refresh_results(), want
+        # dat verwijdert de slot van de "Verwijder alles"-knop die dit triggerde.
         n = len(filenames)
         ui.notify(
             f"{n} bestand{'en' if n != 1 else ''} verwijderd",
             type="warning", position="top", close_button=True, timeout=3000,
         )
+        self._results.clear()
+        self._refresh_results()
+        self._on_change()
 
     def _refresh_results(self) -> None:
         self._results_slot.clear()
