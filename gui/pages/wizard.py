@@ -1194,7 +1194,10 @@ def _build_column_mapper(
                 if asyncio.iscoroutine(result):
                     await result
             finally:
-                apply_btn.props(remove="loading disabled")
+                # on_apply herbouwt bij succes de hele mapper (en dus deze knop);
+                # dan is er niets meer om de loading-state van te resetten.
+                if not apply_btn.is_deleted:
+                    apply_btn.props(remove="loading disabled")
 
         with ui.row().classes("items-center gap-2 mt-1"):
             apply_btn = ui.button(
@@ -1528,31 +1531,35 @@ class _WizardView:
                 revalidate_telbestand, self._project_dir, filename
             )
             self._zone_tel.update_result(filename, result)
-        self._refresh_tel_mapper()
-        self._refresh_coverage()
-        self._refresh_summary()
-        self._refresh_overlap()
+        # Notificeren vóórdat _refresh_tel_mapper() de knop (en diens slot) die
+        # dit triggerde verwijdert — anders zoekt ui.notify() naar een client
+        # via een al vernietigde slot en crasht de verbinding.
         ui.notify(
             "Kolomkoppeling opgeslagen en bestanden hergevalideerd.",
             type="positive",
             position="top",
             timeout=3000,
         )
+        self._refresh_tel_mapper()
+        self._refresh_coverage()
+        self._refresh_summary()
+        self._refresh_overlap()
 
     async def _apply_okt_mapping(self, mapping: dict[str, str]) -> None:
         """Sla oktober-kolomkoppeling op en hervalideer het oktober-bestand."""
         save_project_col_map(self._project_dir, "oktober", mapping)
         result = await asyncio.to_thread(revalidate_oktober, self._project_dir)
         self._zone_okt.update_result("oktober_bestand.xlsx", result)
-        self._refresh_okt_mapper()
-        self._refresh_summary()
-        self._refresh_overlap()
+        # Zie toelichting in _apply_tel_mapping: notify vóór _refresh_okt_mapper().
         ui.notify(
             "Kolomkoppeling opgeslagen en oktober-bestand hergevalideerd.",
             type="positive",
             position="top",
             timeout=3000,
         )
+        self._refresh_okt_mapper()
+        self._refresh_summary()
+        self._refresh_overlap()
 
     def _refresh_coverage(self) -> None:
         cov = compute_tel_coverage(self._zone_tel._results)
