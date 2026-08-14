@@ -120,6 +120,7 @@ def main() -> None:
         reload=False,
         show=False,
         favicon=os.path.join(ASSETS_DIR, "favicon.svg"),
+        uvicorn_logging_level="debug",
     )
 
 
