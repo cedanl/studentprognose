@@ -57,7 +57,9 @@ def _drawer(active: str) -> None:
     """Render de zijbalk met projectcontext, navigatie-items en feedbacklink."""
     feedback = _feedback_dialog()
 
-    with ui.left_drawer(fixed=False).classes("bg-grey-1 gap-1").style(
+    # value=True (i.p.v. None): voorkomt een JS-roundtrip om de vensterbreedte
+    # te bepalen bij elke paginaload, die soms binnen 1s timet.
+    with ui.left_drawer(value=True, fixed=False).classes("bg-grey-1 gap-1").style(
         "display: flex; flex-direction: column;"
     ):
         # Project-contextblok — toont welk project actief is zodat de gebruiker
