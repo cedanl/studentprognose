@@ -44,6 +44,29 @@ def _load_brincodes(project_dir: str) -> list[str]:
     return sorted(codes)
 
 
+def _load_brincode_options(project_dir: str) -> dict[str, str]:
+    """Laad Brincodes met leesbare labels (naam + code) via de mapping."""
+    try:
+        from gui.brincode_map import build_options as build_brincode_options
+
+        codes = _load_brincodes(project_dir)
+        if codes:
+            return build_brincode_options(codes)
+    except Exception:
+        pass
+    return {}
+
+
+def _brincode_label(code: str) -> str:
+    """Geef label voor een enkele Brincode (met naam indien bekend)."""
+    try:
+        from gui.brincode_map import label_for
+
+        return label_for(code)
+    except Exception:
+        return code
+
+
 HELP = {
     "cumulative_timeseries": (
         "Tijdreeksmodel voor stap 1 van het cumulatieve spoor: extrapoleert de "
@@ -218,11 +241,12 @@ class _ConfigView:
             with ui.column().classes("gap-0"):
                 ui.label("Begin hier").classes("font-medium text-sm")
                 ui.label(
-                    "Pas deze 2 instellingen aan — de rest werkt prima met de aanbevolen waarden."
+                    "Pas deze 3 instellingen aan — de rest werkt prima met de aanbevolen waarden."
                 ).classes("text-sm opacity-60")
 
         self._institution_card()
         self._week_card()
+        self._min_training_year_card()
 
     def _institution_card(self) -> None:
         current = self._config.setdefault("institution_filter", [])
@@ -230,8 +254,10 @@ class _ConfigView:
 
         try:
             project_dir = os.path.dirname(os.path.dirname(self._path))
-            data_codes = _load_brincodes(project_dir)
+            brincode_options = _load_brincode_options(project_dir)
+            data_codes = list(brincode_options.keys()) if brincode_options else _load_brincodes(project_dir)
         except Exception:
+            brincode_options = {}
             data_codes = []
 
         with ui.card().classes("w-full mb-4"):
@@ -245,17 +271,26 @@ class _ConfigView:
                         ui.label("Jouw instelling").classes("text-base font-medium")
                         ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
                     ui.label(
-                        "Selecteer je Brincode. De prognose filtert de teldata automatisch op deze code."
+                        "Selecteer je instelling. De prognose filtert de teldata automatisch op deze instelling."
                     ).classes("text-sm opacity-60 mt-1")
 
                     if data_codes:
-                        options = data_codes if not (current_code and current_code not in data_codes) else [current_code, *data_codes]
+                        # Bouw opties met naam indien bekend
+                        if brincode_options:
+                            options = dict(brincode_options)
+                            # Zorg dat huidige code zichtbaar blijft, ook als die niet in data zit
+                            if current_code and current_code not in options:
+                                options[current_code] = _brincode_label(current_code)
+                        else:
+                            # Fallback zonder mapping
+                            all_codes = data_codes if not (current_code and current_code not in data_codes) else [current_code, *data_codes]
+                            options = {c: c for c in all_codes}
 
                         self._inst_select = (
                             ui.select(
                                 options=options,
                                 value=current_code,
-                                label="Selecteer Brincode",
+                                label="Selecteer instelling",
                             )
                             .props("outlined use-input input-debounce=0 clearable")
                             .classes("w-full mt-2")
@@ -284,7 +319,7 @@ class _ConfigView:
                         with ui.row().classes("items-center gap-1.5 mt-2"):
                             ui.icon("info").style("color: #aaa; font-size: 14px;")
                             ui.label(
-                                "Upload telbestanden om de beschikbare Brincodes te detecteren."
+                                "Upload telbestanden om de beschikbare instellingen te detecteren."
                             ).classes("text-xs").style("color: #aaa;")
 
     def _week_card(self) -> None:
@@ -377,6 +412,53 @@ class _ConfigView:
 
                     _week_tiles()
                     _horizon_hint()
+
+    def _min_training_year_card(self) -> None:
+        mc = self._config.setdefault("model_config", {})
+        current = mc.get("min_training_year", 2016)
+
+        with ui.card().classes("w-full mb-4"):
+            with ui.row().classes("items-start gap-4 no-wrap"):
+                with ui.element("div").classes(
+                    "w-12 h-12 rounded-xl flex items-center justify-center flex-none mt-1"
+                ).style(f"background: {theme.INFO}18"):
+                    ui.icon("history").style(f"color: {theme.INFO}; font-size: 22px;")
+                with ui.column().classes("gap-1 grow"):
+                    ui.label("Vroegste trainingsjaar").classes("text-base font-medium")
+                    ui.label(
+                        "Vanaf welk collegejaar telt data mee voor training? "
+                        "Oudere jaren worden genegeerd."
+                    ).classes("text-sm opacity-60 mt-1")
+
+                    inp = (
+                        ui.number(
+                            label="min_training_year",
+                            value=current,
+                            min=2000,
+                            max=2030,
+                            step=1,
+                        )
+                        .props("outlined")
+                        .classes("w-full max-w-xs mt-2")
+                    )
+                    inp.tooltip(HELP["min_training_year"])
+
+                    def _on_change(e) -> None:
+                        try:
+                            mc["min_training_year"] = int(e.value) if e.value is not None else 2016
+                        except (ValueError, TypeError):
+                            mc["min_training_year"] = 2016
+                        self._mark_dirty()
+
+                    inp.on_value_change(_on_change)
+
+                    with ui.row().classes("items-center gap-1.5 mt-2"):
+                        ui.icon("info").style("color: #aaa; font-size: 14px;")
+                        ui.label(
+                            f"Huidig traindata-bereik: {self._selectable_years[0] if self._selectable_years else 'onbekend'}–"
+                            f"{self._selectable_years[-1] if self._selectable_years else 'onbekend'} "
+                            f"(overlap telbestanden × oktober)."
+                        ).classes("text-xs").style("color: #aaa;")
 
     def _render_excl_year_chips(self) -> None:
         self._excl_years_chips.clear()
@@ -510,6 +592,8 @@ class _ConfigView:
         self._filtering_section()
         self._model_section()
         self._ensemble_section()
+        self._ensemble_override_section()
+        self._validation_section()
         self._nf_section()
         self._excl_section()
         self._runtime_section()
@@ -1092,6 +1176,245 @@ class _ConfigView:
             self._render_excl_rows()
             ui.button("Rij toevoegen", icon="add", on_click=self._add_excl_row).props("flat")
 
+    def _ensemble_override_section(self) -> None:
+        """Kaarten voor ensemble_override_cumulative en exclude_from_combined."""
+        override_list = self._config.setdefault("ensemble_override_cumulative", [])
+        exclude_list = self._config.setdefault("exclude_from_combined", [])
+
+        with ui.expansion(
+            f"Ensemble-overrides — {len(override_list) + len(exclude_list)} regel(s)",
+            icon="merge",
+            value=False,
+        ).classes("w-full mb-3").style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.SECONDARY}20; border-left: 4px solid {theme.SECONDARY}; "
+            f"box-shadow: 0 1px 6px rgba(61,104,236,0.08);"
+        ):
+            ui.label(
+                "Bepaal welke opleidingen altijd cumulatief moeten draaien of buiten het ensemble vallen. "
+                "Gebruik exacte programmasleutels (isatcode of naam zoals in je data)."
+            ).classes("text-sm opacity-60 mb-3")
+
+            # --- ensemble_override_cumulative ---
+            with ui.card().classes("w-full mb-3").style("border:1px solid #e8e8e8; box-shadow:none;"):
+                with ui.row().classes("items-center gap-2 mb-2"):
+                    ui.icon("stacked_line_chart").style(f"color:{theme.SECONDARY}")
+                    ui.label("Altijd cumulatief (ensemble_override_cumulative)").classes("text-sm font-semibold")
+                    ui.badge(f"{len(override_list)}").props("color=secondary outline").classes("text-xs")
+                ui.label(
+                    "Deze opleidingen gebruiken altijd het cumulatieve spoor, ook in modus 'beide'. "
+                    "Bijv. opleidingen met onbetrouwbare individuele data."
+                ).classes("text-xs opacity-50 mb-2")
+
+                self._override_container = ui.column().classes("w-full gap-1")
+                self._render_override_rows()
+
+                with ui.row().classes("items-center gap-2 mt-2"):
+                    self._new_override_input = (
+                        ui.input(placeholder="Isatcode of opleidingsnaam (bijv. 56604 of B Geneeskunde)")
+                        .props("dense outlined")
+                        .classes("grow")
+                    )
+                    ui.button("Toevoegen", icon="add", on_click=self._add_override).props("outline dense")
+
+            # --- exclude_from_combined ---
+            with ui.card().classes("w-full").style("border:1px solid #e8e8e8; box-shadow:none;"):
+                with ui.row().classes("items-center gap-2 mb-2"):
+                    ui.icon("block").style(f"color:{theme.NEGATIVE}")
+                    ui.label("Buiten ensemble (exclude_from_combined)").classes("text-sm font-semibold")
+                    ui.badge(f"{len(exclude_list)}").props("color=negative outline").classes("text-xs")
+                ui.label(
+                    "Deze opleidingen worden uitgesloten van het ensemble in modus 'beide'. "
+                    "Ze draaien wel in de losse sporen."
+                ).classes("text-xs opacity-50 mb-2")
+
+                self._exclude_combined_container = ui.column().classes("w-full gap-1")
+                self._render_exclude_combined_rows()
+
+                with ui.row().classes("items-center gap-2 mt-2"):
+                    self._new_exclude_input = (
+                        ui.input(placeholder="Isatcode of opleidingsnaam")
+                        .props("dense outlined")
+                        .classes("grow")
+                    )
+                    ui.button("Toevoegen", icon="add", on_click=self._add_exclude_combined).props("outline dense")
+
+    def _render_override_rows(self) -> None:
+        self._override_container.clear()
+        lst = self._config.get("ensemble_override_cumulative", [])
+        with self._override_container:
+            if not lst:
+                ui.label("Geen opleidingen ingesteld.").classes("text-sm opacity-40 italic py-1")
+                return
+            for val in lst:
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    # Toon met naam indien bekend
+                    label = self._programme_options.get(str(val), str(val))
+                    ui.label(label).classes("text-sm font-mono grow")
+                    ui.button(icon="delete", on_click=lambda v=val: self._remove_override(v)).props("flat round color=negative")
+
+    def _add_override(self) -> None:
+        raw = (self._new_override_input.value or "").strip()
+        if not raw:
+            ui.notify("Voer eerst een opleiding in.", type="warning")
+            return
+        lst = self._config.setdefault("ensemble_override_cumulative", [])
+        if raw in lst:
+            ui.notify(f"'{raw}' staat al in de lijst.", type="warning")
+            return
+        lst.append(raw)
+        self._new_override_input.set_value("")
+        self._render_override_rows()
+        self._mark_dirty()
+
+    def _remove_override(self, val: str) -> None:
+        lst = self._config.get("ensemble_override_cumulative", [])
+        if val in lst:
+            lst.remove(val)
+            self._render_override_rows()
+            self._mark_dirty()
+
+    def _render_exclude_combined_rows(self) -> None:
+        self._exclude_combined_container.clear()
+        lst = self._config.get("exclude_from_combined", [])
+        with self._exclude_combined_container:
+            if not lst:
+                ui.label("Geen opleidingen ingesteld.").classes("text-sm opacity-40 italic py-1")
+                return
+            for val in lst:
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    label = self._programme_options.get(str(val), str(val))
+                    ui.label(label).classes("text-sm font-mono grow")
+                    ui.button(icon="delete", on_click=lambda v=val: self._remove_exclude_combined(v)).props("flat round color=negative")
+
+    def _add_exclude_combined(self) -> None:
+        raw = (self._new_exclude_input.value or "").strip()
+        if not raw:
+            ui.notify("Voer eerst een opleiding in.", type="warning")
+            return
+        lst = self._config.setdefault("exclude_from_combined", [])
+        if raw in lst:
+            ui.notify(f"'{raw}' staat al in de lijst.", type="warning")
+            return
+        lst.append(raw)
+        self._new_exclude_input.set_value("")
+        self._render_exclude_combined_rows()
+        self._mark_dirty()
+
+    def _remove_exclude_combined(self, val: str) -> None:
+        lst = self._config.get("exclude_from_combined", [])
+        if val in lst:
+            lst.remove(val)
+            self._render_exclude_combined_rows()
+            self._mark_dirty()
+
+    def _validation_section(self) -> None:
+        """Datakwaliteitsdrempels (validation) bewerkbaar maken."""
+        validation = self._config.setdefault("validation", {})
+        tel_val = validation.setdefault("telbestand", {})
+
+        # Top-level thresholds met defaults uit _DEFAULT_VALIDATION_CFG indien mogelijk
+        try:
+            from studentprognose.data.validation import _DEFAULT_VALIDATION_CFG
+
+            defaults = _DEFAULT_VALIDATION_CFG
+        except Exception:
+            defaults = {
+                "nan_warning_threshold": 0.05,
+                "nan_error_threshold": 0.30,
+                "collegejaar_min_offset": 15,
+                "collegejaar_max_offset": 2,
+                "weeknummer_min": 1,
+                "weeknummer_max": 53,
+            }
+
+        with ui.expansion(
+            "Validatie & datakwaliteit",
+            icon="verified_user",
+            value=False,
+        ).classes("w-full mb-3").style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.POSITIVE}20; border-left: 4px solid {theme.POSITIVE}; "
+            f"box-shadow: 0 1px 6px rgba(0,175,129,0.08);"
+        ):
+            ui.label(
+                "Drempels voor datakwaliteitscontroles. Overschrijft package-defaults. "
+                "Leeg laten = default gebruiken. Deze waarden bepalen wanneer de pipeline waarschuwt of stopt."
+            ).classes("text-sm opacity-60 mb-3")
+
+            with ui.grid(columns=2).classes("w-full gap-4 mb-4"):
+                # NaN thresholds
+                for key, label, min_v, max_v, step in [
+                    ("nan_warning_threshold", "NaN waarschuwing (0–1)", 0.0, 1.0, 0.01),
+                    ("nan_error_threshold", "NaN foutdrempel (0–1)", 0.0, 1.0, 0.01),
+                    ("collegejaar_min_offset", "Collegejaar min offset (jaren terug)", 1, 50, 1),
+                    ("collegejaar_max_offset", "Collegejaar max offset (jaren vooruit)", 0, 10, 1),
+                    ("weeknummer_min", "Weeknummer min", 1, 53, 1),
+                    ("weeknummer_max", "Weeknummer max", 1, 53, 1),
+                ]:
+                    val = validation.get(key, defaults.get(key))
+                    inp = ui.number(label=label, value=val, min=min_v, max=max_v, step=step).props("outlined dense").classes("w-full")
+                    def _make_handler(k, inp_ref):
+                        def _on_change(e) -> None:
+                            if e.value is None:
+                                validation.pop(k, None)
+                            else:
+                                validation[k] = float(e.value) if "nan_" in k else int(e.value)
+                            self._mark_dirty()
+                        return _on_change
+                    inp.on_value_change(_make_handler(key, inp))
+
+            ui.separator().classes("my-3")
+
+            ui.label("Telbestand-validatie").classes("text-sm font-semibold mb-2")
+            with ui.grid(columns=2).classes("w-full gap-4"):
+                sep_val = tel_val.get("separator", defaults.get("telbestand", {}).get("separator", ";"))
+                sep_inp = ui.input(label="Separator (telbestand)", value=sep_val).props("outlined dense").classes("w-full")
+                def _on_sep(e) -> None:
+                    if not e.value:
+                        tel_val.pop("separator", None)
+                    else:
+                        tel_val["separator"] = e.value
+                    self._mark_dirty()
+                sep_inp.on_value_change(_on_sep)
+
+                prog_col = tel_val.get("programme_column", defaults.get("telbestand", {}).get("programme_column", "Groepeernaam"))
+                prog_inp = ui.input(label="Programme column", value=prog_col).props("outlined dense").classes("w-full")
+                def _on_prog(e) -> None:
+                    if not e.value:
+                        tel_val.pop("programme_column", None)
+                    else:
+                        tel_val["programme_column"] = e.value
+                    self._mark_dirty()
+                prog_inp.on_value_change(_on_prog)
+
+            with ui.column().classes("w-full gap-2 mt-3"):
+                ui.label("Herkomst toegestaan (komma-gescheiden)").classes("text-xs opacity-60")
+                herkomst_allowed = tel_val.get("herkomst_allowed", defaults.get("telbestand", {}).get("herkomst_allowed", ["N", "E", "R"]))
+                herk_str = ", ".join(herkomst_allowed) if isinstance(herkomst_allowed, list) else str(herkomst_allowed)
+                herk_inp = ui.input(value=herk_str, placeholder="N, E, R").props("outlined dense").classes("w-full")
+                def _on_herk(e) -> None:
+                    if not e.value:
+                        tel_val.pop("herkomst_allowed", None)
+                    else:
+                        vals = [v.strip() for v in e.value.split(",") if v.strip()]
+                        tel_val["herkomst_allowed"] = vals
+                    self._mark_dirty()
+                herk_inp.on_value_change(_on_herk)
+
+                ui.label("Vereiste kolommen (komma-gescheiden)").classes("text-xs opacity-60 mt-2")
+                req_cols = tel_val.get("required_columns", defaults.get("telbestand", {}).get("required_columns", []))
+                req_str = ", ".join(req_cols) if isinstance(req_cols, list) else str(req_cols)
+                req_inp = ui.input(value=req_str).props("outlined dense").classes("w-full")
+                def _on_req(e) -> None:
+                    if not e.value:
+                        tel_val.pop("required_columns", None)
+                    else:
+                        vals = [v.strip() for v in e.value.split(",") if v.strip()]
+                        tel_val["required_columns"] = vals
+                    self._mark_dirty()
+                req_inp.on_value_change(_on_req)
+
     def _runtime_section(self) -> None:
         ci = self._config.setdefault("cumulative_input", {})
         runtime = self._config.setdefault("runtime", {})
@@ -1308,11 +1631,10 @@ class _ConfigView:
         ):
             ui.icon("data_object").classes("text-xl opacity-40")
             with ui.column().classes("gap-0 grow"):
-                ui.label("JSON-overzicht").classes("font-medium text-sm")
+                ui.label("JSON-editor (bewerkbaar)").classes("font-medium text-sm")
                 ui.label(
-                    "Bekijk je volledige configuratie als boom: klik ▶ om secties "
-                    "open/dicht te klappen. Wijzigingen doe je in de tabbladen "
-                    "Basis en Geavanceerd — die worden direct opgeslagen."
+                    "Bewerk je volledige configuratie direct. Wijzigingen worden gevalideerd voordat ze worden opgeslagen. "
+                    "Gebruik dit als vangnet voor alle secties, inclusief plumbing (paths, column_roles, model_features)."
                 ).classes("text-sm opacity-50")
 
         with ui.row().classes("items-center gap-2 mb-3"):
@@ -1320,6 +1642,27 @@ class _ConfigView:
             ui.label(self._path).classes("text-xs font-mono opacity-40 break-all")
 
         ui.html('<div id="sp-json-ed"></div>')
+
+        # Opslaan-knop + status
+        with ui.row().classes("w-full items-center gap-3 mt-3"):
+            self._json_save_btn = ui.button("Opslaan uit JSON", icon="save", on_click=self._on_json_save).props("unelevated color=accent")
+            self._json_status = ui.label("").classes("text-xs opacity-60")
+            ui.button("Herstel", icon="restart_alt", on_click=self._run_json_editor_init).props("flat dense color=grey-7").tooltip("Herstel naar laatste opgeslagen versie")
+
+        # JS → Python bridge voor JSON-editor
+        ui.add_body_html("""
+<script>
+function _spGetJson() {
+  try {
+    if (!window.__spJE) return null;
+    return window.__spJE.get();
+  } catch(e) {
+    return {__error: String(e)};
+  }
+}
+</script>
+""")
+        ui.on("sp_json_save", self._handle_json_save_event)
 
         self._run_json_editor_init()
 
@@ -1354,6 +1697,64 @@ class _ConfigView:
             }})(15);
             """
         )
+        if hasattr(self, "_json_status"):
+            self._json_status.set_text("")
+
+    def _on_json_save(self) -> None:
+        """Vraag de JSON-editor om zijn inhoud via JS en emit naar Python."""
+        ui.run_javascript(
+            """
+            (function(){
+              const data = _spGetJson();
+              if (data === null) {
+                emitEvent('sp_json_save', {ok:false, error:'Editor niet geladen'});
+                return;
+              }
+              emitEvent('sp_json_save', {ok:true, data:data});
+            })();
+            """
+        )
+
+    def _handle_json_save_event(self, e) -> None:
+        args = e.args
+        if not args.get("ok"):
+            ui.notify(f"JSON-editor fout: {args.get('error','onbekend')}", type="negative")
+            return
+        data = args.get("data")
+        if isinstance(data, dict) and "__error" in data:
+            ui.notify(f"JSON-editor fout: {data['__error']}", type="negative")
+            return
+        if not isinstance(data, dict):
+            ui.notify("JSON moet een object zijn.", type="negative")
+            return
+
+        # Validatie via bestaande config_io
+        errors = config_io.validate_config(data)
+        if errors:
+            for err in errors:
+                ui.notify(err, type="negative")
+            self._json_status.set_text("Validatiefout — niet opgeslagen")
+            self._json_status.style(f"color:{theme.NEGATIVE}")
+            return
+
+        try:
+            config_io.save_config(self._path, data)
+        except Exception as exc:
+            ui.notify(f"Opslaan mislukt: {exc}", type="negative")
+            self._json_status.set_text("Opslaan mislukt")
+            self._json_status.style(f"color:{theme.NEGATIVE}")
+            return
+
+        # Sync interne state
+        self._config = data
+        self._nf_rows = [
+            {"key": k, "value": v} for k, v in self._config.setdefault("numerus_fixus", {}).items()
+        ]
+        self._excl_rows = [dict(item) for item in self._config.setdefault("excluded_data_points", [])]
+        STATE.config_saved = True
+        ui.notify("Configuratie opgeslagen via JSON-editor.", type="positive")
+        self._json_status.set_text("Opgeslagen ✓")
+        self._json_status.style(f"color:{theme.POSITIVE}")
 
     # ─── Validatie & opslaan ──────────────────────────────────────────────────
 

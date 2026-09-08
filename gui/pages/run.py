@@ -19,6 +19,9 @@ from gui.components.states import empty_state, section_title
 from gui.data_upload import DataYearBounds, scan_data_year_bounds
 from gui.state import STATE
 
+import json as _json
+import os as _os
+
 #: Sleutel waaronder de laatst gebruikte parameters bewaard worden.
 _STORAGE_KEY = "run_settings"
 
@@ -224,6 +227,41 @@ class _RunView:
             f"en het oktober-bestand ({b.okt_years[0]}–{b.okt_years[-1]})."
         )
 
+    def _load_excluded_years(self) -> list[int]:
+        """Lees uitgesloten jaren uit de projectconfiguratie."""
+        if not STATE.is_initialised or not STATE.config_path:
+            return []
+        cfg: dict = {}
+        try:
+            # Probeer via config_io, maar fallback direct naar JSON zodat de
+            # pagina ook werkt zonder zware deps (statsforecast) in de env.
+            from gui import config_io as _config_io
+
+            cfg = _config_io.load_config(STATE.config_path)
+        except Exception:
+            try:
+                with open(STATE.config_path, encoding="utf-8") as f:
+                    cfg = _json.load(f)
+            except Exception:
+                return []
+        excl = cfg.get("excluded_data_points", [])
+        years = set()
+        for item in excl:
+            if isinstance(item, dict) and "year" in item:
+                try:
+                    years.add(int(item["year"]))
+                except (ValueError, TypeError):
+                    continue
+        return sorted(years)
+
+    def _excluded_caption(self) -> tuple[str, str]:
+        """Return (tekst, kleur) voor de uitgesloten jaren banner."""
+        years = self._load_excluded_years()
+        if not years:
+            return ("Geen jaren uitgesloten — alle trainingsjaren tellen mee.", theme.POSITIVE)
+        year_str = ", ".join(str(y) for y in years)
+        return (f"Uitgesloten jaren: {year_str} — deze jaren worden niet meegenomen in de training.", theme.WARNING)
+
     # ── UI-opbouw ────────────────────────────────────────────────────────────
 
     def _build(self) -> None:
@@ -363,6 +401,20 @@ class _RunView:
                 ui.label(self._range_caption()).classes(
                     "text-xs opacity-70 leading-snug"
                 )
+
+        # ── Uitgesloten jaren (transparantie bij starten) ─────────────────────
+        excl_text, excl_color = self._excluded_caption()
+        with ui.card().classes("w-full").style(f"border-left:4px solid {excl_color};"):
+            with ui.row().classes("items-center gap-2 w-full no-wrap"):
+                ui.icon("block").classes("text-lg flex-none").style(f"color:{excl_color}")
+                with ui.column().classes("gap-0 grow"):
+                    ui.label("Uitgesloten jaren").classes("text-sm font-medium")
+                    ui.label(excl_text).classes("text-xs opacity-70 leading-snug")
+                ui.button(
+                    "Aanpassen",
+                    icon="edit",
+                    on_click=lambda: ui.navigate.to("/config"),
+                ).props("flat dense color=grey-7").tooltip("Ga naar Configuratie → Uitsluitingsregels")
 
         # ── Live command-preview ──────────────────────────────────────────────
         with ui.card().classes("w-full bg-grey-2"):

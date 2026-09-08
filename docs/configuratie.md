@@ -102,6 +102,8 @@ De landelijke Studielink-teldata bevat rijen van **álle** instellingen (elke Br
 - **Standaard (`[]`):** geen filter — **alle instellingen** in de data worden meegenomen. Dit is het backwards-compatibele default-gedrag.
 - Meerdere instellingen: `["21PC", "00IC"]`.
 
+In de [grafische interface](gui.md) (tab **Basis** → *Jouw instelling*) toont de keuzelijst de **instellingsnaam** in plaats van alleen de kale Brincode, bijvoorbeeld *Hogeschool Utrecht (25DW)*. Achter de schermen wordt de Brincode opgeslagen. Onbekende codes vallen terug op de kale code (geen crash).
+
 Het filter grijpt aan op **load-tijd**, vóór preprocessing, zodat zowel de training als de voorspelling op de gekozen instelling(en) draaien.
 
 !!! info "Welke sporen worden gefilterd?"
@@ -128,7 +130,7 @@ Een lijst van opleidingsnamen (op `Croho groepeernaam`) waarvoor de ensemble-log
 
 Gebruik dit voor opleidingen met een numerus fixus of een sterk afwijkend aanmeldpatroon waarbij het cumulatieve SARIMA-model aantoonbaar beter presteert. Lege lijst (`[]`) schakelt de uitzondering uit voor alle opleidingen.
 
-De waarden in de demo-configuratie zijn Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.**
+De waarden in de demo-configuratie zijn Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.** In de [grafische interface](gui.md) (tab **Geavanceerd** → *Ensemble-overrides*) kun je deze lijst bewerken via een zoekbare opleidingskeuzelijst.
 
 ## `exclude_from_combined` — uitsluiting van combined-modus
 
@@ -144,9 +146,30 @@ Een lijst van opleidingsnamen (op `Croho groepeernaam`) die worden overgeslagen 
 
 Gebruik dit voor opleidingen waarvoor de combined-modus aantoonbaar slechter werkt dan het cumulatieve spoor alleen. Lege lijst schakelt de uitsluiting uit.
 
-De waarde in de demo-configuratie is Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.**
+De waarde in de demo-configuratie is Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.** In de [grafische interface](gui.md) (tab **Geavanceerd** → *Ensemble-overrides*) kun je deze lijst bewerken via een zoekbare opleidingskeuzelijst.
+
+## `validation` — datakwaliteitsdrempels
+
+Overschrijft de standaard validatiedrempels uit `studentprognose/data/validation.py`. Je hoeft alleen afwijkende waarden op te nemen:
+
+```json
+{
+    "validation": {
+        "nan_error_threshold": 0.20,
+        "telbestand": {
+            "herkomst_allowed": ["N", "E", "R", "O"]
+        }
+    }
+}
+```
+
+In de [grafische interface](gui.md) (tab **Geavanceerd** → *Validatie & datakwaliteit*) kun je deze drempels bewerken: NaN-waarschuwing/fout, collegejaar-offsets, weeknummer-bereik en telbestand-specifieke instellingen (separator, programme-kolom, vereiste kolommen, toegestane herkomst). Leeg laten = package-default gebruiken.
+
+## `model_config.min_training_year`
+
+Vroegste collegejaar dat als trainingsdata meetelt. In de GUI (tab **Basis** → *Vroegste trainingsjaar*) bewerkbaar als numeriek veld. Bepaalt samen met de overlap tussen telbestanden en oktober-bestand het effectieve traindata-bereik dat je op de **Uitvoeren**-pagina ziet.
 
 ## Overige secties (referentie)
 
-Alle secties met **Zelden** of **Nee** in de tabel hierboven — paden, kolomnamen, modelparameters, validatiedrempels, ensemble-gewichten — staan op de aparte pagina **[Configuratie — referentie](configuratie-referentie.md)**. Je hebt ze voor een gewone run niet nodig.
+Alle secties met **Zelden** of **Nee** in de tabel hierboven — paden, kolomnamen, modelparameters, validatiedrempels, ensemble-gewichten — staan op de aparte pagina **[Configuratie — referentie](configuratie-referentie.md)**. Je hebt ze voor een gewone run niet nodig. De **JSON**-tab in de grafische interface is volledig bewerkbaar en fungeert als vangnet voor alle secties, inclusief plumbing (`paths`, `column_roles`, `model_features`).
 

@@ -66,9 +66,22 @@ De interface leidt je langs vijf stappen, in volgorde:
    tabel te zien met verwachte kolomnamen, beschrijvingen en voorbeeldwaarden.
 2. **Configuratie** — stel de modelparameters en paden in. Wijzigingen worden
    kort na het typen automatisch bewaard; met **"Volgende"** sla je expliciet op
-   en ga je door naar de volgende stap.
+   en ga je door naar de volgende stap. De **Basis**-tab bevat je instelling
+   (met naam, bijv. *Hogeschool Utrecht (25DW)* in plaats van kale code),
+   het einde van het academisch jaar en het vroegste trainingsjaar
+   (`min_training_year`). De **Geavanceerd**-tab biedt kaarten voor
+   modelkeuze, ensemble-gewichten, **ensemble-overrides**
+   (`ensemble_override_cumulative` en `exclude_from_combined`),
+   **validatie-drempels** (`validation.telbestand` en NaN/jaar-offsets),
+   numerus fixus en uitsluitingsregels. De **JSON**-tab is volledig bewerkbaar:
+   je kunt de hele configuratie als boom of code aanpassen, met validatie
+   voordat wordt opgeslagen — een vangnet voor alle secties inclusief
+   plumbing (`paths`, `column_roles`, `model_features`).
 3. **Filteren** — bepaal op welke opleidingen, herkomst en examentypes je draait.
-4. **Uitvoeren** — start de voorspelling en volg de voortgang live.
+4. **Uitvoeren** — start de voorspelling en volg de voortgang live. Toont
+   expliciet welke jaren zijn uitgesloten (bijv. *Uitgesloten jaren: 2020, 2021*
+   of *Geen jaren uitgesloten*) zodat je bij het starten ziet wat er wel en
+   niet in de training zit.
 5. **Resultaten** — bekijk een overzicht van de voorspellingen.
 
 Nieuwe gebruikers volgen deze stappen van boven naar beneden; de stap-indicator
