@@ -81,7 +81,6 @@ BRINCODE_NAMES: dict[str, str] = {
     "22ND": "Internationale Agrarische Hogeschool Larenstein",
     "24LE": "Van Hall Instituut",
     "28DE": "Hogeschool van Amsterdam (oud)",
-    "30GB": "Fontys Hogeschool",
 }
 
 
