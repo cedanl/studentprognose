@@ -84,6 +84,17 @@ def validate_config(config: dict) -> list[str]:
     return errors
 
 
+def excluded_years(excluded_data_points: list[dict]) -> list[int]:
+    """Geef de gesorteerde, unieke jaren terug die in uitsluitingsregels voorkomen.
+
+    Een regel telt mee zodra hij een ``year`` bevat, ook als hij daarnaast op
+    herkomst/examentype/opleiding filtert (partiële uitsluiting binnen dat
+    jaar) — zelfde groepering als de jaar-chips in de configuratie-editor.
+    """
+    years = {row["year"] for row in excluded_data_points if row.get("year") is not None}
+    return sorted(years)
+
+
 def parse_json(text: str) -> dict:
     """Parse een JSON-string naar een dict.
 

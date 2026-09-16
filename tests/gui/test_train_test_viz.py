@@ -61,6 +61,31 @@ def test_render_v1_reflects_overlap_not_2016():
     assert "2016" not in html
 
 
+# ── render_v1: uitgesloten-jaren markers (#284) ─────────────────────────────
+
+
+def test_render_v1_marks_excluded_years_within_training():
+    html = tvz.render_v1(
+        "2026", 0, data_start=2020, data_end=2025, excluded_years=[2020, 2021]
+    )
+    assert "Uitgesloten van training: 2020, 2021" in html
+    assert html.count("uitgesloten van training") == 2  # één marker per jaar
+
+
+def test_render_v1_ignores_excluded_years_outside_training_range():
+    """Een uitgesloten jaar buiten het traindata-bereik krijgt geen marker."""
+    html = tvz.render_v1(
+        "2026", 0, data_start=2020, data_end=2025, excluded_years=[2010]
+    )
+    assert "Uitgesloten van training" not in html
+
+
+def test_render_v1_without_excluded_years_has_no_marker():
+    html = tvz.render_v1("2026", 0, data_start=2020, data_end=2025)
+    assert "Uitgesloten van training" not in html
+    assert "uitgesloten van training" not in html
+
+
 # ── scan_data_year_bounds: overlap uit projectbestanden ─────────────────────
 
 
