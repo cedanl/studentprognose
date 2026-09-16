@@ -130,6 +130,9 @@ Gebruik dit voor opleidingen met een numerus fixus of een sterk afwijkend aanmel
 
 De waarden in de demo-configuratie zijn Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.**
 
+!!! tip "In de grafische interface bewerk je deze lijst via een kaart"
+    Werk je via de [grafische interface](gui.md), dan biedt de tab **Geavanceerd** een kaart *Ensemble-uitzondering* met dezelfde zoekbare opleiding-keuzelijst als bij *Numerus fixus*. Anders dan bij numerus fixus accepteert deze keuzelijst zowel een Isatcode als een vrij getypte opleidingsnaam, omdat deze sectie historisch op de naam kan keyen.
+
 ## `exclude_from_combined` — uitsluiting van combined-modus
 
 Een lijst van opleidingsnamen (op `Croho groepeernaam`) die worden overgeslagen in de combined-modus (`-d both`). Opleidingen op deze lijst worden niet meegenomen in de combined-voorspelling.
@@ -146,7 +149,13 @@ Gebruik dit voor opleidingen waarvoor de combined-modus aantoonbaar slechter wer
 
 De waarde in de demo-configuratie is Radboud-specifiek. **Vervang of maak deze lijst leeg voor je eigen instelling.**
 
+!!! tip "In de grafische interface bewerk je deze lijst via een kaart"
+    Werk je via de [grafische interface](gui.md), dan biedt de tab **Geavanceerd** een kaart *Uitgesloten van combined-modus* met dezelfde zoekbare opleiding-keuzelijst (Isatcode of vrij getypte naam).
+
 ## Overige secties (referentie)
 
 Alle secties met **Zelden** of **Nee** in de tabel hierboven — paden, kolomnamen, modelparameters, validatiedrempels, ensemble-gewichten — staan op de aparte pagina **[Configuratie — referentie](configuratie-referentie.md)**. Je hebt ze voor een gewone run niet nodig.
+
+!!! tip "`validation.telbestand` en de JSON-tab zijn ook via de grafische interface bewerkbaar"
+    In de [grafische interface](gui.md) biedt de tab **Geavanceerd** een kaart *Validatie — telbestand* voor het scheidingsteken, de programmakolom, de toegestane herkomstcodes en de verplichte kolommen van `validation.telbestand` (zie [Configuratie — referentie](configuratie-referentie.md#validation-validatiedrempels-overschrijven)). Secties zonder eigen formulierkaart — zoals `model_features`, `columns` of `cumulative_input` — bewerk je rechtstreeks in het tabblad **JSON**; die is schrijfbaar en valideert vóór het opslaan.
 
