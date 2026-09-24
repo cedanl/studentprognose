@@ -58,7 +58,7 @@ def build_zip(
                 for root, _dirs, files in os.walk(member_path):
                     for name in sorted(files):
                         full = os.path.join(root, name)
-                        arcname = os.path.relpath(full, source_dir)
+                        arcname = os.path.relpath(full, source_dir).replace(os.sep, "/")
                         zf.write(full, arcname)
                         written.append(arcname)
             else:
