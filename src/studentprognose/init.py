@@ -31,16 +31,32 @@ Draai daarna `studentprognose` om de ETL te starten en voorspellingen te generer
 _NEXT_STEPS_DEMO = """\
 Demodata staat in data/input_raw/. Draai nu:
 
+  studentprognose -d b -y 2024      # beide sporen, collegejaar 2024
+
+Of met een dashboard:
+
+  studentprognose -d b -y 2024 --dashboard
+
+De demodata bevat zowel telbestanden (cumulatief spoor) als individuele
+aanmelddata (individueel spoor), dus -d c, -d i en -d b werken allemaal.
+Zie: https://cedanl.github.io/studentprognose/je-data-voorbereiden/
+"""
+
+_NEXT_STEPS_DEMO_CUMULATIVE = """\
+Demodata staat in data/input_raw/. Draai nu:
+
   studentprognose -d c -y 2024      # cumulatief spoor, collegejaar 2024
 
 Of met een dashboard:
 
   studentprognose -d c -y 2024 --dashboard
 
-De demodata bevat alleen telbestanden (cumulatief spoor). Voor het individuele
+Deze demodata bevat alleen telbestanden (cumulatief spoor). Voor het individuele
 spoor (-d i of -d b) heb je eigen individuele aanmelddata nodig.
 Zie: https://cedanl.github.io/studentprognose/je-data-voorbereiden/
 """
+
+_INDIVIDUAL_DEMO_FILE = "individuele_aanmelddata.csv"
 
 _NEXT_STEPS_OWN = """\
 Volgende stappen:
@@ -73,7 +89,7 @@ def _ask_demo() -> bool:
         return False
     try:
         antwoord = input(
-            "\nWil je demodata downloaden om direct te starten? (4 MB, ~10 sec) [j/n]: "
+            "\nWil je demodata downloaden om direct te starten? (6 MB, ~10 sec) [j/n]: "
         ).strip().lower()
         return antwoord in ("j", "ja", "y", "yes")
     except (EOFError, KeyboardInterrupt):
@@ -120,6 +136,24 @@ def _download_demo(cwd: str) -> bool:
             os.remove(zip_path)
 
 
+def _demo_next_steps(cwd: str) -> str:
+    """Kies de vervolgstappen op basis van de daadwerkelijk gedownloade demodata.
+
+    Oudere releases leveren een demo-data.zip zonder individuele aanmelddata;
+    dan verwijzen we alleen naar het cumulatieve spoor.
+
+    Args:
+        cwd: Projectmap waarin `init` draait.
+
+    Returns:
+        De tekst met vervolgstappen.
+    """
+    individual = os.path.join(cwd, "data", "input_raw", _INDIVIDUAL_DEMO_FILE)
+    if os.path.exists(individual):
+        return _NEXT_STEPS_DEMO
+    return _NEXT_STEPS_DEMO_CUMULATIVE
+
+
 def run_init():
     cwd = os.getcwd()
 
@@ -162,6 +196,6 @@ def run_init():
 
     print()
     if demo_downloaded:
-        print(_NEXT_STEPS_DEMO)
+        print(_demo_next_steps(cwd))
     else:
         print(_NEXT_STEPS_OWN)

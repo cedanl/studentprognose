@@ -23,7 +23,7 @@ Dit schrijft de configuratie en mapstructuur:
 - `data/input_raw/README.md` — beschrijving van welke bestanden hier horen
 - `data/output/` — map voor de output én de doorlopende audittrail (`_totaal_*.xlsx`)
 
-Daarna vraagt `init` of je **demodata wilt downloaden** (4 MB telbestanden + studentaantallen) zodat je direct kunt draaien zonder eigen data. Kies `n` als je meteen je eigen data wilt gebruiken.
+Daarna vraagt `init` of je **demodata wilt downloaden** (6 MB: telbestanden, individuele aanmelddata én studentaantallen — beide sporen) zodat je direct kunt draaien zonder eigen data. Kies `n` als je meteen je eigen data wilt gebruiken.
 
 Bestaat een bestand al, dan wordt het overgeslagen; je kunt `init` veilig opnieuw draaien. Eigen data klaarzetten doe je op [Je data klaarzetten](je-data-voorbereiden.md).
 

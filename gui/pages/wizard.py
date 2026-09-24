@@ -1307,7 +1307,7 @@ class _WizardView:
             self._confirm_path = ui.label().classes("text-sm font-mono opacity-60 mb-2")
             with ui.row().classes("items-center gap-4 flex-wrap"):
                 self._demo_checkbox = ui.checkbox(
-                    "Demo Studielink-data downloaden (≈4 MB)",
+                    "Demo Studielink-data downloaden (≈6 MB, beide sporen)",
                     value=False,
                 )
                 # Vertikale scheidingslijn

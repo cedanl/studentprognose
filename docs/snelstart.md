@@ -12,12 +12,12 @@ mkdir mijn-prognose && cd mijn-prognose
 studentprognose init
 ```
 
-`init` maakt de mapstructuur en een `configuration/configuration.json` met alle standaardwaarden. Aan het einde vraagt het of je demodata wilt downloaden (4 MB):
+`init` maakt de mapstructuur en een `configuration/configuration.json` met alle standaardwaarden. Aan het einde vraagt het of je demodata wilt downloaden (6 MB, telbestanden + individuele aanmelddata):
 
 ```
-Wil je demodata downloaden om direct te starten? (4 MB, ~10 sec) [j/n]: j
+Wil je demodata downloaden om direct te starten? (6 MB, ~10 sec) [j/n]: j
   Downloaden...
-  demo-data.zip: 4.30MB [00:08, 512kB/s]
+  demo-data.zip: 5.60MB [00:08, 700kB/s]
   Uitpakken...
   Demodata geïnstalleerd in data/input_raw/ ✓
 ```
@@ -38,13 +38,13 @@ Wat er op het scherm verschijnt:
   Bestand                                     Status    Nodig voor
   ──────────────────────────────────────────────────────────────────
   data/input_raw/telbestanden                 ✓         -d cumulative, -d both
-  data/input_raw/individuele_aanmelddata.csv  ✗         -d individual, -d both
+  data/input_raw/individuele_aanmelddata.csv  ✓         -d individual, -d both
   data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (optioneel)
 
   Beschikbare modi:
     -d cumulative      ✓
-    -d individual      ✗  data/input_raw/individuele_aanmelddata.csv ontbreekt
-    -d both            ✗  data/input_raw/individuele_aanmelddata.csv ontbreekt
+    -d individual      ✓
+    -d both            ✓
 
 ==== Processing raw input data ====
 [1/4] Rowbinding telbestanden...        → data/input/vooraanmeldingen_cumulatief.csv
@@ -69,8 +69,7 @@ Saving output...
 ```
 
 !!! note "Waarschuwingen zijn normaal bij de demodata"
-    - **Individuele data ontbreekt** — de demodata bevat alleen telbestanden. `-d c` werkt prima; voor `-d b` of `-d i` heb je eigen individuele aanmelddata nodig.
-    - **Zomergaten** — week 35–40 ontbreken in de telbestanden (Studielink levert in die periode niet). Ook deze waarschuwingen kun je negeren.
+    - **Zomergaten** — week 35–40 ontbreken in de telbestanden (Studielink levert in die periode niet). Deze waarschuwing kun je negeren.
 
 Een run duurt op de demodata typisch **2–4 minuten**, afhankelijk van je machine.
 

@@ -14,7 +14,7 @@ studentprognose init              # projectmap aanmaken + optioneel demodata dow
 studentprognose -d c -y 2024      # eerste prognose (cumulatief spoor)
 ```
 
-`init` vraagt of je **demodata** wilt downloaden (4 MB) zodat je direct kunt starten zonder eigen data. Details in **[Installeren](installeren.md)** en de **[Snelstart](snelstart.md)** (5 minuten).
+`init` vraagt of je **demodata** wilt downloaden (6 MB, beide sporen) zodat je direct kunt starten zonder eigen data. Details in **[Installeren](installeren.md)** en de **[Snelstart](snelstart.md)** (5 minuten).
 
 ## Wat doet de tool?
 
