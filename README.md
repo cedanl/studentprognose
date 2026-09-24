@@ -66,7 +66,7 @@ studentprognose init           # mapstructuur aanmaken + demodata downloaden (op
 studentprognose -d c -y 2024   # eerste prognose op demodata
 ```
 
-`init` vraagt of je demodata wilt downloaden (4 MB) zodat je direct kunt starten. Kies `n` als je meteen je eigen data wilt gebruiken.
+`init` vraagt of je demodata wilt downloaden (6 MB, beide sporen) zodat je direct kunt starten. Kies `n` als je meteen je eigen data wilt gebruiken.
 
 Voor geautomatiseerde runs (cron, taakplanner) — sla de interactieve prompt over:
 
@@ -90,7 +90,7 @@ Dit model is gebouwd voor **data-analisten bij Nederlandse onderwijsinstellingen
 | **Bring Your Own Data** | Je levert je eigen data aan — er wordt niets extern gedeeld |
 | **Privacy-vriendelijk** | Draait volledig lokaal op je eigen machine |
 | **Open source** | Transparant, aanpasbaar en gratis te gebruiken |
-| **Demodata via init** | Direct uitproberen zonder eigen data — `studentprognose init` downloadt 4 MB demodata op aanvraag |
+| **Demodata via init** | Direct uitproberen zonder eigen data — `studentprognose init` downloadt 6 MB demodata (beide sporen) op aanvraag |
 
 ---
 
