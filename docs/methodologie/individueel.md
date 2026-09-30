@@ -111,7 +111,7 @@ Trainingsdata vóór `min_training_year` wordt bewust weggelaten omdat oudere co
 - **Intrekking = niet ingeschreven** — studenten die hun aanmelding vóór de voorspelweek introkken tellen als label 0.
 - **Eerstejaars-filter is correct** — `Is eerstejaars croho opleiding == 1` definieert de doelgroep. Hogerejaars en BBC-ontvangers (al ingeschreven elders) worden expliciet uitgesloten.
 
-Welke features in de praktijk het zwaarst meewegen is per cohort verschillend; de gegroepeerde feature importance (één balk per oorspronkelijke kolom, ook na one-hot encoding) staat in het interactieve dashboard en als losse grafiek op de [XGBoost-pagina](xgboost.md#feature-importance). Zie [XGBoost](xgboost.md) voor verdere technische details over de classifier (alternatieve modellen, configuratie).
+Welke features in de praktijk het zwaarst meewegen is per cohort verschillend; hoe de gegroepeerde feature importance (één balk per oorspronkelijke kolom, ook na one-hot encoding) eruitziet, staat op de [XGBoost-pagina](xgboost.md#feature-importance). Zie [XGBoost](xgboost.md) voor verdere technische details over de classifier (alternatieve modellen, configuratie).
 
 ## Stap 3 — Aggregatie en SARIMA-extrapolatie
 

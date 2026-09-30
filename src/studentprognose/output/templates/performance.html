@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cumulatief model</title>
+<title>__TITLE__</title>
 <style>
 :root {
   color-scheme: light;
@@ -19,6 +19,8 @@
   --history-strong: #a9a79f;
   --series-1: #2a78d6;
   --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-ens: #e87ba4;
   --baseline: #898781;
   --good: #006300;
   --bad: #b3261e;
@@ -46,6 +48,8 @@
     --history-strong: #6b6a64;
     --series-1: #3987e5;
     --series-2: #d95926;
+    --series-3: #199e70;
+    --series-ens: #d55181;
     --baseline: #8d8b85;
     --good: #0ca30c;
     --bad: #e66767;
@@ -66,6 +70,8 @@
   --history-strong: #6b6a64;
   --series-1: #3987e5;
   --series-2: #d95926;
+  --series-3: #199e70;
+  --series-ens: #d55181;
   --baseline: #8d8b85;
   --good: #0ca30c;
   --bad: #e66767;
@@ -190,6 +196,10 @@ details.help dt { font-weight: 600; color: var(--text); }
 .grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
 footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
 [hidden] { display: none !important; }
+.sections { display: flex; flex-direction: column; }
+.grid-2 > .span-2 { grid-column: 1 / -1; }
+.forecast-tiles .tile .value { font-size: 32px; }
+code.plain { background: none; padding: 0; }
 @media (max-width: 860px) {
   .tiles { grid-template-columns: repeat(2, 1fr); }
   .grid-2 { grid-template-columns: 1fr; }
@@ -208,24 +218,28 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
 <div class="wrap">
   <nav aria-label="Dashboardpagina's">__NAV__</nav>
   <header>
-    <h1>Cumulatief model</h1>
+    <h1 id="page-title"></h1>
     <p id="subtitle"></p>
     <p class="intro" id="intro"></p>
   </header>
 
-  <section id="perf">
-    <div class="controls">
+  <main class="sections" id="sections">
+    <section data-block="forecast" hidden>
+      <div class="tiles forecast-tiles" id="forecast-tiles"></div>
+    </section>
+
+    <section data-block="controls" class="controls">
       <label class="control">Collegejaar
         <select id="year-filter"></select>
       </label>
       <label class="control">Model
         <select id="model-filter"></select>
       </label>
-    </div>
+    </section>
 
-    <div class="tiles" id="tiles"></div>
+    <section data-block="tiles" class="tiles" id="tiles"></section>
 
-    <div class="grid-2">
+    <section data-block="groups" class="grid-2">
       <article class="card">
         <h2>Fout naar opleidingsgrootte</h2>
         <p class="lede">WAPE per grootteklasse (werkelijke instroom). Kleine opleidingen hebben vaak
@@ -240,12 +254,11 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
         <div class="chart" id="chart-exam" role="img" aria-label="Fout per examentype"></div>
         <div class="table-scroll"><table id="table-exam"></table></div>
       </article>
-    </div>
+    </section>
 
-    <article class="card">
+    <article data-block="units" class="card">
       <h2>Fout per opleiding</h2>
-      <p class="lede">Elke stip is een opleiding in één collegejaar. Boven de nullijn is overschat,
-        eronder onderschat. Klik op een stip om het verloop van die opleiding hieronder te bekijken.</p>
+      <p class="lede" id="units-lede"></p>
       <div class="chart tall" id="chart-units" role="img" aria-label="Relatieve fout per opleiding tegen opleidingsgrootte"></div>
       <p class="chart-note" id="units-note"></p>
       <details class="help">
@@ -264,8 +277,8 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       </details>
     </article>
 
-    <article class="card" id="programme-card">
-      <h2>Prestatie per opleiding</h2>
+    <article data-block="table" class="card" id="programme-card">
+      <h2 id="programme-title">Prestatie per opleiding</h2>
       <p class="lede" id="programme-lede"></p>
       <div class="table-tools">
         <input type="search" id="table-search" placeholder="Zoek opleiding" aria-label="Zoek opleiding in de tabel">
@@ -279,31 +292,45 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
         <dl id="trust-help"></dl>
       </details>
     </article>
-  </section>
 
-  <section id="perf-empty" class="notice" hidden>
-    <h2>Nog geen modelperformance te tonen</h2>
-    <p>Er is geen realisatie (werkelijke instroom) voor de voorspelde collegejaren, dus de fout valt nog niet te meten.
-      Draai een backtest over afgeronde jaren om de prestaties van het model te zien, bijvoorbeeld:</p>
-    <p style="margin-top:8px"><code id="backtest-cmd"></code></p>
-    <p style="margin-top:8px">Via de Python-API geef je realisaties mee met <code>data_student_numbers</code> en kies je een afgerond <code>year</code>.</p>
-  </section>
+    <section data-block="forecast-extra" class="grid-2" hidden>
+      <article class="card" id="herkomst-card">
+        <h2>Prognose per herkomst</h2>
+        <p class="lede" id="herkomst-lede"></p>
+        <div class="chart" id="chart-herkomst" role="img" aria-label="Prognose per herkomst tegenover vorig jaar"></div>
+        <div class="table-scroll"><table id="table-herkomst"></table></div>
+      </article>
+      <article class="card" id="nf-card" hidden>
+        <h2>Numerus fixus</h2>
+        <p class="lede">Prognose tegenover de capaciteit. Voorbij de lijn betekent een verwachte overschrijding
+          en waarschijnlijk een wachtlijst.</p>
+        <div class="chart" id="chart-nf" role="img" aria-label="Prognose tegenover capaciteit per numerus-fixusopleiding"></div>
+        <div class="table-scroll"><table id="table-nf"></table></div>
+      </article>
+    </section>
 
-  <article class="card" id="trend-card">
-    <h2>Verloop per opleiding</h2>
-    <p class="lede">Gewogen vooraanmelders per week. Grijs zijn eerdere jaren, de donkere lijn is het voorspeljaar tot de
-      voorspelweek, de blauwe stippellijn de prognose van de vooraanmelders. Rechts: werkelijke instroom (★) en
-      voorspelde instroom (◆).</p>
-    <div class="picker">
-      <label class="control">Opleiding
-        <input type="search" id="programme-search" list="programme-list" autocomplete="off"
-               placeholder="Zoek op code, examentype of faculteit">
-      </label>
-      <datalist id="programme-list"></datalist>
-    </div>
-    <div class="chart tall" id="chart-trend" role="img" aria-label="Verloop van vooraanmelders per week"></div>
-    <div class="trackrecord" id="trackrecord"></div>
-  </article>
+    <section data-block="empty" class="notice" id="perf-empty" hidden>
+      <h2>Nog geen modelperformance te tonen</h2>
+      <p>Er is geen realisatie (werkelijke instroom) voor de voorspelde collegejaren, dus de fout valt nog niet te meten.
+        Draai een backtest over afgeronde jaren om de prestaties van het model te zien, bijvoorbeeld:</p>
+      <p style="margin-top:8px"><code id="backtest-cmd"></code></p>
+      <p style="margin-top:8px">Via de Python-API geef je realisaties mee met <code>data_student_numbers</code> en een lijst afgeronde jaren als <code>year</code>.</p>
+    </section>
+
+    <article data-block="trend" class="card" id="trend-card">
+      <h2 id="trend-title"></h2>
+      <p class="lede" id="trend-lede"></p>
+      <div class="picker">
+        <label class="control">Opleiding
+          <input type="search" id="programme-search" list="programme-list" autocomplete="off"
+                 placeholder="Zoek op code, examentype of faculteit">
+        </label>
+        <datalist id="programme-list"></datalist>
+      </div>
+      <div class="chart tall" id="chart-trend" role="img" aria-label="Verloop per week"></div>
+      <div class="trackrecord" id="trackrecord"></div>
+    </article>
+  </main>
 
   <footer id="footer"></footer>
 </div>
@@ -313,15 +340,18 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
 (function () {
   "use strict";
   const DATA = JSON.parse(document.getElementById("dashboard-data").textContent);
-  const META = DATA.meta, PERF = DATA.performance, TREND = DATA.trend;
+  const META = DATA.meta, PAGE = META.page, PERF = DATA.performance, TREND = DATA.trend, FC = DATA.forecast;
   const NAIVE = "Naief_vorig_jaar";
+  const IS_FINAL = META.track === "final";
 
   const pct = new Intl.NumberFormat("nl-NL", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const pct0 = new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 0 });
   const num = new Intl.NumberFormat("nl-NL", { maximumFractionDigits: 0 });
   const fmtPct = v => (v == null ? "–" : pct.format(v));
   const fmtSigned = v => (v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + pct.format(Math.abs(v)));
+  const fmtSignedNum = v => (v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + num.format(Math.abs(v)));
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const block = name => document.querySelector(`[data-block="${name}"]`);
 
   function tokens() {
     const cs = getComputedStyle(document.documentElement);
@@ -329,13 +359,17 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     return {
       text: v("--text"), text2: v("--text-2"), muted: v("--muted"), grid: v("--grid"), axis: v("--axis"),
       surface: v("--surface"), history: v("--history"), historyStrong: v("--history-strong"),
-      s1: v("--series-1"), s2: v("--series-2"), baseline: v("--baseline"), good: v("--good"), bad: v("--bad"),
+      s1: v("--series-1"), s2: v("--series-2"), s3: v("--series-3"), ens: v("--series-ens"),
+      baseline: v("--baseline"), good: v("--good"), bad: v("--bad"), statusBad: v("--status-bad"),
     };
   }
+  // Kleur volgt het model, op elke pagina dezelfde (nooit de rangorde).
   function modelColor(key, t) {
     if (key === NAIVE) return t.baseline;
-    const idx = PERF.models.findIndex(m => m.key === key);
-    return idx === 0 ? t.s1 : t.s2;
+    if (key === "SARIMA_cumulative") return t.s1;
+    if (key === "Prognose_ratio") return t.s2;
+    if (key === "SARIMA_individual") return t.s3;
+    return t.ens;
   }
   function baseLayout(t, extra) {
     return Object.assign({
@@ -350,16 +384,44 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   }
   const CONFIG = { responsive: true, displayModeBar: false };
 
-  // ── Header ────────────────────────────────────────────────────────
+  // ── Opbouw van de pagina ─────────────────────────────────────────
+  const hasPerf = PERF.units.length > 0 && PERF.models.length > 0;
+  const tableModels = PERF.tableModels || [];
+  const hasTable = (PERF.programmes.alle || []).length > 0 && tableModels.length > 0;
+  const hasTrend = !!PAGE.trend && TREND.programmes.length > 0;
+  const state = { year: "alle", model: tableModels.length ? tableModels[0].key : null, programme: null };
+  const labelOfModel = key => (tableModels.concat(PERF.models).find(x => x.key === key) || { label: key }).label;
+  const shortOfModel = key => (tableModels.concat(PERF.models).find(x => x.key === key) || { short: key }).short;
+  // Grafieken tonen alleen modellen met genoeg dekking; valt het gekozen model
+  // daarbuiten, dan tonen ze het primaire model.
+  const chartModel = () => (PERF.models.some(m => m.key === state.model) ? state.model : (PERF.models[0] || {}).key);
+
+  const LAYOUT = IS_FINAL
+    ? ["forecast", "controls", "table", "forecast-extra", "tiles", "groups", "units", "empty"]
+    : ["controls", "tiles", "groups", "units", "table", "empty", "trend"];
+  document.querySelectorAll("[data-block]").forEach(el => {
+    const i = LAYOUT.indexOf(el.dataset.block);
+    el.style.order = i < 0 ? 99 : i;
+    if (i < 0) el.hidden = true;
+  });
+  ["tiles", "groups", "units"].forEach(b => { if (!hasPerf) block(b).hidden = true; });
+  // Met meer dan drie reeksen passen grafiek en tabel niet naast elkaar.
+  if (PERF.models.length > 3) block("groups").style.gridTemplateColumns = "minmax(0, 1fr)";
+  if (!hasTable) block("table").hidden = true;
+  if (!hasTable && !hasPerf) block("controls").hidden = true;
+  if (!hasTrend) block("trend").hidden = true;
+  if (IS_FINAL && FC) { block("forecast").hidden = false; block("forecast-extra").hidden = false; }
+
+  document.getElementById("page-title").textContent = PAGE.title;
   const sub = [`Prognose ${META.year}`];
   if (META.week != null) sub.push(`voorspelweek ${META.week}`);
   document.getElementById("subtitle").textContent = sub.join(" · ");
-  document.getElementById("intro").textContent = PERF.units.length
-    ? `Hoe goed voorspelt het cumulatieve model de instroom? Gemeten op ${num.format(PERF.units.length)} ` +
-      `opleiding-jaren waarvan de werkelijke instroom bekend is, vergeleken met het ratiomodel en een naïeve voorspelling.`
-    : "";
+  document.getElementById("intro").textContent = PAGE.question + (hasPerf
+    ? ` Gemeten op ${num.format(PERF.units.length)} opleiding-jaren waarvan de werkelijke instroom bekend is, ` +
+      `vergeleken met ${PERF.models.length > 2 ? "de andere modellen en " : ""}een naïeve voorspelling.`
+    : "");
   document.getElementById("footer").textContent =
-    `Gegenereerd door studentprognose · alle cijfers op opleidingsniveau, gemeten op de voorspelweek.`;
+    "Gegenereerd door studentprognose · alle cijfers op opleidingsniveau, gemeten op de voorspelweek.";
   if (PERF.nUnitsAll > PERF.units.length) {
     document.getElementById("population-note").textContent =
       `${num.format(PERF.units.length)} van ${num.format(PERF.nUnitsAll)} opleiding-jaren: de rest viel af omdat niet elk model er een voorspelling voor had. `;
@@ -368,42 +430,118 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     document.getElementById("excluded-note").textContent =
       `${META.nNumerusFixus} numerus-fixusopleiding(en): hun instroom wordt door de capaciteit bepaald.`;
   }
-
-  // ── Performance ───────────────────────────────────────────────────
-  const hasPerf = PERF.units.length > 0 && PERF.models.length > 0;
-  const state = { year: "alle", model: hasPerf ? PERF.models[0].key : null, programme: null };
+  document.getElementById("units-lede").textContent =
+    "Elke stip is een opleiding in één collegejaar. Boven de nullijn is overschat, eronder onderschat." +
+    (hasTrend ? " Klik op een stip om het verloop van die opleiding hieronder te bekijken." : "");
 
   if (!hasPerf) {
-    document.getElementById("perf").hidden = true;
-    document.getElementById("perf-empty").hidden = false;
+    block("empty").hidden = false;
     const w = META.week != null ? META.week : 16;
     document.getElementById("backtest-cmd").textContent =
-      `studentprognose -w ${w} -y ${META.year - 3}:${META.year - 1} -d c --dashboard`;
-  } else {
+      `studentprognose -w ${w} -y ${META.year - 3}:${META.year - 1} ${PAGE.backtest} --dashboard`;
+  }
+
+  if (hasPerf || hasTable) {
     const yf = document.getElementById("year-filter");
-    const opts = [["alle", PERF.years.length > 1 ? `Alle jaren (${PERF.years[0]}–${PERF.years[PERF.years.length - 1]})` : `${PERF.years[0]}`]]
-      .concat(PERF.years.length > 1 ? PERF.years.map(y => [String(y), String(y)]) : []);
+    const years = PERF.years;
+    const opts = years.length > 1
+      ? [["alle", `Alle jaren (${years[0]}–${years[years.length - 1]})`]].concat(years.map(y => [String(y), String(y)]))
+      : [["alle", years.length ? String(years[0]) : "–"]];
     yf.innerHTML = opts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("");
-    yf.disabled = PERF.years.length < 2;
+    yf.disabled = years.length < 2;
     const mf = document.getElementById("model-filter");
-    mf.innerHTML = PERF.models.filter(m => m.key !== NAIVE)
-      .map(m => `<option value="${m.key}">${esc(m.label)}</option>`).join("");
+    mf.innerHTML = tableModels.map(m => `<option value="${m.key}">${esc(m.label)}</option>`).join("");
     mf.disabled = mf.options.length < 2;
-    yf.addEventListener("change", () => { state.year = yf.value; renderPerf(); });
+    yf.addEventListener("change", () => { state.year = yf.value; renderAll(); });
     mf.addEventListener("change", () => { state.model = mf.value; renderAll(); });
   }
 
-  function rowsFor(block, model) { return block.filter(r => r.model === model); }
+  // ── Eindoverzicht: prognose ──────────────────────────────────────
+  function renderForecast(t) {
+    if (!IS_FINAL || !FC) return;
+    const label = labelOfModel(tableModels.length ? tableModels[0].key : "");
+    const tiles = [];
+    tiles.push(`<div class="tile"><div class="label">Verwachte eerstejaars ${META.year}</div>
+      <div class="value">${num.format(FC.total)}</div>
+      <div class="sub">${num.format(FC.n)} opleidingen · ${esc(label)}</div></div>`);
+    if (FC.prevTotal) {
+      const ch = FC.prognoseComparable / FC.prevTotal - 1;
+      tiles.push(`<div class="tile"><div class="label">Verandering t.o.v. ${META.year - 1}</div>
+        <div class="value">${fmtSigned(ch)}</div>
+        <div class="sub">${num.format(FC.prevTotal)} → ${num.format(FC.prognoseComparable)} (${num.format(FC.nComparable)} opleidingen met realisatie vorig jaar)</div></div>`);
+    }
+    const rows = programmeRows(tableModels.length ? tableModels[0].key : null);
+    const vol = { hoog: 0, middel: 0, laag: 0, onbekend: 0, nf: 0 };
+    let tot = 0;
+    rows.forEach(r => { if (r.prognose != null) { vol[r.nf ? "nf" : r.t] += r.prognose; tot += r.prognose; } });
+    if (tot > 0) {
+      const ok = (vol.hoog + vol.middel) / tot;
+      tiles.push(`<div class="tile"><div class="label">Prognose met betrouwbaarheid hoog of middel</div>
+        <div class="value">${pct0.format(ok)}</div>
+        <div class="sub">van de verwachte studenten · laag ${pct0.format(vol.laag / tot)} · onbekend ${pct0.format((vol.onbekend + vol.nf) / tot)}</div></div>`);
+    }
+    if (FC.actualTotal != null) {
+      const err = FC.total / FC.actualTotal - 1;
+      tiles.push(`<div class="tile"><div class="label">Werkelijk ${META.year}</div>
+        <div class="value">${num.format(FC.actualTotal)}</div>
+        <div class="sub">prognose zat er ${fmtSigned(err)} naast</div></div>`);
+    } else if (FC.nf.length) {
+      const over = FC.nf.filter(r => r.prognose > r.cap).length;
+      tiles.push(`<div class="tile"><div class="label">Numerus fixus boven capaciteit</div>
+        <div class="value">${over} van ${FC.nf.length}</div><div class="sub">verwachte overschrijding</div></div>`);
+    }
+    document.getElementById("forecast-tiles").innerHTML = tiles.join("");
+
+    // Herkomst
+    const H = FC.herkomst || [];
+    document.getElementById("herkomst-card").hidden = !H.length;
+    if (H.length) {
+      document.getElementById("herkomst-lede").textContent =
+        `Prognose ${META.year} per herkomstgroep naast de werkelijke instroom van ${META.year - 1}.`;
+      const ens = tableModels.length ? tableModels[0].key : null;
+      Plotly.react("chart-herkomst", [
+        { type: "bar", name: `Werkelijk ${META.year - 1}`, x: H.map(r => r.h), y: H.map(r => r.prev),
+          marker: { color: t.baseline, cornerradius: 4 }, hovertemplate: `${META.year - 1}: %{y:,.0f}<extra></extra>` },
+        { type: "bar", name: `Prognose ${META.year}`, x: H.map(r => r.h), y: H.map(r => r.prognose),
+          marker: { color: modelColor(ens, t), cornerradius: 4 }, hovertemplate: `Prognose: %{y:,.0f}<extra></extra>` },
+      ], Object.assign(baseLayout(t, { barmode: "group", bargap: 0.35, bargroupgap: 0.12, height: 300, separators: ",." }),
+        { yaxis: Object.assign(baseLayout(t).yaxis, { rangemode: "tozero" }) }), CONFIG);
+      document.getElementById("table-herkomst").innerHTML =
+        `<thead><tr><th scope="col">Herkomst</th><th scope="col">Werkelijk ${META.year - 1}</th><th scope="col">Prognose ${META.year}</th><th scope="col">Verschil</th></tr></thead><tbody>` +
+        H.map(r => `<tr><th scope="row">${esc(r.h)}</th><td>${r.prev == null ? "–" : num.format(r.prev)}</td><td>${r.prognose == null ? "–" : num.format(r.prognose)}</td>` +
+          `<td>${r.prev ? fmtSigned(r.prognose / r.prev - 1) : "–"}</td></tr>`).join("") + "</tbody>";
+    }
+    // Numerus fixus
+    const NF = FC.nf || [];
+    document.getElementById("nf-card").hidden = !NF.length;
+    document.getElementById("herkomst-card").classList.toggle("span-2", !NF.length);
+    if (NF.length) {
+      const ens = tableModels.length ? tableModels[0].key : null;
+      Plotly.react("chart-nf", [
+        { type: "bar", orientation: "h", name: `Prognose ${META.year}`, y: NF.map(r => r.p), x: NF.map(r => r.prognose),
+          marker: { color: modelColor(ens, t), cornerradius: 4 }, hovertemplate: "Prognose: %{x:,.0f}<extra></extra>" },
+        { type: "scatter", mode: "markers", name: "Capaciteit", y: NF.map(r => r.p), x: NF.map(r => r.cap),
+          marker: { symbol: "line-ns", size: 22, line: { width: 3, color: t.statusBad } }, hovertemplate: "Capaciteit: %{x:,.0f}<extra></extra>" },
+      ], baseLayout(t, { height: Math.max(220, 60 + NF.length * 44), margin: { l: 90, r: 16, t: 8, b: 36 } }), CONFIG);
+      document.getElementById("table-nf").innerHTML =
+        `<thead><tr><th scope="col">Opleiding</th><th scope="col">Capaciteit</th><th scope="col">Prognose</th><th scope="col">Status</th></tr></thead><tbody>` +
+        NF.map(r => `<tr><th scope="row">${esc(r.p)}</th><td>${num.format(r.cap)}</td><td>${num.format(r.prognose)}</td>` +
+          `<td style="text-align:left">${r.prognose > r.cap ? '<span class="badge laag">Boven capaciteit</span>' : '<span class="badge hoog">Binnen capaciteit</span>'}</td></tr>`).join("") + "</tbody>";
+    }
+  }
+
+  // ── Modelperformance ─────────────────────────────────────────────
+  function rowsFor(blockRows, model) { return blockRows.filter(r => r.model === model); }
 
   function renderTiles(summary) {
-    const m = state.model;
+    const m = chartModel();
     const tot = rowsFor(summary.total, m)[0];
     const naive = rowsFor(summary.total, NAIVE)[0];
-    const label = PERF.models.find(x => x.key === m).label;
+    if (!tot) { document.getElementById("tiles").innerHTML = ""; return; }
     const tiles = [];
     tiles.push(`<div class="tile"><div class="label">Fout per student (WAPE)</div>
       <div class="value">${fmtPct(tot.wape)}</div>
-      <div class="sub">${esc(label)} · MAPE ${fmtPct(tot.mape)}</div></div>`);
+      <div class="sub">${esc(labelOfModel(m))} · MAPE ${fmtPct(tot.mape)}</div></div>`);
     if (naive) {
       const skill = naive.wape ? 1 - tot.wape / naive.wape : null;
       const cls = skill == null ? "" : skill >= 0 ? "pos" : "neg";
@@ -424,55 +562,55 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     document.getElementById("tiles").innerHTML = tiles.join("");
   }
 
-  function renderGroupChart(el, block, t) {
-    const groups = [...new Set(block.map(r => r.group))];
-    const nByGroup = Object.fromEntries(groups.map(g => [g, (block.find(r => r.group === g) || {}).n]));
+  function renderGroupChart(el, rows, t) {
+    const groups = [...new Set(rows.map(r => r.group))];
+    const nByGroup = Object.fromEntries(groups.map(g => [g, (rows.find(r => r.group === g) || {}).n]));
     const xLabels = groups.map(g => `${g}<br><span style="font-size:11px">n = ${num.format(nByGroup[g])}</span>`);
     const traces = PERF.models.map(m => {
-      const rows = groups.map(g => block.find(r => r.group === g && r.model === m.key) || {});
+      const rr = groups.map(g => rows.find(r => r.group === g && r.model === m.key) || {});
       return {
-        type: "bar", name: m.label, x: xLabels, y: rows.map(r => r.wape),
+        type: "bar", name: m.label, x: xLabels, y: rr.map(r => r.wape),
         marker: { color: modelColor(m.key, t), cornerradius: 4, line: { color: t.surface, width: 1 } },
-        customdata: rows.map(r => [fmtPct(r.wape), fmtPct(r.mape), fmtSigned(r.bias), fmtPct(r.within), num.format(r.n || 0)]),
+        customdata: rr.map(r => [fmtPct(r.wape), fmtPct(r.mape), fmtSigned(r.bias), fmtPct(r.within), num.format(r.n || 0)]),
         hovertemplate: `<b>${esc(m.label)}</b><br>WAPE %{customdata[0]}<br>MAPE %{customdata[1]}<br>Bias %{customdata[2]}` +
           `<br>Binnen ${pct0.format(META.within)}: %{customdata[3]}<br>n = %{customdata[4]}<extra></extra>`,
       };
     });
-    const layout = baseLayout(t, { barmode: "group", bargap: 0.35, bargroupgap: 0.12, height: 320 });
+    const layout = baseLayout(t, { barmode: "group", bargap: 0.3, bargroupgap: 0.1, height: 320 });
     layout.yaxis = Object.assign(layout.yaxis, { tickformat: ".0%", rangemode: "tozero", title: { text: "WAPE", font: { color: t.muted } } });
     layout.xaxis = Object.assign(layout.xaxis, { showgrid: false });
     Plotly.react(el, traces, layout, CONFIG);
   }
 
-  function renderGroupTable(el, block, t) {
-    const groups = [...new Set(block.map(r => r.group))];
-    const primary = state.model;
+  function renderGroupTable(el, rows, t) {
+    const groups = [...new Set(rows.map(r => r.group))];
+    const primary = chartModel();
     const head = `<thead><tr><th scope="col">Groep</th><th scope="col">n</th>` +
       PERF.models.map(m => `<th scope="col" title="${esc(m.label)}"><span class="swatch" style="background:${modelColor(m.key, t)}"></span>${esc(m.short)}</th>`).join("") +
-      `<th scope="col">Bias ${esc(PERF.models.find(x => x.key === primary).short)}</th></tr></thead>`;
+      `<th scope="col">Bias ${esc(shortOfModel(primary))}</th></tr></thead>`;
     const body = groups.map(g => {
-      const rows = PERF.models.map(m => block.find(r => r.group === g && r.model === m.key) || {});
-      const best = Math.min(...rows.map(r => (r.wape == null ? Infinity : r.wape)));
-      const p = block.find(r => r.group === g && r.model === primary) || {};
-      const cells = rows.map(r => `<td class="${r.wape === best ? "best" : ""}">${fmtPct(r.wape)}</td>`).join("");
-      return `<tr><th scope="row">${esc(g)}</th><td>${num.format(rows[0].n || 0)}</td>${cells}<td>${fmtSigned(p.bias)}</td></tr>`;
+      const rr = PERF.models.map(m => rows.find(r => r.group === g && r.model === m.key) || {});
+      const best = Math.min(...rr.map(r => (r.wape == null ? Infinity : r.wape)));
+      const p = rows.find(r => r.group === g && r.model === primary) || {};
+      const cells = rr.map(r => `<td class="${r.wape === best ? "best" : ""}">${fmtPct(r.wape)}</td>`).join("");
+      return `<tr><th scope="row">${esc(g)}</th><td>${num.format(rr[0].n || 0)}</td>${cells}<td>${fmtSigned(p.bias)}</td></tr>`;
     }).join("");
     el.innerHTML = `${head}<tbody>${body}</tbody>`;
   }
 
   function renderUnits(t) {
-    const m = state.model;
-    const label = PERF.models.find(x => x.key === m).label;
-    const units = PERF.units.filter(u => state.year === "alle" || String(u.y) === state.year)
-      .filter(u => u.m[m] != null);
+    const m = chartModel();
+    const label = labelOfModel(m);
+    const units = PERF.units.filter(u => state.year === "alle" || String(u.y) === state.year).filter(u => u.m[m] != null);
     const exams = [...new Set(units.map(u => u.e))].sort();
     const symbols = ["circle", "diamond", "square", "triangle-up"];
+    const color = modelColor(m, t);
     const traces = exams.map((e, i) => {
       const us = units.filter(u => u.e === e);
       return {
         type: "scatter", mode: "markers", name: e,
         x: us.map(u => u.a), y: us.map(u => (u.m[m] - u.a) / u.a),
-        marker: { color: t.s1, size: 8, symbol: symbols[i % symbols.length], opacity: 0.75, line: { color: t.surface, width: 1 } },
+        marker: { color, size: 8, symbol: symbols[i % symbols.length], opacity: 0.75, line: { color: t.surface, width: 1 } },
         customdata: us.map(u => [u.p, u.y, num.format(u.m[m]), num.format(u.a), fmtSigned((u.m[m] - u.a) / u.a)]),
         hovertemplate: "<b>%{customdata[0]}</b> · %{customdata[1]}<br>Voorspeld %{customdata[2]} · werkelijk %{customdata[3]}" +
           "<br>Fout %{customdata[4]}<extra>" + esc(e) + "</extra>",
@@ -483,15 +621,14 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     const layout = baseLayout(t, { height: 460, hovermode: "closest" });
     layout.xaxis = Object.assign(layout.xaxis, {
       type: "log", title: { text: "Werkelijke instroom (log-schaal)", font: { color: t.muted } },
-      tickvals: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000],
-      tickformat: "d",
+      tickvals: [1, 5, 10, 25, 50, 100, 250, 500, 1000, 2500, 5000], tickformat: "d",
     });
     layout.yaxis = Object.assign(layout.yaxis, {
       tickformat: "+.0%", range: [-Math.min(lim, 1.05), lim], zeroline: true, zerolinewidth: 1.5,
       title: { text: `Relatieve fout ${label}`, font: { color: t.muted } },
     });
     layout.shapes = [{ type: "rect", xref: "paper", x0: 0, x1: 1, y0: -META.within, y1: META.within,
-      fillcolor: t.s1, opacity: 0.07, line: { width: 0 }, layer: "below" }];
+      fillcolor: color, opacity: 0.07, line: { width: 0 }, layer: "below" }];
     layout.annotations = [{ xref: "paper", x: 1, xanchor: "right", y: META.within, yanchor: "bottom",
       text: `± ${pct0.format(META.within)}`, showarrow: false, font: { color: t.muted, size: 11 } }];
     const clipped = ys.filter(y => y > lim || y < -Math.min(lim, 1.05)).length;
@@ -500,32 +637,36 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       : "";
     const el = document.getElementById("chart-units");
     Plotly.react(el, traces, layout, CONFIG);
-    if (!el._clickBound) {
+    if (!el._clickBound && hasTrend) {
       el.on("plotly_click", ev => {
         const pt = ev.points && ev.points[0];
-        if (pt) { selectProgramme(pt.customdata[0]); document.getElementById("trend-card").scrollIntoView({ behavior: "smooth" }); }
+        if (pt && byCode[pt.customdata[0]]) { selectProgramme(pt.customdata[0]); document.getElementById("trend-card").scrollIntoView({ behavior: "smooth" }); }
       });
       el._clickBound = true;
     }
   }
 
   // ── Tabel per opleiding ──────────────────────────────────────────
-  const TRUST_ORDER = { hoog: 0, middel: 1, laag: 2, onbekend: 3 };
-  const TRUST_LABEL = { hoog: "Hoog", middel: "Middel", laag: "Laag", onbekend: "Onbekend" };
-  const hasNaive = PERF.models.some(m => m.key === NAIVE);
+  const TRUST_ORDER = { hoog: 0, middel: 1, laag: 2, onbekend: 3, nf: 4 };
+  const TRUST_LABEL = { hoog: "Hoog", middel: "Middel", laag: "Laag", onbekend: "Onbekend", nf: "Numerus fixus" };
+  const hasNaive = PERF.models.some(m => m.key === NAIVE) || (PERF.programmes.alle || []).some(r => r.m[NAIVE] && r.m[NAIVE].w != null);
   const hasCurrentActual = Object.values(PERF.current).some(c => c.a != null);
   const table = { sort: "prognose", dir: -1, trust: "alle", query: "" };
-  const badge = t => `<span class="badge ${t}">${TRUST_LABEL[t]}</span>`;
+  const badge = t => `<span class="badge ${t === "nf" ? "onbekend" : t}">${TRUST_LABEL[t]}</span>`;
 
   // Betrouwbaarheid gaat over het hele trackrecord en volgt dus niet het jaarfilter:
   // met één jaar zou "hoog" (minstens twee jaren) nooit haalbaar zijn.
+  const trustIndex = {};
+  (PERF.programmes.alle || []).forEach(r => { trustIndex[`${r.p}|${r.e}`] = r; });
   function trustOf(p, e, m) {
-    const r = (PERF.programmes.alle || []).find(x => x.p === p && x.e === e);
+    const cur = PERF.current[`${p}|${e}`];
+    if (cur && cur.nf) return "nf";
+    const r = trustIndex[`${p}|${e}`];
     return (r && r.m[m] && r.m[m].t) || "onbekend";
   }
 
-  function programmeRows() {
-    const m = state.model;
+  function programmeRows(model) {
+    const m = model || state.model;
     const base = PERF.programmes[state.year] || [];
     // Opleidingen zonder evaluatie in het gekozen jaar blijven zichtbaar (met "–").
     const seen = new Set(base.map(r => `${r.p}|${r.e}`));
@@ -537,40 +678,47 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       const prognose = cur.m ? cur.m[m] : null;
       const tp = byCode[r.p] || {};
       return {
-        p: r.p, e: r.e, faculty: tp.faculty || "", n: mm.n || 0, a: r.a,
+        p: r.p, e: r.e, faculty: cur.f || tp.faculty || "", n: mm.n || 0, a: r.a, nf: !!cur.nf,
         w: mm.w, b: mm.b, t: trustOf(r.p, r.e, m),
         wn: r.m[NAIVE] ? r.m[NAIVE].w : null,
         prognose, marge: prognose != null && mm.w != null ? prognose * mm.w : null,
+        prev: cur.prev != null ? cur.prev : null,
+        delta: prognose != null && cur.prev ? prognose / cur.prev - 1 : null,
         actual: cur.a != null ? cur.a : null,
       };
     });
   }
 
   function columns() {
-    const short = PERF.models.find(x => x.key === state.model).short;
-    const cols = [
-      { key: "p", label: "Opleiding", num: false },
-      { key: "t", label: "Betrouwbaarheid", num: false, title: "Over alle geëvalueerde jaren, los van het jaarfilter" },
-      { key: "n", label: "Jaren", num: true, title: "Aantal geëvalueerde collegejaren" },
-      { key: "a", label: "Gem. instroom", num: true, title: "Gemiddelde werkelijke instroom in de geëvalueerde jaren" },
-      { key: "w", label: `WAPE ${short}`, num: true },
-    ];
-    if (hasNaive) cols.push({ key: "wn", label: "WAPE naïef", num: true, title: "Fout van de voorspelling 'evenveel als vorig jaar'" });
-    cols.push({ key: "b", label: `Bias ${short}`, num: true, title: "Positief = overschat" });
-    cols.push({ key: "prognose", label: `Prognose ${META.year}`, num: true, title: "Prognose op de voorspelweek, ± de typische fout (prognose × WAPE)" });
-    if (hasCurrentActual) cols.push({ key: "actual", label: `Werkelijk ${META.year}`, num: true });
-    return cols;
+    const short = shortOfModel(state.model);
+    const c = {
+      p: { key: "p", label: "Opleiding", num: false },
+      t: { key: "t", label: "Betrouwbaarheid", num: false, title: "Over alle geëvalueerde jaren, los van het jaarfilter" },
+      n: { key: "n", label: "Jaren", num: true, title: "Aantal geëvalueerde collegejaren" },
+      a: { key: "a", label: "Gem. instroom", num: true, title: "Gemiddelde werkelijke instroom in de geëvalueerde jaren" },
+      w: { key: "w", label: `WAPE ${short}`, num: true },
+      wn: { key: "wn", label: "WAPE naïef", num: true, title: "Fout van de voorspelling 'evenveel als vorig jaar'" },
+      b: { key: "b", label: `Bias ${short}`, num: true, title: "Positief = overschat" },
+      prognose: { key: "prognose", label: `Prognose ${META.year}`, num: true, title: "Prognose op de voorspelweek, ± de typische fout (prognose × WAPE)" },
+      prev: { key: "prev", label: `Werkelijk ${META.year - 1}`, num: true },
+      delta: { key: "delta", label: "Verschil", num: true, title: `Prognose ${META.year} t.o.v. werkelijk ${META.year - 1}` },
+      actual: { key: "actual", label: `Werkelijk ${META.year}`, num: true },
+    };
+    const order = IS_FINAL
+      ? ["p", "t", "prognose", "prev", "delta", "w", "wn", "b", "actual"]
+      : ["p", "t", "n", "a", "w", "wn", "b", "prognose", "actual"];
+    return order
+      .filter(k => k !== "wn" || hasNaive)
+      .filter(k => k !== "actual" || hasCurrentActual)
+      .map(k => c[k]);
   }
 
-  function sortValue(r, key) {
-    if (key === "t") return TRUST_ORDER[r.t];
-    return r[key];
-  }
+  function sortValue(r, key) { return key === "t" ? TRUST_ORDER[r.t] : r[key]; }
 
   function filteredRows() {
     const q = table.query.trim().toLowerCase();
     let rows = programmeRows();
-    const counts = { alle: rows.length, hoog: 0, middel: 0, laag: 0, onbekend: 0 };
+    const counts = { alle: rows.length, hoog: 0, middel: 0, laag: 0, onbekend: 0, nf: 0 };
     rows.forEach(r => { counts[r.t] += 1; });
     if (table.trust !== "alle") rows = rows.filter(r => r.t === table.trust);
     if (q) rows = rows.filter(r => `${r.p} ${r.e} ${r.faculty}`.toLowerCase().includes(q));
@@ -585,7 +733,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   }
 
   function renderChips(counts) {
-    const order = ["alle", "hoog", "middel", "laag", "onbekend"];
+    const order = ["alle", "hoog", "middel", "laag", "onbekend", "nf"];
     document.getElementById("trust-chips").innerHTML = order
       .filter(k => k === "alle" || counts[k] > 0 || table.trust === k)
       .map(k => `<button type="button" class="chip" data-trust="${k}" aria-pressed="${table.trust === k}">` +
@@ -604,8 +752,12 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     }).join("") + "</tr></thead>";
     const cell = (r, c) => {
       switch (c.key) {
-        case "p": return `<th scope="row"><button type="button" class="link" data-code="${esc(r.p)}">${esc(r.p)}</button>` +
-          ` <span class="sub">${esc([r.e, r.faculty].filter(Boolean).join(" · "))}</span></th>`;
+        case "p": {
+          const code = hasTrend && byCode[r.p]
+            ? `<button type="button" class="link" data-code="${esc(r.p)}">${esc(r.p)}</button>`
+            : `<strong>${esc(r.p)}</strong>`;
+          return `<th scope="row">${code} <span class="sub">${esc([r.e, r.faculty].filter(Boolean).join(" · "))}</span></th>`;
+        }
         case "n": return `<td>${r.n || "–"}</td>`;
         case "a": return `<td>${r.a == null ? "–" : num.format(r.a)}</td>`;
         case "w": return `<td>${fmtPct(r.w)}</td>`;
@@ -613,6 +765,8 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
         case "b": return `<td>${fmtSigned(r.b)}</td>`;
         case "prognose": return `<td>${r.prognose == null ? "–" : num.format(r.prognose)}` +
           (r.marge != null ? `<span class="margin">± ${num.format(r.marge)}</span>` : "") + "</td>";
+        case "prev": return `<td>${r.prev == null ? "–" : num.format(r.prev)}</td>`;
+        case "delta": return `<td>${fmtSigned(r.delta)}</td>`;
         case "actual": return `<td>${r.actual == null ? "–" : num.format(r.actual)}</td>`;
         case "t": return `<td style="text-align:left">${badge(r.t)}</td>`;
       }
@@ -622,7 +776,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     const el = document.getElementById("table-programmes");
     el.innerHTML = head + `<tbody>${body || `<tr><td colspan="${cols.length}" style="text-align:left">Geen opleidingen gevonden.</td></tr>`}</tbody>`;
     document.getElementById("table-note").textContent =
-      `${num.format(rows.length)} van ${num.format(counts.alle)} opleidingen. Klik op een code om het verloop te bekijken.`;
+      `${num.format(rows.length)} van ${num.format(counts.alle)} opleidingen.` + (hasTrend ? " Klik op een code om het verloop te bekijken." : "");
     table.lastRows = rows;
     table.lastCols = cols;
   }
@@ -638,10 +792,10 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     };
     const header = cols.map(c => `"${c.label}"`).concat(['"Examentype"', '"Faculteit"', '"Marge"']).join(";");
     const lines = rows.map(r => cols.map(c => val(r, c.key)).concat([val(r, "e"), val(r, "faculty"), val(r, "marge")]).join(";"));
-    const blob = new Blob(["\ufeff" + [header].concat(lines).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const blob = new Blob(["﻿" + [header].concat(lines).join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `prestatie-per-opleiding-${META.year}-wk${META.week}-${state.year}.csv`;
+    a.download = `${META.track}-per-opleiding-${META.year}-wk${META.week}-${state.year}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -653,14 +807,16 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       `<dt>${badge("middel")}</dt><dd>WAPE ≤ ${pct0.format(T.medium)}. Ook een opleiding met een lage fout, maar te weinig jaren of niet beter dan naïef.</dd>` +
       `<dt>${badge("laag")}</dt><dd>WAPE boven ${pct0.format(T.medium)}. Gebruik de prognose alleen met een ruime marge of eigen kennis van de opleiding.</dd>` +
       `<dt>${badge("onbekend")}</dt><dd>Nog geen jaar met realisatie om de voorspelling tegen af te zetten.</dd>` +
+      `<dt>${badge("nf")}</dt><dd>Numerus-fixusopleiding: de capaciteit bepaalt de instroom, dus de modelfout zegt hier weinig.</dd>` +
       `<dt>Marge</dt><dd>± prognose × WAPE: de gemiddelde afwijking die het model voor deze opleiding had. Geen statistisch interval.</dd>`;
-    document.getElementById("programme-lede").textContent =
-      `Hoe goed voorspelde het model elke opleiding, en hoeveel vertrouwen verdient de prognose voor ${META.year}? ` +
-      `De betrouwbaarheid volgt uit de fout van het gekozen model over álle geëvalueerde jaren; ` +
-      `de overige kolommen volgen het jaarfilter.`;
+    document.getElementById("programme-title").textContent = IS_FINAL ? "Prognose per opleiding" : "Prestatie per opleiding";
+    document.getElementById("programme-lede").textContent = (IS_FINAL
+      ? `De prognose voor ${META.year} per opleiding, met hoeveel vertrouwen die verdient. `
+      : `Hoe goed voorspelde het model elke opleiding, en hoeveel vertrouwen verdient de prognose voor ${META.year}? `) +
+      "De betrouwbaarheid volgt uit de fout van het gekozen model over álle geëvalueerde jaren; de overige kolommen volgen het jaarfilter.";
   }
 
-  if (hasPerf) {
+  if (hasTable) {
     renderTrustHelp();
     const search = document.getElementById("table-search");
     search.addEventListener("input", () => { table.query = search.value; renderProgrammeTable(); });
@@ -673,7 +829,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       if (s) {
         const k = s.dataset.key;
         if (table.sort === k) table.dir = -table.dir;
-        else { table.sort = k; table.dir = (k === "p" || k === "e" || k === "t") ? 1 : -1; }
+        else { table.sort = k; table.dir = (k === "p" || k === "t") ? 1 : -1; }
         renderProgrammeTable();
         return;
       }
@@ -684,10 +840,11 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   }
 
   function renderPerf() {
-    if (!hasPerf) return;
-    renderProgrammeTable();
     const t = tokens();
-    const summary = PERF.summaries[state.year];
+    renderForecast(t);
+    if (hasTable) renderProgrammeTable();
+    if (!hasPerf) return;
+    const summary = PERF.summaries[state.year] || PERF.summaries.alle;
     renderTiles(summary);
     renderGroupChart(document.getElementById("chart-size"), summary.size, t);
     renderGroupTable(document.getElementById("table-size"), summary.size, t);
@@ -701,13 +858,17 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   const byCode = Object.fromEntries(progs.map(p => [p.code, p]));
   const labelOf = p => [p.code, p.exam, p.faculty].filter(Boolean).join(" · ");
   const byLabel = Object.fromEntries(progs.map(p => [labelOf(p), p]));
-  document.getElementById("programme-list").innerHTML =
-    progs.map(p => `<option value="${esc(labelOf(p))}"></option>`).join("");
   const search = document.getElementById("programme-search");
-  search.addEventListener("change", () => {
-    const p = byLabel[search.value] || byCode[search.value.split(" · ")[0].trim()];
-    if (p) selectProgramme(p.code);
-  });
+  if (hasTrend) {
+    document.getElementById("trend-title").textContent = PAGE.trend.title;
+    document.getElementById("trend-lede").textContent = PAGE.trend.lede;
+    document.getElementById("programme-list").innerHTML =
+      progs.map(p => `<option value="${esc(labelOf(p))}"></option>`).join("");
+    search.addEventListener("change", () => {
+      const p = byLabel[search.value] || byCode[search.value.split(" · ")[0].trim()];
+      if (p) selectProgramme(p.code);
+    });
+  }
 
   function selectProgramme(code) {
     const p = byCode[code];
@@ -718,30 +879,33 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   }
 
   function renderTrend() {
+    if (!hasTrend) return;
     const el = document.getElementById("chart-trend");
     const p = byCode[state.programme];
-    if (!p) { document.getElementById("trend-card").hidden = true; return; }
+    if (!p) return;
     const t = tokens();
     const weeks = META.weeks;
     const pwIdx = META.week != null ? weeks.indexOf(String(META.week)) : -1;
     const years = Object.keys(p.series).map(Number).sort((a, b) => a - b);
     const hist = years.filter(y => y < META.year);
+    const primary = tableModels.length ? tableModels[0].key : null;
+    const accent = modelColor(primary, t);
     const traces = [];
     hist.forEach((y, i) => {
       const last = i === hist.length - 1;
       traces.push({
-        type: "scatter", mode: "lines", name: String(y), x: weeks, y: p.series[String(y)],
+        type: "scatter", mode: "lines", name: hist.length > 1 && last ? `Eerdere jaren (${y} donkerder)` : String(y),
+        x: weeks, y: p.series[String(y)],
         line: { color: last ? t.historyStrong : t.history, width: last ? 1.75 : 1.25 },
         legendgroup: "hist", showlegend: last, connectgaps: true,
         hovertemplate: `${y}: %{y:.0f}<extra></extra>`,
       });
-      if (last) traces[traces.length - 1].name = hist.length > 1 ? `Eerdere jaren (${y} donkerder)` : String(y);
     });
     const cur = p.series[String(META.year)];
     if (cur) {
       const known = cur.map((v, i) => (pwIdx < 0 || i <= pwIdx ? v : null));
       const later = cur.map((v, i) => (pwIdx >= 0 && i >= pwIdx ? v : null));
-      traces.push({ type: "scatter", mode: "lines", name: `${META.year} t/m voorspelweek`, x: weeks, y: known, connectgaps: true,
+      traces.push({ type: "scatter", mode: "lines", name: `${META.year} ${PAGE.trend.current}`, x: weeks, y: known, connectgaps: true,
         line: { color: t.text, width: 2.5 }, hovertemplate: `${META.year}: %{y:.0f}<extra></extra>` });
       if (later.some((v, i) => i > pwIdx && v != null)) {
         traces.push({ type: "scatter", mode: "lines", name: `${META.year} na voorspelweek`, x: weeks, y: later, connectgaps: true,
@@ -751,8 +915,8 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     if (p.forecast) {
       const fc = p.forecast.slice();
       if (cur && pwIdx >= 0 && cur[pwIdx] != null) fc[pwIdx] = cur[pwIdx];
-      traces.push({ type: "scatter", mode: "lines", name: "Prognose vooraanmelders", x: weeks, y: fc, connectgaps: true,
-        line: { color: t.s1, width: 2, dash: "dash" }, hovertemplate: "Prognose: %{y:.0f}<extra></extra>" });
+      traces.push({ type: "scatter", mode: "lines", name: PAGE.trend.forecast, x: weeks, y: fc, connectgaps: true,
+        line: { color: accent, width: 2, dash: "dash" }, hovertemplate: "Prognose: %{y:.0f}<extra></extra>" });
     }
     const endX = weeks[weeks.length - 1];
     const actualYears = Object.keys(p.actuals).map(Number).filter(y => y <= META.year).sort();
@@ -766,7 +930,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
     if (p.predicted != null) {
       traces.push({ type: "scatter", mode: "markers", name: `Voorspelde instroom ${META.year}`,
         x: [endX], y: [p.predicted],
-        marker: { symbol: "diamond", size: 12, color: t.s1, line: { color: t.surface, width: 1.5 } },
+        marker: { symbol: "diamond", size: 12, color: accent, line: { color: t.surface, width: 1.5 } },
         hovertemplate: `Voorspeld ${META.year}: %{y:.0f}<extra></extra>` });
     }
     const layout = baseLayout(t, { height: 460, hovermode: "x unified" });
@@ -774,7 +938,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
       type: "category", categoryorder: "array", categoryarray: weeks, title: { text: "Week", font: { color: t.muted } },
       tickmode: "array", tickvals: weeks.filter((w, i) => i % 4 === 0),
     });
-    layout.yaxis = Object.assign(layout.yaxis, { rangemode: "tozero", title: { text: "Gewogen vooraanmelders", font: { color: t.muted } } });
+    layout.yaxis = Object.assign(layout.yaxis, { rangemode: "tozero", title: { text: PAGE.trend.yTitle, font: { color: t.muted } } });
     if (pwIdx >= 0) {
       // Positie-index i.p.v. het weeklabel: Plotly leest een numerieke string op een
       // categorie-as als index, waardoor "16" anders op de 17e categorie belandt.
@@ -789,13 +953,13 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
 
   function renderTrackrecord(p) {
     const box = document.getElementById("trackrecord");
-    if (!hasPerf) { box.textContent = ""; return; }
     const m = state.model;
-    const label = PERF.models.find(x => x.key === m).label;
+    if (!m) { box.textContent = ""; return; }
+    const label = labelOfModel(m);
     const own = PERF.units.filter(u => u.p === p.code && u.m[m] != null).sort((a, b) => a.y - b.y);
-    if (!own.length) { box.innerHTML = `${badge("onbekend")} Geen geëvalueerde voorspellingen van ${esc(label)} voor deze opleiding.`; return; }
-    const row = (PERF.programmes.alle || []).find(r => r.p === p.code && r.m[m]);
-    const tb = row ? badge(trustOf(row.p, row.e, m)) : "";
+    const row = (PERF.programmes.alle || []).find(r => r.p === p.code);
+    const tb = row ? badge(trustOf(row.p, row.e, m)) : badge("onbekend");
+    if (!own.length) { box.innerHTML = `${tb} Geen geëvalueerde voorspellingen van ${esc(label)} voor deze opleiding.`; return; }
     box.innerHTML = tb + `<strong>${esc(label)}:</strong> ` + own.map(u => {
       const e = (u.m[m] - u.a) / u.a;
       return `<span>${u.y}${own.filter(o => o.y === u.y).length > 1 ? " " + esc(u.e) : ""}: voorspeld ${num.format(u.m[m])}, werkelijk ${num.format(u.a)} (${fmtSigned(e)})</span>`;
@@ -803,7 +967,7 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
   }
 
   // ── Init ─────────────────────────────────────────────────────────
-  if (progs.length) {
+  if (hasTrend) {
     const withPred = progs.find(p => p.predicted != null);
     state.programme = (withPred || progs[0]).code;
     search.value = labelOf(byCode[state.programme]);

@@ -25,8 +25,6 @@ def _make_strategy_stub():
         get_dashboard_data=lambda: {
             "data_cumulative": None,
             "xgboost_curve": None,
-            "xgb_classifier_importance": None,
-            "xgb_regressor_importance": None,
         },
     )
 
@@ -176,7 +174,6 @@ def _install_dashboard_fake_strategy(monkeypatch, *, result="frame"):
         def get_dashboard_data(self):
             return {
                 "data_cumulative": None, "xgboost_curve": None,
-                "xgb_classifier_importance": None, "xgb_regressor_importance": None,
             }
 
     monkeypatch.setattr(

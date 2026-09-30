@@ -134,16 +134,18 @@ Dat is Python-API-werk (notebooks, cloud, MLflow) en staat daarom op de pagina [
 
 ## Interactief dashboard
 
-Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren onder `data/output/visualisaties/`. Per modus (`-d i`, `-d c`, `-d b`) wordt een apart dashboard aangemaakt met daarin:
+Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren onder `data/output/visualisations/`. Welke pagina's je krijgt, hangt af van de modus:
 
-- **Individueel dashboard**: XGBoost-voorspellingen per opleiding, SARIMA-trajecten, feature importance (classifier).
-- **Cumulatief dashboard**: modelperformance van het cumulatieve model (fout naar opleidingsgrootte en examentype, vergeleken met een naïeve voorspelling) en het verloop per opleiding.
-- **Eindoverzicht**: ensemble-voorspellingen per opleiding, foutmaten, vergelijking met vorige jaren.
+| Pagina | Wanneer | Beantwoordt |
+|---|---|---|
+| **Individueel** (`individual/dashboard.html`) | `-d i` of `-d b`, zodra het individuele model voorspellingen heeft | Hoe goed voorspelt het individuele model? |
+| **Cumulatief** (`cumulative/dashboard.html`) | `-d c` of `-d b` | Hoe goed voorspelt het cumulatieve model? |
+| **Eindoverzicht** (`final/dashboard.html`) | Altijd | Wat is de prognose, en hoeveel vertrouwen verdient die? |
 
-De dashboards zijn zelfstandige HTML-bestanden (geen server nodig) en kunnen in elke browser geopend worden.
+Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. Alle pagina's hebben dezelfde opzet: kerncijfers, de fout naar opleidingsgrootte en examentype, een tabel per opleiding met een **betrouwbaarheidslabel**, en (bij de modelpagina's) het verloop per opleiding. Elk model heeft op alle pagina's dezelfde kleur. De dashboards zijn zelfstandige HTML-bestanden (geen server of internet nodig) en openen in elke browser.
 
 !!! info "Dashboard is opt-in"
-    Sinds deze versie wordt het dashboard alleen gegenereerd als je expliciet `--dashboard` meegeeft. Een voorbeeld:
+    Het dashboard wordt alleen gegenereerd als je expliciet `--dashboard` meegeeft. Een voorbeeld:
 
     ```bash
     studentprognose --dashboard -d both -w 10 -y 2024
@@ -154,19 +156,16 @@ De dashboards zijn zelfstandige HTML-bestanden (geen server nodig) en kunnen in 
 !!! note "Dashboard toont alleen de laatste week"
     Bij een multi-week run (bijv. `-w 10:20`) toont het dashboard alleen de prognose van de **laatste week** in de reeks. De Excel-output bevat wel alle weken.
 
-Hieronder staan voorbeelden van de belangrijkste grafieken per dashboard, gegenereerd met demodata.
-
 ### Eindoverzicht (`final/dashboard.html`)
 
-Altijd beschikbaar, ongeacht de gekozen modus. Toont het totaalplaatje: prognose per opleiding, verwachte groei/krimp, en betrouwbaarheid.
+Altijd beschikbaar. Het eindoverzicht gaat over de **eindprognose**: het ensemble als dat er is, anders het model dat de prognose levert. Bovenaan staan de totale verwachte instroom, de verandering ten opzichte van vorig jaar, en welk deel van de verwachte studenten een prognose met betrouwbaarheid hoog of middel heeft. Daaronder volgen:
 
-<iframe src="../assets/plots/output_cockpit.html" width="100%" height="400" frameborder="0" style="border-radius: 8px;"></iframe>
+- **Prognose per opleiding**: prognose ± marge, werkelijke instroom vorig jaar, het verschil en het betrouwbaarheidslabel. Zoeken, sorteren, filteren en downloaden als CSV kan hier ook.
+- **Prognose per herkomst**: NL, EER en niet-EER naast de instroom van vorig jaar.
+- **Numerus fixus** (als je die hebt ingesteld): prognose tegenover de capaciteit.
+- **Modelperformance**: dezelfde foutanalyses als op de modelpagina's, met het ensemble naast de losse modellen en de naïeve voorspelling. Zo zie je of het ensemble iets toevoegt.
 
-*Prognose per opleiding met realisatie vorig jaar, verschil en betrouwbaarheid. Betrouwbaarheid is gebaseerd op historische modelfouten: groen = hoog, geel = midden, rood = laag (demodata).*
-
-<iframe src="../assets/plots/output_growth.html" width="100%" height="420" frameborder="0" style="border-radius: 8px;"></iframe>
-
-*Verwachte groei (groen) en krimp (rood) t.o.v. vorig jaar. Het getal toont het absolute verschil in studenten (demodata).*
+Numerus-fixusopleidingen staan in de tabel met een eigen label: hun instroom wordt door de capaciteit bepaald, dus een modelfout zegt daar weinig.
 
 ### Cumulatief dashboard (`cumulative/dashboard.html`)
 
@@ -220,12 +219,6 @@ Een opleiding telt voor elk model mee in de jaren waarvoor dat model een voorspe
 
 ### Individueel dashboard (`individual/dashboard.html`)
 
-Beschikbaar bij `-d i` of `-d b`. Toont analyses op basis van per-student aanmelddata: XGBoost-classificatie, SARIMA-trajecten, en nauwkeurigheid per opleiding.
+Beschikbaar bij `-d i` of `-d b`, zodra het individuele model voorspellingen heeft. De opzet is gelijk aan het cumulatieve dashboard: kerncijfers, fout naar opleidingsgrootte en examentype, fout per opleiding en de tabel met betrouwbaarheid.
 
-<iframe src="../assets/plots/output_individual_cockpit.html" width="100%" height="400" frameborder="0" style="border-radius: 8px;"></iframe>
-
-*Prognose per opleiding op basis van het individuele model, vergeleken met de realisatie van vorig jaar. Kleur in de Δ%-kolom toont de afwijking: groen ≤ 5%, geel 5–15%, rood > 15% (demodata).*
-
-<iframe src="../assets/plots/output_scatter.html" width="100%" height="520" frameborder="0" style="border-radius: 8px;"></iframe>
-
-*Elke bol is een opleiding in een bepaald jaar. Hoe dichter bij de diagonaal, hoe beter de voorspelling. Bolgrootte toont het werkelijke aantal studenten (demodata).*
+Het **verloop per opleiding** laat hier iets anders zien: het verwachte aantal inschrijvingen per week. Dat is de som van de inschrijfkansen die XGBoost per aanmelder berekent (tot en met de voorspelweek), doorgetrokken naar het eind van het seizoen met SARIMA. Rechts staan de werkelijke instroom van eerdere jaren (★) en de voorspelde instroom (◆).

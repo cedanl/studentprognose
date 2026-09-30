@@ -1,4 +1,4 @@
-"""Modelperformance van het cumulatieve spoor, klaar voor het dashboard.
+"""Modelperformance per voorspelspoor, klaar voor het dashboard.
 
 Zet de pipeline-output om naar **evaluatie-eenheden** (één rij per collegejaar ×
 opleiding × examentype) en vat de fout samen per opleidingsgrootte en per
@@ -31,14 +31,47 @@ YEAR = "Collegejaar"
 EXAM_TYPE = "Examentype"
 WEEK = "Weeknummer"
 
-# Voorspelkolommen van het cumulatieve spoor, in weergavevolgorde. De kolom
-# 'SARIMA_cumulative' bevat historisch gezien de XGBoost-regressoroutput (#181).
-MODEL_COLUMNS: dict[str, str] = {
-    "SARIMA_cumulative": "XGBoost (cumulatief)",
-    "Prognose_ratio": "Ratiomodel",
-}
 NAIVE = "Naief_vorig_jaar"
 NAIVE_LABEL = "Naïef (vorig jaar)"
+
+# Leesbare namen van alle voorspelkolommen. 'SARIMA_cumulative' bevat historisch
+# gezien de XGBoost-regressoroutput (#181); 'SARIMA_individual' is de SARIMA-
+# extrapolatie van de XGBoost-classificatie per aanmelder.
+MODEL_LABELS: dict[str, str] = {
+    "Weighted_ensemble_prediction": "Ensemble (gewogen)",
+    "Average_ensemble_prediction": "Ensemble (gemiddeld)",
+    "Ensemble_prediction": "Ensemble",
+    "SARIMA_cumulative": "XGBoost (cumulatief)",
+    "SARIMA_individual": "Individueel model",
+    "Prognose_ratio": "Ratiomodel",
+    NAIVE: NAIVE_LABEL,
+}
+SHORT_LABELS: dict[str, str] = {
+    "Weighted_ensemble_prediction": "Ensemble",
+    "Average_ensemble_prediction": "Ensemble gem.",
+    "Ensemble_prediction": "Ensemble",
+    "SARIMA_cumulative": "XGBoost",
+    "SARIMA_individual": "Individueel",
+    "Prognose_ratio": "Ratio",
+    NAIVE: "Naïef",
+}
+
+# Te evalueren kolommen per dashboardpagina, primair model eerst. Voor het
+# eindoverzicht is het primaire model de eindprognose (het ensemble); de losse
+# sporen staan erbij zodat je ziet of het ensemble iets toevoegt.
+TRACK_MODELS: dict[str, list[str]] = {
+    "cumulative": ["SARIMA_cumulative", "Prognose_ratio"],
+    "individual": ["SARIMA_individual"],
+    "final": [
+        "Weighted_ensemble_prediction",
+        "Ensemble_prediction",
+        "SARIMA_cumulative",
+        "SARIMA_individual",
+        "Prognose_ratio",
+    ],
+}
+# Standaard (en terugwaarts compatibel): het cumulatieve spoor.
+MODEL_COLUMNS: dict[str, str] = {m: MODEL_LABELS[m] for m in TRACK_MODELS["cumulative"]}
 
 # Grootteklassen op basis van de werkelijke instroom van de opleiding.
 SIZE_EDGES: list[float] = [0, 25, 50, 100, 250, np.inf]
@@ -70,6 +103,7 @@ def build_evaluation_units(
     predict_week: int | None,
     data_studentcount: pd.DataFrame | None = None,
     numerus_fixus: dict | list | None = None,
+    models: list[str] | None = None,
 ) -> pd.DataFrame:
     """Bouw één evaluatie-eenheid per collegejaar × opleiding × examentype.
 
@@ -80,14 +114,15 @@ def build_evaluation_units(
         data_studentcount: Realisaties van alle jaren, nodig voor de naïeve baseline
             (realisatie vorig jaar). Zonder dit ontbreekt de baseline.
         numerus_fixus: Numerus-fixusopleidingen die buiten de evaluatie blijven.
+        models: Te evalueren voorspelkolommen; standaard :data:`MODEL_COLUMNS`.
 
     Returns:
         DataFrame met ``Collegejaar``, ``Croho groepeernaam``, ``Examentype``,
-        ``Aantal_studenten``, ``Grootteklasse``, één kolom per aanwezig model in
-        :data:`MODEL_COLUMNS` en ``Naief_vorig_jaar``. Leeg als er niets te
+        ``Aantal_studenten``, ``Grootteklasse``, één kolom per aanwezig model en
+        ``Naief_vorig_jaar``. Leeg als er niets te
         evalueren valt (bijv. een collegejaar zonder realisatie).
     """
-    models = [m for m in MODEL_COLUMNS if m in data.columns]
+    models = [m for m in (models or list(MODEL_COLUMNS)) if m in data.columns]
     out_cols = [YEAR, PROGRAMME, EXAM_TYPE, ACTUAL, "Grootteklasse", *models, NAIVE]
     if ACTUAL not in data.columns or not models:
         return pd.DataFrame(columns=out_cols)
@@ -99,7 +134,7 @@ def build_evaluation_units(
 
     units = _programme_totals(frame, models)
 
-    units[NAIVE] = _previous_year_actuals(units, data_studentcount)
+    units[NAIVE] = previous_year_actuals(units, data_studentcount)
     units["Grootteklasse"] = size_class(units[ACTUAL])
     units[YEAR] = units[YEAR].astype(int)
     return units[out_cols].reset_index(drop=True)
@@ -140,13 +175,14 @@ def current_predictions(
     prediction_year: int,
     predict_week: int | None,
     numerus_fixus: dict | list | None = None,
+    models: list[str] | None = None,
 ) -> pd.DataFrame:
     """Prognose per opleiding × examentype voor het voorspeljaar, per model.
 
     ``Aantal_studenten`` is gevuld zodra de realisatie bekend is (backtest) en
     anders leeg.
     """
-    models = [m for m in MODEL_COLUMNS if m in data.columns]
+    models = [m for m in (models or list(MODEL_COLUMNS)) if m in data.columns]
     cols = [PROGRAMME, EXAM_TYPE, ACTUAL, *models]
     if not models or YEAR not in data.columns:
         return pd.DataFrame(columns=cols)
@@ -238,7 +274,7 @@ def programme_summary(units: pd.DataFrame, models: list[str]) -> pd.DataFrame:
     return pd.DataFrame(rows, columns=cols)
 
 
-def _previous_year_actuals(
+def previous_year_actuals(
     units: pd.DataFrame, data_studentcount: pd.DataFrame | None
 ) -> pd.Series:
     """Realisatie van jaar-1 voor dezelfde opleiding × examentype (de naïeve voorspelling)."""
@@ -265,14 +301,18 @@ def _previous_year_actuals(
     return pd.Series(merged[NAIVE].to_numpy(dtype="float64"), index=units.index)
 
 
-def comparable_models(units: pd.DataFrame) -> list[str]:
+def comparable_models(
+    units: pd.DataFrame, models: list[str] | None = None
+) -> list[str]:
     """Modellen (incl. baseline) die genoeg dekking hebben voor een eerlijke vergelijking.
 
-    Het eerste aanwezige model uit :data:`MODEL_COLUMNS` is het primaire model en
-    doet altijd mee. Andere kolommen doen mee zodra ze minstens
-    :data:`MIN_COVERAGE` van de eenheden van het primaire model dekken.
+    Het eerste aanwezige model uit ``models`` (standaard :data:`MODEL_COLUMNS`) is
+    het primaire model en doet altijd mee. Andere kolommen doen mee zodra ze
+    minstens :data:`MIN_COVERAGE` van de eenheden van het primaire model dekken.
     """
-    present = [m for m in [*MODEL_COLUMNS, NAIVE] if m in units.columns]
+    present = [
+        m for m in [*(models or list(MODEL_COLUMNS)), NAIVE] if m in units.columns
+    ]
     present = [m for m in present if units[m].notna().any()]
     if not present:
         return []
@@ -368,13 +408,6 @@ def summarise(
     return pd.DataFrame(rows, columns=cols)
 
 
-SHORT_LABELS: dict[str, str] = {
-    "SARIMA_cumulative": "XGBoost",
-    "Prognose_ratio": "Ratio",
-    NAIVE: "Naïef",
-}
-
-
 def model_label(column: str) -> str:
     """Leesbare naam van een modelkolom of de baseline."""
-    return NAIVE_LABEL if column == NAIVE else MODEL_COLUMNS.get(column, column)
+    return MODEL_LABELS.get(column, column)

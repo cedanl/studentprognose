@@ -839,8 +839,6 @@ def _make_dashboard_builder(strategy, cfg, cwd: str) -> DashboardBuilder:
         data_cumulative=dd["data_cumulative"],
         data_studentcount=strategy.postprocessor.data_studentcount,
         data_xgboost_curve=dd["xgboost_curve"],
-        xgb_classifier_importance=dd["xgb_classifier_importance"],
-        xgb_regressor_importance=dd["xgb_regressor_importance"],
         final_academic_week=strategy.final_academic_week,
     )
 

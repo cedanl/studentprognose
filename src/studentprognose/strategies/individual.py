@@ -136,8 +136,6 @@ class IndividualStrategy(PredictionStrategy):
         return {
             "data_cumulative": None,
             "xgboost_curve": self.xgboost_curve,
-            "xgb_classifier_importance": self.xgboost_importance,
-            "xgb_regressor_importance": None,
         }
 
     def get_programme_columns_by_track(self) -> dict:

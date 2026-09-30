@@ -1,4 +1,4 @@
-"""Tests voor de cumulatieve performancepagina (issue #295).
+"""Tests voor de dashboardpagina's rond modelperformance (issue #295).
 
 Bewaakt de foutaggregatie (opleidingsniveau, grootteklassen, examentype, naïeve
 baseline) en dat de pagina als zelfstandig HTML-bestand wordt weggeschreven,
@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from studentprognose.output import cumulative_page
+from studentprognose.output import performance_page
 from studentprognose.output import model_performance as mp
 from studentprognose.output.dashboard import DashboardBuilder
 from studentprognose.utils.weeks import DataOption, StudentYearPrediction
@@ -199,7 +199,7 @@ def _builder(tmp_path, data, studentcount, option=DataOption.CUMULATIVE):
 
 
 def test_payload_is_strict_json(output, studentcount):
-    payload = cumulative_page.build_payload(
+    payload = performance_page.build_payload(
         output,
         _cumulative(),
         studentcount,
@@ -319,7 +319,7 @@ def test_payload_table_includes_unevaluated_programmes(output, studentcount):
     # E heeft een prognose maar geen realisatie: in de tabel als 'onbekend'.
     data = output.copy()
     data.loc[data["Croho groepeernaam"] == "E", "Collegejaar"] = 2024
-    payload = cumulative_page.build_payload(
+    payload = performance_page.build_payload(
         data,
         _cumulative(),
         studentcount,
@@ -329,9 +329,114 @@ def test_payload_table_includes_unevaluated_programmes(output, studentcount):
         38,
     )
     rows = {r["p"]: r for r in payload["performance"]["programmes"]["alle"]}
-    assert rows["E"]["m"]["SARIMA_cumulative"]["t"] == "onbekend"
+    # Zonder evaluatie geen modelcijfers; de pagina toont dan "onbekend".
+    assert rows["E"]["m"] == {}
     assert rows["A"]["m"]["SARIMA_cumulative"]["t"] in mp.TRUST_LEVELS
     assert (
         payload["performance"]["current"]["A|Bachelor"]["m"]["SARIMA_cumulative"]
         == 110.0
     )
+
+
+# ── Individuele pagina en eindoverzicht ───────────────────────────────
+
+
+def test_track_models_final_prefers_filled_ensemble():
+    data = pd.DataFrame(
+        {
+            "Weighted_ensemble_prediction": [np.nan],
+            "Ensemble_prediction": [5.0],
+            "SARIMA_cumulative": [4.0],
+            "SARIMA_individual": [np.nan],
+            "Prognose_ratio": [3.0],
+        }
+    )
+    assert performance_page.track_models("final", data) == [
+        "Ensemble_prediction",
+        "SARIMA_cumulative",
+        "Prognose_ratio",
+    ]
+    assert performance_page.track_models("individual", data) == []
+
+
+def test_final_payload_has_forecast_overview_with_numerus_fixus(output, studentcount):
+    data = output.assign(Weighted_ensemble_prediction=output["SARIMA_cumulative"])
+    payload = performance_page.build_payload(
+        data,
+        _cumulative(),
+        studentcount,
+        2024,
+        10,
+        [str(w) for w in range(1, 53)],
+        38,
+        numerus_fixus={"C": 60},
+        track="final",
+    )
+    fc = payload["forecast"]
+    # A (110) + B (5) + C (80, NF telt mee in de prognose) + E (10); D is onvolledig.
+    assert fc["total"] == pytest.approx(205.0)
+    assert fc["nf"] == [{"p": "C", "cap": 60.0, "prognose": 80.0, "prev": None}]
+    assert payload["performance"]["current"]["C|Bachelor"]["nf"] is True
+    assert payload["trend"]["programmes"] == []
+    assert (
+        payload["performance"]["tableModels"][0]["key"]
+        == "Weighted_ensemble_prediction"
+    )
+
+
+def test_individual_payload_trend_uses_xgboost_curve(output, studentcount):
+    data = output.assign(SARIMA_individual=output["SARIMA_cumulative"])
+    curve = pd.DataFrame(
+        {
+            "Collegejaar": [2024] * 4,
+            "Croho groepeernaam": ["A", "A", "A", "A"],
+            "Herkomst": ["NL", "EER", "NL", "EER"],
+            "Examentype": ["Bachelor"] * 4,
+            "Faculteit": ["FdM"] * 4,
+            "Weeknummer": [9, 9, 10, 10],
+            "XGBoost_cumulative": [10.0, 5.0, 20.0, 8.0],
+        }
+    )
+    payload = performance_page.build_payload(
+        data,
+        None,
+        studentcount,
+        2024,
+        10,
+        [str(w) for w in range(1, 53)],
+        38,
+        track="individual",
+        xgboost_curve=curve,
+    )
+    prog = payload["trend"]["programmes"][0]
+    assert prog["code"] == "A"
+    assert prog["series"]["2024"][8:10] == [15.0, 28.0]  # herkomst opgeteld per week
+    assert prog["predicted"] == pytest.approx(110.0)
+    assert payload["meta"]["page"]["title"] == "Individueel model"
+
+
+def test_builder_skips_individual_page_without_individual_predictions(
+    tmp_path, output, studentcount
+):
+    data = output.assign(SARIMA_individual=np.nan)
+    b = _builder(tmp_path, data, studentcount, option=DataOption.BOTH_DATASETS)
+    b.build_and_save()
+    vis = tmp_path / "data/output/visualisations"
+    assert not (vis / "individual").exists()
+    assert "../individual/dashboard.html" not in (
+        vis / "final/dashboard.html"
+    ).read_text("utf-8")
+
+
+def test_both_mode_builds_all_three_pages(tmp_path, output, studentcount):
+    """Standaardmodus (beide) met voorspellingen van beide sporen: drie pagina's."""
+    data = output.assign(
+        SARIMA_individual=output["SARIMA_cumulative"],
+        Weighted_ensemble_prediction=output["SARIMA_cumulative"],
+    )
+    _builder(tmp_path, data, studentcount, option=DataOption.BOTH_DATASETS).build_and_save()
+    vis = tmp_path / "data/output/visualisations"
+    assert sorted(p.name for p in vis.iterdir()) == ["cumulative", "final", "individual"]
+    final = (vis / "final/dashboard.html").read_text("utf-8")
+    for page in ("individual", "cumulative", "final"):
+        assert f"../{page}/dashboard.html" in final
