@@ -1145,107 +1145,6 @@ def plot_output_scatter(predictions: dict) -> go.Figure:
     return fig
 
 
-def plot_output_conversion(
-    curves: dict, student_counts: dict,
-) -> go.Figure:
-    """Grouped bar chart: vooraanmelders at week 38 vs actual enrolments."""
-    progs = [p[0] for p in OUTPUT_PROGRAMMES]
-    year = 2024
-
-    vooraanmelders, inschrijvingen = [], []
-    for prog in progs:
-        va = sum(int(curves[(prog, h, year)][-1]) for h in ["NL", "EER", "Niet-EER"]
-                 if (prog, h, year) in curves)
-        ins = sum(student_counts[(prog, h, year)] for h in ["NL", "EER", "Niet-EER"]
-                  if (prog, h, year) in student_counts)
-        vooraanmelders.append(va)
-        inschrijvingen.append(ins)
-
-    conv_pct = [f"{a / p:.0%}" if p > 0 else "–" for p, a in zip(vooraanmelders, inschrijvingen)]
-
-    fig = go.Figure()
-    fig.add_trace(go.Bar(
-        x=progs, y=vooraanmelders, name="Vooraanmelders (wk 38)",
-        marker_color=CONVERSION_COLOURS["predicted"],
-        text=[f"{v:.0f}" for v in vooraanmelders], textposition="outside",
-        hovertemplate="%{x}<br>Vooraanmelders: %{y:.0f}<extra></extra>",
-    ))
-    fig.add_trace(go.Bar(
-        x=progs, y=inschrijvingen, name="Inschrijvingen",
-        marker_color=CONVERSION_COLOURS["actual"],
-        text=conv_pct, textposition="outside",
-        hovertemplate="%{x}<br>Inschrijvingen: %{y:.0f}<br>Conversie: %{text}<extra></extra>",
-    ))
-
-    fig.update_layout(
-        title=dict(text="Vooraanmelders vs inschrijvingen — 2024 (demodata)", font=dict(size=15)),
-        xaxis=dict(title="", tickangle=-35),
-        yaxis=dict(title="Aantal"),
-        barmode="group",
-        height=460,
-        margin=dict(b=120),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    return fig
-
-
-def plot_output_accuracy_heatmap(predictions: dict) -> go.Figure:
-    """Heatmap: MAPE per programme × model — shows which model works best where."""
-    progs = [p[0] for p in OUTPUT_PROGRAMMES]
-    models = ["SARIMA (individueel)", "XGBoost (cumulatief)", "Ratio-model", "Ensemble"]
-    model_keys = ["SARIMA_individual", "SARIMA_cumulative", "Prognose_ratio", "Ensemble"]
-
-    z = []
-    annotations = []
-    for i, prog in enumerate(progs):
-        row = []
-        for j, key in enumerate(model_keys):
-            mapes = []
-            for yr in RECENT_YEARS:
-                p = predictions[(prog, yr)]
-                if p["actual"] > 0:
-                    mapes.append(abs(p[key] - p["actual"]) / p["actual"])
-            avg = np.mean(mapes) if mapes else 0
-            row.append(avg)
-        z.append(row)
-
-    for i, prog in enumerate(progs):
-        best_j = int(np.argmin(z[i]))
-        for j in range(len(models)):
-            val = z[i][j]
-            is_best = j == best_j
-            annotations.append(dict(
-                x=models[j], y=prog,
-                text=f"★ {val:.0%}" if is_best else f"{val:.0%}",
-                showarrow=False,
-                font=dict(color="white" if val > 0.15 else "#333", size=12),
-            ))
-
-    fig = go.Figure(go.Heatmap(
-        z=z, x=models, y=progs,
-        colorscale=[
-            [0, "#2ca02c"], [0.10, "#2ca02c"],
-            [0.10, "#f0ad4e"], [0.25, "#f0ad4e"],
-            [0.25, "#d62728"], [1.0, "#d62728"],
-        ],
-        zmin=0, zmax=0.40,
-        showscale=False,
-        hovertemplate="%{y}<br>%{x}: %{z:.1%}<extra></extra>",
-    ))
-    fig.update_layout(
-        title=dict(
-            text="Modelvergelijking per opleiding — gemiddelde MAPE (★ = best, demodata)",
-            font=dict(size=15),
-        ),
-        xaxis=dict(title="", side="top", tickangle=0),
-        yaxis=dict(title="", autorange="reversed"),
-        height=400,
-        margin=dict(l=220, t=80),
-        annotations=[a for a in annotations],
-    )
-    return fig
-
-
 def plot_output_individual_cockpit(predictions: dict) -> go.Figure:
     """Individual model cockpit: prognose per programme with Δ% vs previous year."""
     year, prev_year = 2024, 2023
@@ -2039,21 +1938,11 @@ def main() -> None:
     )
 
     # ── Output plots (output-begrijpen.md) ──────────────────────────
-    out_curves, out_counts, predictions = _generate_output_data()
+    _, _, predictions = _generate_output_data()
 
     _wrap_html(plot_output_cockpit(predictions), "output_cockpit.html", output_dir)
     _wrap_html(plot_output_growth(predictions), "output_growth.html", output_dir)
     _wrap_html(plot_output_scatter(predictions), "output_scatter.html", output_dir)
-    _wrap_html(
-        plot_output_conversion(out_curves, out_counts),
-        "output_conversion.html",
-        output_dir,
-    )
-    _wrap_html(
-        plot_output_accuracy_heatmap(predictions),
-        "output_accuracy_heatmap.html",
-        output_dir,
-    )
     _wrap_html(
         plot_output_individual_cockpit(predictions),
         "output_individual_cockpit.html",
