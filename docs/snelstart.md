@@ -83,9 +83,9 @@ Wil je het visueel? Voeg `--dashboard` toe:
 studentprognose -d c -y 2024 --dashboard
 ```
 
-<iframe src="../assets/plots/output_cockpit.html" width="100%" height="400" frameborder="0" style="border-radius: 8px;"></iframe>
+![Cumulatief dashboard met kerncijfers en fout naar opleidingsgrootte en examentype](assets/cumulatief-dashboard.png)
 
-*Voorbeelddashboard op de demodata: prognose, conversie en betrouwbaarheid per opleiding.*
+*Voorbeelddashboard op de demodata: hoe goed het model presteert, per opleidingsgrootte en examentype. Zie [Output lezen](output-begrijpen.md#interactief-dashboard) voor alle pagina's.*
 
 ## Wat nu?
 

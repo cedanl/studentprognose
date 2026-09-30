@@ -32,7 +32,7 @@ Zie [Methodologie](methodologie/index.md) voor de uitleg per model en [Begrippen
 
 Naast Excel-bestanden genereert de tool desgewenst interactieve dashboards (`--dashboard`):
 
-<iframe src="assets/plots/output_cockpit.html" width="100%" height="400" frameborder="0" style="border-radius: 8px;"></iframe>
+![Cumulatief dashboard met kerncijfers en fout naar opleidingsgrootte en examentype](assets/cumulatief-dashboard.png)
 
 Zie [Output lezen](output-begrijpen.md) voor uitleg van elk cijfer en wanneer je een prognose wel of niet moet vertrouwen.
 

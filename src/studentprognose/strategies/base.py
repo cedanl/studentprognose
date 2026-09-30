@@ -59,8 +59,6 @@ class PredictionStrategy(ABC):
         return {
             "data_cumulative": None,
             "xgboost_curve": None,
-            "xgb_classifier_importance": None,
-            "xgb_regressor_importance": None,
         }
 
     def _programme_column_name(self) -> str:

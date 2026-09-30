@@ -2,8 +2,10 @@ import os
 import sys
 import traceback
 import warnings
+from collections.abc import Sequence
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 
 from studentprognose.cli import PipelineConfig, parse_args
@@ -323,7 +325,7 @@ def run_pipeline_from_dataframes(
 
 
 def build_dashboard_from_dataframes(
-    year: int,
+    year: int | Sequence[int],
     week: int,
     data_cumulative: Optional[pd.DataFrame] = None,
     data_individual: Optional[pd.DataFrame] = None,
@@ -348,7 +350,10 @@ def build_dashboard_from_dataframes(
     roep deze functie ná (of in plaats van) die functie aan met dezelfde argumenten.
 
     Args:
-        year: Academisch jaar om te voorspellen (bijv. ``2025``).
+        year: Academisch jaar om te voorspellen (bijv. ``2025``), of een lijst jaren
+            (bijv. ``[2022, 2023, 2024, 2025]``) voor een backtest. Het cumulatieve
+            dashboard meet de modelfout over alle jaren waarvan de realisatie bekend
+            is; het laatste jaar is het voorspeljaar.
         week: ISO-weeknummer waarvandaan voorspeld wordt (bijv. ``10``).
         data_cumulative: Cumulatief vooraanmeld-DataFrame. Vereist wanneer ``dataset``
             ``CUMULATIVE`` of ``BOTH_DATASETS`` is.
@@ -357,7 +362,7 @@ def build_dashboard_from_dataframes(
         configuration: Configuratiedict (zelfde structuur als ``configuration.json``).
             Bij ``None`` worden de gebundelde package-defaults gebruikt.
         data_student_numbers: Studentaantallen eerstejaars DataFrame (optioneel, maar
-            nodig voor de realisatie-/conversiegrafieken in het dashboard).
+            nodig voor de modelperformance en de naïeve baseline in het dashboard).
         data_latest: Laatste output Excel DataFrame voor hogerejaarsvoorspellingen (optioneel).
         data_weighted_ensemble: Ensemble-gewichten DataFrame (optioneel).
         dataset: Welke dataset(s) te gebruiken. Standaard ``BOTH_DATASETS``.
@@ -433,7 +438,7 @@ def build_dashboard_from_dataframes(
 
 
 def _prepare_in_memory_run(
-    year: int,
+    year: int | Sequence[int],
     week: int,
     *,
     data_cumulative: Optional[pd.DataFrame],
@@ -467,8 +472,11 @@ def _prepare_in_memory_run(
     # buiten de range van de meegegeven data valt, in plaats van een stille None of een
     # kernel-crash verderop in de pipeline. Draait vóór config-werk (fail fast); de
     # 2-tuple wordt door de detector via `*_` afgehandeld.
+    years = [int(year)] if isinstance(year, (int, np.integer)) else [int(y) for y in year]
+    if not years:
+        raise ValueError("year mag geen lege lijst zijn.")
     mismatch = detect_data_range_mismatch(
-        (data_individual, data_cumulative), [year], [week]
+        (data_individual, data_cumulative), years, [week]
     )
     if mismatch is not None:
         raise ValueError(format_api_range_error(year, week, mismatch))
@@ -507,7 +515,7 @@ def _prepare_in_memory_run(
         cwd = os.getcwd()
 
     cfg = PipelineConfig(
-        years=[year],
+        years=years,
         weeks=[week],
         weeks_specified=True,
         years_specified=True,
@@ -831,8 +839,6 @@ def _make_dashboard_builder(strategy, cfg, cwd: str) -> DashboardBuilder:
         data_cumulative=dd["data_cumulative"],
         data_studentcount=strategy.postprocessor.data_studentcount,
         data_xgboost_curve=dd["xgboost_curve"],
-        xgb_classifier_importance=dd["xgb_classifier_importance"],
-        xgb_regressor_importance=dd["xgb_regressor_importance"],
         final_academic_week=strategy.final_academic_week,
     )
 

@@ -46,8 +46,6 @@ class CombinedStrategy(PredictionStrategy):
         return {
             "data_cumulative": self.cumulative.data_cumulative,
             "xgboost_curve": self.individual.xgboost_curve,
-            "xgb_classifier_importance": self.individual.xgboost_importance,
-            "xgb_regressor_importance": self.cumulative.xgboost_importance,
         }
 
     def get_programme_columns_by_track(self) -> dict:

@@ -132,7 +132,7 @@ output_dir = build_dashboard_from_dataframes(
     year=2025,
     week=10,
     data_cumulative=df_cum,
-    data_student_numbers=sc,   # nodig voor de realisatie-/conversiegrafieken
+    data_student_numbers=sc,   # nodig voor modelperformance en naïeve baseline
     dataset=DataOption.CUMULATIVE,
     configuration=config,
 )
@@ -147,6 +147,27 @@ print(f"Dashboards geschreven naar {output_dir}")
     De `year`/`week`-rangecontrole is identiek aan die van `run_pipeline_from_dataframes`;
     komt geen enkele rij door de filters, dan krijg je een heldere `ValueError` in plaats
     van een leeg dashboard.
+
+#### Modelperformance over meerdere jaren
+
+Het cumulatieve dashboard laat zien hoe goed het model presteert: de fout per
+opleidingsgrootte en per examentype, vergeleken met een naïeve voorspelling (zie
+[Output lezen](output-begrijpen.md#cumulatief-dashboard-cumulativedashboardhtml)). Die fout
+valt alleen te meten voor jaren waarvan de realisatie in `data_student_numbers` zit. Geef
+een **lijst jaren** mee voor een backtest; het laatste jaar is het voorspeljaar:
+
+```python
+output_dir = build_dashboard_from_dataframes(
+    year=[2022, 2023, 2024, 2025],  # elk jaar wordt vanaf week 16 voorspeld
+    week=16,
+    data_cumulative=df_cum,
+    data_student_numbers=sc,
+    dataset=DataOption.CUMULATIVE,
+    configuration=config,
+)
+```
+
+Elk jaar is een volledige pipeline-run, dus de rekentijd groeit met het aantal jaren.
 
 ## Hyperparameter tuning
 

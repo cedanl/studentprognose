@@ -149,8 +149,6 @@ class CumulativeStrategy(PredictionStrategy):
         return {
             "data_cumulative": self.data_cumulative,
             "xgboost_curve": None,
-            "xgb_classifier_importance": None,
-            "xgb_regressor_importance": self.xgboost_importance,
         }
 
     def get_programme_columns_by_track(self) -> dict:

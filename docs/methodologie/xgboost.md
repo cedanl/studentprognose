@@ -87,7 +87,7 @@ De uitkomsten van beide sporen komen samen in het [ensemble](ensemble.md), waar 
 
 Na het trainen van elk XGBoost-model wordt de **feature importance** geëxtraheerd en gegroepeerd per oorspronkelijke feature. One-hot geëncodeerde categorieën worden teruggegroepeerd naar hun oorspronkelijke kolom (bijv. alle `Herkomst_NL`, `Herkomst_EER`, … worden samengevoegd tot `Herkomst`). Weeknummers worden weergegeven als `Week 1`, `Week 2`, etc.
 
-De gegroepeerde importances worden getoond in het interactieve dashboard (zie [Output lezen](../output-begrijpen.md#interactief-dashboard)).
+Het dashboard toont de importances niet: dat richt zich op hoe goed het model voorspelt. Via de Python-API zijn ze na een run beschikbaar als `strategy.xgboost_importance`. De grafieken hieronder zijn voorbeelden op demodata.
 
 <iframe src="../../assets/plots/xgb_classifier_importance.html" width="100%" height="450" frameborder="0" style="border-radius: 8px;"></iframe>
 

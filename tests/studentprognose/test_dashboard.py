@@ -25,8 +25,6 @@ def _make_strategy_stub():
         get_dashboard_data=lambda: {
             "data_cumulative": None,
             "xgboost_curve": None,
-            "xgb_classifier_importance": None,
-            "xgb_regressor_importance": None,
         },
     )
 
@@ -176,7 +174,6 @@ def _install_dashboard_fake_strategy(monkeypatch, *, result="frame"):
         def get_dashboard_data(self):
             return {
                 "data_cumulative": None, "xgboost_curve": None,
-                "xgb_classifier_importance": None, "xgb_regressor_importance": None,
             }
 
     monkeypatch.setattr(
@@ -234,3 +231,36 @@ def test_build_dashboard_from_dataframes_raises_without_data(tmp_path, monkeypat
         build_dashboard_from_dataframes(
             year=2025, week=10, data_individual=data_individual, dataset=DataOption.INDIVIDUAL,
         )
+
+
+def test_build_dashboard_from_dataframes_accepts_year_list(tmp_path, monkeypatch):
+    """Een lijst jaren draait een backtest: elk jaar wordt voorspeld (issue #295)."""
+    import studentprognose.main as main_mod
+    from studentprognose import DataOption, build_dashboard_from_dataframes
+
+    _install_dashboard_fake_strategy(monkeypatch)
+    seen = {}
+    make = main_mod.create_strategy
+
+    def _capture(cfg, datasets, configuration, cwd):
+        seen["years"] = list(cfg.years)
+        return make(cfg, datasets, configuration, cwd)
+
+    monkeypatch.setattr(main_mod, "create_strategy", _capture)
+    monkeypatch.chdir(tmp_path)
+
+    data_individual = pd.DataFrame(
+        {"Collegejaar": [2024, 2025], "Croho groepeernaam": ["B Foo", "B Foo"]}
+    )
+    build_dashboard_from_dataframes(
+        year=[2024, 2025], week=10, data_individual=data_individual,
+        dataset=DataOption.INDIVIDUAL,
+    )
+    assert seen["years"] == [2024, 2025]
+
+
+def test_build_dashboard_from_dataframes_rejects_empty_year_list():
+    from studentprognose import build_dashboard_from_dataframes
+
+    with pytest.raises(ValueError, match="lege lijst"):
+        build_dashboard_from_dataframes(year=[], week=10)
