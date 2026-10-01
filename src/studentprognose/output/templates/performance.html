@@ -82,7 +82,7 @@ body {
   background: var(--page); color: var(--text);
   font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
-.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 24px 16px 64px; }
 nav { display: flex; gap: 4px; margin-bottom: 28px; flex-wrap: wrap; }
 .nav-link {
   padding: 6px 14px; border-radius: 999px; color: var(--text-2);
@@ -152,6 +152,28 @@ td .margin { color: var(--muted); font-size: 12px; margin-left: 4px; }
 button.link { all: unset; cursor: pointer; color: var(--series-1); font-weight: 600; }
 button.link:hover { text-decoration: underline; }
 tbody tr:hover { background: var(--accent-wash); }
+tbody tr.is-selected { background: var(--accent-wash); font-weight: 600; }
+.btn-plain { margin-left: 0; }
+#expand-all[hidden] + .btn-plain { margin-left: auto; }
+button.expand {
+  all: unset; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; margin-right: 4px; border-radius: 5px; color: var(--text-2);
+  font-size: 16px; line-height: 1; vertical-align: -1px; transition: transform 0.15s ease;
+}
+button.expand:hover { background: var(--accent-wash); color: var(--text); }
+button.expand:focus-visible { outline: 2px solid var(--series-1); outline-offset: 1px; }
+button.expand[aria-expanded="true"] { transform: rotate(90deg); color: var(--text); }
+.expand-spacer { display: inline-block; width: 20px; margin-right: 4px; }
+#table-programmes th, #table-programmes td { padding-left: 8px; padding-right: 8px; }
+tr.is-open > th, tr.is-open > td { border-bottom-color: transparent; }
+tr.origin-row > th, tr.origin-row > td {
+  background: var(--accent-wash); font-size: 13px; color: var(--text-2);
+  padding-top: 4px; padding-bottom: 4px; border-bottom-color: transparent;
+}
+tr.origin-row.is-last > th, tr.origin-row.is-last > td { border-bottom-color: var(--grid); }
+tr.origin-row .badge { font-size: 11.5px; padding: 1px 8px 1px 6px; }
+#table-programmes th.origin-cell { padding-left: 40px; font-weight: 500; }
+.origin-name { color: var(--text); }
 .tile {
   background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
   padding: 16px 18px;
@@ -198,11 +220,17 @@ footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
 [hidden] { display: none !important; }
 .sections { display: flex; flex-direction: column; }
 .grid-2 > .span-2 { grid-column: 1 / -1; }
+.view-note {
+  display: none; margin: -4px 0 16px; padding: 8px 12px; border-radius: 8px;
+  background: var(--accent-wash); color: var(--text-2); font-size: 13.5px;
+}
+.view-note.is-on { display: block; }
+.view-note strong { color: var(--text); }
 .forecast-tiles .tile .value { font-size: 32px; }
 code.plain { background: none; padding: 0; }
 @media (max-width: 860px) {
   .tiles { grid-template-columns: repeat(2, 1fr); }
-  .grid-2 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 480px) {
   .tiles { grid-template-columns: 1fr; }
@@ -235,14 +263,19 @@ code.plain { background: none; padding: 0; }
       <label class="control">Model
         <select id="model-filter"></select>
       </label>
+      <label class="control" id="origin-control" hidden>Herkomst
+        <select id="origin-filter"></select>
+      </label>
     </section>
+
+    <p data-block="view-note" class="view-note" id="view-note" role="status"></p>
 
     <section data-block="tiles" class="tiles" id="tiles"></section>
 
     <section data-block="groups" class="grid-2">
       <article class="card">
         <h2>Fout naar opleidingsgrootte</h2>
-        <p class="lede">WAPE per grootteklasse (werkelijke instroom). Kleine opleidingen hebben vaak
+        <p class="lede" id="size-lede">WAPE per grootteklasse (werkelijke instroom). Kleine opleidingen hebben vaak
           een hogere relatieve fout: één student meer of minder telt daar zwaar.</p>
         <div class="chart" id="chart-size" role="img" aria-label="Fout per grootteklasse"></div>
         <div class="table-scroll"><table id="table-size"></table></div>
@@ -254,6 +287,14 @@ code.plain { background: none; padding: 0; }
         <div class="chart" id="chart-exam" role="img" aria-label="Fout per examentype"></div>
         <div class="table-scroll"><table id="table-exam"></table></div>
       </article>
+      <article class="card span-2" id="origin-card" hidden>
+        <h2>Fout naar herkomst</h2>
+        <p class="lede">WAPE per herkomstgroep, gemeten per opleiding × herkomst. Fouten tussen
+          herkomstgroepen vallen hier niet tegen elkaar weg, dus deze WAPE ligt meestal hoger dan
+          die op opleidingsniveau. Kies een herkomst bovenaan om alle cijfers voor die groep te zien.</p>
+        <div class="chart" id="chart-origin" role="img" aria-label="Fout per herkomst"></div>
+        <div class="table-scroll"><table id="table-origin"></table></div>
+      </article>
     </section>
 
     <article data-block="units" class="card">
@@ -264,8 +305,10 @@ code.plain { background: none; padding: 0; }
       <details class="help">
         <summary>Hoe worden deze cijfers berekend?</summary>
         <dl>
-          <dt>Populatie</dt><dd><span id="population-note"></span>Opleidingen met een bekende realisatie, gemeten op de voorspelweek.
-            Herkomstgroepen zijn opgeteld tot één opleiding. Modellen worden vergeleken op dezelfde set opleidingen.</dd>
+          <dt>Populatie</dt><dd><span id="population-note"></span><span id="population-text">Opleidingen met een bekende realisatie, gemeten op de voorspelweek.
+            Herkomstgroepen zijn opgeteld tot één opleiding.</span> Modellen worden vergeleken op dezelfde set opleidingen.</dd>
+          <dt>Prognose = gemeten</dt><dd>De fout wordt gemeten op precies de prognose die in de tabel staat: dezelfde
+            herkomstgroepen, dezelfde week.<span id="unrealised-note"></span></dd>
           <dt>WAPE</dt><dd>Som van absolute fouten gedeeld door de som van de werkelijke instroom.
             Grote opleidingen wegen zwaarder; dit is de fout "per student".</dd>
           <dt>MAPE</dt><dd>Gemiddelde procentuele fout per opleiding. Elke opleiding telt even zwaar,
@@ -283,7 +326,8 @@ code.plain { background: none; padding: 0; }
       <div class="table-tools">
         <input type="search" id="table-search" placeholder="Zoek opleiding" aria-label="Zoek opleiding in de tabel">
         <div class="chips" role="group" aria-label="Filter op betrouwbaarheid" id="trust-chips"></div>
-        <button type="button" class="btn" id="csv-download">Download CSV</button>
+        <button type="button" class="btn" id="expand-all" aria-pressed="false" hidden>Herkomst uitklappen</button>
+        <button type="button" class="btn btn-plain" id="csv-download">Download CSV</button>
       </div>
       <div class="table-wrap"><table id="table-programmes"></table></div>
       <p class="chart-note" id="table-note"></p>
@@ -328,6 +372,7 @@ code.plain { background: none; padding: 0; }
         <datalist id="programme-list"></datalist>
       </div>
       <div class="chart tall" id="chart-trend" role="img" aria-label="Verloop per week"></div>
+      <p class="chart-note" id="trend-empty" hidden>Geen opleidingen met gegevens voor deze herkomst.</p>
       <div class="trackrecord" id="trackrecord"></div>
     </article>
   </main>
@@ -340,7 +385,11 @@ code.plain { background: none; padding: 0; }
 (function () {
   "use strict";
   const DATA = JSON.parse(document.getElementById("dashboard-data").textContent);
-  const META = DATA.meta, PAGE = META.page, PERF = DATA.performance, TREND = DATA.trend, FC = DATA.forecast;
+  const META = DATA.meta, PAGE = META.page, TREND = DATA.trend, FC = DATA.forecast;
+  const ORIGINS = META.origins || [];
+  const ALL = "alle";
+  // PERF is de weergave die nu getoond wordt: alle herkomsten opgeteld, of één herkomstgroep.
+  let PERF = DATA.performance;
   const NAIVE = "Naief_vorig_jaar";
   const IS_FINAL = META.track === "final";
 
@@ -385,30 +434,27 @@ code.plain { background: none; padding: 0; }
   const CONFIG = { responsive: true, displayModeBar: false };
 
   // ── Opbouw van de pagina ─────────────────────────────────────────
-  const hasPerf = PERF.units.length > 0 && PERF.models.length > 0;
-  const tableModels = PERF.tableModels || [];
-  const hasTable = (PERF.programmes.alle || []).length > 0 && tableModels.length > 0;
+  const state = { year: "alle", model: null, programme: null, origin: ALL };
+  // Afgeleid van de gekozen herkomstweergave; zie setView().
+  let hasPerf = false, tableModels = [], hasTable = false;
   const hasTrend = !!PAGE.trend && TREND.programmes.length > 0;
-  const state = { year: "alle", model: tableModels.length ? tableModels[0].key : null, programme: null };
   const labelOfModel = key => (tableModels.concat(PERF.models).find(x => x.key === key) || { label: key }).label;
   const shortOfModel = key => (tableModels.concat(PERF.models).find(x => x.key === key) || { short: key }).short;
   // Grafieken tonen alleen modellen met genoeg dekking; valt het gekozen model
   // daarbuiten, dan tonen ze het primaire model.
   const chartModel = () => (PERF.models.some(m => m.key === state.model) ? state.model : (PERF.models[0] || {}).key);
+  const isOrigin = () => state.origin !== ALL;
+  const viewLabel = () => (isOrigin() ? `herkomst ${state.origin}` : "alle herkomsten");
+  const unitWord = () => (isOrigin() ? "opleiding-jaren (alleen herkomst " + state.origin + ")" : "opleiding-jaren");
 
   const LAYOUT = IS_FINAL
-    ? ["forecast", "controls", "table", "forecast-extra", "tiles", "groups", "units", "empty"]
-    : ["controls", "tiles", "groups", "units", "table", "empty", "trend"];
+    ? ["forecast", "controls", "view-note", "table", "forecast-extra", "tiles", "groups", "units", "empty"]
+    : ["controls", "view-note", "tiles", "groups", "units", "table", "empty", "trend"];
   document.querySelectorAll("[data-block]").forEach(el => {
     const i = LAYOUT.indexOf(el.dataset.block);
     el.style.order = i < 0 ? 99 : i;
     if (i < 0) el.hidden = true;
   });
-  ["tiles", "groups", "units"].forEach(b => { if (!hasPerf) block(b).hidden = true; });
-  // Met meer dan drie reeksen passen grafiek en tabel niet naast elkaar.
-  if (PERF.models.length > 3) block("groups").style.gridTemplateColumns = "minmax(0, 1fr)";
-  if (!hasTable) block("table").hidden = true;
-  if (!hasTable && !hasPerf) block("controls").hidden = true;
   if (!hasTrend) block("trend").hidden = true;
   if (IS_FINAL && FC) { block("forecast").hidden = false; block("forecast-extra").hidden = false; }
 
@@ -416,59 +462,128 @@ code.plain { background: none; padding: 0; }
   const sub = [`Prognose ${META.year}`];
   if (META.week != null) sub.push(`voorspelweek ${META.week}`);
   document.getElementById("subtitle").textContent = sub.join(" · ");
-  document.getElementById("intro").textContent = PAGE.question + (hasPerf
-    ? ` Gemeten op ${num.format(PERF.units.length)} opleiding-jaren waarvan de werkelijke instroom bekend is, ` +
-      `vergeleken met ${PERF.models.length > 2 ? "de andere modellen en " : ""}een naïeve voorspelling.`
-    : "");
-  document.getElementById("footer").textContent =
-    "Gegenereerd door studentprognose · alle cijfers op opleidingsniveau, gemeten op de voorspelweek.";
-  if (PERF.nUnitsAll > PERF.units.length) {
-    document.getElementById("population-note").textContent =
-      `${num.format(PERF.units.length)} van ${num.format(PERF.nUnitsAll)} opleiding-jaren: de rest viel af omdat niet elk model er een voorspelling voor had. `;
-  }
   if (META.nNumerusFixus > 0) {
     document.getElementById("excluded-note").textContent =
       `${META.nNumerusFixus} numerus-fixusopleiding(en): hun instroom wordt door de capaciteit bepaald.`;
   }
-  document.getElementById("units-lede").textContent =
-    "Elke stip is een opleiding in één collegejaar. Boven de nullijn is overschat, eronder onderschat." +
-    (hasTrend ? " Klik op een stip om het verloop van die opleiding hieronder te bekijken." : "");
-
-  if (!hasPerf) {
-    block("empty").hidden = false;
+  {
     const w = META.week != null ? META.week : 16;
     document.getElementById("backtest-cmd").textContent =
       `studentprognose -w ${w} -y ${META.year - 3}:${META.year - 1} ${PAGE.backtest} --dashboard`;
   }
 
-  if (hasPerf || hasTable) {
+  // Alles wat afhangt van de gekozen herkomst: zichtbaarheid, filters en teksten.
+  function setView(origin) {
+    state.origin = origin;
+    PERF = origin === ALL ? DATA.performance : (DATA.performanceByOrigin || {})[origin] || DATA.performance;
+    hasPerf = PERF.units.length > 0 && PERF.models.length > 0;
+    tableModels = PERF.tableModels || [];
+    hasTable = (PERF.programmes.alle || []).length > 0 && tableModels.length > 0;
+    if (!tableModels.some(m => m.key === state.model)) state.model = tableModels.length ? tableModels[0].key : null;
+    if (state.year !== "alle" && !PERF.programmes[state.year]) state.year = "alle";
+    rebuildIndexes();
+
+    ["tiles", "groups", "units"].forEach(b => { block(b).hidden = !hasPerf; });
+    // Met meer dan drie reeksen passen grafiek en tabel niet naast elkaar.
+    block("groups").style.gridTemplateColumns = PERF.models.length > 3 ? "minmax(0, 1fr)" : "";
+    block("table").hidden = !hasTable;
+    block("controls").hidden = !hasTable && !hasPerf && !ORIGINS.length;
+    block("empty").hidden = hasPerf;
+
     const yf = document.getElementById("year-filter");
     const years = PERF.years;
     const opts = years.length > 1
       ? [["alle", `Alle jaren (${years[0]}–${years[years.length - 1]})`]].concat(years.map(y => [String(y), String(y)]))
       : [["alle", years.length ? String(years[0]) : "–"]];
     yf.innerHTML = opts.map(([v, l]) => `<option value="${v}">${esc(l)}</option>`).join("");
+    yf.value = state.year;
     yf.disabled = years.length < 2;
     const mf = document.getElementById("model-filter");
     mf.innerHTML = tableModels.map(m => `<option value="${m.key}">${esc(m.label)}</option>`).join("");
+    mf.value = state.model || "";
     mf.disabled = mf.options.length < 2;
+
+    document.getElementById("intro").textContent = PAGE.question + (hasPerf
+      ? ` Gemeten op ${num.format(PERF.units.length)} ${unitWord()} waarvan de werkelijke instroom bekend is, ` +
+        `vergeleken met ${PERF.models.length > 2 ? "de andere modellen en " : ""}een naïeve voorspelling.`
+      : "");
+    document.getElementById("footer").textContent = "Gegenereerd door studentprognose · " + (isOrigin()
+      ? `cijfers per opleiding voor herkomst ${state.origin}, gemeten op de voorspelweek.`
+      : "alle cijfers op opleidingsniveau, gemeten op de voorspelweek.");
+    const note = document.getElementById("view-note");
+    note.classList.toggle("is-on", isOrigin());
+    note.innerHTML = isOrigin()
+      ? `Je bekijkt alleen <strong>herkomst ${esc(state.origin)}</strong>: prognose, fout, betrouwbaarheid en naïeve ` +
+        `voorspelling gaan over de studenten uit deze groep, niet over de hele opleiding.`
+      : "";
+    document.getElementById("population-note").textContent = PERF.nUnitsAll > PERF.units.length
+      ? `${num.format(PERF.units.length)} van ${num.format(PERF.nUnitsAll)} ${unitWord()}: de rest viel af omdat niet elk model er een voorspelling voor had. `
+      : "";
+    document.getElementById("population-text").textContent = isOrigin()
+      ? `Opleidingen met studenten uit herkomst ${state.origin} in een jaar met bekende realisatie, gemeten op de voorspelweek. ` +
+        "Elke opleiding telt alleen met deze herkomstgroep."
+      : "Opleidingen met een bekende realisatie, gemeten op de voorspelweek. Herkomstgroepen zijn opgeteld tot één opleiding.";
+    document.getElementById("unrealised-note").textContent = PERF.nUnrealised > 0
+      ? ` ${num.format(PERF.nUnrealised)} herkomstgroep(en) hadden een voorspelling maar geen realisatie; die tellen mee als 0 werkelijke studenten.`
+      : "";
+    document.getElementById("size-lede").textContent = isOrigin()
+      ? `WAPE per grootteklasse, op basis van de werkelijke instroom uit herkomst ${state.origin}. Kleine groepen hebben vaak een hogere relatieve fout.`
+      : "WAPE per grootteklasse (werkelijke instroom). Kleine opleidingen hebben vaak een hogere relatieve fout: één student meer of minder telt daar zwaar.";
+    document.getElementById("units-lede").textContent =
+      `Elke stip is een opleiding in één collegejaar${isOrigin() ? ` (alleen herkomst ${state.origin})` : ""}. Boven de nullijn is overschat, eronder onderschat.` +
+      (hasTrend ? " Klik op een stip om het verloop van die opleiding hieronder te bekijken." : "");
+    if (hasTable) renderTrustHelp();
+    if (hasTrend) refreshProgrammeList();
+  }
+
+  {
+    const yf = document.getElementById("year-filter");
+    const mf = document.getElementById("model-filter");
     yf.addEventListener("change", () => { state.year = yf.value; renderAll(); });
     mf.addEventListener("change", () => { state.model = mf.value; renderAll(); });
+    if (ORIGINS.length) {
+      const of = document.getElementById("origin-filter");
+      document.getElementById("origin-control").hidden = false;
+      of.innerHTML = [[ALL, "Alle herkomsten"]].concat(ORIGINS.map(h => [h, h]))
+        .map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join("");
+      of.addEventListener("change", () => { setView(of.value); writeHash(); renderAll(); });
+    }
+  }
+
+  // De gekozen herkomst staat in de URL (#herkomst=EER), zodat een link precies deze weergave opent.
+  function readHash() {
+    const m = /(?:^|[#&])herkomst=([^&]+)/.exec(window.location.hash);
+    const h = m ? decodeURIComponent(m[1]) : ALL;
+    return ORIGINS.includes(h) ? h : ALL;
+  }
+  function writeHash() {
+    const h = state.origin === ALL ? "" : `#herkomst=${encodeURIComponent(state.origin)}`;
+    try { history.replaceState(null, "", window.location.pathname + window.location.search + h); } catch (e) { /* file:// in sommige browsers */ }
+    document.querySelectorAll("nav a.nav-link").forEach(a => {
+      a.setAttribute("href", a.getAttribute("href").split("#")[0] + h);
+    });
   }
 
   // ── Eindoverzicht: prognose ──────────────────────────────────────
   function renderForecast(t) {
     if (!IS_FINAL || !FC) return;
     const label = labelOfModel(tableModels.length ? tableModels[0].key : "");
+    // Kerncijfers volgen het herkomstfilter; de herkomstgrafiek toont altijd alle groepen.
+    const K = isOrigin() ? (FC.byOrigin || {})[state.origin] : FC;
     const tiles = [];
-    tiles.push(`<div class="tile"><div class="label">Verwachte eerstejaars ${META.year}</div>
-      <div class="value">${num.format(FC.total)}</div>
-      <div class="sub">${num.format(FC.n)} opleidingen · ${esc(label)}</div></div>`);
-    if (FC.prevTotal) {
-      const ch = FC.prognoseComparable / FC.prevTotal - 1;
+    if (!K) {
+      tiles.push(`<div class="tile"><div class="label">Verwachte eerstejaars ${META.year} · ${esc(state.origin)}</div>
+        <div class="value">–</div><div class="sub">geen prognose voor deze herkomst</div></div>`);
+    } else {
+      tiles.push(`<div class="tile"><div class="label">Verwachte eerstejaars ${META.year}${isOrigin() ? " · " + esc(state.origin) : ""}</div>
+        <div class="value">${num.format(K.total)}</div>
+        <div class="sub">${num.format(K.n)} opleidingen · ${esc(label)}</div></div>`);
+    }
+    if (K && K.prevTotal) {
+      const ch = K.prognoseComparable / K.prevTotal - 1;
       tiles.push(`<div class="tile"><div class="label">Verandering t.o.v. ${META.year - 1}</div>
         <div class="value">${fmtSigned(ch)}</div>
-        <div class="sub">${num.format(FC.prevTotal)} → ${num.format(FC.prognoseComparable)} (${num.format(FC.nComparable)} opleidingen met realisatie vorig jaar)</div></div>`);
+        <div class="sub">${num.format(K.prevTotal)} → ${num.format(K.prognoseComparable)} (${num.format(K.nComparable)} opleidingen met realisatie vorig jaar)</div></div>`);
     }
     const rows = programmeRows(tableModels.length ? tableModels[0].key : null);
     const vol = { hoog: 0, middel: 0, laag: 0, onbekend: 0, nf: 0 };
@@ -480,12 +595,12 @@ code.plain { background: none; padding: 0; }
         <div class="value">${pct0.format(ok)}</div>
         <div class="sub">van de verwachte studenten · laag ${pct0.format(vol.laag / tot)} · onbekend ${pct0.format((vol.onbekend + vol.nf) / tot)}</div></div>`);
     }
-    if (FC.actualTotal != null) {
-      const err = FC.total / FC.actualTotal - 1;
+    if (K && K.actualTotal != null) {
+      const err = K.total / K.actualTotal - 1;
       tiles.push(`<div class="tile"><div class="label">Werkelijk ${META.year}</div>
-        <div class="value">${num.format(FC.actualTotal)}</div>
+        <div class="value">${num.format(K.actualTotal)}</div>
         <div class="sub">prognose zat er ${fmtSigned(err)} naast</div></div>`);
-    } else if (FC.nf.length) {
+    } else if (!isOrigin() && FC.nf.length) {
       const over = FC.nf.filter(r => r.prognose > r.cap).length;
       tiles.push(`<div class="tile"><div class="label">Numerus fixus boven capaciteit</div>
         <div class="value">${over} van ${FC.nf.length}</div><div class="sub">verwachte overschrijding</div></div>`);
@@ -499,23 +614,27 @@ code.plain { background: none; padding: 0; }
       document.getElementById("herkomst-lede").textContent =
         `Prognose ${META.year} per herkomstgroep naast de werkelijke instroom van ${META.year - 1}.`;
       const ens = tableModels.length ? tableModels[0].key : null;
+      // Bij een gekozen herkomst blijven de andere groepen zichtbaar, maar gedempt.
+      const op = H.map(r => (isOrigin() && r.h !== state.origin ? 0.35 : 1));
       Plotly.react("chart-herkomst", [
         { type: "bar", name: `Werkelijk ${META.year - 1}`, x: H.map(r => r.h), y: H.map(r => r.prev),
-          marker: { color: t.baseline, cornerradius: 4 }, hovertemplate: `${META.year - 1}: %{y:,.0f}<extra></extra>` },
+          marker: { color: t.baseline, cornerradius: 4, opacity: op }, hovertemplate: `${META.year - 1}: %{y:,.0f}<extra></extra>` },
         { type: "bar", name: `Prognose ${META.year}`, x: H.map(r => r.h), y: H.map(r => r.prognose),
-          marker: { color: modelColor(ens, t), cornerradius: 4 }, hovertemplate: `Prognose: %{y:,.0f}<extra></extra>` },
+          marker: { color: modelColor(ens, t), cornerradius: 4, opacity: op }, hovertemplate: `Prognose: %{y:,.0f}<extra></extra>` },
       ], Object.assign(baseLayout(t, { barmode: "group", bargap: 0.35, bargroupgap: 0.12, height: 300, separators: ",." }),
         { yaxis: Object.assign(baseLayout(t).yaxis, { rangemode: "tozero" }) }), CONFIG);
       document.getElementById("table-herkomst").innerHTML =
         `<thead><tr><th scope="col">Herkomst</th><th scope="col">Werkelijk ${META.year - 1}</th><th scope="col">Prognose ${META.year}</th><th scope="col">Verschil</th></tr></thead><tbody>` +
-        H.map(r => `<tr><th scope="row">${esc(r.h)}</th><td>${r.prev == null ? "–" : num.format(r.prev)}</td><td>${r.prognose == null ? "–" : num.format(r.prognose)}</td>` +
+        H.map(r => `<tr${isOrigin() && r.h === state.origin ? ' class="is-selected"' : ""}><th scope="row">${esc(r.h)}</th><td>${r.prev == null ? "–" : num.format(r.prev)}</td><td>${r.prognose == null ? "–" : num.format(r.prognose)}</td>` +
           `<td>${r.prev ? fmtSigned(r.prognose / r.prev - 1) : "–"}</td></tr>`).join("") + "</tbody>";
     }
     // Numerus fixus
     const NF = FC.nf || [];
-    document.getElementById("nf-card").hidden = !NF.length;
-    document.getElementById("herkomst-card").classList.toggle("span-2", !NF.length);
-    if (NF.length) {
+    // Capaciteit geldt voor de hele opleiding, dus alleen in de weergave "alle herkomsten".
+    const showNf = NF.length > 0 && !isOrigin();
+    document.getElementById("nf-card").hidden = !showNf;
+    document.getElementById("herkomst-card").classList.toggle("span-2", !showNf);
+    if (showNf) {
       const ens = tableModels.length ? tableModels[0].key : null;
       Plotly.react("chart-nf", [
         { type: "bar", orientation: "h", name: `Prognose ${META.year}`, y: NF.map(r => r.p), x: NF.map(r => r.prognose),
@@ -649,15 +768,19 @@ code.plain { background: none; padding: 0; }
   // ── Tabel per opleiding ──────────────────────────────────────────
   const TRUST_ORDER = { hoog: 0, middel: 1, laag: 2, onbekend: 3, nf: 4 };
   const TRUST_LABEL = { hoog: "Hoog", middel: "Middel", laag: "Laag", onbekend: "Onbekend", nf: "Numerus fixus" };
-  const hasNaive = PERF.models.some(m => m.key === NAIVE) || (PERF.programmes.alle || []).some(r => r.m[NAIVE] && r.m[NAIVE].w != null);
-  const hasCurrentActual = Object.values(PERF.current).some(c => c.a != null);
-  const table = { sort: "prognose", dir: -1, trust: "alle", query: "" };
+  let hasNaive = false, hasCurrentActual = false;
+  const table = { sort: "prognose", dir: -1, trust: "alle", query: "", expanded: new Set() };
   const badge = t => `<span class="badge ${t === "nf" ? "onbekend" : t}">${TRUST_LABEL[t]}</span>`;
 
   // Betrouwbaarheid gaat over het hele trackrecord en volgt dus niet het jaarfilter:
   // met één jaar zou "hoog" (minstens twee jaren) nooit haalbaar zijn.
-  const trustIndex = {};
-  (PERF.programmes.alle || []).forEach(r => { trustIndex[`${r.p}|${r.e}`] = r; });
+  let trustIndex = {};
+  function rebuildIndexes() {
+    trustIndex = {};
+    (PERF.programmes.alle || []).forEach(r => { trustIndex[`${r.p}|${r.e}`] = r; });
+    hasNaive = PERF.models.some(m => m.key === NAIVE) || (PERF.programmes.alle || []).some(r => r.m[NAIVE] && r.m[NAIVE].w != null);
+    hasCurrentActual = Object.values(PERF.current).some(c => c.a != null);
+  }
   function trustOf(p, e, m) {
     const cur = PERF.current[`${p}|${e}`];
     if (cur && cur.nf) return "nf";
@@ -665,28 +788,55 @@ code.plain { background: none; padding: 0; }
     return (r && r.m[m] && r.m[m].t) || "onbekend";
   }
 
-  function programmeRows(model) {
-    const m = model || state.model;
-    const base = PERF.programmes[state.year] || [];
+  // Tabelrijen van één weergave (alle herkomsten of één herkomstgroep), voor het
+  // gekozen model en jaar. De betrouwbaarheid komt altijd uit "alle jaren" van die weergave.
+  function rowsOf(P, m, year) {
+    const base = P.programmes[year] || [];
     // Opleidingen zonder evaluatie in het gekozen jaar blijven zichtbaar (met "–").
     const seen = new Set(base.map(r => `${r.p}|${r.e}`));
-    const extra = (PERF.programmes.alle || []).filter(r => !seen.has(`${r.p}|${r.e}`))
+    const extra = (P.programmes.alle || []).filter(r => !seen.has(`${r.p}|${r.e}`))
       .map(r => ({ p: r.p, e: r.e, a: null, m: {} }));
+    const trustRows = {};
+    (P.programmes.alle || []).forEach(r => { trustRows[`${r.p}|${r.e}`] = r; });
     return base.concat(extra).map(r => {
-      const cur = PERF.current[`${r.p}|${r.e}`] || {};
+      const key = `${r.p}|${r.e}`;
+      const cur = P.current[key] || {};
       const mm = r.m[m] || {};
       const prognose = cur.m ? cur.m[m] : null;
       const tp = byCode[r.p] || {};
+      const tr = trustRows[key];
       return {
-        p: r.p, e: r.e, faculty: cur.f || tp.faculty || "", n: mm.n || 0, a: r.a, nf: !!cur.nf,
-        w: mm.w, b: mm.b, t: trustOf(r.p, r.e, m),
+        key, p: r.p, e: r.e, faculty: cur.f || tp.faculty || "", n: mm.n || 0, a: r.a, nf: !!cur.nf,
+        w: mm.w, b: mm.b, t: cur.nf ? "nf" : (tr && tr.m[m] && tr.m[m].t) || "onbekend",
         wn: r.m[NAIVE] ? r.m[NAIVE].w : null,
         prognose, marge: prognose != null && mm.w != null ? prognose * mm.w : null,
         prev: cur.prev != null ? cur.prev : null,
         delta: prognose != null && cur.prev ? prognose / cur.prev - 1 : null,
         actual: cur.a != null ? cur.a : null,
+        // Fout van de getoonde prognose, zodra de realisatie van dat jaar bekend is.
+        err: prognose != null && cur.a != null ? prognose - cur.a : null,
+        errPct: prognose != null && cur.a ? prognose / cur.a - 1 : null,
       };
     });
+  }
+
+  function programmeRows(model) { return rowsOf(PERF, model || state.model, state.year); }
+
+  // Uitsplitsing per herkomst onder een opleidingsrij: alleen in de weergave
+  // "alle herkomsten", want daar zijn de herkomstgroepen opgeteld.
+  const canExpand = () => !isOrigin() && ORIGINS.length > 0;
+  function originRows() {
+    const out = {};
+    ORIGINS.forEach(h => {
+      const P = (DATA.performanceByOrigin || {})[h];
+      if (!P) return;
+      rowsOf(P, state.model, state.year).forEach(r => {
+        // Een herkomst zonder prognose én zonder evaluatie zegt niets; die tonen we niet.
+        if (r.prognose == null && r.w == null && r.actual == null) return;
+        (out[r.key] = out[r.key] || []).push(Object.assign(r, { h }));
+      });
+    });
+    return out;
   }
 
   function columns() {
@@ -703,13 +853,15 @@ code.plain { background: none; padding: 0; }
       prev: { key: "prev", label: `Werkelijk ${META.year - 1}`, num: true },
       delta: { key: "delta", label: "Verschil", num: true, title: `Prognose ${META.year} t.o.v. werkelijk ${META.year - 1}` },
       actual: { key: "actual", label: `Werkelijk ${META.year}`, num: true },
+      err: { key: "err", label: `Fout ${META.year}`, num: true,
+        title: `Prognose min werkelijk ${META.year}, in studenten en als percentage van werkelijk. Positief = overschat` },
     };
     const order = IS_FINAL
-      ? ["p", "t", "prognose", "prev", "delta", "w", "wn", "b", "actual"]
-      : ["p", "t", "n", "a", "w", "wn", "b", "prognose", "actual"];
+      ? ["p", "t", "prognose", "prev", "delta", "w", "wn", "b", "actual", "err"]
+      : ["p", "t", "n", "a", "w", "wn", "b", "prognose", "actual", "err"];
     return order
       .filter(k => k !== "wn" || hasNaive)
-      .filter(k => k !== "actual" || hasCurrentActual)
+      .filter(k => (k !== "actual" && k !== "err") || hasCurrentActual)
       .map(k => c[k]);
   }
 
@@ -745,18 +897,32 @@ code.plain { background: none; padding: 0; }
     const { rows, counts } = filteredRows();
     renderChips(counts);
     const cols = columns();
+    const expandable = canExpand();
+    const byOrigin = expandable ? originRows() : {};
     const head = "<thead><tr>" + cols.map(c => {
       const sort = table.sort === c.key ? (table.dir > 0 ? "ascending" : "descending") : "none";
       return `<th scope="col" aria-sort="${sort}"${c.title ? ` title="${esc(c.title)}"` : ""}>` +
         `<button type="button" class="sort" data-key="${c.key}">${esc(c.label)}</button></th>`;
     }).join("") + "</tr></thead>";
-    const cell = (r, c) => {
+    const cell = (r, c, sub) => {
       switch (c.key) {
         case "p": {
+          if (sub) {
+            return `<th scope="row" class="origin-cell"><span class="origin-name">${esc(r.h)}</span></th>`;
+          }
+          const subs = byOrigin[r.key] || [];
+          const open = table.expanded.has(r.key);
+          const toggle = expandable
+            ? (subs.length
+              ? `<button type="button" class="expand" data-key="${esc(r.key)}" aria-expanded="${open}" ` +
+                `aria-label="${open ? "Verberg" : "Toon"} herkomst voor ${esc(r.p)} ${esc(r.e)}" title="Uitsplitsing per herkomst">` +
+                `<span aria-hidden="true">›</span></button>`
+              : `<span class="expand-spacer" aria-hidden="true"></span>`)
+            : "";
           const code = hasTrend && byCode[r.p]
             ? `<button type="button" class="link" data-code="${esc(r.p)}">${esc(r.p)}</button>`
             : `<strong>${esc(r.p)}</strong>`;
-          return `<th scope="row">${code} <span class="sub">${esc([r.e, r.faculty].filter(Boolean).join(" · "))}</span></th>`;
+          return `<th scope="row">${toggle}${code} <span class="sub">${esc([r.e, r.faculty].filter(Boolean).join(" · "))}</span></th>`;
         }
         case "n": return `<td>${r.n || "–"}</td>`;
         case "a": return `<td>${r.a == null ? "–" : num.format(r.a)}</td>`;
@@ -768,17 +934,38 @@ code.plain { background: none; padding: 0; }
         case "prev": return `<td>${r.prev == null ? "–" : num.format(r.prev)}</td>`;
         case "delta": return `<td>${fmtSigned(r.delta)}</td>`;
         case "actual": return `<td>${r.actual == null ? "–" : num.format(r.actual)}</td>`;
+        case "err": return r.err == null ? "<td>–</td>"
+          : `<td>${fmtSignedNum(r.err)}` + (r.errPct != null ? `<span class="margin">${fmtSigned(r.errPct)}</span>` : "") + "</td>";
         case "t": return `<td style="text-align:left">${badge(r.t)}</td>`;
       }
       return "<td></td>";
     };
-    const body = rows.map(r => "<tr>" + cols.map(c => cell(r, c)).join("") + "</tr>").join("");
+    const body = rows.map(r => {
+      const open = expandable && table.expanded.has(r.key);
+      let html = `<tr${open ? ' class="is-open"' : ""}>` + cols.map(c => cell(r, c, false)).join("") + "</tr>";
+      if (open) {
+        html += (byOrigin[r.key] || []).map((s, i, all) =>
+          `<tr class="origin-row${i === all.length - 1 ? " is-last" : ""}">` + cols.map(c => cell(s, c, true)).join("") + "</tr>").join("");
+      }
+      return html;
+    }).join("");
     const el = document.getElementById("table-programmes");
     el.innerHTML = head + `<tbody>${body || `<tr><td colspan="${cols.length}" style="text-align:left">Geen opleidingen gevonden.</td></tr>`}</tbody>`;
+
+    const all = document.getElementById("expand-all");
+    all.hidden = !expandable;
+    const withSubs = rows.filter(r => (byOrigin[r.key] || []).length);
+    const allOpen = withSubs.length > 0 && withSubs.every(r => table.expanded.has(r.key));
+    all.setAttribute("aria-pressed", String(allOpen));
+    all.textContent = allOpen ? "Herkomst inklappen" : "Herkomst uitklappen";
+
     document.getElementById("table-note").textContent =
-      `${num.format(rows.length)} van ${num.format(counts.alle)} opleidingen.` + (hasTrend ? " Klik op een code om het verloop te bekijken." : "");
+      `${num.format(rows.length)} van ${num.format(counts.alle)} opleidingen.` +
+      (expandable ? " Klik op › voor de uitsplitsing per herkomst." : "") +
+      (hasTrend ? " Klik op een code om het verloop te bekijken." : "");
     table.lastRows = rows;
     table.lastCols = cols;
+    table.lastByOrigin = byOrigin;
   }
 
   function downloadCsv() {
@@ -790,12 +977,22 @@ code.plain { background: none; padding: 0; }
       if (typeof v === "number") return nl.format(v);
       return `"${String(v).replace(/"/g, '""')}"`;
     };
-    const header = cols.map(c => `"${c.label}"`).concat(['"Examentype"', '"Faculteit"', '"Marge"']).join(";");
-    const lines = rows.map(r => cols.map(c => val(r, c.key)).concat([val(r, "e"), val(r, "faculty"), val(r, "marge")]).join(";"));
+    const origin = isOrigin() ? state.origin : "Alle";
+    const line = (r, h) => cols.map(c => val(r, c.key)).concat([val(r, "e"), val(r, "faculty"), val(r, "marge"), `"${h}"`]).join(";");
+    const header = cols.map(c => `"${c.label}"`).concat(['"Examentype"', '"Faculteit"', '"Marge"', '"Herkomst"']).join(";");
+    // Uitgeklapte opleidingen gaan met hun herkomstregels mee, net als op het scherm.
+    const lines = [];
+    rows.forEach(r => {
+      lines.push(line(r, origin));
+      if (canExpand() && table.expanded.has(r.key)) {
+        (table.lastByOrigin[r.key] || []).forEach(s => lines.push(line(Object.assign({}, s, { faculty: r.faculty }), s.h)));
+      }
+    });
     const blob = new Blob(["﻿" + [header].concat(lines).join("\r\n")], { type: "text/csv;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${META.track}-per-opleiding-${META.year}-wk${META.week}-${state.year}.csv`;
+    const suffix = isOrigin() ? `-${state.origin.replace(/[^A-Za-z0-9-]/g, "")}` : "";
+    a.download = `${META.track}-per-opleiding-${META.year}-wk${META.week}-${state.year}${suffix}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }
@@ -809,15 +1006,15 @@ code.plain { background: none; padding: 0; }
       `<dt>${badge("onbekend")}</dt><dd>Nog geen jaar met realisatie om de voorspelling tegen af te zetten.</dd>` +
       `<dt>${badge("nf")}</dt><dd>Numerus-fixusopleiding: de capaciteit bepaalt de instroom, dus de modelfout zegt hier weinig.</dd>` +
       `<dt>Marge</dt><dd>± prognose × WAPE: de gemiddelde afwijking die het model voor deze opleiding had. Geen statistisch interval.</dd>`;
-    document.getElementById("programme-title").textContent = IS_FINAL ? "Prognose per opleiding" : "Prestatie per opleiding";
+    document.getElementById("programme-title").textContent = (IS_FINAL ? "Prognose per opleiding" : "Prestatie per opleiding") +
+      (isOrigin() ? ` · herkomst ${state.origin}` : "");
     document.getElementById("programme-lede").textContent = (IS_FINAL
       ? `De prognose voor ${META.year} per opleiding, met hoeveel vertrouwen die verdient. `
       : `Hoe goed voorspelde het model elke opleiding, en hoeveel vertrouwen verdient de prognose voor ${META.year}? `) +
       "De betrouwbaarheid volgt uit de fout van het gekozen model over álle geëvalueerde jaren; de overige kolommen volgen het jaarfilter.";
   }
 
-  if (hasTable) {
-    renderTrustHelp();
+  {
     const search = document.getElementById("table-search");
     search.addEventListener("input", () => { table.query = search.value; renderProgrammeTable(); });
     document.getElementById("trust-chips").addEventListener("click", ev => {
@@ -833,10 +1030,25 @@ code.plain { background: none; padding: 0; }
         renderProgrammeTable();
         return;
       }
+      const x = ev.target.closest("button.expand");
+      if (x) {
+        const k = x.dataset.key;
+        if (table.expanded.has(k)) table.expanded.delete(k); else table.expanded.add(k);
+        renderProgrammeTable();
+        const again = document.querySelector(`#table-programmes button.expand[data-key="${CSS.escape(k)}"]`);
+        if (again) again.focus();
+        return;
+      }
       const l = ev.target.closest("button.link");
       if (l) { selectProgramme(l.dataset.code); document.getElementById("trend-card").scrollIntoView({ behavior: "smooth" }); }
     });
     document.getElementById("csv-download").addEventListener("click", downloadCsv);
+    document.getElementById("expand-all").addEventListener("click", () => {
+      const keys = table.lastRows.filter(r => (table.lastByOrigin[r.key] || []).length).map(r => r.key);
+      const allOpen = keys.length > 0 && keys.every(k => table.expanded.has(k));
+      keys.forEach(k => (allOpen ? table.expanded.delete(k) : table.expanded.add(k)));
+      renderProgrammeTable();
+    });
   }
 
   function renderPerf() {
@@ -850,6 +1062,12 @@ code.plain { background: none; padding: 0; }
     renderGroupTable(document.getElementById("table-size"), summary.size, t);
     renderGroupChart(document.getElementById("chart-exam"), summary.exam, t);
     renderGroupTable(document.getElementById("table-exam"), summary.exam, t);
+    const originRows = summary.origin || [];
+    document.getElementById("origin-card").hidden = !originRows.length;
+    if (originRows.length) {
+      renderGroupChart(document.getElementById("chart-origin"), originRows, t);
+      renderGroupTable(document.getElementById("table-origin"), originRows, t);
+    }
     renderUnits(t);
   }
 
@@ -859,11 +1077,48 @@ code.plain { background: none; padding: 0; }
   const labelOf = p => [p.code, p.exam, p.faculty].filter(Boolean).join(" · ");
   const byLabel = Object.fromEntries(progs.map(p => [labelOf(p), p]));
   const search = document.getElementById("programme-search");
+  // Reeksen staan per herkomst in de pagina; voor "alle herkomsten" tellen we ze op.
+  // Een week is alleen leeg als geen enkele herkomstgroep er een waarde heeft.
+  function sumArrays(arrs) {
+    if (!arrs.length) return null;
+    const out = arrs[0].map(() => null);
+    arrs.forEach(a => a.forEach((v, i) => { if (v != null) out[i] = (out[i] || 0) + v; }));
+    return out.map(v => (v == null ? null : Math.round(v * 10) / 10));
+  }
+  function pick(byOrigin) {
+    byOrigin = byOrigin || {};
+    return isOrigin() ? (byOrigin[state.origin] != null ? [byOrigin[state.origin]] : []) : Object.values(byOrigin);
+  }
+  function viewTrend(p) {
+    const series = {};
+    pick(p.series).forEach(byYear => Object.entries(byYear).forEach(([y, arr]) => { (series[y] = series[y] || []).push(arr); }));
+    Object.keys(series).forEach(y => { series[y] = sumArrays(series[y]); });
+    const actuals = {};
+    pick(p.actuals).forEach(byYear => Object.entries(byYear).forEach(([y, v]) => { actuals[y] = (actuals[y] || 0) + v; }));
+    const pred = pick(p.predicted);
+    return {
+      series, actuals,
+      forecast: sumArrays(pick(p.forecast)),
+      predicted: pred.length ? pred.reduce((a, b) => a + b, 0) : null,
+    };
+  }
+  const inView = p => !isOrigin() || (p.series && p.series[state.origin] != null) || (p.predicted && p.predicted[state.origin] != null);
+
+  function refreshProgrammeList() {
+    document.getElementById("programme-list").innerHTML =
+      progs.filter(inView).map(p => `<option value="${esc(labelOf(p))}"></option>`).join("");
+    const cur = byCode[state.programme];
+    if (!cur || !inView(cur)) {
+      const visible = progs.filter(inView);
+      const next = visible.find(p => viewTrend(p).predicted != null) || visible[0];
+      state.programme = next ? next.code : null;
+    }
+    search.value = state.programme ? labelOf(byCode[state.programme]) : "";
+  }
+
   if (hasTrend) {
     document.getElementById("trend-title").textContent = PAGE.trend.title;
     document.getElementById("trend-lede").textContent = PAGE.trend.lede;
-    document.getElementById("programme-list").innerHTML =
-      progs.map(p => `<option value="${esc(labelOf(p))}"></option>`).join("");
     search.addEventListener("change", () => {
       const p = byLabel[search.value] || byCode[search.value.split(" · ")[0].trim()];
       if (p) selectProgramme(p.code);
@@ -881,8 +1136,11 @@ code.plain { background: none; padding: 0; }
   function renderTrend() {
     if (!hasTrend) return;
     const el = document.getElementById("chart-trend");
-    const p = byCode[state.programme];
-    if (!p) return;
+    const p0 = byCode[state.programme];
+    document.getElementById("trend-empty").hidden = !!p0;
+    el.hidden = !p0;
+    if (!p0) { document.getElementById("trackrecord").textContent = ""; return; }
+    const p = Object.assign({}, p0, viewTrend(p0));
     const t = tokens();
     const weeks = META.weeks;
     const pwIdx = META.week != null ? weeks.indexOf(String(META.week)) : -1;
@@ -948,7 +1206,7 @@ code.plain { background: none; padding: 0; }
         text: ` voorspelweek ${META.week}`, showarrow: false, font: { color: t.muted, size: 11 } }];
     }
     Plotly.react(el, traces, layout, CONFIG);
-    renderTrackrecord(p);
+    renderTrackrecord(p0);
   }
 
   function renderTrackrecord(p) {
@@ -959,20 +1217,20 @@ code.plain { background: none; padding: 0; }
     const own = PERF.units.filter(u => u.p === p.code && u.m[m] != null).sort((a, b) => a.y - b.y);
     const row = (PERF.programmes.alle || []).find(r => r.p === p.code);
     const tb = row ? badge(trustOf(row.p, row.e, m)) : badge("onbekend");
-    if (!own.length) { box.innerHTML = `${tb} Geen geëvalueerde voorspellingen van ${esc(label)} voor deze opleiding.`; return; }
-    box.innerHTML = tb + `<strong>${esc(label)}:</strong> ` + own.map(u => {
+    const scope = isOrigin() ? ` (herkomst ${esc(state.origin)})` : "";
+    if (!own.length) { box.innerHTML = `${tb} Geen geëvalueerde voorspellingen van ${esc(label)} voor deze opleiding${scope}.`; return; }
+    box.innerHTML = tb + `<strong>${esc(label)}${scope}:</strong> ` + own.map(u => {
       const e = (u.m[m] - u.a) / u.a;
       return `<span>${u.y}${own.filter(o => o.y === u.y).length > 1 ? " " + esc(u.e) : ""}: voorspeld ${num.format(u.m[m])}, werkelijk ${num.format(u.a)} (${fmtSigned(e)})</span>`;
     }).join("");
   }
 
   // ── Init ─────────────────────────────────────────────────────────
-  if (hasTrend) {
-    const withPred = progs.find(p => p.predicted != null);
-    state.programme = (withPred || progs[0]).code;
-    search.value = labelOf(byCode[state.programme]);
-  }
   function renderAll() { renderPerf(); renderTrend(); }
+  const startOrigin = readHash();
+  if (ORIGINS.length) document.getElementById("origin-filter").value = startOrigin;
+  setView(startOrigin);
+  if (startOrigin !== ALL) writeHash();
   renderAll();
   const mq = window.matchMedia("(prefers-color-scheme: dark)");
   if (mq.addEventListener) mq.addEventListener("change", renderAll);

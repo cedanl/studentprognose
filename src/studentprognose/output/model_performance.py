@@ -11,7 +11,13 @@ Keuzes die de getallen bepalen:
   voorspellingen.
 - **Opleidingsniveau.** De pipeline voorspelt per herkomstgroep; beleid kijkt naar
   de opleiding. We tellen de herkomstgroepen daarom eerst op, zodat een opleiding
-  van 300 studenten één punt is en niet drie.
+  van 300 studenten één punt is en niet drie. Met ``by_origin=True`` blijft de
+  herkomstgroep juist een eigen eenheid (opleiding × herkomst).
+- **Eén optelling voor fout en prognose.** De evaluatie en de getoonde prognose
+  gebruiken dezelfde optelling (:func:`_unit_totals`), zodat de WAPE altijd hoort
+  bij de prognose die ernaast staat. Een herkomstgroep met een voorspelling maar
+  zonder realisatie telt mee als 0 werkelijk: als de opleiding dat jaar een
+  realisatie heeft, kwam er uit die groep niemand.
 - **Gelijke populatie.** Modellen worden alleen vergeleken op eenheden waarvoor
   ze allemaal een voorspelling hebben, anders vergelijk je appels met peren.
 - **Naïeve baseline.** "Dit jaar komen er evenveel als vorig jaar." Een model dat
@@ -30,6 +36,11 @@ PROGRAMME = "Croho groepeernaam"
 YEAR = "Collegejaar"
 EXAM_TYPE = "Examentype"
 WEEK = "Weeknummer"
+ORIGIN = "Herkomst"
+# Vaste weergavevolgorde; onbekende waarden komen alfabetisch achteraan.
+ORIGIN_ORDER: list[str] = ["NL", "EER", "Niet-EER"]
+# Aantal herkomstgroepen met een voorspelling maar zonder realisatie per eenheid.
+UNREALISED = "Herkomst_zonder_realisatie"
 
 NAIVE = "Naief_vorig_jaar"
 NAIVE_LABEL = "Naïef (vorig jaar)"
@@ -98,12 +109,31 @@ def size_class(actual: pd.Series) -> pd.Categorical:
     return pd.cut(actual, bins=SIZE_EDGES, labels=SIZE_LABELS, right=False)
 
 
+def origin_order(values) -> list[str]:
+    """Herkomstwaarden in vaste volgorde (NL, EER, Niet-EER, dan de rest)."""
+    vals = {str(v) for v in values if pd.notna(v) and str(v) != ""}
+    return sorted(
+        vals,
+        key=lambda h: (
+            ORIGIN_ORDER.index(h) if h in ORIGIN_ORDER else len(ORIGIN_ORDER),
+            h,
+        ),
+    )
+
+
+def _unit_keys(by_origin: bool, with_year: bool = True) -> list[str]:
+    keys = [YEAR] if with_year else []
+    keys += [PROGRAMME, EXAM_TYPE]
+    return keys + [ORIGIN] if by_origin else keys
+
+
 def build_evaluation_units(
     data: pd.DataFrame,
     predict_week: int | None,
     data_studentcount: pd.DataFrame | None = None,
     numerus_fixus: dict | list | None = None,
     models: list[str] | None = None,
+    by_origin: bool = False,
 ) -> pd.DataFrame:
     """Bouw één evaluatie-eenheid per collegejaar × opleiding × examentype.
 
@@ -115,25 +145,33 @@ def build_evaluation_units(
             (realisatie vorig jaar). Zonder dit ontbreekt de baseline.
         numerus_fixus: Numerus-fixusopleidingen die buiten de evaluatie blijven.
         models: Te evalueren voorspelkolommen; standaard :data:`MODEL_COLUMNS`.
+        by_origin: Eén eenheid per opleiding × herkomst in plaats van per
+            opleiding. Vereist een kolom ``Herkomst``.
 
     Returns:
-        DataFrame met ``Collegejaar``, ``Croho groepeernaam``, ``Examentype``,
-        ``Aantal_studenten``, ``Grootteklasse``, één kolom per aanwezig model en
-        ``Naief_vorig_jaar``. Leeg als er niets te
-        evalueren valt (bijv. een collegejaar zonder realisatie).
+        DataFrame met ``Collegejaar``, ``Croho groepeernaam``, ``Examentype``
+        (en ``Herkomst`` bij ``by_origin``), ``Aantal_studenten``,
+        ``Grootteklasse``, één kolom per aanwezig model, ``Naief_vorig_jaar`` en
+        ``Herkomst_zonder_realisatie``. Leeg als er niets te evalueren valt
+        (bijv. een collegejaar zonder realisatie).
     """
     models = [m for m in (models or list(MODEL_COLUMNS)) if m in data.columns]
-    out_cols = [YEAR, PROGRAMME, EXAM_TYPE, ACTUAL, "Grootteklasse", *models, NAIVE]
+    keys = _unit_keys(by_origin)
+    out_cols = [*keys, ACTUAL, "Grootteklasse", *models, NAIVE, UNREALISED]
     if ACTUAL not in data.columns or not models:
+        return pd.DataFrame(columns=out_cols)
+    if by_origin and ORIGIN not in data.columns:
         return pd.DataFrame(columns=out_cols)
 
     frame = _predict_week_rows(data, predict_week, numerus_fixus)
-    frame = frame[frame[ACTUAL].notna() & (frame[ACTUAL] > 0)]
-    if frame.empty:
+    units = _unit_totals(frame, models, keys)
+    # Alleen eenheden met een realisatie zijn te evalueren; een jaar zonder
+    # realisatie (de live prognose) valt hier vanzelf af.
+    units = units[units[ACTUAL] > 0]
+    if units.empty:
         return pd.DataFrame(columns=out_cols)
 
-    units = _programme_totals(frame, models)
-
+    units = units.copy()
     units[NAIVE] = previous_year_actuals(units, data_studentcount)
     units["Grootteklasse"] = size_class(units[ACTUAL])
     units[YEAR] = units[YEAR].astype(int)
@@ -152,22 +190,44 @@ def _predict_week_rows(
     )
     if nf:
         frame = frame[~frame[PROGRAMME].astype(str).isin({str(p) for p in nf})]
-    return frame.assign(**{PROGRAMME: frame[PROGRAMME].astype(str)})
+    frame = frame.assign(**{PROGRAMME: frame[PROGRAMME].astype(str)})
+    if ORIGIN in frame.columns:
+        frame = frame.assign(**{ORIGIN: frame[ORIGIN].astype(str)})
+    return frame
 
 
-def _sum_complete(s: pd.Series) -> float:
-    # Een opleiding waarvan één herkomstgroep geen voorspelling heeft, zou met een
-    # onvolledige som worden vergeleken met de volledige realisatie.
-    return float(s.sum()) if s.notna().all() else np.nan
+def _unit_totals(
+    frame: pd.DataFrame, models: list[str], keys: list[str]
+) -> pd.DataFrame:
+    """Tel herkomstrijen op tot één rij per ``keys``, voor evaluatie én prognose.
 
-
-def _programme_totals(frame: pd.DataFrame, models: list[str]) -> pd.DataFrame:
-    """Tel herkomstgroepen op tot één rij per collegejaar × opleiding × examentype."""
-    agg = {ACTUAL: lambda s: float(s.sum()) if s.notna().any() else np.nan}
-    agg.update({m: _sum_complete for m in models})
-    return frame.groupby(
-        [YEAR, PROGRAMME, EXAM_TYPE], as_index=False, observed=True
-    ).agg(agg)
+    - **Realisatie**: som van de bekende waarden; leeg als geen enkele rij er een
+      heeft (bijv. het live voorspeljaar).
+    - **Voorspelling**: som van de voorspelde rijen. Een rij zonder realisatie
+      telt gewoon mee: de voorspelling hoort bij de opleiding, ook als die
+      herkomstgroep uiteindelijk niemand opleverde.
+    - **Onvolledig**: heeft een rij mét realisatie geen voorspelling van een model,
+      dan wordt het totaal van dat model leeg. Anders vergelijk je een deelsom met
+      de volledige realisatie.
+    """
+    f = frame.copy()
+    realised = f[ACTUAL].fillna(0) > 0
+    agg: dict[str, tuple[str, object]] = {
+        ACTUAL: (ACTUAL, lambda s: s.sum(min_count=1)),
+    }
+    for i, m in enumerate(models):
+        f[f"_gap{i}"] = realised & f[m].isna()
+        agg[m] = (m, lambda s: s.sum(min_count=1))
+        agg[f"_gap{i}"] = (f"_gap{i}", "any")
+    predicted = f[models].notna().any(axis=1)
+    f["_unrealised"] = predicted & ~realised
+    agg[UNREALISED] = ("_unrealised", "sum")
+    out = f.groupby(keys, as_index=False, observed=True).agg(**agg)
+    for i, m in enumerate(models):
+        out[m] = out[m].astype("float64").mask(out[f"_gap{i}"])
+    out[ACTUAL] = out[ACTUAL].astype("float64")
+    out[UNREALISED] = out[UNREALISED].astype(int)
+    return out.drop(columns=[f"_gap{i}" for i in range(len(models))])
 
 
 def current_predictions(
@@ -176,15 +236,21 @@ def current_predictions(
     predict_week: int | None,
     numerus_fixus: dict | list | None = None,
     models: list[str] | None = None,
+    by_origin: bool = False,
 ) -> pd.DataFrame:
-    """Prognose per opleiding × examentype voor het voorspeljaar, per model.
+    """Prognose per opleiding × examentype (× herkomst) voor het voorspeljaar, per model.
 
-    ``Aantal_studenten`` is gevuld zodra de realisatie bekend is (backtest) en
-    anders leeg.
+    Gebruikt dezelfde optelling als :func:`build_evaluation_units`, zodat de
+    prognose in een backtestjaar exact de voorspelling is waarop de fout gemeten
+    wordt. ``Aantal_studenten`` is gevuld zodra de realisatie bekend is (backtest)
+    en anders leeg.
     """
     models = [m for m in (models or list(MODEL_COLUMNS)) if m in data.columns]
-    cols = [PROGRAMME, EXAM_TYPE, ACTUAL, *models]
+    keys = _unit_keys(by_origin, with_year=False)
+    cols = [*keys, ACTUAL, *models]
     if not models or YEAR not in data.columns:
+        return pd.DataFrame(columns=cols)
+    if by_origin and ORIGIN not in data.columns:
         return pd.DataFrame(columns=cols)
     frame = _predict_week_rows(data, predict_week, numerus_fixus)
     frame = frame[frame[YEAR] == prediction_year]
@@ -192,7 +258,7 @@ def current_predictions(
         frame = frame.assign(**{ACTUAL: np.nan})
     if frame.empty:
         return pd.DataFrame(columns=cols)
-    totals = _programme_totals(frame, models)
+    totals = _unit_totals(frame, models, keys)
     totals = totals[totals[models].notna().any(axis=1)]
     return totals[cols].reset_index(drop=True)
 
@@ -277,27 +343,28 @@ def programme_summary(units: pd.DataFrame, models: list[str]) -> pd.DataFrame:
 def previous_year_actuals(
     units: pd.DataFrame, data_studentcount: pd.DataFrame | None
 ) -> pd.Series:
-    """Realisatie van jaar-1 voor dezelfde opleiding × examentype (de naïeve voorspelling)."""
+    """Realisatie van jaar-1 voor dezelfde eenheid (de naïeve voorspelling).
+
+    Heeft ``units`` een kolom ``Herkomst``, dan is de baseline de realisatie van
+    jaar-1 voor die herkomstgroep; anders die van de hele opleiding × examentype.
+    """
     if data_studentcount is None or data_studentcount.empty:
         return pd.Series(np.nan, index=units.index)
-    needed = {YEAR, PROGRAMME, EXAM_TYPE, ACTUAL}
-    if not needed.issubset(data_studentcount.columns):
+    keys = [YEAR, PROGRAMME, EXAM_TYPE]
+    if ORIGIN in units.columns:
+        keys.append(ORIGIN)
+    if not {*keys, ACTUAL}.issubset(data_studentcount.columns):
         return pd.Series(np.nan, index=units.index)
 
-    prev = (
-        data_studentcount.assign(
-            **{PROGRAMME: data_studentcount[PROGRAMME].astype(str)}
-        )
-        .groupby([YEAR, PROGRAMME, EXAM_TYPE], as_index=False)[ACTUAL]
-        .sum()
+    sc = data_studentcount.assign(
+        **{PROGRAMME: data_studentcount[PROGRAMME].astype(str)}
     )
+    if ORIGIN in keys:
+        sc = sc.assign(**{ORIGIN: sc[ORIGIN].astype(str)})
+    prev = sc.groupby(keys, as_index=False)[ACTUAL].sum()
     prev[YEAR] = prev[YEAR].astype(int) + 1
     prev = prev[prev[ACTUAL] > 0].rename(columns={ACTUAL: NAIVE})
-    merged = (
-        units[[YEAR, PROGRAMME, EXAM_TYPE]]
-        .astype({YEAR: int})
-        .merge(prev, on=[YEAR, PROGRAMME, EXAM_TYPE], how="left")
-    )
+    merged = units[keys].astype({YEAR: int}).merge(prev, on=keys, how="left")
     return pd.Series(merged[NAIVE].to_numpy(dtype="float64"), index=units.index)
 
 
