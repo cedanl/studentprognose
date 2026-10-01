@@ -1,8 +1,9 @@
-"""Tests voor de dashboardpagina's rond modelperformance (issue #295).
+"""Tests voor de dashboardpagina's rond modelperformance (issues #295 en #297).
 
-Bewaakt de foutaggregatie (opleidingsniveau, grootteklassen, examentype, naïeve
-baseline) en dat de pagina als zelfstandig HTML-bestand wordt weggeschreven,
-zonder dode navigatielinks.
+Bewaakt de foutaggregatie (opleidingsniveau, grootteklassen, examentype, herkomst,
+naïeve baseline), dat de fout altijd hoort bij de getoonde prognose, en dat de
+pagina als zelfstandig HTML-bestand wordt weggeschreven, zonder dode
+navigatielinks.
 """
 
 import json
@@ -410,8 +411,10 @@ def test_individual_payload_trend_uses_xgboost_curve(output, studentcount):
     )
     prog = payload["trend"]["programmes"][0]
     assert prog["code"] == "A"
-    assert prog["series"]["2024"][8:10] == [15.0, 28.0]  # herkomst opgeteld per week
-    assert prog["predicted"] == pytest.approx(110.0)
+    # Reeksen per herkomst; de pagina telt ze op voor "alle herkomsten".
+    assert prog["series"]["NL"]["2024"][8:10] == [10.0, 20.0]
+    assert prog["series"]["EER"]["2024"][8:10] == [5.0, 8.0]
+    assert prog["predicted"] == {"NL": 66.0, "EER": 44.0}
     assert payload["meta"]["page"]["title"] == "Individueel model"
 
 
@@ -434,9 +437,202 @@ def test_both_mode_builds_all_three_pages(tmp_path, output, studentcount):
         SARIMA_individual=output["SARIMA_cumulative"],
         Weighted_ensemble_prediction=output["SARIMA_cumulative"],
     )
-    _builder(tmp_path, data, studentcount, option=DataOption.BOTH_DATASETS).build_and_save()
+    _builder(
+        tmp_path, data, studentcount, option=DataOption.BOTH_DATASETS
+    ).build_and_save()
     vis = tmp_path / "data/output/visualisations"
-    assert sorted(p.name for p in vis.iterdir()) == ["cumulative", "final", "individual"]
+    assert sorted(p.name for p in vis.iterdir()) == [
+        "cumulative",
+        "final",
+        "individual",
+    ]
     final = (vis / "final/dashboard.html").read_text("utf-8")
     for page in ("individual", "cumulative", "final"):
         assert f"../{page}/dashboard.html" in final
+
+
+# ── Herkomst (#297) ───────────────────────────────────────────────────
+
+
+def _unrealised_output():
+    """F: NL met realisatie, EER voorspeld maar zonder realisatie (geen EER-studenten)."""
+    return pd.DataFrame(
+        [
+            _row(2024, "F", "NL", 10, 262, 308.0, 250.0),
+            _row(2024, "F", "EER", 10, np.nan, 231.0, 20.0),
+            _row(2024, "F", "Niet-EER", 10, np.nan, np.nan, np.nan),
+        ]
+    )
+
+
+def test_unrealised_origin_prediction_counts_against_zero():
+    units = mp.build_evaluation_units(_unrealised_output(), 10).set_index(
+        "Croho groepeernaam"
+    )
+    f = units.loc["F"]
+    assert f["Aantal_studenten"] == 262
+    assert f["SARIMA_cumulative"] == pytest.approx(539.0), (
+        "de EER-voorspelling hoort bij de opleiding, ook zonder EER-studenten"
+    )
+    assert f["Prognose_ratio"] == pytest.approx(270.0)
+    assert f[mp.UNREALISED] == 1, "Niet-EER zonder voorspelling telt niet als gat"
+
+
+def test_evaluated_prediction_equals_shown_prognose():
+    """De WAPE moet gemeten zijn op precies de prognose die ernaast staat."""
+    data = pd.concat([_unrealised_output()], ignore_index=True)
+    units = mp.build_evaluation_units(data, 10).set_index("Croho groepeernaam")
+    cur = mp.current_predictions(data, 2024, 10).set_index("Croho groepeernaam")
+    for m in ("SARIMA_cumulative", "Prognose_ratio"):
+        assert units.loc["F", m] == pytest.approx(cur.loc["F", m])
+
+
+def test_payload_wape_matches_table_prognose():
+    payload = performance_page.build_payload(
+        _unrealised_output(), None, None, 2024, 10, [str(w) for w in range(1, 53)], 38
+    )
+    perf = payload["performance"]
+    row = next(r for r in perf["programmes"]["alle"] if r["p"] == "F")
+    prognose = perf["current"]["F|Bachelor"]["m"]["SARIMA_cumulative"]
+    assert prognose == pytest.approx(539.0)
+    assert row["m"]["SARIMA_cumulative"]["w"] == pytest.approx(
+        abs(539 - 262) / 262, abs=1e-4
+    )
+    assert perf["nUnrealised"] == 1
+
+
+def test_units_by_origin_keep_origin_and_naive_per_origin(output, studentcount):
+    units = mp.build_evaluation_units(
+        output, 10, studentcount, {"C": 60}, by_origin=True
+    ).set_index(["Croho groepeernaam", "Herkomst"])
+    assert units.loc[("A", "NL"), "SARIMA_cumulative"] == pytest.approx(66.0)
+    assert units.loc[("A", "EER"), "Aantal_studenten"] == 40
+    assert units.loc[("A", "NL"), mp.NAIVE] == 50, "baseline: NL-realisatie vorig jaar"
+    assert units.loc[("A", "EER"), mp.NAIVE] == 40
+    # D-EER mist alleen in XGBoost; per herkomst is D-NL wel volledig.
+    assert units.loc[("D", "NL"), "SARIMA_cumulative"] == pytest.approx(30.0)
+    assert np.isnan(units.loc[("D", "EER"), "SARIMA_cumulative"])
+
+
+def test_by_origin_without_origin_column_is_empty(output):
+    units = mp.build_evaluation_units(
+        output.drop(columns="Herkomst"), 10, by_origin=True
+    )
+    assert units.empty
+
+
+def test_origin_order_is_fixed_then_alphabetical():
+    assert mp.origin_order(["Niet-EER", "Onbekend", "NL", "EER", None, "NL"]) == [
+        "NL",
+        "EER",
+        "Niet-EER",
+        "Onbekend",
+    ]
+
+
+def test_payload_has_view_per_origin(output, studentcount):
+    payload = performance_page.build_payload(
+        output,
+        _cumulative(),
+        studentcount,
+        2024,
+        10,
+        [str(w) for w in range(1, 53)],
+        38,
+    )
+    assert payload["meta"]["origins"] == ["NL", "EER"]
+    views = payload["performanceByOrigin"]
+    assert set(views) == {"NL", "EER"}
+    eer = views["EER"]["current"]["A|Bachelor"]
+    assert eer["m"]["SARIMA_cumulative"] == pytest.approx(44.0)
+    assert eer["prev"] == 40, "naïef per herkomst"
+    # De herkomstweergave heeft dezelfde opbouw als 'alle herkomsten'.
+    assert set(views["NL"]) == set(payload["performance"])
+
+
+def test_payload_error_by_origin_in_all_view(output, studentcount):
+    payload = performance_page.build_payload(
+        output,
+        _cumulative(),
+        studentcount,
+        2024,
+        10,
+        [str(w) for w in range(1, 53)],
+        38,
+    )
+    rows = payload["performance"]["summaries"]["alle"]["origin"]
+    xgb = {r["group"]: r for r in rows if r["model"] == "SARIMA_cumulative"}
+    assert list(xgb) == ["NL", "EER"]
+    # NL: A 66/60, B 5/10 -> |6|+|5| / 70 ; D valt af (geen XGBoost voor D-EER
+    # is per herkomst geen probleem, maar de ratio/naïef-populatie bepaalt mee).
+    assert xgb["NL"]["n"] >= 2
+    assert xgb["EER"]["wape"] == pytest.approx(0.1)
+    # Per herkomst bestaat de uitsplitsing niet (alles is daar al één herkomst).
+    assert "origin" not in payload["performanceByOrigin"]["NL"]["summaries"]["alle"]
+
+
+def test_final_forecast_per_origin_adds_up(output, studentcount):
+    data = output.assign(Weighted_ensemble_prediction=output["SARIMA_cumulative"])
+    payload = performance_page.build_payload(
+        data,
+        _cumulative(),
+        studentcount,
+        2024,
+        10,
+        [str(w) for w in range(1, 53)],
+        38,
+        numerus_fixus={"C": 60},
+        track="final",
+    )
+    fc = payload["forecast"]
+    bars = {r["h"]: r["prognose"] for r in fc["herkomst"]}
+    assert bars == {h: fc["byOrigin"][h]["total"] for h in fc["byOrigin"]}
+    assert fc["byOrigin"]["EER"]["total"] == pytest.approx(44.0)
+
+
+def test_payload_without_origin_column_has_no_origin_views(output, studentcount):
+    payload = performance_page.build_payload(
+        output.drop(columns="Herkomst"),
+        _cumulative().drop(columns="Herkomst"),
+        studentcount.drop(columns="Herkomst"),
+        2024,
+        10,
+        [str(w) for w in range(1, 53)],
+        38,
+    )
+    assert payload["meta"]["origins"] == []
+    assert payload["performanceByOrigin"] == {}
+    assert "origin" not in payload["performance"]["summaries"]["alle"]
+    # Trend valt terug op één reeks zonder herkomst.
+    assert list(payload["trend"]["programmes"][0]["series"]) == [""]
+
+
+def test_page_has_origin_filter(tmp_path, output, studentcount):
+    _builder(tmp_path, output, studentcount).build_and_save()
+    page = (
+        tmp_path / "data/output/visualisations/cumulative/dashboard.html"
+    ).read_text("utf-8")
+    assert 'id="origin-filter"' in page
+    assert "Fout naar herkomst" in page
+    assert 'id="expand-all"' in page, "uitklapbare herkomstrijen in de tabel"
+
+
+def test_origin_views_add_up_to_programme_prognose(output, studentcount):
+    """De uitklaprijen per herkomst tellen op tot de opleidingsrij erboven."""
+    payload = performance_page.build_payload(
+        output,
+        _cumulative(),
+        studentcount,
+        2024,
+        10,
+        [str(w) for w in range(1, 53)],
+        38,
+    )
+    total = payload["performance"]["current"]["A|Bachelor"]
+    parts = [
+        v["current"]["A|Bachelor"] for v in payload["performanceByOrigin"].values()
+    ]
+    for m in ("SARIMA_cumulative", "Prognose_ratio"):
+        assert sum(p["m"][m] for p in parts) == pytest.approx(total["m"][m])
+    assert sum(p["a"] for p in parts) == total["a"]
+    assert sum(p["prev"] for p in parts) == total["prev"]

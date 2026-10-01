@@ -8,6 +8,10 @@ Alle drie de pagina's delen één opzet en één template. Ze beantwoorden:
 4. (Cumulatief/individueel) Hoe verloopt het seizoen van één opleiding?
 5. (Eindoverzicht) Wat is de totale prognose, per herkomst en voor numerus fixus?
 
+Elke pagina kan worden gefilterd op herkomst (NL, EER, Niet-EER). De standaard is
+"alle herkomsten", waarin de herkomstgroepen per opleiding zijn opgeteld; per
+herkomst worden alle cijfers opnieuw berekend op opleiding × herkomst-niveau.
+
 Python rekent alle cijfers uit (:mod:`studentprognose.output.model_performance`)
 en schrijft ze als JSON in de pagina. De browser tekent alleen, met de ingebouwde
 plotly.js. Zo blijft het bestand klein en werkt de pagina ook offline, bijvoorbeeld
@@ -164,6 +168,7 @@ def _current_frame(
     prediction_year: int,
     predict_week: int | None,
     models: list[str],
+    by_origin: bool = False,
 ) -> pd.DataFrame:
     """Prognose per opleiding voor het voorspeljaar, inclusief numerus fixus.
 
@@ -171,7 +176,9 @@ def _current_frame(
     overzicht van prognoses; ze krijgen daar een eigen label.
     """
     cur = (
-        mp.current_predictions(data, prediction_year, predict_week, None, models)
+        mp.current_predictions(
+            data, prediction_year, predict_week, None, models, by_origin
+        )
         if models
         else pd.DataFrame()
     )
@@ -180,6 +187,7 @@ def _current_frame(
             columns=[
                 mp.PROGRAMME,
                 mp.EXAM_TYPE,
+                *([mp.ORIGIN] if by_origin else []),
                 mp.ACTUAL,
                 *models,
                 mp.YEAR,
@@ -216,15 +224,31 @@ def _current_payload(current: pd.DataFrame, models: list[str], nf: set[str]) -> 
 
 
 def _performance_payload(
-    units: pd.DataFrame, models: list[str], current: pd.DataFrame, nf: set[str]
+    units: pd.DataFrame,
+    models: list[str],
+    current: pd.DataFrame,
+    nf: set[str],
+    origin_units: pd.DataFrame | None = None,
+    origins: list[str] | None = None,
 ) -> dict:
-    """Samenvattingen voor 'alle jaren' en per afzonderlijk jaar, plus de tabel."""
+    """Samenvattingen voor 'alle jaren' en per afzonderlijk jaar, plus de tabel.
+
+    Args:
+        origin_units: Eenheden op opleiding × herkomst-niveau. Alleen meegeven voor
+            de weergave "alle herkomsten": dan krijgt die ook de fout per herkomst.
+        origins: Volgorde van de herkomstgroepen in die uitsplitsing.
+    """
     chart_models = mp.comparable_models(units, models)
     pop = mp.common_population(units, chart_models)
     exam_order = sorted(pop[mp.EXAM_TYPE].dropna().astype(str).unique())
+    opop = (
+        mp.common_population(origin_units, chart_models)
+        if origin_units is not None and chart_models
+        else None
+    )
 
-    def _block(sub: pd.DataFrame) -> dict:
-        return {
+    def _block(sub: pd.DataFrame, osub: pd.DataFrame | None) -> dict:
+        out = {
             "total": _records(mp.summarise(sub, chart_models)),
             "size": _records(
                 mp.summarise(
@@ -235,16 +259,24 @@ def _performance_payload(
                 mp.summarise(sub, chart_models, by=mp.EXAM_TYPE, order=exam_order)
             ),
         }
+        if osub is not None:
+            out["origin"] = _records(
+                mp.summarise(osub, chart_models, by=mp.ORIGIN, order=origins)
+            )
+        return out
 
     years = sorted(int(y) for y in pop[mp.YEAR].unique())
-    summaries = {ALL_YEARS: _block(pop)}
+    summaries = {ALL_YEARS: _block(pop, opop)}
     # De tabel per opleiding beoordeelt elk model op zijn eigen jaren (zie
     # programme_summary), dus die krijgt alle eenheden i.p.v. de gelijke populatie.
     table_models = [m for m in [*models, mp.NAIVE] if m in units.columns]
     programmes = {ALL_YEARS: _programme_rows(units, table_models, current)}
     for y in sorted(int(y) for y in units[mp.YEAR].unique()):
         if str(y) not in summaries:
-            summaries[str(y)] = _block(pop[pop[mp.YEAR] == y])
+            summaries[str(y)] = _block(
+                pop[pop[mp.YEAR] == y],
+                None if opop is None else opop[opop[mp.YEAR] == y],
+            )
         programmes[str(y)] = _programme_rows(
             units[units[mp.YEAR] == y], table_models, current
         )
@@ -270,7 +302,27 @@ def _performance_payload(
         "current": _clean(_current_payload(current, models, nf)),
         "units": _clean(unit_rows),
         "nUnitsAll": len(units),
+        # Herkomstgroepen met een voorspelling maar zonder realisatie, meegeteld als 0.
+        "nUnrealised": int(units[mp.UNREALISED].sum())
+        if mp.UNREALISED in units.columns
+        else 0,
     }
+
+
+def _origin_views(
+    origin_units: pd.DataFrame,
+    origin_current: pd.DataFrame,
+    models: list[str],
+    nf: set[str],
+    origins: list[str],
+) -> dict[str, dict]:
+    """Eén volledige performance-payload per herkomstgroep."""
+    views = {}
+    for h in origins:
+        u = origin_units[origin_units[mp.ORIGIN] == h].drop(columns=[mp.ORIGIN])
+        c = origin_current[origin_current[mp.ORIGIN] == h].drop(columns=[mp.ORIGIN])
+        views[h] = _performance_payload(u, models, c, nf)
+    return views
 
 
 # ── Verloop per opleiding ─────────────────────────────────────────────
@@ -284,62 +336,77 @@ def _joined(s: pd.Series) -> str:
     return " / ".join(sorted(s.dropna().astype(str).unique()))
 
 
+def _origin_of(frame: pd.DataFrame) -> pd.Series:
+    """Herkomst per rij als string; ``""`` als de bron geen herkomst kent."""
+    if mp.ORIGIN in frame.columns:
+        return frame[mp.ORIGIN].astype(str)
+    return pd.Series("", index=frame.index)
+
+
 def _actuals_by_programme(
     data_studentcount: pd.DataFrame | None,
-) -> dict[str, dict[str, float]]:
-    actuals: dict[str, dict[str, float]] = {}
+) -> dict[str, dict[str, dict[str, float]]]:
+    """Werkelijke instroom per opleiding → herkomst → jaar."""
+    actuals: dict[str, dict[str, dict[str, float]]] = {}
     if data_studentcount is None or not {mp.YEAR, mp.PROGRAMME, mp.ACTUAL}.issubset(
         data_studentcount.columns
     ):
         return actuals
-    sc = data_studentcount.groupby([mp.PROGRAMME, mp.YEAR])[mp.ACTUAL].sum()
-    for (p, y), v in sc.items():
+    sc = data_studentcount.assign(_h=_origin_of(data_studentcount))
+    sc = sc.groupby([mp.PROGRAMME, "_h", mp.YEAR])[mp.ACTUAL].sum()
+    for (p, h, y), v in sc.items():
         if v > 0:
-            actuals.setdefault(str(p), {})[str(int(y))] = float(v)
+            actuals.setdefault(str(p), {}).setdefault(h, {})[str(int(y))] = float(v)
     return actuals
 
 
 def _forecast_by_programme(
     data: pd.DataFrame, prediction_year: int, predict_week: int | None, final_week: int
-) -> dict[str, dict[int, float]]:
-    """De doorgetrokken curve na de voorspelweek (SARIMA) per opleiding × week."""
+) -> dict[str, dict[str, dict[int, float]]]:
+    """De doorgetrokken curve na de voorspelweek (SARIMA) per opleiding × herkomst × week."""
     rows = data[data[mp.YEAR] == prediction_year]
-    out: dict[str, dict[int, float]] = {}
+    out: dict[str, dict[str, dict[int, float]]] = {}
     if FORECAST not in rows.columns or predict_week is None:
         return out
     pw_key = week_sort_key(predict_week, final_week)
     f = rows[rows[FORECAST].notna()]
     f = f[f[mp.WEEK].apply(lambda w: week_sort_key(int(w), final_week) > pw_key)]
-    for (p, w), v in f.groupby([mp.PROGRAMME, mp.WEEK])[FORECAST].sum().items():
-        out.setdefault(str(p), {})[int(w)] = float(v)
+    f = f.assign(_h=_origin_of(f))
+    for (p, h, w), v in (
+        f.groupby([mp.PROGRAMME, "_h", mp.WEEK])[FORECAST].sum().items()
+    ):
+        out.setdefault(str(p), {}).setdefault(h, {})[int(w)] = float(v)
     return out
 
 
 def _predicted_by_programme(
-    data: pd.DataFrame,
-    prediction_year: int,
-    predict_week: int | None,
-    primary: str | None,
-) -> dict[str, float]:
-    if primary is None or predict_week is None or primary not in data.columns:
+    current: pd.DataFrame, primary: str | None
+) -> dict[str, dict[str, float]]:
+    """Voorspelde instroom per opleiding → herkomst, uit de prognose op herkomstniveau."""
+    if primary is None or current.empty or primary not in current.columns:
         return {}
-    pp = data[(data[mp.YEAR] == prediction_year) & (data[mp.WEEK] == predict_week)]
-    pp = pp.groupby(mp.PROGRAMME)[primary].agg(
-        lambda s: s.sum() if s.notna().any() else np.nan
-    )
-    return {str(p): float(v) for p, v in pp.items() if pd.notna(v)}
+    cur = current[current[primary].notna()].assign(_h=_origin_of(current))
+    pp = cur.groupby([mp.PROGRAMME, "_h"])[primary].sum()
+    out: dict[str, dict[str, float]] = {}
+    for (p, h), v in pp.items():
+        out.setdefault(str(p), {})[h] = float(v)
+    return out
 
 
 def _trend_payload(
     curves: pd.DataFrame,
     value: str,
     source: pd.DataFrame,
-    forecast: dict[str, dict[int, float]],
-    predicted: dict[str, float],
-    actuals: dict[str, dict[str, float]],
+    forecast: dict[str, dict[str, dict[int, float]]],
+    predicted: dict[str, dict[str, float]],
+    actuals: dict[str, dict[str, dict[str, float]]],
     weeks: list[str],
 ) -> dict:
-    """Eén compacte reeks per opleiding × jaar, uitgelijnd op de academische weken."""
+    """Eén compacte reeks per opleiding × herkomst × jaar, uitgelijnd op de academische weken.
+
+    De browser telt de herkomstgroepen op voor de weergave "alle herkomsten"; zo
+    staat elke reeks maar één keer in de pagina.
+    """
     if curves.empty:
         return {"programmes": []}
     pos = {int(w): i for i, w in enumerate(weeks)}
@@ -360,27 +427,29 @@ def _trend_payload(
     meta = meta.fillna("")
 
     # Omvang (voor sortering en de standaardkeuze): recentste bekende eindstand.
-    size = (
-        curves[curves[mp.YEAR] == curves[mp.YEAR].max()]
-        .groupby(mp.PROGRAMME)[value]
-        .max()
-    )
+    latest = curves[curves[mp.YEAR] == curves[mp.YEAR].max()]
+    size = latest.groupby([mp.PROGRAMME, mp.WEEK])[value].sum().groupby(level=0).max()
 
+    def _row(ws: pd.Series, vs: pd.Series) -> list[float | None]:
+        arr: list[float | None] = [None] * len(weeks)
+        for w, v in zip(ws, vs):
+            i = pos.get(int(w))
+            if i is not None:
+                arr[i] = round(float(v), 1)
+        return arr
+
+    curves = curves.assign(_h=_origin_of(curves))
     programmes = []
     for prog, sub in curves.groupby(mp.PROGRAMME):
         prog = str(prog)
-        series = {}
-        for yr, ys in sub.groupby(mp.YEAR):
-            arr: list[float | None] = [None] * len(weeks)
-            for w, v in zip(ys[mp.WEEK], ys[value]):
-                i = pos.get(int(w))
-                if i is not None:
-                    arr[i] = round(float(v), 1)
-            series[str(int(yr))] = arr
-        fc: list[float | None] = [None] * len(weeks)
-        for w, v in forecast.get(prog, {}).items():
-            if int(w) in pos:
-                fc[pos[int(w)]] = round(v, 1)
+        series: dict[str, dict[str, list]] = {}
+        for (h, yr), ys in sub.groupby(["_h", mp.YEAR]):
+            series.setdefault(h, {})[str(int(yr))] = _row(ys[mp.WEEK], ys[value])
+        fc: dict[str, list] = {}
+        for h, fw in forecast.get(prog, {}).items():
+            arr = _row(pd.Series(list(fw)), pd.Series(list(fw.values())))
+            if any(v is not None for v in arr):
+                fc[h] = arr
         programmes.append(
             {
                 "code": prog,
@@ -388,8 +457,8 @@ def _trend_payload(
                 "faculty": meta.at[prog, "faculty"] if prog in meta.index else "",
                 "size": float(size.get(prog, 0.0)),
                 "series": series,
-                "forecast": fc if any(v is not None for v in fc) else None,
-                "predicted": predicted.get(prog),
+                "forecast": fc,
+                "predicted": predicted.get(prog, {}),
                 "actuals": actuals.get(prog, {}),
             }
         )
@@ -399,61 +468,79 @@ def _trend_payload(
 
 
 def _applicant_curves(data_cumulative: pd.DataFrame | None) -> pd.DataFrame:
+    keys = [mp.PROGRAMME, mp.YEAR, mp.WEEK]
     if data_cumulative is None or data_cumulative.empty:
-        return pd.DataFrame(columns=[mp.PROGRAMME, mp.YEAR, mp.WEEK, APPLICANTS])
-    return (
-        data_cumulative.groupby([mp.PROGRAMME, mp.YEAR, mp.WEEK])[APPLICANTS]
-        .sum()
-        .reset_index()
-    )
+        return pd.DataFrame(columns=[*keys, APPLICANTS])
+    if mp.ORIGIN in data_cumulative.columns:
+        keys.append(mp.ORIGIN)
+    return data_cumulative.groupby(keys)[APPLICANTS].sum().reset_index()
 
 
 def _individual_curves(xgboost_curve: pd.DataFrame | None) -> pd.DataFrame:
-    cols = [mp.PROGRAMME, mp.YEAR, mp.WEEK, "XGBoost_cumulative"]
+    keys = [mp.PROGRAMME, mp.YEAR, mp.WEEK]
     if xgboost_curve is None or xgboost_curve.empty:
-        return pd.DataFrame(columns=cols)
+        return pd.DataFrame(columns=[*keys, "XGBoost_cumulative"])
     xc = xgboost_curve.assign(**{mp.PROGRAMME: xgboost_curve[mp.PROGRAMME].astype(str)})
-    return xc.groupby(cols[:3])["XGBoost_cumulative"].sum().reset_index()
+    if mp.ORIGIN in xc.columns:
+        keys.append(mp.ORIGIN)
+    return xc.groupby(keys)["XGBoost_cumulative"].sum().reset_index()
 
 
 # ── Eindoverzicht: prognose ───────────────────────────────────────────
 
 
+def _forecast_totals(cur: pd.DataFrame, primary: str) -> dict:
+    """Kerncijfers van de prognose: totaal, t.o.v. vorig jaar en (indien bekend) werkelijk."""
+    cur = cur[cur[primary].notna()]
+    both = cur[cur[mp.NAIVE].notna()]
+    return {
+        "total": float(cur[primary].sum()),
+        "n": int(cur[[mp.PROGRAMME, mp.EXAM_TYPE]].drop_duplicates().shape[0]),
+        "prevTotal": float(both[mp.NAIVE].sum()) if not both.empty else None,
+        "prognoseComparable": float(both[primary].sum()) if not both.empty else None,
+        "nComparable": int(
+            both[[mp.PROGRAMME, mp.EXAM_TYPE]].drop_duplicates().shape[0]
+        ),
+        "actualTotal": float(cur[mp.ACTUAL].sum())
+        if cur[mp.ACTUAL].notna().any()
+        else None,
+    }
+
+
 def _forecast_overview(
-    data: pd.DataFrame,
     current: pd.DataFrame,
+    origin_current: pd.DataFrame | None,
+    origins: list[str],
     data_studentcount: pd.DataFrame | None,
     prediction_year: int,
-    predict_week: int | None,
     primary: str | None,
     numerus_fixus: dict,
 ) -> dict | None:
-    """Totale prognose, verandering t.o.v. vorig jaar, per herkomst en numerus fixus."""
+    """Totale prognose, verandering t.o.v. vorig jaar, per herkomst en numerus fixus.
+
+    De herkomstuitsplitsing komt uit dezelfde prognose op herkomstniveau als het
+    herkomstfilter, zodat de staafjes optellen tot de kerncijfers per herkomst.
+    """
     if primary is None or current.empty or primary not in current.columns:
         return None
     cur = current[current[primary].notna()]
-    both = cur[cur[mp.NAIVE].notna()]
-    total = float(cur[primary].sum())
-    actual_known = cur[mp.ACTUAL].notna().any()
 
     herkomst: list[dict] = []
-    if "Herkomst" in data.columns and predict_week is not None:
-        rows = data[
-            (data[mp.YEAR] == prediction_year) & (data[mp.WEEK] == predict_week)
-        ]
-        prog = rows.groupby("Herkomst")[primary].sum(min_count=1)
+    by_origin: dict[str, dict] = {}
+    if origin_current is not None and not origin_current.empty:
         prev = pd.Series(dtype="float64")
-        if data_studentcount is not None and "Herkomst" in data_studentcount.columns:
+        if data_studentcount is not None and mp.ORIGIN in data_studentcount.columns:
             sc = data_studentcount[data_studentcount[mp.YEAR] == prediction_year - 1]
             codes = set(cur[mp.PROGRAMME].astype(str))
             sc = sc[sc[mp.PROGRAMME].astype(str).isin(codes)]
-            prev = sc.groupby("Herkomst")[mp.ACTUAL].sum()
-        order = ["NL", "EER", "Niet-EER"]
-        for h in sorted(
-            prog.index.astype(str),
-            key=lambda x: (order.index(x) if x in order else 9, x),
-        ):
-            herkomst.append({"h": h, "prognose": prog.get(h), "prev": prev.get(h)})
+            prev = sc.groupby(sc[mp.ORIGIN].astype(str))[mp.ACTUAL].sum()
+        for h in origins:
+            oc = origin_current[origin_current[mp.ORIGIN] == h]
+            if oc[primary].notna().any():
+                by_origin[h] = _forecast_totals(oc, primary)
+                herkomst.append(
+                    {"h": h, "prognose": by_origin[h]["total"], "prev": prev.get(h)}
+                )
 
     nf_rows = []
     for code, cap in (numerus_fixus or {}).items():
@@ -473,15 +560,9 @@ def _forecast_overview(
 
     return _clean(
         {
-            "total": total,
-            "n": int(len(cur)),
-            "prevTotal": float(both[mp.NAIVE].sum()) if not both.empty else None,
-            "prognoseComparable": float(both[primary].sum())
-            if not both.empty
-            else None,
-            "nComparable": int(len(both)),
-            "actualTotal": float(cur[mp.ACTUAL].sum()) if actual_known else None,
+            **_forecast_totals(cur, primary),
             "herkomst": herkomst,
+            "byOrigin": by_origin,
             "nf": nf_rows,
         }
     )
@@ -508,30 +589,41 @@ def build_payload(
         track: ``"cumulative"``, ``"individual"`` of ``"final"``.
         xgboost_curve: Geaggregeerde XGBoost-curve van het individuele spoor; nodig
             voor het verloop op de individuele pagina.
+
+    Returns:
+        ``performance`` bevat de weergave "alle herkomsten"; ``performanceByOrigin``
+        dezelfde opbouw per herkomstgroep (leeg zonder kolom ``Herkomst``).
     """
     page = PAGES[track]
     numerus_fixus = numerus_fixus or {}
     nf = {str(k) for k in numerus_fixus}
     models = track_models(track, data)
     primary = models[0] if models else None
-    if models:
-        units = mp.build_evaluation_units(
-            data, predict_week, data_studentcount, numerus_fixus, models
-        )
-    else:  # geen enkele voorspelkolom gevuld: niets te evalueren
-        units = pd.DataFrame(
-            columns=[
-                mp.YEAR,
-                mp.PROGRAMME,
-                mp.EXAM_TYPE,
-                mp.ACTUAL,
-                "Grootteklasse",
-                mp.NAIVE,
-            ]
-        )
+    has_origin = mp.ORIGIN in data.columns
+
+    units = mp.build_evaluation_units(
+        data, predict_week, data_studentcount, numerus_fixus, models
+    )
     current = _current_frame(
         data, data_studentcount, prediction_year, predict_week, models
     )
+    origin_units = origin_current = None
+    origins: list[str] = []
+    if has_origin:
+        origin_units = mp.build_evaluation_units(
+            data, predict_week, data_studentcount, numerus_fixus, models, by_origin=True
+        )
+        origin_current = _current_frame(
+            data,
+            data_studentcount,
+            prediction_year,
+            predict_week,
+            models,
+            by_origin=True,
+        )
+        origins = mp.origin_order(
+            pd.concat([origin_units[mp.ORIGIN], origin_current[mp.ORIGIN]])
+        )
 
     if track == "cumulative":
         curves, value, source = (
@@ -553,7 +645,9 @@ def build_payload(
             value,
             source if source is not None else pd.DataFrame(),
             _forecast_by_programme(data, prediction_year, predict_week, final_week),
-            _predicted_by_programme(data, prediction_year, predict_week, primary),
+            _predicted_by_programme(
+                origin_current if origin_current is not None else current, primary
+            ),
             _actuals_by_programme(data_studentcount),
             weeks,
         )
@@ -572,20 +666,28 @@ def build_payload(
             "nNumerusFixus": len(nf),
             "within": mp.WITHIN_THRESHOLD,
             "sizeLabels": mp.SIZE_LABELS,
+            "origins": origins,
             "trust": {
                 "high": mp.TRUST_HIGH,
                 "medium": mp.TRUST_MEDIUM,
                 "minYearsHigh": mp.TRUST_MIN_YEARS_HIGH,
             },
         },
-        "performance": _performance_payload(units, models, current, nf),
+        "performance": _performance_payload(
+            units, models, current, nf, origin_units, origins
+        ),
+        "performanceByOrigin": (
+            _origin_views(origin_units, origin_current, models, nf, origins)
+            if has_origin
+            else {}
+        ),
         "forecast": (
             _forecast_overview(
-                data,
                 current,
+                origin_current,
+                origins,
                 data_studentcount,
                 prediction_year,
-                predict_week,
                 primary,
                 numerus_fixus,
             )

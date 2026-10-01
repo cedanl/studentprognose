@@ -64,4 +64,4 @@ De methodologie op deze pagina's komt voort uit het model dat oorspronkelijk bij
 
 ## Dashboard-visualisatie
 
-Na het opslaan van de resultaten genereert de pipeline een interactief Plotly-dashboard per modus. Het dashboard laat per model zien hoe groot de fout is (per opleidingsgrootte, examentype en opleiding), of het model een naïeve voorspelling verslaat, en hoeveel vertrouwen de prognose per opleiding verdient. Het wordt opgeslagen als zelfstandig HTML-bestand onder `data/output/visualisations/`. Zie [Output lezen](../output-begrijpen.md#interactief-dashboard) voor details.
+Na het opslaan van de resultaten genereert de pipeline een interactief Plotly-dashboard per modus. Het dashboard laat per model zien hoe groot de fout is (per opleidingsgrootte, examentype, herkomst en opleiding), of het model een naïeve voorspelling verslaat, en hoeveel vertrouwen de prognose per opleiding verdient. Alle cijfers zijn ook per herkomstgroep (NL, EER, niet-EER) te bekijken. Het wordt opgeslagen als zelfstandig HTML-bestand onder `data/output/visualisations/`. Zie [Output lezen](../output-begrijpen.md#interactief-dashboard) voor details.

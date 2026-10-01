@@ -142,7 +142,7 @@ Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren 
 | **Cumulatief** (`cumulative/dashboard.html`) | `-d c` of `-d b` | Hoe goed voorspelt het cumulatieve model? |
 | **Eindoverzicht** (`final/dashboard.html`) | Altijd | Wat is de prognose, en hoeveel vertrouwen verdient die? |
 
-Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. Alle pagina's hebben dezelfde opzet: kerncijfers, de fout naar opleidingsgrootte en examentype, een tabel per opleiding met een **betrouwbaarheidslabel**, en (bij de modelpagina's) het verloop per opleiding. Elk model heeft op alle pagina's dezelfde kleur. De dashboards zijn zelfstandige HTML-bestanden (geen server of internet nodig) en openen in elke browser.
+Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. Alle pagina's hebben dezelfde opzet: een [herkomstfilter](#herkomstfilter-en-fout-naar-herkomst) bovenaan, kerncijfers, de fout naar opleidingsgrootte, examentype en herkomst, een tabel per opleiding met een **betrouwbaarheidslabel**, en (bij de modelpagina's) het verloop per opleiding. Elk model heeft op alle pagina's dezelfde kleur. De dashboards zijn zelfstandige HTML-bestanden (geen server of internet nodig) en openen in elke browser.
 
 !!! info "Dashboard is opt-in"
     Het dashboard wordt alleen gegenereerd als je expliciet `--dashboard` meegeeft. Een voorbeeld:
@@ -161,8 +161,8 @@ Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. A
 Altijd beschikbaar. Het eindoverzicht gaat over de **eindprognose**: het ensemble als dat er is, anders het model dat de prognose levert. Bovenaan staan de totale verwachte instroom, de verandering ten opzichte van vorig jaar, en welk deel van de verwachte studenten een prognose met betrouwbaarheid hoog of middel heeft. Daaronder volgen:
 
 - **Prognose per opleiding**: prognose ± marge, werkelijke instroom vorig jaar, het verschil en het betrouwbaarheidslabel. Zoeken, sorteren, filteren en downloaden als CSV kan hier ook.
-- **Prognose per herkomst**: NL, EER en niet-EER naast de instroom van vorig jaar.
-- **Numerus fixus** (als je die hebt ingesteld): prognose tegenover de capaciteit.
+- **Prognose per herkomst**: NL, EER en niet-EER naast de instroom van vorig jaar. Deze grafiek toont altijd alle herkomstgroepen; kies je bovenaan een herkomst, dan wordt die groep uitgelicht.
+- **Numerus fixus** (als je die hebt ingesteld): prognose tegenover de capaciteit. Alleen zichtbaar bij "alle herkomsten", want de capaciteit geldt voor de hele opleiding en niet per herkomstgroep.
 - **Modelperformance**: dezelfde foutanalyses als op de modelpagina's, met het ensemble naast de losse modellen en de naïeve voorspelling. Zo zie je of het ensemble iets toevoegt.
 
 Numerus-fixusopleidingen staan in de tabel met een eigen label: hun instroom wordt door de capaciteit bepaald, dus een modelfout zegt daar weinig.
@@ -174,15 +174,28 @@ Beschikbaar bij `-d c` of `-d b`. Deze pagina beantwoordt één vraag: **hoe goe
 1. **Kerncijfers**: de fout per student (WAPE), de vergelijking met een naïeve voorspelling, de systematische afwijking (bias) en het aandeel opleidingen dat binnen 10% van de realisatie zat.
 2. **Fout naar opleidingsgrootte**: de WAPE per grootteklasse (< 25, 25–49, 50–99, 100–249 en ≥ 250 eerstejaars), naast het ratiomodel en de naïeve voorspelling, met het aantal opleidingen (n) per klasse.
 3. **Fout naar examentype**: dezelfde vergelijking voor bachelor en master.
-4. **Fout per opleiding**: elke stip is een opleiding in één jaar. Klik op een stip om het verloop van die opleiding te openen.
-5. **Prestatie per opleiding**: een tabel met per opleiding de historische fout, de vergelijking met naïef, de bias, de prognose met een marge en een **betrouwbaarheidslabel** (zie hieronder). Je kunt zoeken, sorteren en filteren op betrouwbaarheid, en de tabel downloaden als CSV (puntkomma-gescheiden, opent direct in Excel).
-6. **Verloop per opleiding**: de gewogen vooraanmelders per week voor alle jaren, de prognose van de vooraanmelders na de voorspelweek, en de voorspelde en werkelijke instroom. Met het zoekveld kies je een opleiding. Onder de grafiek staat hoe het model het voor deze opleiding in eerdere jaren deed.
+4. **Fout naar herkomst**: de WAPE per herkomstgroep (NL, EER, niet-EER), zie [hieronder](#herkomstfilter-en-fout-naar-herkomst).
+5. **Fout per opleiding**: elke stip is een opleiding in één jaar. Klik op een stip om het verloop van die opleiding te openen.
+6. **Prestatie per opleiding**: een tabel met per opleiding de historische fout, de vergelijking met naïef, de bias, de prognose met een marge en een **betrouwbaarheidslabel** (zie hieronder). Je kunt zoeken, sorteren en filteren op betrouwbaarheid, en de tabel downloaden als CSV (puntkomma-gescheiden, opent direct in Excel).
+7. **Verloop per opleiding**: de gewogen vooraanmelders per week voor alle jaren, de prognose van de vooraanmelders na de voorspelweek, en de voorspelde en werkelijke instroom. Met het zoekveld kies je een opleiding. Onder de grafiek staat hoe het model het voor deze opleiding in eerdere jaren deed.
 
 ![Cumulatief dashboard met kerncijfers en fout naar opleidingsgrootte en examentype](assets/cumulatief-dashboard.png)
 
 *Bovenste deel van de pagina na een backtest over 2022–2025 (demodata).*
 
 **Hoe de fout gemeten wordt.** Alles wordt gemeten op de **voorspelweek**: dat is het moment waarop je de prognose in de praktijk gebruikt. De pipeline voorspelt per herkomstgroep, maar het dashboard telt die eerst op tot één getal per opleiding, want op dat niveau worden beslissingen genomen. De modellen worden vergeleken op **dezelfde set opleidingen**, zodat een model niet beter lijkt doordat het de moeilijke gevallen overslaat. Numerus-fixusopleidingen tellen niet mee: daar bepaalt de capaciteit de instroom, niet de aanmeldingen.
+
+**Prognose en fout zijn op dezelfde optelling gebaseerd.** De WAPE en bias in de tabel horen bij precies het getal dat in de kolom "Prognose" staat. Dat vraagt een keuze voor herkomstgroepen die wel een voorspelling hebben, maar geen realisatie (bijvoorbeeld een voorspelling van 3 niet-EER-studenten, terwijl er in het telbestand geen enkele niet-EER-student bij die opleiding staat):
+
+- Heeft de opleiding dat jaar wél een realisatie, dan telt zo'n herkomstgroep mee als **0 werkelijke studenten**: er kwam uit die groep niemand. De voorspelling voor die groep is dan volledig fout, en dat hoort in de fout terug te komen. Zou je de groep weglaten, dan meet je de fout op een kleiner getal dan de prognose die je ziet, en lijkt het model beter dan het is.
+- Heeft een herkomstgroep wél een realisatie, maar geen voorspelling van een model, dan blijft het opleidingstotaal van dat model **leeg**. Een deelsom van de voorspellingen afzetten tegen de volledige realisatie zou een te lage prognose en een vertekende fout opleveren.
+- In een lopend jaar (nog geen realisatie) is de prognose simpelweg de som van de voorspelde herkomstgroepen.
+
+Onder **"Hoe worden deze cijfers berekend?"** staat hoeveel herkomstgroepen als 0 zijn meegeteld.
+
+!!! warning "Wanneer kijk je kritisch naar deze cijfers?"
+    - **Veel herkomstgroepen als 0 meegeteld?** Dan kan het zijn dat het telbestand onvolledig is (een herkomst ontbreekt, of een jaar is maar gedeeltelijk geladen), in plaats van dat er echt niemand kwam. Controleer de teldata voordat je de fout aan het model toeschrijft.
+    - **"Werkelijk vorig jaar" veel hoger dan de realisatie die je kent?** Dat kan wijzen op dubbeltelling in het telbestand, bijvoorbeeld doordat twee versies van hetzelfde bestand samen zijn ingelezen. Dat vertekent zowel de naïeve voorspelling als de fout.
 
 ![Tabel met prestatie en betrouwbaarheid per opleiding](assets/cumulatief-tabel.png)
 
@@ -217,8 +230,30 @@ Een opleiding telt voor elk model mee in de jaren waarvoor dat model een voorspe
 !!! note "Grootteklasse op basis van de realisatie"
     De grootteklasse wordt bepaald door de **werkelijke** instroom. Dat is eerlijk voor de evaluatie, maar je weet het vooraf niet precies. Gebruik de klasse daarom om te zien waar het model zwak is, niet als indeling bij een lopende prognose.
 
+### Herkomstfilter en fout naar herkomst
+
+Bovenaan elke dashboardpagina (cumulatief, individueel en eindoverzicht) kies je **Alle herkomsten**, **NL**, **EER** of **Niet-EER**. De standaard is "alle herkomsten": de herkomstgroepen worden per opleiding opgeteld, omdat op dat niveau de meeste beslissingen vallen.
+
+Kies je een herkomst, dan wordt alles opnieuw berekend voor alleen die groep, per opleiding × herkomst: kerncijfers, fout naar grootte en examentype, fout per opleiding, de tabel (prognose, WAPE, bias, betrouwbaarheid) en het verloop per opleiding. Twee dingen veranderen mee:
+
+- De **naïeve voorspelling** is dan de realisatie van vorig jaar van díe herkomstgroep. Zo vergelijk je het model met een eerlijke basislijn voor dezelfde groep.
+- De **grootteklasse** is de instroom binnen die herkomstgroep. Een grote opleiding met 15 EER-studenten valt bij het filter EER dus in de klasse < 25.
+
+Op het eindoverzicht volgen de kerncijfers het filter; de grafiek "Prognose per herkomst" blijft alle groepen tonen. De gekozen herkomst staat in de adresbalk (bijvoorbeeld `#herkomst=EER`) en gaat mee als je naar een andere dashboardpagina klikt, zodat je een link naar een specifieke weergave kunt delen. Een CSV-download krijgt een kolom Herkomst en de herkomst in de bestandsnaam.
+
+**Uitsplitsing per opleiding.** Wil je voor één opleiding zien welke herkomstgroep de fout veroorzaakt, dan hoef je niet te wisselen tussen filters. In de weergave "alle herkomsten" klik je in de tabel op het pijltje (›) vóór de opleiding. Daaronder verschijnen NL, EER en niet-EER, elk met hun eigen prognose, WAPE, bias, betrouwbaarheid en naïeve voorspelling. Is de realisatie van het voorspeljaar al bekend (een backtest), dan toont de kolom **Fout** per rij hoeveel studenten de prognose ernaast zat, en hoeveel procent dat is. De prognoses, realisaties en fouten van de herkomstgroepen tellen op tot de opleidingsrij erboven. Met **Herkomst uitklappen** klap je alle opleidingen tegelijk open. Uitgeklapte opleidingen gaan met hun herkomstregels mee in de CSV-download.
+
+Een opleiding met een redelijke totale fout kan zo een herkomstgroep verbergen die structureel misgaat: bijvoorbeeld een NL-voorspelling die 3% afwijkt en een niet-EER-voorspelling die 50% te hoog zit. Andersom heeft een kleine herkomstgroep snel een groot percentage. Kijk dan naar het aantal studenten erachter voordat je conclusies trekt.
+
+**Waarom per herkomst kijken?** Herkomstgroepen gedragen zich verschillend: internationale studenten melden zich eerder of later aan, trekken zich vaker terug en zijn gevoeliger voor beleid (taal, visa, collegegeld). Een goede fout op opleidingsniveau kan verbergen dat het model één groep structureel over- en een andere onderschat.
+
+**Fout naar herkomst.** In de weergave "alle herkomsten" staat naast de fout naar opleidingsgrootte en examentype een kaart met de WAPE per herkomstgroep, per model en naast de naïeve voorspelling. Lees die met twee kanttekeningen:
+
+- Deze WAPE wordt gemeten per opleiding × herkomst. Fouten tussen herkomstgroepen vallen daardoor **niet tegen elkaar weg** (5 NL-studenten te veel en 5 EER-studenten te weinig is op opleidingsniveau 0 fout, hier 10). De WAPE ligt hier dus meestal hoger dan op opleidingsniveau; dat is geen tegenstrijdigheid.
+- Kleine herkomstgroepen, vaak EER en niet-EER bij masters, hebben relatief grote fouten: een paar studenten verschil is al snel tientallen procenten. Kijk daar vooral naar de richting (bias) en naar het verschil met naïef, niet naar het precieze percentage.
+
 ### Individueel dashboard (`individual/dashboard.html`)
 
-Beschikbaar bij `-d i` of `-d b`, zodra het individuele model voorspellingen heeft. De opzet is gelijk aan het cumulatieve dashboard: kerncijfers, fout naar opleidingsgrootte en examentype, fout per opleiding en de tabel met betrouwbaarheid.
+Beschikbaar bij `-d i` of `-d b`, zodra het individuele model voorspellingen heeft. De opzet is gelijk aan het cumulatieve dashboard: herkomstfilter, kerncijfers, fout naar opleidingsgrootte, examentype en herkomst, fout per opleiding en de tabel met betrouwbaarheid.
 
 Het **verloop per opleiding** laat hier iets anders zien: het verwachte aantal inschrijvingen per week. Dat is de som van de inschrijfkansen die XGBoost per aanmelder berekent (tot en met de voorspelweek), doorgetrokken naar het eind van het seizoen met SARIMA. Rechts staan de werkelijke instroom van eerdere jaren (★) en de voorspelde instroom (◆).
