@@ -183,18 +183,34 @@ Beschikbaar bij `-d c` of `-d b`. Deze pagina beantwoordt één vraag: **hoe goe
 
 *Bovenste deel van de pagina na een backtest over 2022–2025 (demodata).*
 
-**Hoe de fout gemeten wordt.** Alles wordt gemeten op de **voorspelweek**: dat is het moment waarop je de prognose in de praktijk gebruikt. De pipeline voorspelt per herkomstgroep, maar het dashboard telt die eerst op tot één getal per opleiding, want op dat niveau worden beslissingen genomen. De modellen worden vergeleken op **dezelfde set opleidingen**, zodat een model niet beter lijkt doordat het de moeilijke gevallen overslaat. Numerus-fixusopleidingen tellen niet mee: daar bepaalt de capaciteit de instroom, niet de aanmeldingen.
+**Hoe de fout gemeten wordt.** Alles wordt gemeten op de **voorspelweek**: dat is het moment waarop je de prognose in de praktijk gebruikt. De pipeline voorspelt per herkomstgroep, maar het dashboard telt die eerst op tot één getal per opleiding, want op dat niveau worden beslissingen genomen. De modellen worden vergeleken op **dezelfde opleidingen en herkomstgroepen**, zodat een model niet beter lijkt doordat het de moeilijke gevallen overslaat. Numerus-fixusopleidingen tellen niet mee: daar bepaalt de capaciteit de instroom, niet de aanmeldingen.
 
 **Prognose en fout zijn op dezelfde optelling gebaseerd.** De WAPE en bias in de tabel horen bij precies het getal dat in de kolom "Prognose" staat. Dat vraagt een keuze voor herkomstgroepen die wel een voorspelling hebben, maar geen realisatie (bijvoorbeeld een voorspelling van 3 niet-EER-studenten, terwijl er in het telbestand geen enkele niet-EER-student bij die opleiding staat):
 
 - Heeft de opleiding dat jaar wél een realisatie, dan telt zo'n herkomstgroep mee als **0 werkelijke studenten**: er kwam uit die groep niemand. De voorspelling voor die groep is dan volledig fout, en dat hoort in de fout terug te komen. Zou je de groep weglaten, dan meet je de fout op een kleiner getal dan de prognose die je ziet, en lijkt het model beter dan het is.
-- Heeft een herkomstgroep wél een realisatie, maar geen voorspelling van een model, dan blijft het opleidingstotaal van dat model **leeg**. Een deelsom van de voorspellingen afzetten tegen de volledige realisatie zou een te lage prognose en een vertekende fout opleveren.
-- In een lopend jaar (nog geen realisatie) is de prognose simpelweg de som van de voorspelde herkomstgroepen.
+- Heeft een herkomstgroep wél een realisatie, maar **geen voorspelling**, dan telt die groep **niet mee in de cijfers**: niet in de prognose, niet in de realisatie en niet in de naïeve voorspelling. De opleiding telt mee met de groepen die wél voorspeld zijn. Zie het voorbeeld hieronder.
+- In een lopend jaar (nog geen realisatie) is de prognose simpelweg de som van de voorspelde herkomstgroepen, en "werkelijk vorig jaar" is de instroom van vorig jaar van diezelfde groepen.
 
-Onder **"Hoe worden deze cijfers berekend?"** staat hoeveel herkomstgroepen als 0 zijn meegeteld.
+**Voorbeeld.** Een master heeft deze aantallen:
+
+| Herkomst | Voorspeld | Werkelijk |
+|---|---|---|
+| NL | 50 | 50 |
+| EER | 20 | 20 |
+| Niet-EER | geen voorspelling | 30 |
+
+Het dashboard meet deze opleiding als 70 voorspeld tegen 70 werkelijk. Zou je de 30 niet-EER-studenten meetellen, dan krijgt het model een fout van 30% voor een groep die het niet voorspeld heeft. Zou je de hele opleiding weglaten, dan verdwijnen de twee goed voorspelde groepen uit het oordeel. Beide geven een vertekend beeld van hoe goed het model is.
+
+Welke groepen meetellen hangt af van wat je bekijkt:
+
+- **Grafieken en kerncijfers** vergelijken modellen. Daar tellen alleen de herkomstgroepen die **alle vergeleken modellen** voorspellen, zodat elk model op dezelfde studenten wordt gemeten.
+- **De tabel per opleiding** beoordeelt elk model op de herkomstgroepen die **dat model zelf** voorspelt. Prognose, werkelijke instroom, fout, verschil met vorig jaar en de naïeve WAPE in een rij gaan dus altijd over dezelfde groepen. Wissel je van model, dan kan de werkelijke instroom in de tabel veranderen.
+
+De niet-voorspelde groepen verdwijnen niet uit het dashboard: je ziet ze nog in het verloop van de aanmeldingen. Onder **"Hoe worden deze cijfers berekend?"** staat hoeveel herkomstgroepen als 0 zijn meegeteld, en hoeveel herkomstgroepen (en studenten) buiten de cijfers vallen omdat ze geen voorspelling hadden.
 
 !!! warning "Wanneer kijk je kritisch naar deze cijfers?"
     - **Veel herkomstgroepen als 0 meegeteld?** Dan kan het zijn dat het telbestand onvolledig is (een herkomst ontbreekt, of een jaar is maar gedeeltelijk geladen), in plaats van dat er echt niemand kwam. Controleer de teldata voordat je de fout aan het model toeschrijft.
+    - **Veel studenten zonder voorspelling?** De cijfers zeggen dan alleen iets over het deel dat wél voorspeld is. Voor de planning van de hele opleiding moet je de ontbrekende groepen zelf inschatten, bijvoorbeeld met de instroom van vorig jaar.
     - **"Werkelijk vorig jaar" veel hoger dan de realisatie die je kent?** Dat kan wijzen op dubbeltelling in het telbestand, bijvoorbeeld doordat twee versies van hetzelfde bestand samen zijn ingelezen. Dat vertekent zowel de naïeve voorspelling als de fout.
 
 ![Tabel met prestatie en betrouwbaarheid per opleiding](assets/cumulatief-tabel.png)
@@ -241,7 +257,7 @@ Kies je een herkomst, dan wordt alles opnieuw berekend voor alleen die groep, pe
 
 Op het eindoverzicht volgen de kerncijfers het filter; de grafiek "Prognose per herkomst" blijft alle groepen tonen. De gekozen herkomst staat in de adresbalk (bijvoorbeeld `#herkomst=EER`) en gaat mee als je naar een andere dashboardpagina klikt, zodat je een link naar een specifieke weergave kunt delen. Een CSV-download krijgt een kolom Herkomst en de herkomst in de bestandsnaam.
 
-**Uitsplitsing per opleiding.** Wil je voor één opleiding zien welke herkomstgroep de fout veroorzaakt, dan hoef je niet te wisselen tussen filters. In de weergave "alle herkomsten" klik je in de tabel op het pijltje (›) vóór de opleiding. Daaronder verschijnen NL, EER en niet-EER, elk met hun eigen prognose, WAPE, bias, betrouwbaarheid en naïeve voorspelling. Is de realisatie van het voorspeljaar al bekend (een backtest), dan toont de kolom **Fout** per rij hoeveel studenten de prognose ernaast zat, en hoeveel procent dat is. De prognoses, realisaties en fouten van de herkomstgroepen tellen op tot de opleidingsrij erboven. Met **Herkomst uitklappen** klap je alle opleidingen tegelijk open. Uitgeklapte opleidingen gaan met hun herkomstregels mee in de CSV-download.
+**Uitsplitsing per opleiding.** Wil je voor één opleiding zien welke herkomstgroep de fout veroorzaakt, dan hoef je niet te wisselen tussen filters. In de weergave "alle herkomsten" klik je in de tabel op het pijltje (›) vóór de opleiding. Daaronder verschijnen NL, EER en niet-EER, elk met hun eigen prognose, WAPE, bias, betrouwbaarheid en naïeve voorspelling. Is de realisatie van het voorspeljaar al bekend (een backtest), dan toont de kolom **Fout** per rij hoeveel studenten de prognose ernaast zat, en hoeveel procent dat is. De prognoses, realisaties en fouten van de herkomstgroepen tellen op tot de opleidingsrij erboven. Uitzondering: een herkomstgroep zonder voorspelling van het gekozen model staat er wel bij, met een lege prognose en de werkelijke instroom, maar telt niet mee in de opleidingsrij (zie [Cumulatief dashboard](#cumulatief-dashboard-cumulativedashboardhtml)). Met **Herkomst uitklappen** klap je alle opleidingen tegelijk open. Uitgeklapte opleidingen gaan met hun herkomstregels mee in de CSV-download.
 
 Een opleiding met een redelijke totale fout kan zo een herkomstgroep verbergen die structureel misgaat: bijvoorbeeld een NL-voorspelling die 3% afwijkt en een niet-EER-voorspelling die 50% te hoog zit. Andersom heeft een kleine herkomstgroep snel een groot percentage. Kijk dan naar het aantal studenten erachter voordat je conclusies trekt.
 

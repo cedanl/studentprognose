@@ -18,6 +18,12 @@ Keuzes die de getallen bepalen:
   bij de prognose die ernaast staat. Een herkomstgroep met een voorspelling maar
   zonder realisatie telt mee als 0 werkelijk: als de opleiding dat jaar een
   realisatie heeft, kwam er uit die groep niemand.
+- **Alleen voorspelde herkomstgroepen.** Heeft een herkomstgroep wél een
+  realisatie maar geen voorspelling, dan telt die groep niet mee: niet in de
+  realisatie, niet in de prognose en niet in de naïeve baseline. De opleiding
+  blijft dan meetellen met de groepen die wél voorspeld zijn (#299). Welke
+  modellen een groep moeten voorspellen bepaalt ``population``: bij een
+  modelvergelijking allemaal, in de tabel per opleiding elk model voor zich.
 - **Gelijke populatie.** Modellen worden alleen vergeleken op eenheden waarvoor
   ze allemaal een voorspelling hebben, anders vergelijk je appels met peren.
 - **Naïeve baseline.** "Dit jaar komen er evenveel als vorig jaar." Een model dat
@@ -41,6 +47,10 @@ ORIGIN = "Herkomst"
 ORIGIN_ORDER: list[str] = ["NL", "EER", "Niet-EER"]
 # Aantal herkomstgroepen met een voorspelling maar zonder realisatie per eenheid.
 UNREALISED = "Herkomst_zonder_realisatie"
+# Herkomstgroepen met een realisatie maar zonder voorspelling, en hun studenten. Die
+# vallen buiten de cijfers (#299); de kolommen tellen wat er is weggelaten.
+UNPREDICTED = "Herkomst_zonder_voorspelling"
+UNPREDICTED_STUDENTS = "Studenten_zonder_voorspelling"
 
 NAIVE = "Naief_vorig_jaar"
 NAIVE_LABEL = "Naïef (vorig jaar)"
@@ -134,6 +144,7 @@ def build_evaluation_units(
     numerus_fixus: dict | list | None = None,
     models: list[str] | None = None,
     by_origin: bool = False,
+    population: list[str] | None = None,
 ) -> pd.DataFrame:
     """Bouw één evaluatie-eenheid per collegejaar × opleiding × examentype.
 
@@ -147,24 +158,40 @@ def build_evaluation_units(
         models: Te evalueren voorspelkolommen; standaard :data:`MODEL_COLUMNS`.
         by_origin: Eén eenheid per opleiding × herkomst in plaats van per
             opleiding. Vereist een kolom ``Herkomst``.
+        population: Modellen die een herkomstgroep moeten voorspellen om mee te
+            tellen. Standaard alle ``models``; zie :func:`_unit_totals`.
 
     Returns:
         DataFrame met ``Collegejaar``, ``Croho groepeernaam``, ``Examentype``
         (en ``Herkomst`` bij ``by_origin``), ``Aantal_studenten``,
-        ``Grootteklasse``, één kolom per aanwezig model, ``Naief_vorig_jaar`` en
-        ``Herkomst_zonder_realisatie``. Leeg als er niets te evalueren valt
+        ``Grootteklasse``, één kolom per aanwezig model, ``Naief_vorig_jaar``,
+        ``Herkomst_zonder_realisatie``, ``Herkomst_zonder_voorspelling`` en
+        ``Studenten_zonder_voorspelling``. Leeg als er niets te evalueren valt
         (bijv. een collegejaar zonder realisatie).
     """
     models = [m for m in (models or list(MODEL_COLUMNS)) if m in data.columns]
     keys = _unit_keys(by_origin)
-    out_cols = [*keys, ACTUAL, "Grootteklasse", *models, NAIVE, UNREALISED]
+    out_cols = [
+        *keys,
+        ACTUAL,
+        "Grootteklasse",
+        *models,
+        NAIVE,
+        UNREALISED,
+        UNPREDICTED,
+        UNPREDICTED_STUDENTS,
+    ]
     if ACTUAL not in data.columns or not models:
         return pd.DataFrame(columns=out_cols)
     if by_origin and ORIGIN not in data.columns:
         return pd.DataFrame(columns=out_cols)
 
-    frame = _predict_week_rows(data, predict_week, numerus_fixus)
-    units = _unit_totals(frame, models, keys)
+    frame = _with_naive(
+        _predict_week_rows(data, predict_week, numerus_fixus), data_studentcount
+    )
+    units = _naive_fallback(
+        frame, _unit_totals(frame, models, keys, population), data_studentcount
+    )
     # Alleen eenheden met een realisatie zijn te evalueren; een jaar zonder
     # realisatie (de live prognose) valt hier vanzelf af.
     units = units[units[ACTUAL] > 0]
@@ -172,7 +199,6 @@ def build_evaluation_units(
         return pd.DataFrame(columns=out_cols)
 
     units = units.copy()
-    units[NAIVE] = previous_year_actuals(units, data_studentcount)
     units["Grootteklasse"] = size_class(units[ACTUAL])
     units[YEAR] = units[YEAR].astype(int)
     return units[out_cols].reset_index(drop=True)
@@ -196,28 +222,88 @@ def _predict_week_rows(
     return frame
 
 
+def _with_naive(
+    frame: pd.DataFrame, data_studentcount: pd.DataFrame | None
+) -> pd.DataFrame:
+    """Voeg per rij de realisatie van vorig jaar toe (de naïeve voorspelling).
+
+    Per herkomstgroep, zodat :func:`_unit_totals` de baseline optelt over precies
+    dezelfde groepen als de realisatie en de prognose.
+    """
+    if (
+        data_studentcount is None
+        or ORIGIN not in frame.columns
+        or ORIGIN not in data_studentcount.columns
+    ):
+        # Geen herkomst om over op te tellen: de baseline volgt per eenheid
+        # (zie _naive_fallback).
+        return frame
+    return frame.assign(**{NAIVE: previous_year_actuals(frame, data_studentcount)})
+
+
+def _naive_fallback(
+    frame: pd.DataFrame, units: pd.DataFrame, data_studentcount: pd.DataFrame | None
+) -> pd.DataFrame:
+    """Baseline per eenheid als die niet per herkomstgroep op te tellen was."""
+    if NAIVE in frame.columns:
+        return units
+    if YEAR in units.columns or frame.empty:
+        keyed = units
+    else:
+        # Prognose voor één voorspeljaar: de eenheden dragen het jaar niet.
+        keyed = units.assign(**{YEAR: frame[YEAR].iloc[0]})
+    return units.assign(**{NAIVE: previous_year_actuals(keyed, data_studentcount)})
+
+
 def _unit_totals(
-    frame: pd.DataFrame, models: list[str], keys: list[str]
+    frame: pd.DataFrame,
+    models: list[str],
+    keys: list[str],
+    population: list[str] | None = None,
 ) -> pd.DataFrame:
     """Tel herkomstrijen op tot één rij per ``keys``, voor evaluatie én prognose.
 
-    - **Realisatie**: som van de bekende waarden; leeg als geen enkele rij er een
-      heeft (bijv. het live voorspeljaar).
+    - **Alleen voorspelde groepen**: een rij mét realisatie die geen voorspelling
+      heeft van een model uit ``population`` (standaard alle ``models``) telt
+      niet mee: niet in de realisatie, niet in de voorspellingen en niet in de
+      naïeve baseline. Zo blijft een opleiding meetellen met de groepen die wél
+      voorspeld zijn, in plaats van helemaal weg te vallen.
+    - **Realisatie**: som van de bekende waarden van de meetellende rijen; leeg
+      als geen enkele rij er een heeft (bijv. het live voorspeljaar).
     - **Voorspelling**: som van de voorspelde rijen. Een rij zonder realisatie
       telt gewoon mee: de voorspelling hoort bij de opleiding, ook als die
       herkomstgroep uiteindelijk niemand opleverde.
-    - **Onvolledig**: heeft een rij mét realisatie geen voorspelling van een model,
-      dan wordt het totaal van dat model leeg. Anders vergelijk je een deelsom met
-      de volledige realisatie.
+    - **Onvolledig**: mist een model buiten ``population`` de voorspelling voor
+      een meetellende rij mét realisatie, dan wordt het totaal van dat model
+      leeg. Anders vergelijk je een deelsom met de volledige realisatie.
     """
+    population = [
+        m for m in (models if population is None else population) if m in models
+    ]
     f = frame.copy()
     realised = f[ACTUAL].fillna(0) > 0
+    skipped = (
+        realised & f[population].isna().any(axis=1)
+        if population
+        else pd.Series(False, index=f.index)
+    )
+    keep = ~skipped
+
+    f["_actual"] = f[ACTUAL].where(keep)
+    f[UNPREDICTED] = skipped
+    f[UNPREDICTED_STUDENTS] = f[ACTUAL].where(skipped, 0).fillna(0)
     agg: dict[str, tuple[str, object]] = {
-        ACTUAL: (ACTUAL, lambda s: s.sum(min_count=1)),
+        ACTUAL: ("_actual", lambda s: s.sum(min_count=1)),
+        UNPREDICTED: (UNPREDICTED, "sum"),
+        UNPREDICTED_STUDENTS: (UNPREDICTED_STUDENTS, "sum"),
     }
+    if NAIVE in f.columns:
+        f["_naive"] = f[NAIVE].where(keep)
+        agg[NAIVE] = ("_naive", lambda s: s.sum(min_count=1))
     for i, m in enumerate(models):
-        f[f"_gap{i}"] = realised & f[m].isna()
-        agg[m] = (m, lambda s: s.sum(min_count=1))
+        f[f"_m{i}"] = f[m].where(keep)
+        f[f"_gap{i}"] = realised & keep & f[m].isna()
+        agg[m] = (f"_m{i}", lambda s: s.sum(min_count=1))
         agg[f"_gap{i}"] = (f"_gap{i}", "any")
     predicted = f[models].notna().any(axis=1)
     f["_unrealised"] = predicted & ~realised
@@ -226,7 +312,13 @@ def _unit_totals(
     for i, m in enumerate(models):
         out[m] = out[m].astype("float64").mask(out[f"_gap{i}"])
     out[ACTUAL] = out[ACTUAL].astype("float64")
-    out[UNREALISED] = out[UNREALISED].astype(int)
+    if NAIVE in out.columns:
+        out[NAIVE] = out[NAIVE].astype("float64")
+    else:
+        out[NAIVE] = np.nan
+    for c in (UNREALISED, UNPREDICTED):
+        out[c] = out[c].astype(int)
+    out[UNPREDICTED_STUDENTS] = out[UNPREDICTED_STUDENTS].astype("float64")
     return out.drop(columns=[f"_gap{i}" for i in range(len(models))])
 
 
@@ -237,17 +329,20 @@ def current_predictions(
     numerus_fixus: dict | list | None = None,
     models: list[str] | None = None,
     by_origin: bool = False,
+    data_studentcount: pd.DataFrame | None = None,
+    population: list[str] | None = None,
 ) -> pd.DataFrame:
     """Prognose per opleiding × examentype (× herkomst) voor het voorspeljaar, per model.
 
     Gebruikt dezelfde optelling als :func:`build_evaluation_units`, zodat de
     prognose in een backtestjaar exact de voorspelling is waarop de fout gemeten
     wordt. ``Aantal_studenten`` is gevuld zodra de realisatie bekend is (backtest)
-    en anders leeg.
+    en anders leeg. ``Naief_vorig_jaar`` is de realisatie van vorig jaar van
+    dezelfde herkomstgroepen (leeg zonder ``data_studentcount``).
     """
     models = [m for m in (models or list(MODEL_COLUMNS)) if m in data.columns]
     keys = _unit_keys(by_origin, with_year=False)
-    cols = [*keys, ACTUAL, *models]
+    cols = [*keys, ACTUAL, *models, NAIVE]
     if not models or YEAR not in data.columns:
         return pd.DataFrame(columns=cols)
     if by_origin and ORIGIN not in data.columns:
@@ -258,9 +353,31 @@ def current_predictions(
         frame = frame.assign(**{ACTUAL: np.nan})
     if frame.empty:
         return pd.DataFrame(columns=cols)
-    totals = _unit_totals(frame, models, keys)
+    frame = _with_naive(frame, data_studentcount)
+    totals = _naive_fallback(
+        frame, _unit_totals(frame, models, keys, population), data_studentcount
+    )
     totals = totals[totals[models].notna().any(axis=1)]
     return totals[cols].reset_index(drop=True)
+
+
+def unpredicted_rows(
+    data: pd.DataFrame,
+    predict_week: int | None,
+    numerus_fixus: dict | list | None,
+    population: list[str],
+) -> pd.DataFrame:
+    """Herkomstgroepen met een realisatie maar zonder voorspelling van ``population``.
+
+    Dit zijn precies de rijen die :func:`_unit_totals` buiten de cijfers laat. Het
+    dashboard gebruikt ze om te melden hoeveel groepen en studenten dat zijn.
+    """
+    population = [m for m in population if m in data.columns]
+    if ACTUAL not in data.columns or not population:
+        return data.iloc[0:0]
+    frame = _predict_week_rows(data, predict_week, numerus_fixus)
+    realised = frame[ACTUAL].fillna(0) > 0
+    return frame[realised & frame[population].isna().any(axis=1)]
 
 
 def trust_level(wape: float, n_years: int, beats_naive: bool | None = None) -> str:
@@ -299,12 +416,14 @@ def programme_summary(units: pd.DataFrame, models: list[str]) -> pd.DataFrame:
 
     Returns:
         Eén rij per opleiding met ``actual_mean`` (over alle geëvalueerde jaren) en
-        per model ``n_<model>`` (jaren), ``wape_<model>``, ``bias_<model>`` en
-        ``trust_<model>``. De betrouwbaarheid van de naïeve baseline zelf wordt niet
-        bepaald.
+        per model ``n_<model>`` (jaren), ``actual_<model>`` (gemiddelde realisatie
+        in die jaren), ``wape_<model>``, ``bias_<model>``, ``trust_<model>`` en
+        ``naive_<model>`` (WAPE van de naïeve voorspelling in dezelfde jaren). De
+        betrouwbaarheid van de naïeve baseline zelf wordt niet bepaald.
     """
     base = [PROGRAMME, EXAM_TYPE, "actual_mean"]
-    cols = base + [f"{k}_{m}" for m in models for k in ("n", "wape", "bias", "trust")]
+    stats = ("n", "actual", "wape", "bias", "trust", "naive")
+    cols = base + [f"{k}_{m}" for m in models for k in stats]
     if units.empty or not models:
         return pd.DataFrame(columns=cols)
 
@@ -320,8 +439,12 @@ def programme_summary(units: pd.DataFrame, models: list[str]) -> pd.DataFrame:
             has = sub[m].notna()
             met = error_metrics(sub.loc[has, ACTUAL], sub.loc[has, m])
             row[f"n_{m}"] = int(sub.loc[has, YEAR].nunique())
+            row[f"actual_{m}"] = (
+                float(sub.loc[has, ACTUAL].mean()) if has.any() else np.nan
+            )
             row[f"wape_{m}"] = met["wape"]
             row[f"bias_{m}"] = met["bias"]
+            row[f"naive_{m}"] = np.nan
             if m == NAIVE:
                 row[f"trust_{m}"] = None
                 continue
@@ -331,9 +454,9 @@ def programme_summary(units: pd.DataFrame, models: list[str]) -> pd.DataFrame:
                 if both.any():
                     # Vergelijk op dezelfde jaren, anders is het geen eerlijke vergelijking.
                     a, n = sub.loc[both, ACTUAL], sub.loc[both, NAIVE]
+                    row[f"naive_{m}"] = error_metrics(a, n)["wape"]
                     beats_naive = (
-                        error_metrics(a, sub.loc[both, m])["wape"]
-                        <= error_metrics(a, n)["wape"]
+                        error_metrics(a, sub.loc[both, m])["wape"] <= row[f"naive_{m}"]
                     )
             row[f"trust_{m}"] = trust_level(met["wape"], row[f"n_{m}"], beats_naive)
         rows.append(row)

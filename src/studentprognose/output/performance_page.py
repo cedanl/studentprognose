@@ -131,31 +131,47 @@ def _model_meta(models: list[str]) -> list[dict]:
 
 
 def _programme_rows(
-    units: pd.DataFrame, models: list[str], current: pd.DataFrame
+    model_units: dict[str, pd.DataFrame], models: list[str], current: pd.DataFrame
 ) -> list[dict]:
     """Eén tabelrij per opleiding: historische fout, betrouwbaarheid en actuele prognose.
+
+    Elk model wordt beoordeeld op zijn eigen eenheden (``model_units``): alleen de
+    herkomstgroepen die dát model voorspelt tellen mee, ook in de realisatie
+    (``a``) en de naïeve WAPE (``wn``) ernaast. De naïeve baseline (``m[NAIVE]``)
+    en de gemiddelde instroom van de rij komen van het eerste model met een
+    evaluatie.
 
     Opleidingen met een prognose maar zonder geëvalueerd jaar krijgen een rij met
     betrouwbaarheid ``onbekend``, zodat de tabel alle voorspelde opleidingen toont.
     """
-    summary = mp.programme_summary(units, models)
     rows: dict[tuple[str, str], dict] = {}
-    for r in summary.to_dict(orient="records"):
-        key = (r[mp.PROGRAMME], r[mp.EXAM_TYPE])
-        rows[key] = {
-            "p": key[0],
-            "e": key[1],
-            "a": r["actual_mean"],
-            "m": {
-                m: {
-                    "n": int(r[f"n_{m}"]),
-                    "w": r[f"wape_{m}"],
-                    "b": r[f"bias_{m}"],
-                    "t": r[f"trust_{m}"],
+    for m in models:
+        units = model_units.get(m)
+        if units is None or units.empty:
+            continue
+        summary = mp.programme_summary(units, [m, mp.NAIVE])
+        for r in summary.to_dict(orient="records"):
+            key = (r[mp.PROGRAMME], r[mp.EXAM_TYPE])
+            row = rows.setdefault(
+                key, {"p": key[0], "e": key[1], "a": r["actual_mean"], "m": {}}
+            )
+            if r[f"n_{m}"] == 0:
+                continue
+            row["m"][m] = {
+                "n": int(r[f"n_{m}"]),
+                "a": r[f"actual_{m}"],
+                "w": r[f"wape_{m}"],
+                "b": r[f"bias_{m}"],
+                "t": r[f"trust_{m}"],
+                "wn": r[f"naive_{m}"],
+            }
+            if mp.NAIVE not in row["m"] and r[f"n_{mp.NAIVE}"] > 0:
+                row["m"][mp.NAIVE] = {
+                    "n": int(r[f"n_{mp.NAIVE}"]),
+                    "w": r[f"wape_{mp.NAIVE}"],
+                    "b": r[f"bias_{mp.NAIVE}"],
+                    "t": None,
                 }
-                for m in models
-            },
-        }
     for r in current.to_dict(orient="records"):
         key = (str(r[mp.PROGRAMME]), str(r[mp.EXAM_TYPE]))
         rows.setdefault(key, {"p": key[0], "e": key[1], "a": None, "m": {}})
@@ -172,22 +188,37 @@ def _current_frame(
 ) -> pd.DataFrame:
     """Prognose per opleiding voor het voorspeljaar, inclusief numerus fixus.
 
+    Elk model telt alleen de herkomstgroepen die het zelf voorspelt; per model
+    staan de bijbehorende realisatie (``_a_<model>``) en realisatie van vorig jaar
+    (``_p_<model>``) erbij. ``Aantal_studenten`` en ``Naief_vorig_jaar`` zijn die
+    van het eerste model met een prognose.
+
     Numerus-fixusopleidingen tellen niet mee in de evaluatie, maar horen wel in het
     overzicht van prognoses; ze krijgen daar een eigen label.
     """
-    cur = (
-        mp.current_predictions(
-            data, prediction_year, predict_week, None, models, by_origin
+    keys = [mp.PROGRAMME, mp.EXAM_TYPE, *([mp.ORIGIN] if by_origin else [])]
+    frames = []
+    for m in models:
+        c = mp.current_predictions(
+            data,
+            prediction_year,
+            predict_week,
+            None,
+            [m],
+            by_origin,
+            data_studentcount,
+            population=[m],
         )
-        if models
-        else pd.DataFrame()
-    )
-    if cur.empty:
+        if not c.empty:
+            frames.append(
+                c.rename(columns={mp.ACTUAL: f"_a_{m}", mp.NAIVE: f"_p_{m}"}).set_index(
+                    keys
+                )
+            )
+    if not frames:
         return pd.DataFrame(
             columns=[
-                mp.PROGRAMME,
-                mp.EXAM_TYPE,
-                *([mp.ORIGIN] if by_origin else []),
+                *keys,
                 mp.ACTUAL,
                 *models,
                 mp.YEAR,
@@ -195,8 +226,15 @@ def _current_frame(
                 "Faculteit",
             ]
         )
+    cur = pd.concat(frames, axis=1).reset_index()
+    present = [m for m in models if m in cur.columns]
+    for col, prefix in ((mp.ACTUAL, "_a_"), (mp.NAIVE, "_p_")):
+        first = pd.Series(np.nan, index=cur.index)
+        for m in present:
+            take = first.isna() & cur[m].notna()
+            first = first.mask(take, cur[f"{prefix}{m}"])
+        cur[col] = first.astype("float64")
     cur = cur.assign(**{mp.YEAR: int(prediction_year)})
-    cur[mp.NAIVE] = mp.previous_year_actuals(cur, data_studentcount)
     if "Faculteit" in data.columns:
         fac = (
             data.assign(**{mp.PROGRAMME: data[mp.PROGRAMME].astype(str)})
@@ -218,32 +256,99 @@ def _current_payload(current: pd.DataFrame, models: list[str], nf: set[str]) -> 
             "f": r["Faculteit"],
             "nf": str(r[mp.PROGRAMME]) in nf,
             "m": {m: r[m] for m in models if m in r},
+            # Realisatie en vorig jaar van precies de herkomstgroepen die dit model
+            # voorspelt; daartegen worden fout en verschil van zijn prognose gemeten.
+            "am": {m: r[f"_a_{m}"] for m in models if f"_a_{m}" in r},
+            "pm": {m: r[f"_p_{m}"] for m in models if f"_p_{m}" in r},
         }
         for r in current.to_dict(orient="records")
     }
 
 
+class _Units:
+    """Evaluatie-eenheden per (modellen, populatie), gecachet.
+
+    Welke herkomstgroepen meetellen hangt af van de vraag (modelvergelijking of
+    tabel per model), dus de payload vraagt de eenheden meerdere keren op met een
+    andere ``population``. ``only(h)`` geeft dezelfde eenheden voor één herkomst.
+    """
+
+    def __init__(
+        self,
+        data: pd.DataFrame,
+        predict_week: int | None,
+        data_studentcount: pd.DataFrame | None,
+        numerus_fixus: dict,
+        by_origin: bool = False,
+    ):
+        self._args = (data, predict_week, data_studentcount, numerus_fixus)
+        self._by_origin = by_origin
+        self._origin: str | None = None
+        self._cache: dict[tuple, pd.DataFrame] = {}
+
+    def only(self, origin: str) -> _Units:
+        view = _Units.__new__(_Units)
+        view.__dict__.update(self.__dict__)
+        view._origin = origin
+        return view
+
+    def __call__(self, models: list[str], population: list[str]) -> pd.DataFrame:
+        key = (tuple(models), tuple(population))
+        if key not in self._cache:
+            data, week, sc, nf = self._args
+            self._cache[key] = mp.build_evaluation_units(
+                data, week, sc, nf, list(models), self._by_origin, list(population)
+            )
+        units = self._cache[key]
+        if self._origin is None:
+            return units
+        return units[units[mp.ORIGIN] == self._origin].drop(columns=[mp.ORIGIN])
+
+    def skipped(self, population: list[str]) -> pd.Series:
+        """Realisatie van de herkomstgroepen die buiten de cijfers vallen."""
+        data, week, _, nf = self._args
+        rows = mp.unpredicted_rows(data, week, nf, population)
+        if rows.empty:
+            return pd.Series(dtype="float64")
+        if self._origin is not None:
+            rows = rows[rows[mp.ORIGIN] == self._origin]
+        return rows[mp.ACTUAL]
+
+
 def _performance_payload(
-    units: pd.DataFrame,
+    units_for: _Units,
     models: list[str],
     current: pd.DataFrame,
     nf: set[str],
-    origin_units: pd.DataFrame | None = None,
+    origin_units_for: _Units | None = None,
     origins: list[str] | None = None,
 ) -> dict:
     """Samenvattingen voor 'alle jaren' en per afzonderlijk jaar, plus de tabel.
 
+    Alleen herkomstgroepen met een voorspelling tellen mee (#299). Welke dat zijn
+    hangt af van wat je meet:
+
+    - **Modelvergelijking** (grafieken en kerncijfers): de groepen die álle
+      vergeleken modellen voorspellen, zodat elk model op dezelfde studenten
+      wordt gemeten.
+    - **Tabel per opleiding**: elk model op de groepen die het zelf voorspelt.
+
     Args:
-        origin_units: Eenheden op opleiding × herkomst-niveau. Alleen meegeven voor
+        units_for: Evaluatie-eenheden op opleidingsniveau.
+        origin_units_for: Idem op opleiding × herkomst-niveau. Alleen meegeven voor
             de weergave "alle herkomsten": dan krijgt die ook de fout per herkomst.
         origins: Volgorde van de herkomstgroepen in die uitsplitsing.
     """
-    chart_models = mp.comparable_models(units, models)
+    primary_units = units_for(models[:1], models[:1]) if models else pd.DataFrame()
+    chart_models = (
+        mp.comparable_models(units_for(models, models[:1]), models) if models else []
+    )
+    units = units_for(chart_models, chart_models) if chart_models else primary_units
     pop = mp.common_population(units, chart_models)
     exam_order = sorted(pop[mp.EXAM_TYPE].dropna().astype(str).unique())
     opop = (
-        mp.common_population(origin_units, chart_models)
-        if origin_units is not None and chart_models
+        mp.common_population(origin_units_for(chart_models, chart_models), chart_models)
+        if origin_units_for is not None and chart_models
         else None
     )
 
@@ -267,18 +372,21 @@ def _performance_payload(
 
     years = sorted(int(y) for y in pop[mp.YEAR].unique())
     summaries = {ALL_YEARS: _block(pop, opop)}
-    # De tabel per opleiding beoordeelt elk model op zijn eigen jaren (zie
-    # programme_summary), dus die krijgt alle eenheden i.p.v. de gelijke populatie.
-    table_models = [m for m in [*models, mp.NAIVE] if m in units.columns]
-    programmes = {ALL_YEARS: _programme_rows(units, table_models, current)}
-    for y in sorted(int(y) for y in units[mp.YEAR].unique()):
+    # De tabel per opleiding beoordeelt elk model op zijn eigen herkomstgroepen en
+    # jaren (zie programme_summary), dus die krijgt per model eigen eenheden.
+    model_units = {m: units_for([m], [m]) for m in models if m != mp.NAIVE}
+    programmes = {ALL_YEARS: _programme_rows(model_units, models, current)}
+    table_years = sorted(
+        {int(y) for u in model_units.values() for y in u[mp.YEAR].unique()}
+    )
+    for y in table_years:
         if str(y) not in summaries:
             summaries[str(y)] = _block(
                 pop[pop[mp.YEAR] == y],
                 None if opop is None else opop[opop[mp.YEAR] == y],
             )
         programmes[str(y)] = _programme_rows(
-            units[units[mp.YEAR] == y], table_models, current
+            {m: u[u[mp.YEAR] == y] for m, u in model_units.items()}, models, current
         )
 
     unit_rows = [
@@ -292,6 +400,7 @@ def _performance_payload(
         }
         for row in pop.to_dict(orient="records")
     ]
+    skipped = units_for.skipped(chart_models or models[:1])
 
     return {
         "models": _model_meta(chart_models),
@@ -301,16 +410,19 @@ def _performance_payload(
         "programmes": _clean(programmes),
         "current": _clean(_current_payload(current, models, nf)),
         "units": _clean(unit_rows),
-        "nUnitsAll": len(units),
+        "nUnitsAll": len(primary_units),
         # Herkomstgroepen met een voorspelling maar zonder realisatie, meegeteld als 0.
         "nUnrealised": int(units[mp.UNREALISED].sum())
         if mp.UNREALISED in units.columns
         else 0,
+        # Herkomstgroepen met een realisatie maar zonder voorspelling: buiten de cijfers.
+        "nUnpredicted": len(skipped),
+        "nUnpredictedStudents": float(skipped.sum()),
     }
 
 
 def _origin_views(
-    origin_units: pd.DataFrame,
+    origin_units: _Units,
     origin_current: pd.DataFrame,
     models: list[str],
     nf: set[str],
@@ -319,13 +431,9 @@ def _origin_views(
     """Eén volledige performance-payload per herkomstgroep."""
     views = {}
     for h in origins:
-        u = origin_units[origin_units[mp.ORIGIN] == h].drop(columns=[mp.ORIGIN])
         c = origin_current[origin_current[mp.ORIGIN] == h].drop(columns=[mp.ORIGIN])
-        views[h] = _performance_payload(u, models, c, nf)
+        views[h] = _performance_payload(origin_units.only(h), models, c, nf)
     return views
-
-
-# ── Verloop per opleiding ─────────────────────────────────────────────
 
 
 def _first_known(s: pd.Series) -> str:
@@ -511,8 +619,6 @@ def _forecast_overview(
     current: pd.DataFrame,
     origin_current: pd.DataFrame | None,
     origins: list[str],
-    data_studentcount: pd.DataFrame | None,
-    prediction_year: int,
     primary: str | None,
     numerus_fixus: dict,
 ) -> dict | None:
@@ -528,12 +634,9 @@ def _forecast_overview(
     herkomst: list[dict] = []
     by_origin: dict[str, dict] = {}
     if origin_current is not None and not origin_current.empty:
-        prev = pd.Series(dtype="float64")
-        if data_studentcount is not None and mp.ORIGIN in data_studentcount.columns:
-            sc = data_studentcount[data_studentcount[mp.YEAR] == prediction_year - 1]
-            codes = set(cur[mp.PROGRAMME].astype(str))
-            sc = sc[sc[mp.PROGRAMME].astype(str).isin(codes)]
-            prev = sc.groupby(sc[mp.ORIGIN].astype(str))[mp.ACTUAL].sum()
+        # Vorig jaar van dezelfde (voorspelde) herkomstgroepen als de prognose.
+        oc_all = origin_current[origin_current[primary].notna()]
+        prev = oc_all.groupby(oc_all[mp.ORIGIN].astype(str))[mp.NAIVE].sum(min_count=1)
         for h in origins:
             oc = origin_current[origin_current[mp.ORIGIN] == h]
             if oc[primary].notna().any():
@@ -601,17 +704,15 @@ def build_payload(
     primary = models[0] if models else None
     has_origin = mp.ORIGIN in data.columns
 
-    units = mp.build_evaluation_units(
-        data, predict_week, data_studentcount, numerus_fixus, models
-    )
+    units = _Units(data, predict_week, data_studentcount, numerus_fixus)
     current = _current_frame(
         data, data_studentcount, prediction_year, predict_week, models
     )
     origin_units = origin_current = None
     origins: list[str] = []
     if has_origin:
-        origin_units = mp.build_evaluation_units(
-            data, predict_week, data_studentcount, numerus_fixus, models, by_origin=True
+        origin_units = _Units(
+            data, predict_week, data_studentcount, numerus_fixus, by_origin=True
         )
         origin_current = _current_frame(
             data,
@@ -622,7 +723,9 @@ def build_payload(
             by_origin=True,
         )
         origins = mp.origin_order(
-            pd.concat([origin_units[mp.ORIGIN], origin_current[mp.ORIGIN]])
+            pd.concat(
+                [origin_units(models, models[:1])[mp.ORIGIN], origin_current[mp.ORIGIN]]
+            )
         )
 
     if track == "cumulative":
@@ -686,8 +789,6 @@ def build_payload(
                 current,
                 origin_current,
                 origins,
-                data_studentcount,
-                prediction_year,
                 primary,
                 numerus_fixus,
             )
