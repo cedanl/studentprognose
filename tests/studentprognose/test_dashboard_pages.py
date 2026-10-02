@@ -44,7 +44,7 @@ def output():
             _row(2024, "B", "NL", 10, 10, 5.0, 12.0, exam="Master"),
             # C: numerus fixus
             _row(2024, "C", "NL", 10, 50, 80.0, 50.0),
-            # D: één herkomstgroep zonder XGBoost-voorspelling -> onvolledig
+            # D: EER zonder XGBoost-voorspelling -> telt niet mee (#299)
             _row(2024, "D", "NL", 10, 30, 30.0, 30.0),
             _row(2024, "D", "EER", 10, 20, np.nan, 20.0),
             # E: geen realisatie -> niet evalueerbaar
@@ -77,14 +77,98 @@ def test_units_are_programme_level_at_predict_week(output, studentcount):
     )
 
 
-def test_incomplete_herkomst_prediction_is_not_summed(output, studentcount):
+def test_unpredicted_herkomst_is_left_out_of_the_unit(output, studentcount):
+    """#299: alleen voorspelde herkomstgroepen tellen mee, de opleiding blijft."""
     units = mp.build_evaluation_units(output, 10, studentcount).set_index(
         "Croho groepeernaam"
     )
-    assert np.isnan(units.loc["D", "SARIMA_cumulative"]), (
-        "deelsom mag niet tegen volledige realisatie"
+    d = units.loc["D"]
+    assert d["Aantal_studenten"] == 30, (
+        "EER-realisatie zonder voorspelling telt niet mee"
     )
-    assert units.loc["D", "Prognose_ratio"] == pytest.approx(50.0)
+    assert d["SARIMA_cumulative"] == pytest.approx(30.0)
+    assert d["Prognose_ratio"] == pytest.approx(30.0), "zelfde groepen voor elk model"
+    assert d[mp.UNPREDICTED] == 1
+    assert d[mp.UNPREDICTED_STUDENTS] == 20
+
+
+def test_population_decides_which_models_must_predict(output, studentcount):
+    """Per model: elk model op de herkomstgroepen die het zelf voorspelt."""
+    ratio = mp.build_evaluation_units(
+        output,
+        10,
+        studentcount,
+        models=["Prognose_ratio"],
+        population=["Prognose_ratio"],
+    ).set_index("Croho groepeernaam")
+    assert ratio.loc["D", "Aantal_studenten"] == 50
+    assert ratio.loc["D", "Prognose_ratio"] == pytest.approx(50.0)
+    assert ratio.loc["D", mp.UNPREDICTED] == 0
+
+    xgb = mp.build_evaluation_units(
+        output,
+        10,
+        studentcount,
+        models=["SARIMA_cumulative", "Prognose_ratio"],
+        population=["Prognose_ratio"],
+    ).set_index("Croho groepeernaam")
+    assert np.isnan(xgb.loc["D", "SARIMA_cumulative"]), (
+        "model buiten population: deelsom mag niet tegen volledige realisatie"
+    )
+
+
+def test_unit_drops_out_when_no_realised_group_is_predicted():
+    data = pd.DataFrame([_row(2024, "G", "NL", 10, 25, np.nan, 20.0)])
+    assert mp.build_evaluation_units(data, 10).empty
+    rows = mp.unpredicted_rows(data, 10, None, ["SARIMA_cumulative"])
+    assert list(rows["Aantal_studenten"]) == [25]
+
+
+def test_naive_baseline_uses_the_same_herkomst_groups():
+    """Vorig jaar telt alleen de herkomstgroepen die ook in de prognose zitten."""
+    data = pd.DataFrame(
+        [
+            _row(2024, "D", "NL", 10, 30, 33.0, 30.0),
+            _row(2024, "D", "EER", 10, 20, np.nan, 20.0),
+        ]
+    )
+    sc = pd.DataFrame(
+        {
+            "Collegejaar": [2023, 2023],
+            "Croho groepeernaam": ["D", "D"],
+            "Herkomst": ["NL", "EER"],
+            "Examentype": ["Bachelor", "Bachelor"],
+            "Aantal_studenten": [25, 15],
+        }
+    )
+    units = mp.build_evaluation_units(data, 10, sc).set_index("Croho groepeernaam")
+    assert units.loc["D", mp.NAIVE] == 25, "EER (15) valt weg, net als in de realisatie"
+    cur = mp.current_predictions(
+        data,
+        2024,
+        10,
+        data_studentcount=sc,
+        models=["Prognose_ratio"],
+        population=["Prognose_ratio"],
+    ).set_index("Croho groepeernaam")
+    assert cur.loc["D", mp.NAIVE] == 40
+
+
+def test_naive_without_origin_in_studentcount_falls_back_to_programme(output):
+    sc = pd.DataFrame(
+        {
+            "Collegejaar": [2023],
+            "Croho groepeernaam": ["A"],
+            "Examentype": ["Bachelor"],
+            "Aantal_studenten": [90],
+        }
+    )
+    units = mp.build_evaluation_units(output, 10, sc).set_index("Croho groepeernaam")
+    assert units.loc["A", mp.NAIVE] == 90
+    cur = mp.current_predictions(
+        output.assign(Collegejaar=2024), 2024, 10, data_studentcount=sc
+    ).set_index("Croho groepeernaam")
+    assert cur.loc["A", mp.NAIVE] == 90
 
 
 def test_naive_baseline_is_previous_year_actual(output, studentcount):
@@ -161,7 +245,7 @@ def test_summarise_skips_empty_size_classes(output, studentcount):
     summary = mp.summarise(
         units, ["SARIMA_cumulative"], by="Grootteklasse", order=mp.SIZE_LABELS
     )
-    assert list(summary["group"]) == ["< 25", "50–99", "100–249"]
+    assert list(summary["group"]) == ["< 25", "25–49", "50–99", "100–249"]
 
 
 # ── Pagina ────────────────────────────────────────────────────────────
@@ -311,8 +395,9 @@ def test_current_predictions_sums_herkomst_for_prediction_year(output):
         "Croho groepeernaam"
     )
     assert cur.loc["A", "SARIMA_cumulative"] == pytest.approx(110.0)
-    assert np.isnan(cur.loc["D", "SARIMA_cumulative"])
-    assert cur.loc["D", "Prognose_ratio"] == pytest.approx(50.0)
+    # D-EER heeft een realisatie maar geen XGBoost-voorspelling: valt weg (#299).
+    assert cur.loc["D", "SARIMA_cumulative"] == pytest.approx(30.0)
+    assert cur.loc["D", "Prognose_ratio"] == pytest.approx(30.0)
     assert "C" not in cur.index
 
 
@@ -374,8 +459,8 @@ def test_final_payload_has_forecast_overview_with_numerus_fixus(output, studentc
         track="final",
     )
     fc = payload["forecast"]
-    # A (110) + B (5) + C (80, NF telt mee in de prognose) + E (10); D is onvolledig.
-    assert fc["total"] == pytest.approx(205.0)
+    # A (110) + B (5) + C (80, NF telt mee in de prognose) + D (30, alleen NL) + E (10).
+    assert fc["total"] == pytest.approx(235.0)
     assert fc["nf"] == [{"p": "C", "cap": 60.0, "prognose": 80.0, "prev": None}]
     assert payload["performance"]["current"]["C|Bachelor"]["nf"] is True
     assert payload["trend"]["programmes"] == []
@@ -511,7 +596,7 @@ def test_units_by_origin_keep_origin_and_naive_per_origin(output, studentcount):
     assert units.loc[("A", "EER"), mp.NAIVE] == 40
     # D-EER mist alleen in XGBoost; per herkomst is D-NL wel volledig.
     assert units.loc[("D", "NL"), "SARIMA_cumulative"] == pytest.approx(30.0)
-    assert np.isnan(units.loc[("D", "EER"), "SARIMA_cumulative"])
+    assert ("D", "EER") not in units.index, "zonder voorspelling geen eenheid"
 
 
 def test_by_origin_without_origin_column_is_empty(output):
@@ -636,3 +721,123 @@ def test_origin_views_add_up_to_programme_prognose(output, studentcount):
         assert sum(p["m"][m] for p in parts) == pytest.approx(total["m"][m])
     assert sum(p["a"] for p in parts) == total["a"]
     assert sum(p["prev"] for p in parts) == total["prev"]
+
+
+# ── Alleen voorspelde herkomstgroepen (#299) ──────────────────────────
+
+
+def _weeks():
+    return [str(w) for w in range(1, 53)]
+
+
+def test_payload_compares_models_on_groups_all_of_them_predict(output, studentcount):
+    # D heeft vorig jaar nodig, anders valt het af op de ontbrekende baseline.
+    sc = pd.concat(
+        [
+            studentcount,
+            pd.DataFrame(
+                {
+                    "Collegejaar": [2023, 2023],
+                    "Croho groepeernaam": ["D", "D"],
+                    "Herkomst": ["NL", "EER"],
+                    "Examentype": ["Bachelor", "Bachelor"],
+                    "Aantal_studenten": [28, 18],
+                }
+            ),
+        ],
+        ignore_index=True,
+    )
+    payload = performance_page.build_payload(
+        output, _cumulative(), sc, 2024, 10, _weeks(), 38, {"C": 60}
+    )
+    perf = payload["performance"]
+    d = next(u for u in perf["units"] if u["p"] == "D")
+    assert d["a"] == 30, "D telt mee in de grafieken, zonder de niet-voorspelde EER"
+    assert d["m"]["SARIMA_cumulative"] == pytest.approx(30.0)
+    assert d["m"]["Prognose_ratio"] == pytest.approx(30.0)
+    assert d["m"][mp.NAIVE] == 28, "baseline zonder de EER-groep (18)"
+    assert perf["nUnpredicted"] == 1
+    assert perf["nUnpredictedStudents"] == 20
+    eer = payload["performanceByOrigin"]["EER"]
+    assert eer["nUnpredicted"] == 1
+    assert payload["performanceByOrigin"]["NL"]["nUnpredicted"] == 0
+
+
+def test_payload_table_scores_each_model_on_its_own_groups(output, studentcount):
+    payload = performance_page.build_payload(
+        output, _cumulative(), studentcount, 2024, 10, _weeks(), 38, {"C": 60}
+    )
+    perf = payload["performance"]
+    row = next(r for r in perf["programmes"]["alle"] if r["p"] == "D")
+    xgb, ratio = row["m"]["SARIMA_cumulative"], row["m"]["Prognose_ratio"]
+    assert xgb["a"] == 30 and xgb["w"] == pytest.approx(0.0)
+    assert ratio["a"] == 50 and ratio["w"] == pytest.approx(0.0)
+    cur = perf["current"]["D|Bachelor"]
+    assert cur["m"] == {"SARIMA_cumulative": 30.0, "Prognose_ratio": 50.0}
+    assert cur["am"] == {"SARIMA_cumulative": 30.0, "Prognose_ratio": 50.0}
+    assert cur["a"] == 30, "realisatie van het primaire model"
+
+
+def test_table_naive_wape_is_measured_on_the_model_groups():
+    data = pd.DataFrame(
+        [
+            _row(2024, "D", "NL", 10, 30, 33.0, 30.0),
+            _row(2024, "D", "EER", 10, 20, np.nan, 20.0),
+        ]
+    )
+    sc = pd.DataFrame(
+        {
+            "Collegejaar": [2023, 2023],
+            "Croho groepeernaam": ["D", "D"],
+            "Herkomst": ["NL", "EER"],
+            "Examentype": ["Bachelor", "Bachelor"],
+            "Aantal_studenten": [24, 20],
+        }
+    )
+    payload = performance_page.build_payload(data, None, sc, 2024, 10, _weeks(), 38)
+    row = payload["performance"]["programmes"]["alle"][0]
+    # XGBoost: alleen NL (naïef 24 tegen 30); ratio: NL + EER (naïef 44 tegen 50).
+    assert row["m"]["SARIMA_cumulative"]["wn"] == pytest.approx(6 / 30)
+    assert row["m"]["Prognose_ratio"]["wn"] == pytest.approx(6 / 50)
+    cur = payload["performance"]["current"]["D|Bachelor"]
+    assert cur["pm"] == {"SARIMA_cumulative": 24.0, "Prognose_ratio": 44.0}
+
+
+def test_forecast_previous_year_per_origin_uses_predicted_groups():
+    """Eindoverzicht: 'vorig jaar' per herkomst alleen voor groepen met prognose."""
+    data = pd.DataFrame(
+        [
+            _row(2025, "D", "NL", 10, np.nan, 33.0, 30.0),
+            _row(2025, "H", "NL", 10, np.nan, 10.0, 10.0),
+            _row(2025, "H", "EER", 10, np.nan, 5.0, 5.0),
+        ]
+    ).assign(Weighted_ensemble_prediction=lambda d: d["SARIMA_cumulative"])
+    sc = pd.DataFrame(
+        {
+            "Collegejaar": [2024, 2024, 2024, 2024],
+            "Croho groepeernaam": ["D", "D", "H", "H"],
+            "Herkomst": ["NL", "EER", "NL", "EER"],
+            "Examentype": ["Bachelor"] * 4,
+            "Aantal_studenten": [30, 20, 9, 4],
+        }
+    )
+    fc = performance_page.build_payload(
+        data, None, sc, 2025, 10, _weeks(), 38, track="final"
+    )["forecast"]
+    prev = {r["h"]: r["prev"] for r in fc["herkomst"]}
+    assert prev == {"NL": 39.0, "EER": 4.0}, "D-EER heeft geen prognose dit jaar"
+    assert fc["prevTotal"] == pytest.approx(43.0)
+
+
+def test_origin_row_without_prediction_stays_visible_but_outside_programme(
+    output, studentcount
+):
+    """D-EER: zichtbaar in de uitklaprij (werkelijk 20), niet in de opleidingsrij."""
+    payload = performance_page.build_payload(
+        output, _cumulative(), studentcount, 2024, 10, _weeks(), 38, {"C": 60}
+    )
+    eer = payload["performanceByOrigin"]["EER"]["current"]["D|Bachelor"]
+    assert eer["m"]["SARIMA_cumulative"] is None, "lege prognose"
+    assert eer["a"] == 20
+    total = payload["performance"]["current"]["D|Bachelor"]
+    assert total["am"]["SARIMA_cumulative"] == 30

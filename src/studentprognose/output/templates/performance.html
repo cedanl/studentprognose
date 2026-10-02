@@ -309,6 +309,9 @@ code.plain { background: none; padding: 0; }
             Herkomstgroepen zijn opgeteld tot één opleiding.</span> Modellen worden vergeleken op dezelfde set opleidingen.</dd>
           <dt>Prognose = gemeten</dt><dd>De fout wordt gemeten op precies de prognose die in de tabel staat: dezelfde
             herkomstgroepen, dezelfde week.<span id="unrealised-note"></span></dd>
+          <dt>Alleen voorspelde herkomstgroepen</dt><dd>Heeft een herkomstgroep wel studenten maar geen voorspelling,
+            dan telt die groep niet mee in de cijfers: niet in de prognose, niet in de realisatie en niet in de naïeve
+            voorspelling. De opleiding telt mee met de groepen die wél voorspeld zijn.<span id="unpredicted-note"></span></dd>
           <dt>WAPE</dt><dd>Som van absolute fouten gedeeld door de som van de werkelijke instroom.
             Grote opleidingen wegen zwaarder; dit is de fout "per student".</dd>
           <dt>MAPE</dt><dd>Gemiddelde procentuele fout per opleiding. Elke opleiding telt even zwaar,
@@ -526,6 +529,10 @@ code.plain { background: none; padding: 0; }
     document.getElementById("unrealised-note").textContent = PERF.nUnrealised > 0
       ? ` ${num.format(PERF.nUnrealised)} herkomstgroep(en) hadden een voorspelling maar geen realisatie; die tellen mee als 0 werkelijke studenten.`
       : "";
+    document.getElementById("unpredicted-note").textContent = PERF.nUnpredicted > 0
+      ? ` In deze weergave gaat het om ${num.format(PERF.nUnpredicted)} herkomstgroep(en) met samen ` +
+        `${num.format(PERF.nUnpredictedStudents)} studenten.`
+      : " In deze weergave had elke herkomstgroep met studenten een voorspelling.";
     document.getElementById("size-lede").textContent = isOrigin()
       ? `WAPE per grootteklasse, op basis van de werkelijke instroom uit herkomst ${state.origin}. Kleine groepen hebben vaak een hogere relatieve fout.`
       : "WAPE per grootteklasse (werkelijke instroom). Kleine opleidingen hebben vaak een hogere relatieve fout: één student meer of minder telt daar zwaar.";
@@ -805,17 +812,21 @@ code.plain { background: none; padding: 0; }
       const prognose = cur.m ? cur.m[m] : null;
       const tp = byCode[r.p] || {};
       const tr = trustRows[key];
+      // Realisatie en vorig jaar van de herkomstgroepen die dít model voorspelt (#299).
+      const own = (field, fallback) => (cur[field] && cur[field][m] !== undefined ? cur[field][m] : fallback);
+      const actual = own("am", cur.a), prev = own("pm", cur.prev);
       return {
-        key, p: r.p, e: r.e, faculty: cur.f || tp.faculty || "", n: mm.n || 0, a: r.a, nf: !!cur.nf,
+        key, p: r.p, e: r.e, faculty: cur.f || tp.faculty || "", n: mm.n || 0,
+        a: mm.a !== undefined ? mm.a : r.a, nf: !!cur.nf,
         w: mm.w, b: mm.b, t: cur.nf ? "nf" : (tr && tr.m[m] && tr.m[m].t) || "onbekend",
-        wn: r.m[NAIVE] ? r.m[NAIVE].w : null,
+        wn: mm.wn !== undefined ? mm.wn : (r.m[NAIVE] ? r.m[NAIVE].w : null),
         prognose, marge: prognose != null && mm.w != null ? prognose * mm.w : null,
-        prev: cur.prev != null ? cur.prev : null,
-        delta: prognose != null && cur.prev ? prognose / cur.prev - 1 : null,
-        actual: cur.a != null ? cur.a : null,
+        prev: prev != null ? prev : null,
+        delta: prognose != null && prev ? prognose / prev - 1 : null,
+        actual: actual != null ? actual : null,
         // Fout van de getoonde prognose, zodra de realisatie van dat jaar bekend is.
-        err: prognose != null && cur.a != null ? prognose - cur.a : null,
-        errPct: prognose != null && cur.a ? prognose / cur.a - 1 : null,
+        err: prognose != null && actual != null ? prognose - actual : null,
+        errPct: prognose != null && actual ? prognose / actual - 1 : null,
       };
     });
   }
