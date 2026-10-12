@@ -50,6 +50,7 @@ Elke rij in de output beschrijft een combinatie van **opleiding × herkomst × e
 |-------|-----------------|-------------|
 | `SARIMA_cumulative` | `-d c` of `-d b` | SARIMA-voorspelling op basis van Studielink telbestanden |
 | `SARIMA_individual` | `-d i` of `-d b` | SARIMA-voorspelling op basis van individuele aanmelddata |
+| `Voorspelde vooraanmelders` | `-d c` of `-d b` | SARIMA-prognose van de cumulatieve vooraanmelders per week ná de voorspelweek (één rij per week). Weken die niet in de aanmelddata voorkomen krijgen geen rij — zie [SARIMA → Ontbrekende weken](methodologie/sarima.md#ontbrekende-weken-afkappen-op-de-voorspelweek). |
 | `Prognose_ratio` | `-d c` of `-d b` | Ratio-modelvoorspelling (3-jaars historisch gemiddelde) |
 | `Ensemble_prediction` | `-d b` | Gewogen combinatie van bovenstaande modellen |
 | `Baseline` | `-d c` of `-d b` | Naïeve referentie: `vorig_jaar_inschrijvingen / vorig_jaar_aanmeldingen × huidige_aanmeldingen`. Identiek aan `Prognose_ratio`, maar expliciet benoemd voor gebruik als planningsreferentie. |

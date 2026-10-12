@@ -14,12 +14,20 @@ TRANSFORM_GROUP_COLS = [
 
 
 def transform_data(
-    data_input: pd.DataFrame, targ_col: str, final_week: int = FINAL_ACADEMIC_WEEK
+    data_input: pd.DataFrame,
+    targ_col: str,
+    final_week: int = FINAL_ACADEMIC_WEEK,
+    interpolate_interior_gaps: bool = False,
 ) -> pd.DataFrame:
     """Makes a certain pivot_wider where it transforms the data from long to wide.
 
     ``final_week`` bepaalt de laatste week van het academisch jaar en daarmee de
     seizoensvolgorde van de weekkolommen (default 38; UvA-aanmeldfase 36).
+
+    Ontbrekende weken worden 0. Met ``interpolate_interior_gaps`` worden weken
+    die binnen een rij tússen twee waarnemingen ontbreken eerst lineair
+    geïnterpoleerd; alleen start- en eindweken zonder waarneming worden dan 0.
+    Bedoeld voor cumulatieve reeksen, niet voor indicatoren zoals ``Deadline``.
     """
     group_cols = TRANSFORM_GROUP_COLS
 
@@ -34,6 +42,12 @@ def transform_data(
     colnames = group_cols + get_all_weeks_valid(data.columns, final_week)
 
     data = data[colnames]
+
+    if interpolate_interior_gaps:
+        week_cols = colnames[len(group_cols):]
+        data[week_cols] = (
+            data[week_cols].astype("float64").interpolate(axis=1, limit_area="inside")
+        )
 
     data = data.fillna(0)
 

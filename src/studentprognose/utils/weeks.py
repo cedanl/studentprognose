@@ -155,6 +155,30 @@ def compute_pred_len(predict_week: int, final_week: int = FINAL_ACADEMIC_WEEK) -
     return final_week - predict_week
 
 
+def get_forecast_weeks(
+    columns, predict_week: int, final_week: int = FINAL_ACADEMIC_WEEK
+) -> list[str]:
+    """De weekkolommen ná ``predict_week`` die in ``columns`` bestaan, in seizoensvolgorde.
+
+    Dit is de werkelijke voorspelhorizon van een tijdreeks die over
+    ``get_all_weeks_valid(columns)`` is opgebouwd. ``compute_pred_len`` telt
+    daarentegen alle kalenderweken tot ``final_week`` en is alleen gelijk aan
+    ``len(get_forecast_weeks(...))`` als er geen weekkolommen ontbreken.
+
+    Raises:
+        ValueError: Als ``predict_week`` zelf geen kolom is; de reeks kan dan
+            niet op de voorspelweek worden afgekapt.
+    """
+    valid = get_all_weeks_valid(columns, final_week)
+    key = str(int(predict_week))
+    if key not in valid:
+        raise ValueError(
+            f"Voorspelweek {predict_week} ontbreekt als weekkolom; de tijdreeks kan "
+            f"niet op deze week worden afgekapt."
+        )
+    return valid[valid.index(key) + 1:]
+
+
 def get_all_weeks_valid(columns, final_week: int = FINAL_ACADEMIC_WEEK):
     col_set = set(columns)
     return [w for w in get_all_weeks_ordered(final_week) if w in col_set]

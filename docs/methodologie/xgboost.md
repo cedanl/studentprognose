@@ -61,6 +61,8 @@ De regressor voorspelt het **totaal aantal inschrijvingen** per opleiding/herkom
 
 De lagged en afgeleide features worden per (opleiding × herkomst × examentype × jaar) berekend ten opzichte van de voorspelweek. Ontbreekt een referentieweek dan wordt als fallback week 1 gebruikt; is ook die afwezig dan wordt 0 ingevuld.
 
+De weekkolommen van het voorspeljaar zijn tot en met de voorspelweek echte waarnemingen; de weken daarna zijn de SARIMA-prognose. Een fout in die prognose werkt dus direct door in `SARIMA_cumulative`. Een week die binnen een jaar tussen twee waarnemingen ontbreekt, wordt in de weekkolommen geïnterpoleerd in plaats van op 0 gezet, in training én in het voorspeljaar (zie [SARIMA → Ontbrekende weken](sarima.md#ontbrekende-weken-afkappen-op-de-voorspelweek)).
+
 ### Waarom XGBoost hier?
 
 Om dezelfde reden als bij de classifier (zie [Waarom XGBoost hier?](#waarom-xgboost-hier) hierboven): de relatie tussen het cumulatieve vooraanmeldpatroon en het uiteindelijke inschrijvingsaantal is niet-lineair en varieert per opleiding, herkomst en jaar. XGBoost leert dat patroon zonder dat de wekelijkse curve expliciet gemodelleerd hoeft te worden.

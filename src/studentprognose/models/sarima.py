@@ -3,7 +3,10 @@ from numpy import linalg as LA
 from statsforecast.models import ARIMA
 
 from studentprognose.models.base import BaseForecaster
-from studentprognose.utils.weeks import get_all_weeks_valid, compute_pred_len, academic_start_week
+from studentprognose.utils.weeks import (
+    get_all_weeks_valid, get_all_weeks_ordered, get_forecast_weeks, compute_pred_len,
+    academic_start_week,
+)
 from studentprognose.utils.constants import (
     FINAL_ACADEMIC_WEEK,
     SARIMA_ORDER, SARIMA_ORDER_INDIVIDUAL, SARIMA_SEASONAL_ORDER, SARIMA_SEASONAL_ORDER_ALT,
@@ -59,10 +62,63 @@ class SARIMAForecaster(BaseForecaster):
         return result["mean"]
 
 
-def create_time_series(data, pred_len, final_week: int = FINAL_ACADEMIC_WEEK):
+def split_time_series(
+    data, predict_year: int, predict_week: int, final_week: int = FINAL_ACADEMIC_WEEK
+) -> tuple[np.ndarray, list[str]]:
+    """Bouw de trainingsreeks tot en met ``predict_week`` en bepaal de horizon.
+
+    De jaren (rijen van ``data``, wide format) worden achter elkaar geplakt over
+    de weekkolommen die bestaan (``get_all_weeks_valid``). De horizon is het
+    aantal van díe kolommen ná ``predict_week`` — niet ``compute_pred_len``, dat
+    alle kalenderweken telt. Zo eindigt de trainingsreeks altijd precies op
+    ``predict_week``, ook als er weekkolommen ontbreken (#301).
+
+    Args:
+        data: Wide-format data voor één opleiding/herkomst/examentype, één rij
+            per collegejaar; de laatste rij is het voorspeljaar.
+        predict_year: Het collegejaar waarin ``predict_week`` valt.
+        predict_week: Laatste bekende week.
+        final_week: Laatste week van het academisch jaar.
+
+    Returns:
+        (trainingsreeks, doelweken): de doelweken zijn de weekkolommen
+        waarvoor de forecast geldt, in volgorde.
+
+    Raises:
+        ValueError: Als het voorspeljaar niet de laatste rij is, of als
+            ``predict_week`` geen weekkolom is. Afkappen zou dan in een ander
+            jaar of op een andere week vallen.
+    """
+    data = data.sort_values("Collegejaar", kind="stable")
+    if data.empty or int(data["Collegejaar"].iloc[-1]) != int(predict_year):
+        raise ValueError(
+            f"Geen rij voor collegejaar {predict_year}; de tijdreeks kan niet op "
+            f"week {predict_week} van dat jaar worden afgekapt."
+        )
+    target_weeks = get_forecast_weeks(data.columns, predict_week, final_week)
     ts_data = data.loc[:, get_all_weeks_valid(data.columns, final_week)].values.flatten()
-    ts_data = ts_data[:-pred_len]
-    return np.array(ts_data)
+    if target_weeks:
+        ts_data = ts_data[: -len(target_weeks)]
+    return np.asarray(ts_data, dtype=np.float64), target_weeks
+
+
+def align_forecast_to_calendar(
+    forecast, target_weeks: list[str], predict_week: int, final_week: int = FINAL_ACADEMIC_WEEK
+) -> np.ndarray:
+    """Zet een forecast over ``target_weeks`` op de kalenderweken ná ``predict_week``.
+
+    Aanroepers verwachten één waarde per kalenderweek (``predict_week`` + 1 t/m
+    ``final_week``, lengte ``compute_pred_len``). Weken zonder weekkolom in de
+    data krijgen ``NaN``: daarvoor bestaat geen waarneming en dus geen forecast.
+    """
+    ordered = get_all_weeks_ordered(final_week)
+    calendar = ordered[ordered.index(str(int(predict_week))) + 1:]
+    aligned = np.full(compute_pred_len(int(predict_week), final_week), np.nan)
+    position = {week: i for i, week in enumerate(calendar)}
+    forecast = np.asarray(forecast, dtype=np.float64)
+    for week, value in zip(target_weeks, forecast):
+        aligned[position[week]] = value
+    return aligned
 
 
 def _default_forecaster_factory() -> BaseForecaster:
@@ -103,7 +159,7 @@ def predict_with_sarima_cumulative(
     row,
     predict_year,
     predict_week,
-    pred_len,
+    pred_len: int,
     skip_years=0,
     already_printed=False,
     min_training_year: int = 2016,
@@ -113,6 +169,10 @@ def predict_with_sarima_cumulative(
     """Voorspelt vooraanmeldingen per programme/herkomst/week voor cumulatieve data.
 
     Args:
+        pred_len: Aantal kalenderweken ná ``predict_week`` t/m ``final_week``
+            (``compute_pred_len``); de lengte van de geretourneerde reeks. De
+            forecast-horizon zelf volgt uit de weekkolommen (zie
+            ``split_time_series``).
         forecaster_factory: Callable die een vers BaseForecaster-object retourneert.
             Wordt per aanroep gecalld zodat joblib-parallellisatie veilig werkt.
             Default: SARIMAForecaster met standaard ordes.
@@ -120,7 +180,9 @@ def predict_with_sarima_cumulative(
             Bepaalt de seizoensvolgorde en de reset-week-injectie.
 
     Returns:
-        list: predictions per toekomstige week, of lege lijst bij fout.
+        Eén voorspelling per kalenderweek ná ``predict_week`` t/m ``final_week``
+        (lengte ``pred_len``); ``NaN`` voor weken die als weekkolom in de data
+        ontbreken. Lege lijst bij fout.
     """
     programme = row["Croho groepeernaam"]
     herkomst = row["Herkomst"]
@@ -145,16 +207,19 @@ def predict_with_sarima_cumulative(
 
     data[str(academic_start_week(final_week))] = 0
 
-    ts_data = create_time_series(data, pred_len, final_week)
-
     try:
+        ts_data, target_weeks = split_time_series(
+            data, predict_year - skip_years, predict_week, final_week
+        )
+        if not target_weeks:
+            return align_forecast_to_calendar([], [], predict_week, final_week)
         factory = forecaster_factory or _default_forecaster_factory
         # Seizoenslengte afstemmen op de werkelijke jaar-periode (gevulde-week-
         # kolommen), niet de vaste 52 — zie shrink_season_length_to_period.
         model = shrink_season_length_to_period(factory(), data.columns, final_week)
         model.fit(ts_data)
-        pred = model.forecast(steps=pred_len)
-        return pred
+        pred = model.forecast(steps=len(target_weeks))
+        return align_forecast_to_calendar(pred, target_weeks, predict_week, final_week)
 
     except (LA.LinAlgError, IndexError, ValueError) as error:
         print(f"Cumulative sarima error on: {programme}, {herkomst}")
@@ -228,18 +293,16 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             except IndexError:
                 return []
 
-        pred_len = compute_pred_len(int(predict_week))
-
-        def create_exogenous(data, pred_len):
-            exg_data = data.loc[:, get_all_weeks_valid(data.columns)].values.flatten()
-            exg_data_train = exg_data[:-pred_len]
-            exg_data_test = exg_data[-pred_len:]
-            return np.array(exg_data_train), np.array(exg_data_test)
-
-        ts_data = create_time_series(data, pred_len)
+        ts_data, target_weeks = split_time_series(data, predict_year, predict_week)
 
         if data_exog is not None:
-            exogenous_train_1, exg_data_test_1 = create_exogenous(data_exog, pred_len)
+            exogenous_train_1, exog_weeks = split_time_series(data_exog, predict_year, predict_week)
+            if exog_weeks != target_weeks:
+                raise ValueError("Exogene reeks heeft andere weekkolommen dan de tijdreeks.")
+            exg_data_test_1 = (
+                data_exog.sort_values("Collegejaar", kind="stable")
+                .iloc[-1][target_weeks].to_numpy(dtype=np.float64)
+            )
         else:
             exogenous_train_1 = None
 
@@ -255,17 +318,17 @@ def predict_with_sarima_individual(data_individual, row, predict_year, predict_w
             model.fit(ts_data, exog=exogenous_train_1)
 
             if data_exog is not None:
-                pred = model.forecast(steps=pred_len, exog=exg_data_test_1)
+                pred = model.forecast(steps=len(target_weeks), exog=exg_data_test_1)
             else:
-                pred = model.forecast(steps=pred_len)
+                pred = model.forecast(steps=len(target_weeks))
 
-            return pred
+            return align_forecast_to_calendar(pred, target_weeks, predict_week)
         except (LA.LinAlgError, IndexError, ValueError) as error:
             print(f"Individual error on: {programme}, {herkomst}")
             print(error)
             return []
-    except KeyError as error:
-        print(f"Individual key error on: {programme}, {herkomst}")
+    except (KeyError, ValueError) as error:
+        print(f"Individual error on: {programme}, {herkomst}")
         print(error)
         return []
 
@@ -278,10 +341,15 @@ def _get_transformed_data(data, min_training_year: int = 2016, final_week: int =
         min_training_year: Earliest academic year included in training. Should be
             read from ``model_config.min_training_year`` in the caller's configuration.
         final_week: Laatste week van het academisch jaar (default 38; UvA 36).
+
+    Een week die binnen een jaar ontbreekt tussen twee waarnemingen in, wordt
+    lineair geïnterpoleerd in plaats van op 0 gezet: in een cumulatieve reeks is
+    een val naar nul midden in het jaar een artefact (bijv. een ontbrekend
+    telbestand), geen echte waarneming (#301).
     """
     from studentprognose.data.transforms import transform_data
 
     data = data.drop_duplicates()
     data = data[data["Collegejaar"] >= min_training_year]
-    data = transform_data(data, "ts", final_week)
+    data = transform_data(data, "ts", final_week, interpolate_interior_gaps=True)
     return data

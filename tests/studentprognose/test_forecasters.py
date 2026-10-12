@@ -351,6 +351,9 @@ def test_cumulative_sarima_funnel_forecast_declines():
     ))
 
     assert len(pred) == pred_len
+    # Weken 35-36 bestaan niet als weekkolom: geen forecast (#301).
+    assert np.isnan(pred[-2:]).all()
+    pred = pred[:-2]
     assert np.all(np.isfinite(pred))
     assert pred[-1] < pred[0]  # daalt netto na de piek
     assert pred[: len(pred) // 2].mean() > pred[len(pred) // 2:].mean()
