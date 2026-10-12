@@ -6,8 +6,10 @@ import pandas as pd
 from studentprognose.benchmark.metrics import mape, mae, rmse
 from studentprognose.benchmark.splitter import time_series_split
 from studentprognose.config import get_columns, get_final_academic_week
-from studentprognose.models.sarima import _get_transformed_data, shrink_season_length_to_period
-from studentprognose.utils.weeks import compute_pred_len, get_all_weeks_valid, academic_start_week
+from studentprognose.models.sarima import (
+    _get_transformed_data, shrink_season_length_to_period, split_time_series,
+)
+from studentprognose.utils.weeks import academic_start_week
 
 
 def evaluate_timeseries_model(
@@ -40,7 +42,6 @@ def evaluate_timeseries_model(
     # seizoensvolgorde, reset-week, voorspelhorizon én seizoenslengte hieronder
     # de productie-pipeline spiegelen.
     final_week = get_final_academic_week(config)
-    pred_len = compute_pred_len(predict_week, final_week)
 
     group_keys = data_cumulative.groupby(
         [c.programme, c.origin, c.exam_type]
@@ -78,15 +79,18 @@ def evaluate_timeseries_model(
             test_year = int(test_wide[c.academic_year].iloc[0])
 
             train_for_ts = pd.concat([train_wide, test_wide])
-            ts_data = train_for_ts.loc[
-                :, get_all_weeks_valid(train_for_ts.columns, final_week)
-            ].values.flatten()
-
-            if len(ts_data) <= pred_len:
+            # Zelfde afkapping als productie (split_time_series): de horizon is
+            # het aantal bestaande weekkolommen ná predict_week (#301).
+            try:
+                ts_train, target_weeks = split_time_series(
+                    train_for_ts, test_year, predict_week, final_week
+                )
+            except ValueError:
                 continue
-
-            ts_train = ts_data[:-pred_len]
-            ts_actual = ts_data[-pred_len:]
+            if not target_weeks or len(ts_train) == 0:
+                continue
+            ts_actual = test_wide.iloc[-1][target_weeks].to_numpy(dtype=np.float64)
+            pred_len = len(target_weeks)
 
             t0 = time.perf_counter()
             try:

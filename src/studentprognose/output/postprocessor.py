@@ -101,6 +101,10 @@ class PostProcessor:
 
             current_week = increment_week(row["Weeknummer"])
             for current_prediction in current_predicted_preregistrations:
+                # NaN = week zonder weekkolom in de data: geen forecast, geen rij.
+                if pd.isna(current_prediction):
+                    current_week = increment_week(current_week)
+                    continue
                 dict["Collegejaar"].append(row["Collegejaar"])
                 dict["Faculteit"].append(row["Faculteit"])
                 dict["Examentype"].append(row["Examentype"])
