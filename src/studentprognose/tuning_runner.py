@@ -18,7 +18,8 @@ from studentprognose.models.tuning import (
     tune_regressor,
     tune_sarima,
 )
-from studentprognose.utils.weeks import DataOption, academic_start_week
+from studentprognose.utils.weeks import DataOption
+from studentprognose.data.transforms import ensure_start_week
 
 
 def run_tuning(
@@ -97,7 +98,7 @@ def run_tuning(
 
             final_week = get_final_academic_week(config)
             full_data = _get_transformed_data(data_cumulative.copy(), min_year, final_week)
-            full_data[str(academic_start_week(final_week))] = 0
+            full_data = ensure_start_week(full_data, final_week)
             full_data = _add_engineered_features(full_data, data_cumulative, predict_week)
 
             grid_used = grid if grid is not None else DEFAULT_PARAM_GRIDS.get(name, {})

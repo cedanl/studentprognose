@@ -209,6 +209,9 @@ In de grafische interface (tabblad **Configuratie → Basis**) kies je deze week
 
 Een verkeerde waarde laat de cumulatieve voorspelling crashen (de pipeline slicet kolommen tot deze week) of geeft een onjuiste voorspelhorizon. De waarde geldt voor het **cumulatieve spoor**; het individuele spoor gebruikt de vaste Studielink-kalender.
 
+!!! warning "Kies de week waarin je data écht eindigt"
+    Zet `36` alleen als je bron na week 36 niets meer levert. Loopt je data door tot week 38 (Studielink-telbestanden), dan belanden weken 37–38 (het eind van de aanmeldcyclus) aan het begin van het jaar. De instroomvoorspelling kan dan fors te hoog of te laag uitvallen. De pipeline waarschuwt hiervoor vóór elke voorspelling (zie [Validatie → Weekdekking en eindweek](validatie.md#weekdekking-en-eindweek)).
+
 ## `cumulative_input` — UvA SQL-telbestand omzetten
 
 Stuurt hoe de ETL-rowbind (`_rowbind_and_reformat`) de ruwe telbestanden uit `path_raw_telbestanden` omzet naar de 16-koloms `vooraanmeldingen_cumulatief.csv`. **De meegeleverde (`init`-)config bevat dit blok al, ingesteld op het raw Studielink SQL-formaat** — dat is de standaard-doelgroep. De `Default`-kolom hieronder beschrijft de code-terugval wanneer je het blok (of een sleutel) volledig weglaat; dan vervalt de ETL naar de legacy-defaults (`;`-gescheiden). Voor het UvA SQL-formaat (zie [Je data klaarzetten](je-data-voorbereiden.md#uva-sql-telbestand-fijnmazig-studielink-formaat)):

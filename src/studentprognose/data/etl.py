@@ -3,13 +3,15 @@ import shutil
 
 import numpy as np
 import pandas as pd
-from scipy.interpolate import interp1d
 
+from studentprognose.config import get_final_academic_week
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 from studentprognose.utils.telbestand_filenames import (
     compile_patterns,
     match_telbestand,
     week_from_match,
 )
+from studentprognose.utils.weeks import get_all_weeks_ordered
 
 # De 16 canonieke kolommen van vooraanmeldingen_cumulatief.csv (downstream-contract).
 _OUTPUT_COLUMNS = [
@@ -97,7 +99,10 @@ def run_etl(configuration):
     # Step 2: Interpolate missing weeks
     if os.path.exists(output_cumulative):
         print("[2/4] Interpolating missing weeks...    → data/input/vooraanmeldingen_cumulatief.csv")
-        _interpolate_missing_weeks(output_cumulative)
+        _interpolate_missing_weeks(
+            output_cumulative,
+            get_final_academic_week(configuration),
+        )
     else:
         print("[2/4] Skipping interpolation (no cumulative file)")
 
@@ -253,40 +258,39 @@ def _warn_unmapped_values(series, mapping, column):
         )
 
 
-def _interpolate_missing_weeks(csv_path):
-    """Interpolate missing weeks in the cumulative data file."""
+_INTERPOLATED_MEASURES = [
+    "Gewogen vooraanmelders", "Ongewogen vooraanmelders",
+    "Aantal aanmelders met 1 aanmelding", "Inschrijvingen",
+]
+
+
+def _interpolate_missing_weeks(csv_path, final_week: int = FINAL_ACADEMIC_WEEK):
+    """Vul ontbrekende weken binnen een collegejaar aan in het cumulatieve bestand.
+
+    Per reeks (alle identiteitskolommen + ``Collegejaar``) wordt gekeken welke
+    weken ontbreken **tussen** de eerste en laatste aangeleverde week, in de
+    volgorde van het academisch jaar (``final_week + 1`` → 52 → ``final_week``).
+    Voor die weken wordt een nieuwe rij toegevoegd met lineair geïnterpoleerde
+    aantallen. Weken vóór de eerste of ná de laatste aangeleverde week worden
+    niet aangevuld: daar is geen waarneming om tussen te interpoleren (vóór de
+    eerste snapshot waren er bijvoorbeeld nog geen aanmelders). ISO-week 53 valt
+    buiten het 52-weeks rooster en blijft ongemoeid.
+
+    Alleen eerstejaars-rijen (``Herinschrijving`` en ``Hogerejaars`` == "Nee")
+    worden aangevuld, zoals voorheen.
+    """
     data = pd.read_csv(csv_path, sep=";", low_memory=True)
 
     # Convert Dutch numeric formats
-    for col in ["Gewogen vooraanmelders", "Ongewogen vooraanmelders",
-                "Aantal aanmelders met 1 aanmelding", "Inschrijvingen"]:
+    for col in _INTERPOLATED_MEASURES:
         data[col] = data[col].apply(_convert_to_float)
 
-    # Auto-detect: find years and week gaps to interpolate
-    years = data["Collegejaar"].unique()
-    interpolated = False
-
-    for year in years:
-        year_data = data[(data["Collegejaar"] == year)
-                         & (data["Herinschrijving"] == "Nee")
-                         & (data["Hogerejaars"] == "Nee")]
-        weeks = sorted(year_data["Weeknummer"].unique())
-
-        if len(weeks) < 2:
-            continue
-
-        # Find gaps between consecutive weeks (accounting for wrap-around)
-        for i in range(len(weeks) - 1):
-            start_week = weeks[i]
-            end_week = weeks[i + 1]
-            if end_week - start_week > 1:
-                data = _interpolate(data, year, start_week, end_week)
-                interpolated = True
-
-        # Check wrap-around gap (last week → first week)
-        if weeks[-1] > weeks[0] + 40:  # Likely a wrap scenario (e.g., week 51 and week 1)
-            data = _interpolate(data, year, weeks[-1], weeks[0])
-            interpolated = True
+    added = _interpolated_rows(data, final_week)
+    if not added.empty:
+        data = pd.concat([data, added[data.columns]], ignore_index=True)
+        print(f"  {len(added)} ontbrekende weekrij(en) aangevuld door interpolatie")
+    else:
+        print("  No gaps found to interpolate")
 
     # Round results
     data["Gewogen vooraanmelders"] = data["Gewogen vooraanmelders"].round(2)
@@ -296,8 +300,62 @@ def _interpolate_missing_weeks(csv_path):
 
     data.to_csv(csv_path, sep=";", index=False)
 
-    if not interpolated:
-        print("  No gaps found to interpolate")
+
+def _interpolated_rows(data: pd.DataFrame, final_week: int) -> pd.DataFrame:
+    """Nieuwe rijen voor ontbrekende weken tussen twee aangeleverde weken.
+
+    Returns:
+        DataFrame met dezelfde kolommen als ``data`` (leeg als er niets ontbreekt).
+    """
+    order = [int(w) for w in get_all_weeks_ordered(final_week)]
+    position = {week: i for i, week in enumerate(order)}
+
+    subset = data[
+        (data["Herinschrijving"] == "Nee")
+        & (data["Hogerejaars"] == "Nee")
+        & data["Weeknummer"].isin(position)
+    ]
+    if subset.empty:
+        return data.iloc[0:0]
+
+    key_cols = [
+        c for c in data.columns
+        if c not in _INTERPOLATED_MEASURES and c not in ("Weeknummer", "Weeknummer rapportage")
+    ]
+    # NaN-sleutels (bijv. een lege Faculteit) tijdelijk vervangen: unstack kan
+    # NaN niet als indexwaarde gebruiken.
+    na_token = "__ontbreekt__"
+    keys = subset[key_cols].astype(object).where(subset[key_cols].notna(), na_token)
+    frame = pd.concat([keys, subset[_INTERPOLATED_MEASURES]], axis=1)
+    frame["_pos"] = subset["Weeknummer"].map(position)
+
+    grouped = frame.groupby(key_cols + ["_pos"], sort=False)
+    present = grouped.size().unstack("_pos")
+    measures = grouped[_INTERPOLATED_MEASURES].sum(min_count=1)
+
+    # Alleen posities tussen de eerste en laatste aangeleverde week per reeks.
+    present = present.reindex(columns=range(len(order)))
+    has_row = present.notna()
+    inside = has_row.cummax(axis=1) & has_row[has_row.columns[::-1]].cummax(axis=1)[has_row.columns]
+    missing = inside & ~has_row
+    if not missing.to_numpy().any():
+        return data.iloc[0:0]
+
+    new = missing.stack()
+    new = new[new].index.to_frame(index=False)
+    for col in _INTERPOLATED_MEASURES:
+        wide = measures[col].unstack("_pos").reindex(columns=range(len(order)))
+        wide = wide.interpolate(axis=1, limit_area="inside")
+        values = wide.stack(future_stack=True).rename(col).reset_index()
+        new = new.merge(values, on=key_cols + ["_pos"], how="left")
+
+    new["Weeknummer"] = new["_pos"].map(dict(enumerate(order)))
+    new["Weeknummer rapportage"] = new["Weeknummer"]
+    new = new.drop(columns="_pos")
+    for col in key_cols:
+        new[col] = new[col].where(new[col] != na_token, np.nan)
+        new[col] = new[col].astype(data[col].dtype, errors="ignore")
+    return new[data.columns]
 
 
 def _convert_to_float(value):
@@ -307,104 +365,6 @@ def _convert_to_float(value):
         return float(value)
     except (ValueError, TypeError):
         return np.nan
-
-
-def _interpolate(data, year, start_week, end_week, max_week=52):
-    """Linear interpolation for missing weeks between start_week and end_week."""
-    is_wrap = start_week > end_week
-
-    filtered = data[
-        (data["Herinschrijving"] == "Nee")
-        & (data["Hogerejaars"] == "Nee")
-        & (data["Collegejaar"] == year)
-        & (data["Weeknummer"].isin([start_week, end_week]))
-    ]
-
-    if not is_wrap:
-        intermediate_weeks = list(range(start_week + 1, end_week))
-    else:
-        intermediate_weeks = list(range(start_week + 1, max_week + 1)) + list(range(1, end_week))
-
-    if not intermediate_weeks:
-        return data
-
-    def _week_position(week):
-        if not is_wrap:
-            return week - start_week
-        elif week >= start_week:
-            return week - start_week
-        else:
-            return week + (max_week - start_week + 1)
-
-    updates = {
-        "Collegejaar": [], "Weeknummer": [], "Type hoger onderwijs": [],
-        "Groepeernaam Croho": [], "Herkomst": [], "target_value": [], "value": [],
-    }
-
-    groups = filtered[["Type hoger onderwijs", "Groepeernaam Croho", "Herkomst"]].drop_duplicates()
-
-    for _, group in groups.iterrows():
-        croho = group["Groepeernaam Croho"]
-        herkomst = group["Herkomst"]
-        examentype = group["Type hoger onderwijs"]
-
-        group_data = filtered[
-            (filtered["Groepeernaam Croho"] == croho)
-            & (filtered["Herkomst"] == herkomst)
-            & (filtered["Type hoger onderwijs"] == examentype)
-        ]
-
-        for target_col in ["Gewogen vooraanmelders", "Ongewogen vooraanmelders",
-                           "Aantal aanmelders met 1 aanmelding", "Inschrijvingen"]:
-            val_start = group_data[group_data["Weeknummer"] == start_week][target_col]
-            val_end = group_data[group_data["Weeknummer"] == end_week][target_col]
-
-            if val_start.empty or val_end.empty:
-                continue
-
-            pos_end = _week_position(end_week)
-            interpolator = interp1d(
-                [0, pos_end],
-                [float(val_start.iloc[0]), float(val_end.iloc[0])],
-                kind="linear",
-            )
-            positions = [_week_position(w) for w in intermediate_weeks]
-            values = interpolator(positions)
-
-            for week, val in zip(intermediate_weeks, values):
-                updates["Collegejaar"].append(year)
-                updates["Weeknummer"].append(week)
-                updates["Type hoger onderwijs"].append(examentype)
-                updates["Groepeernaam Croho"].append(croho)
-                updates["Herkomst"].append(herkomst)
-                updates["target_value"].append(target_col)
-                updates["value"].append(val)
-
-    if not updates["Collegejaar"]:
-        return data
-
-    updates_df = pd.DataFrame(updates)
-    updates_pivot = updates_df.pivot_table(
-        index=["Collegejaar", "Weeknummer", "Type hoger onderwijs", "Groepeernaam Croho", "Herkomst"],
-        columns="target_value",
-        values="value",
-    ).reset_index()
-
-    data = data.merge(
-        updates_pivot,
-        on=["Collegejaar", "Weeknummer", "Type hoger onderwijs", "Groepeernaam Croho", "Herkomst"],
-        how="left",
-        suffixes=("", "_interpolated"),
-    )
-
-    for col in ["Gewogen vooraanmelders", "Ongewogen vooraanmelders",
-                "Aantal aanmelders met 1 aanmelding", "Inschrijvingen"]:
-        interp_col = f"{col}_interpolated"
-        if interp_col in data.columns:
-            data[col] = data[interp_col].combine_first(data[col])
-            data.drop(columns=[interp_col], inplace=True)
-
-    return data
 
 
 def _calculate_student_count(data, volume):

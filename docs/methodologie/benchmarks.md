@@ -66,7 +66,7 @@ Dit bootst de productiescenario na: het model traint op historische data en voor
 Het cumulatieve spoor heeft twee stappen. De benchmark meet beide apart:
 
 1. **Stap 1 (tijdreeks):** hoe goed extrapoleert het model de vooraanmelderscurve? Gemeten als MAPE/MAE/RMSE op de curve zelf. De curve wordt op precies dezelfde manier op de voorspelweek afgekapt als in productie: alleen weken die in de data voorkomen tellen mee (zie [SARIMA → Ontbrekende weken](sarima.md#ontbrekende-weken-afkappen-op-de-voorspelweek)).
-2. **Stap 2 (regressie):** hoe goed vertaalt het model vooraanmelders naar inschrijvingen? Gemeten op het eindaantal studenten.
+2. **Stap 2 (regressie):** hoe goed vertaalt het model vooraanmelders naar inschrijvingen? Gemeten op het eindaantal studenten. De regressors krijgen dezelfde features als in productie: vroege weken zonder data in elk jaar vallen weg (zie [XGBoost → Features](xgboost.md#features_1)).
 
 Door apart te meten kun je zien waar de fout zit: in de extrapolatie of in de vertaling.
 

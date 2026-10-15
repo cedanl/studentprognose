@@ -8,8 +8,8 @@ from studentprognose.utils.programme_key import normalize_programme_values, merg
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy, _add_engineered_features
-from studentprognose.utils.weeks import get_weeks_list, academic_start_week
-from studentprognose.data.transforms import transform_data
+from studentprognose.utils.weeks import get_weeks_list
+from studentprognose.data.transforms import ensure_start_week, transform_data
 from studentprognose.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
 
 
@@ -116,7 +116,7 @@ class CombinedStrategy(PredictionStrategy):
             self.cumulative.data_cumulative.copy(deep=True), self.min_training_year,
             self.cumulative.final_academic_week,
         )
-        full_data[str(academic_start_week(self.cumulative.final_academic_week))] = 0
+        full_data = ensure_start_week(full_data, self.cumulative.final_academic_week)
         full_data = _add_engineered_features(full_data, self.cumulative.data_cumulative, int(self.predict_week))
 
         self.skip_years = skip_years

@@ -90,7 +90,7 @@ Telbestand met studentaantallen, door de instelling zelf aangeleverd — zie [Je
 
 ## Pre-prediction checks
 
-Vóór elke modelrun voert de pipeline vier aanvullende checks uit op de **cumulatieve vooraanmelddata**. Ze draaien per `(jaar, week)`-combinatie, na ETL maar vóór de modellen.
+Vóór elke modelrun voert de pipeline zes aanvullende checks uit op de **cumulatieve vooraanmelddata**. Ze draaien per `(jaar, week)`-combinatie, na ETL maar vóór de modellen.
 
 !!! note "Alleen actief als cumulatieve data beschikbaar is"
     De pre-prediction checks worden overgeslagen als de pipeline zonder cumulatieve data draait (individueel-enkel modus, `-d i`). In dat geval is er geen `Gewogen vooraanmelders`-kolom om te valideren.
@@ -101,6 +101,8 @@ Vóór elke modelrun voert de pipeline vier aanvullende checks uit op de **cumul
 | Lege dataset | Hard stop | Geen rijen aanwezig voor het gevraagde jaar+week |
 | Trainingshistorie | Hard stop / waarschuwing | Geen historische collegejaren (`Collegejaar < voorspeljaar`) aanwezig om op te trainen |
 | Historisch realisme | Hard stop / waarschuwing | Afwijking t.o.v. dezelfde week vorig jaar per opleiding/herkomst/examentype |
+| Eindweek | Waarschuwing | De startweek (`final_academic_week + 1`) bevat al bijna de eindaantallen van het jaar: de data loopt door na de ingestelde eindweek |
+| Weekdekking | Waarschuwing | Het voorspeljaar mist weken vóór de voorspelweek die in eerdere jaren wél data hebben |
 
 ### Trainingshistorie — waarom deze check bestaat
 
@@ -136,6 +138,22 @@ De absolute vloer (`max(…)`) voorkomt vals-positieven bij kleine opleidingen: 
 Numerus-fixus-opleidingen (examentype Bachelor) worden overgeslagen — hun aanmeldpatroon is beleidsmatig bepaald en niet vergelijkbaar met het historische patroon.
 
 Als er geen vorig-jaar-data beschikbaar is (nieuwe opleiding), wordt de check stilzwijgend overgeslagen.
+
+### Weekdekking en eindweek
+
+Het instroommodel (XGBoost) vergelijkt het voorspeljaar week voor week met eerdere jaren. Twee situaties maken die vergelijking scheef, zonder dat er iets crasht. Beide checks geven daarom alleen een **waarschuwing**.
+
+**Weekdekking.** Een week telt als "gebruikelijk" als minstens 80% van de eerdere collegejaren er data voor heeft. Ontbreekt zo'n week in het voorspeljaar vóór de voorspelweek, dan meldt de pipeline welke weken het zijn. Meestal ontbreekt er een telbestand, of opende de aanmeldcyclus dat jaar later. De pipeline vangt het zo goed mogelijk op:
+
+- **gaten tussen twee aangeleverde weken** worden geïnterpoleerd;
+- **vroege weken** die niet in elk jaar data hebben, gaan niet als feature naar het instroommodel.
+
+De instroomvoorspelling (`SARIMA_cumulative`) is dan wel minder zeker. Vul ontbrekende telbestanden aan als ze bestaan.
+
+**Eindweek.** De startweek van het academisch jaar (`final_academic_week + 1`) hoort de eerste, kleinste stand van een nieuw collegejaar te bevatten. Staat daar in de afgeronde jaren al gemiddeld de helft of meer van de eindaantallen, dan levert je bron nog weken ná de ingestelde eindweek aan. Die weken (het eind van de aanmeldcyclus) belanden dan aan het **begin** van het jaar. Controleer [`model_config.final_academic_week`](configuratie-referentie.md#final_academic_week): voor Studielink-telbestanden is dat meestal 38.
+
+!!! warning "Deze waarschuwingen niet negeren"
+    Een voorspeljaar met ontbrekende vroege weken kan een instroomvoorspelling opleveren die een factor te laag of te hoog is, terwijl backtests op complete eerdere jaren er goed uitzien. Zie issue [#303](https://github.com/cedanl/studentprognose/issues/303).
 
 ### Hard stop omzeilen met `--yes`
 
