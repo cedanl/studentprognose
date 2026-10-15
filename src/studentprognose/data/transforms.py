@@ -1,4 +1,4 @@
-from studentprognose.utils.weeks import get_all_weeks_valid
+from studentprognose.utils.weeks import academic_start_week, get_all_weeks_valid
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
 import pandas as pd
@@ -51,6 +51,20 @@ def transform_data(
 
     data = data.fillna(0)
 
+    return data
+
+
+def ensure_start_week(data: pd.DataFrame, final_week: int = FINAL_ACADEMIC_WEEK) -> pd.DataFrame:
+    """Zorg dat de startweek van het academisch jaar als kolom bestaat.
+
+    De startweek (``final_week + 1``) markeert in de aaneengeplakte reeks de
+    overgang naar een nieuw jaar. Ontbreekt de kolom, dan wordt hij met 0
+    toegevoegd (er waren nog geen aanmelders). Bestaat hij al, dan blijven de
+    echte waarden staan; voorheen werden die altijd met 0 overschreven (#303).
+    """
+    column = str(academic_start_week(final_week))
+    if column not in data.columns:
+        data[column] = 0
     return data
 
 

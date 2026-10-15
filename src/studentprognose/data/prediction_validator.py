@@ -1,6 +1,6 @@
 """Pre-prediction datakwaliteitschecks.
 
-Vier checks worden uitgevoerd op de cumulatieve data vóór de modellen draaien:
+Zes checks worden uitgevoerd op de cumulatieve data vóór de modellen draaien:
 
   decimaalintegriteit – hard stop als 'Gewogen vooraanmelders' strings met
                         komma's of niet-numerieke waarden bevat.
@@ -11,6 +11,11 @@ Vier checks worden uitgevoerd op de cumulatieve data vóór de modellen draaien:
   historisch realisme – vergelijkt de huidige week met dezelfde week een jaar
                         eerder. Hard stop bij extreme afwijking, warning bij
                         matige afwijking. NF-opleidingen worden overgeslagen.
+  eindweek            – warning als de startweek (final_academic_week + 1) al
+                        bijna de eindaantallen van het jaar bevat: de data loopt
+                        dan door na de ingestelde eindweek.
+  weekdekking         – warning als het voorspeljaar weken vóór de voorspelweek
+                        mist die in eerdere jaren wél data hebben (#303).
 
 Drempelwaarden (niet configureerbaar, bewust conservatief):
   warning  : afwijking > max(15 absoluut, 30% relatief)
@@ -22,7 +27,8 @@ import warnings
 
 import pandas as pd
 
-from studentprognose.utils.constants import LOOKBACK_YEARS
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, LOOKBACK_YEARS
+from studentprognose.utils.weeks import academic_start_week, get_all_weeks_ordered
 
 
 def run_pre_prediction_checks(
@@ -31,6 +37,7 @@ def run_pre_prediction_checks(
     predict_week: int,
     numerus_fixus_list: dict,
     yes: bool = False,
+    final_week: int = FINAL_ACADEMIC_WEEK,
 ) -> None:
     """Run all pre-prediction checks. Hard stops exit the process."""
     current = data_cumulative[
@@ -51,6 +58,9 @@ def run_pre_prediction_checks(
     _check_empty_data(current, predict_year, predict_week)
     _check_training_history(data_cumulative, predict_year, yes)
     _check_historical_realism(current, last_year, numerus_fixus_list, predict_year, predict_week, yes)
+    totals = _weekly_totals(data_cumulative)
+    _check_final_week(totals, predict_year, final_week)
+    _check_week_coverage(totals, predict_year, predict_week, final_week)
 
 
 # ---------------------------------------------------------------------------
@@ -212,3 +222,102 @@ def _check_historical_realism(
                 UserWarning,
                 stacklevel=2,
             )
+
+
+# ---------------------------------------------------------------------------
+# Weekdekking (#303)
+# ---------------------------------------------------------------------------
+
+def _weekly_totals(data_cumulative: pd.DataFrame) -> pd.DataFrame:
+    """Totaal gewogen vooraanmelders per collegejaar (rij) en week (kolom).
+
+    Alleen eerstejaars als de kolom ``Hogerejaars`` bestaat. Een week zonder
+    rijen is ``NaN``; een week met rijen maar zonder aanmelders is 0.
+    """
+    needed = {"Collegejaar", "Weeknummer", "Gewogen vooraanmelders"}
+    if not needed.issubset(data_cumulative.columns) or data_cumulative.empty:
+        return pd.DataFrame()
+    data = data_cumulative
+    if "Hogerejaars" in data.columns:
+        data = data[data["Hogerejaars"] == "Nee"]
+    data = data.assign(
+        Collegejaar=pd.to_numeric(data["Collegejaar"], errors="coerce"),
+        Weeknummer=pd.to_numeric(data["Weeknummer"], errors="coerce"),
+        _gewogen=pd.to_numeric(data["Gewogen vooraanmelders"], errors="coerce"),
+    ).dropna(subset=["Collegejaar", "Weeknummer"])
+    totals = data.groupby(["Collegejaar", "Weeknummer"])["_gewogen"].sum().unstack()
+    totals.index = totals.index.astype(int)
+    totals.columns = totals.columns.astype(int)
+    return totals
+
+
+def _check_final_week(totals: pd.DataFrame, predict_year: int, final_week: int) -> None:
+    """Waarschuw als de data doorloopt na ``final_week``.
+
+    De startweek (``final_week + 1``) hoort de eerste, kleinste stand van een
+    nieuw collegejaar te bevatten. Staan daar in de afgeronde jaren al bijna de
+    eindaantallen, dan levert de bron nog weken ná ``final_week`` aan (het eind
+    van de cyclus). Die weken komen dan aan het begin van het jaar te staan.
+    """
+    start = academic_start_week(final_week)
+    if totals.empty or start not in totals.columns:
+        return
+    complete = totals[totals.index < predict_year]
+    peak = complete.max(axis=1)
+    complete = complete[complete[start].notna() & (peak > 0)]
+    if complete.empty:
+        return
+    share = complete[start] / peak[complete.index]
+    if not share.median() >= 0.5:
+        return
+    later = sorted(w for w in totals.columns if final_week < w <= 52)
+    warnings.warn(
+        f"Week {start} (de startweek bij final_academic_week={final_week}) bevat al "
+        f"~{share.median():.0%} van de eindaantallen van het jaar. Je data loopt "
+        f"waarschijnlijk door tot na week {final_week} (aanwezig: week "
+        f"{', '.join(map(str, later[:3]))}{'…' if len(later) > 3 else ''}). Die weken "
+        f"belanden nu aan het begin van het jaar. Controleer "
+        f"model_config.final_academic_week (standaard 38).",
+        UserWarning,
+        stacklevel=2,
+    )
+
+
+def _check_week_coverage(
+    totals: pd.DataFrame, predict_year: int, predict_week: int, final_week: int
+) -> None:
+    """Waarschuw als het voorspeljaar weken mist die eerdere jaren wél hebben.
+
+    Een week telt als "gebruikelijk" als minstens 80% van de eerdere collegejaren
+    er rijen voor heeft. Ontbreekt zo'n week in het voorspeljaar vóór de
+    voorspelweek, dan kent het model daar geen waarde voor. Vroege weken zonder
+    data gaan niet als feature naar de regressor; gaten tussen twee aangeleverde
+    weken worden geïnterpoleerd. De uitkomst is dan minder zeker, en vaak ontbreekt
+    er een telbestand.
+    """
+    if totals.empty or predict_year not in totals.index:
+        return
+    history = totals[totals.index < predict_year]
+    if history.empty:
+        return
+    order = [int(w) for w in get_all_weeks_ordered(final_week)]
+    if int(predict_week) not in order:
+        return
+    known = order[: order.index(int(predict_week)) + 1]
+    usual = [
+        w for w in known
+        if w in history.columns and history[w].notna().mean() >= 0.8
+    ]
+    present = totals.loc[predict_year]
+    missing = [w for w in usual if w not in present.index or pd.isna(present[w])]
+    if not missing:
+        return
+    warnings.warn(
+        f"Collegejaar {predict_year} mist week {', '.join(map(str, missing))} vóór de "
+        f"voorspelweek {predict_week}, terwijl eerdere jaren daar wel data hebben. "
+        f"Ontbreekt er een telbestand? Vroege weken zonder data worden niet als "
+        f"feature gebruikt en gaten ertussen worden geïnterpoleerd, maar de "
+        f"instroomvoorspelling ('SARIMA_cumulative') is minder zeker.",
+        UserWarning,
+        stacklevel=2,
+    )

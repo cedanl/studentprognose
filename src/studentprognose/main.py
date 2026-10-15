@@ -775,6 +775,7 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_ou
                 week,
                 strategy.numerus_fixus_list,
                 yes=cfg.yes,
+                final_week=strategy.final_academic_week,
             )
 
         print(f"Predicting first-years: {year}-{week}...")

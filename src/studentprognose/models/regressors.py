@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 
 import numpy as np
+import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import OneHotEncoder
 
@@ -125,6 +126,48 @@ class ExtraTreesRegressor(BaseRegressor):
     @property
     def feature_importances_(self) -> np.ndarray | None:
         return self._model.feature_importances_
+
+
+def covered_feature_columns(
+    frames: list[pd.DataFrame],
+    final_week: int = FINAL_ACADEMIC_WEEK,
+    year_col: str = "Collegejaar",
+) -> list[str]:
+    """Kolommen voor de regressor, zonder vroege weken die niet in elk jaar data hebben.
+
+    Een weekkolom aan het begin van het academisch jaar telt alleen mee als
+    feature als **elk** collegejaar in ``frames`` (training én voorspeljaar)
+    vanaf die week data heeft. Mist één jaar zijn eerste weken — een gemist
+    telbestand, of een aanmeldcyclus die later opende — dan staan daar nullen
+    die in de andere jaren nooit voorkomen. De regressor ziet het jaar dan als
+    iets buiten zijn trainingsdata en voorspelt onbetrouwbaar (#303). Die vroege
+    weken bevatten nauwelijks informatie over de instroom, dus ze weglaten kost
+    weinig.
+
+    Args:
+        frames: Train- en testdata (wide format, één weekkolom per week).
+        final_week: Laatste week van het academisch jaar.
+        year_col: Naam van de jaar-kolom.
+
+    Returns:
+        De kolommen van ``frames[0]`` minus de weggelaten vroege weken.
+    """
+    columns = list(frames[0].columns)
+    week_cols = [str(w) for w in get_weeks_list(final_week, final_week) if str(w) in columns]
+    if not week_cols:
+        return columns
+
+    data = pd.concat([f[[year_col] + week_cols] for f in frames], ignore_index=True)
+    filled = data.groupby(year_col)[week_cols].sum().gt(0)
+    filled = filled[filled.any(axis=1)]
+    if filled.empty:
+        return columns
+
+    # Eerste week met data per jaar (week_cols staat in academische volgorde);
+    # de laatste daarvan is de eerste week die in élk jaar gevuld is.
+    first_filled = filled.to_numpy().argmax(axis=1).max()
+    dropped = set(week_cols[:first_filled])
+    return [c for c in columns if c not in dropped]
 
 
 def build_preprocessor(

@@ -10,12 +10,12 @@ from studentprognose.utils.parallel import run_parallel_with_fallback
 from studentprognose.utils.programme_key import normalize_programme_series
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.utils.weeks import (
-    increment_week, compute_pred_len, academic_start_week, get_all_weeks_ordered,
+    increment_week, compute_pred_len, get_all_weeks_ordered,
 )
 from studentprognose.models import create_forecaster, create_regressor
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
-from studentprognose.data.transforms import TRANSFORM_GROUP_COLS
+from studentprognose.data.transforms import TRANSFORM_GROUP_COLS, ensure_start_week
 from studentprognose.data.preprocessing.excluded_data_points import apply_excluded_data_points
 
 _EPS = 1e-8
@@ -229,7 +229,7 @@ class CumulativeStrategy(PredictionStrategy):
         full_data = _get_transformed_data(
             self.data_cumulative.copy(deep=True), self.min_training_year, self.final_academic_week
         )
-        full_data[str(academic_start_week(self.final_academic_week))] = 0
+        full_data = ensure_start_week(full_data, self.final_academic_week)
         full_data = _add_engineered_features(full_data, self.data_cumulative, int(self.predict_week))
 
         if not self._tuned and (self._tune or self._tune_sarima):

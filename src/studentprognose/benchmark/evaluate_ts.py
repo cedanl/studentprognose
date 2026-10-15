@@ -9,7 +9,7 @@ from studentprognose.config import get_columns, get_final_academic_week
 from studentprognose.models.sarima import (
     _get_transformed_data, shrink_season_length_to_period, split_time_series,
 )
-from studentprognose.utils.weeks import academic_start_week
+from studentprognose.data.transforms import ensure_start_week
 
 
 def evaluate_timeseries_model(
@@ -58,7 +58,7 @@ def evaluate_timeseries_model(
     wide_all = _get_transformed_data(data_cumulative.copy(), min_training_year, final_week)
     if wide_all.empty:
         return pd.DataFrame(results)
-    wide_all[str(academic_start_week(final_week))] = 0
+    wide_all = ensure_start_week(wide_all, final_week)
 
     for _, group_row in group_keys.iterrows():
         programme = group_row[c.programme]

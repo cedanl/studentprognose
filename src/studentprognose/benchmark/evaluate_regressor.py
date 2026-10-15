@@ -6,7 +6,7 @@ import pandas as pd
 from studentprognose.benchmark.metrics import mape, mae, rmse
 from studentprognose.benchmark.splitter import time_series_split
 from studentprognose.config import get_columns, get_model_features, get_final_academic_week
-from studentprognose.models.regressors import build_preprocessor
+from studentprognose.models.regressors import build_preprocessor, covered_feature_columns
 from studentprognose.strategies.cumulative import ENGINEERED_FEATURE_COLS
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 
@@ -123,13 +123,16 @@ def _evaluate_single(
     # Geef available_cols mee, net als de productie-pijplijn (predict_with_xgboost):
     # de wide-pivot bevat niet altijd élke weekkolom tot final_week (bijv. UvA met
     # final_week 36 levert ~43 i.p.v. 52 weken). Zonder deze filter eist de
-    # ColumnTransformer ontbrekende kolommen op en faalt elke fold stil.
+    # ColumnTransformer ontbrekende kolommen op en faalt elke fold stil. Vroege
+    # weken zonder data in elk jaar vallen weg, zoals in productie (#303).
     preprocessor, numeric_cols, categorical_cols = build_preprocessor(
         ENGINEERED_FEATURE_COLS,
         categorical_cols=reg_categorical,
         year_col=year_col,
         final_week=final_week,
-        available_cols=list(X_train.columns),
+        available_cols=covered_feature_columns(
+            [X_train, X_test], final_week=final_week, year_col=year_col
+        ),
     )
 
     try:

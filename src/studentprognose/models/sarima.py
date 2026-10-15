@@ -3,9 +3,9 @@ from numpy import linalg as LA
 from statsforecast.models import ARIMA
 
 from studentprognose.models.base import BaseForecaster
+from studentprognose.data.transforms import ensure_start_week
 from studentprognose.utils.weeks import (
     get_all_weeks_valid, get_all_weeks_ordered, get_forecast_weeks, compute_pred_len,
-    academic_start_week,
 )
 from studentprognose.utils.constants import (
     FINAL_ACADEMIC_WEEK,
@@ -205,7 +205,7 @@ def predict_with_sarima_cumulative(
         & (data["Examentype"] == examentype)
     ]
 
-    data[str(academic_start_week(final_week))] = 0
+    data = ensure_start_week(data, final_week)
 
     try:
         ts_data, target_weeks = split_time_series(

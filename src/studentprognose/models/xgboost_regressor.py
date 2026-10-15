@@ -6,6 +6,7 @@ from studentprognose.models.regressors import (
     BaseRegressor,
     XGBoostRegressor,
     build_preprocessor,
+    covered_feature_columns,
 )
 
 
@@ -54,7 +55,11 @@ def predict_with_xgboost(
             )
 
     preprocessor, numeric_cols, categorical_cols = build_preprocessor(
-        extra_numeric_cols, final_week=final_week, available_cols=list(X_train.columns)
+        extra_numeric_cols,
+        final_week=final_week,
+        available_cols=covered_feature_columns(
+            [X_train, test], final_week=final_week, year_col=c.academic_year
+        ),
     )
 
     X_train_transformed = preprocessor.fit_transform(X_train)

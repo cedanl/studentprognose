@@ -61,6 +61,10 @@ De regressor voorspelt het **totaal aantal inschrijvingen** per opleiding/herkom
 
 De lagged en afgeleide features worden per (opleiding × herkomst × examentype × jaar) berekend ten opzichte van de voorspelweek. Ontbreekt een referentieweek dan wordt als fallback week 1 gebruikt; is ook die afwezig dan wordt 0 ingevuld.
 
+**Vroege weken zonder data in elk jaar vallen weg.** Een weekkolom aan het begin van het academisch jaar gaat alleen als feature mee als *elk* collegejaar (training én voorspeljaar) vanaf die week data heeft. Mist één jaar zijn eerste weken, door een gemist telbestand of doordat de aanmeldcyclus later opende, dan staan daar nullen die in de trainingsjaren nooit voorkomen. Het model ziet het jaar dan als iets wat het niet kent, en de voorspelling kan een factor naast zitten. Die vroege weken bevatten nauwelijks informatie over de uiteindelijke instroom, dus weglaten kost weinig. De startweek (`final_academic_week + 1`) is in elk jaar 0 en valt om dezelfde reden altijd weg.
+
+**Wanneer vertrouw je het niet?** Als er veel vroege weken wegvallen, bijvoorbeeld omdat één trainingsjaar pas laat begint. Het model kijkt dan alleen naar latere weken. De pipeline [waarschuwt](../validatie.md#weekdekking-en-eindweek) als het voorspeljaar weken mist die eerdere jaren wel hebben.
+
 De weekkolommen van het voorspeljaar zijn tot en met de voorspelweek echte waarnemingen; de weken daarna zijn de SARIMA-prognose. Een fout in die prognose werkt dus direct door in `SARIMA_cumulative`. Een week die binnen een jaar tussen twee waarnemingen ontbreekt, wordt in de weekkolommen geïnterpoleerd in plaats van op 0 gezet, in training én in het voorspeljaar (zie [SARIMA → Ontbrekende weken](sarima.md#ontbrekende-weken-afkappen-op-de-voorspelweek)).
 
 ### Waarom XGBoost hier?

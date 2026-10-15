@@ -127,6 +127,8 @@ Een week die binnen één jaar ontbreekt maar tussen twee waarnemingen ligt (bij
 
 Ontbreekt de rij voor het voorspeljaar of de voorspelweek zelf, dan voorspelt het model voor die opleiding niets in plaats van stil in een ander jaar af te kappen. Je ziet dan een melding in de console.
 
+De **startweek** van het academisch jaar (`final_academic_week + 1`) markeert in de aaneengeplakte reeks de overgang naar een nieuw jaar. Ontbreekt die week in de data, dan wordt hij als 0 toegevoegd. Staat er echte data in, dan blijft die staan (vóór [#303](https://github.com/cedanl/studentprognose/issues/303) werd die altijd met 0 overschreven).
+
 ## Bekende hardgecodeerde uitzondering: 2021
 
 Dit illustreert een bredere aanname: **het model gaat ervan uit dat historische aanmeldpatronen representatief zijn**. Uitzonderingsjaren zoals 2021 (COVID) moeten handmatig worden afgehandeld.

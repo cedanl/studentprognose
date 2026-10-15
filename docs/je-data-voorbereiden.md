@@ -121,11 +121,28 @@ De ETL draait automatisch bij elke run (tenzij `--noetl`):
 | Stap | Actie | Input | Output |
 |------|-------|-------|--------|
 | 1 | Rowbind + reformat (config-gedreven via [`cumulative_input`](configuratie-referentie.md#cumulative_input-uva-sql-telbestand-omzetten)) | `telbestanden/*.csv` | Samengevoegd cumulatief bestand |
-| 2 | Interpolatie ontbrekende weken | Samengevoegd bestand | `vooraanmeldingen_cumulatief.csv` |
+| 2 | Interpolatie ontbrekende weken (zie [hieronder](#ontbrekende-weken-in-de-telbestanden)) | Samengevoegd bestand | `vooraanmeldingen_cumulatief.csv` |
 | 3 | Studentaantallen berekenen | `oktober_bestand.xlsx` | `student_count_*.xlsx`, `student_volume.xlsx` |
 | 4 | Kopiëren individuele data | `individuele_aanmelddata.csv` | `vooraanmeldingen_individueel.csv` |
 
 Zie de [volledige dataflow](https://github.com/cedanl/studentprognose/blob/main/doc/PIPELINE.md) voor een Mermaid-diagram.
+
+### Ontbrekende weken in de telbestanden
+
+Mist er een telbestand, dan ontbreekt die week in de cumulatieve data. De ETL vult zo'n week aan met een rechte lijn tussen de week ervoor en de week erna. Dat gebeurt alleen **tussen twee aangeleverde weken van hetzelfde collegejaar**, in de volgorde van het academisch jaar (week `final_academic_week + 1` → 52 → `final_academic_week`). Een gat rond de jaarwisseling (bijv. week 52 en 1) wordt dus gewoon aangevuld.
+
+Weken **vóór de eerste** of **ná de laatste** aangeleverde week van een collegejaar vult de ETL niet aan. Daar is niets om tussen te interpoleren, en vóór de eerste snapshot waren er vaak echt nog geen aanmelders. De pipeline behandelt zulke vroege weken apart (zie [XGBoost → Features](methodologie/xgboost.md#features_1)) en waarschuwt als ze in het voorspeljaar ontbreken terwijl eerdere jaren ze wel hebben (zie [Validatie → Weekdekking](validatie.md#weekdekking-en-eindweek)).
+
+!!! note "Alleen eerstejaars"
+    De interpolatie geldt voor rijen met `Herinschrijving` en `Hogerejaars` = "Nee". ISO-week 53 valt buiten het 52-weeks rooster en blijft ongemoeid.
+
+!!! tip "Controleren welke weken je hebt"
+    ```python
+    import pandas as pd
+    d = pd.read_csv("data/input/vooraanmeldingen_cumulatief.csv", sep=";")
+    for y, g in d.groupby("Collegejaar"):
+        print(y, "ontbreekt:", sorted(set(range(1, 53)) - set(g.Weeknummer)))
+    ```
 
 ## ETL overslaan
 
