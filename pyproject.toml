@@ -30,7 +30,7 @@ classifiers = [
 ]
 dependencies = [
     "matplotlib>=3.10.0",
-    "pillow>=12.2.0",
+    "pillow>=12.3.0",
     "openpyxl>=3.1.5",
     "pandas>=2.2.3",
     "scikit-learn>=1.6.1",
@@ -67,8 +67,8 @@ dev = [
 docs = [
     "mkdocs>=1.6.0",
     "mkdocs-material>=9.5.0",
-    "mkdocstrings[python]>=0.26.0",
-    "pymdown-extensions>=10.21.3",
+    "mkdocstrings[python]>=1.0.7",
+    "pymdown-extensions>=11.0.1",
 ]
 
 [tool.hatch.version]
