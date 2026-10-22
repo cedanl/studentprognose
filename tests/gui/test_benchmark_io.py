@@ -77,3 +77,15 @@ def test_deep_merge_does_not_mutate():
     overlay = {"a": {"c": 2}}
     benchmark_io.deep_merge(base, overlay)
     assert base == {"a": {"b": 1}}  # ongewijzigd
+
+
+def test_summarize_cwf_backtest_compares_with_naive():
+    df = pd.DataFrame({
+        "Aantal_studenten": [100, 50],
+        "Prognose_cwf": [90, 50],
+        "Naief_vorig_jaar": [80, 40],
+    })
+    records = benchmark_io.summarize(df, "mape")
+    assert [r["model"] for r in records] == ["CWF", "Naïef (vorig jaar)"]
+    assert records[0]["metric"] == 0.05
+    assert records[0]["winner"] is True

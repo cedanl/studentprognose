@@ -26,7 +26,7 @@ from studentprognose import (
     pivot_metrics,                 # metrieken → model × jaar/week-matrix (backtest)
     to_mlflow_metrics,             # metrieken afvlakken voor mlflow.log_metrics (Fabric)
     PipelineConfig,                # configuratie-dataclass voor de pipeline
-    DataOption,                    # enum: INDIVIDUAL / CUMULATIVE / BOTH_DATASETS
+    DataOption,                    # enum: INDIVIDUAL / CUMULATIVE / BOTH_DATASETS / CWF
     StudentYearPrediction,         # enum: FIRST_YEARS / VOLUME
 )
 ```
@@ -95,6 +95,29 @@ result = run_pipeline_from_dataframes(
     dataset=DataOption.CUMULATIVE,
 )
 ```
+
+#### Het CWF-model vanuit Python
+
+Met `dataset=DataOption.CWF` draait het [CWF-model](methodologie/cwf.md). Geef naast de cumulatieve data ook de eerstejaars-studentaantallen mee; die zijn voor CWF verplicht.
+
+```python
+from studentprognose import run_pipeline_from_dataframes, DataOption
+
+result = run_pipeline_from_dataframes(
+    year=2025,
+    week=16,
+    data_cumulative=df_cum,
+    data_student_numbers=df_counts,   # Collegejaar, Croho groepeernaam, Herkomst, Examentype, Aantal_studenten
+    dataset=DataOption.CWF,
+    save_output=False,
+)
+
+week = result[(result["Collegejaar"] == 2025) & (result["Weeknummer"] == 16)]
+print(week[["Croho groepeernaam", "Herkomst", "Prognose_cwf",
+            "cwf_ondergrens", "cwf_bovengrens", "cwf_betrouwbaarheid"]])
+```
+
+`build_dashboard_from_dataframes(..., dataset=DataOption.CWF)` schrijft daarnaast een CWF-dashboard met interval en labels. `skip_years` en `tune` worden voor CWF niet ondersteund.
 
 !!! warning "`year`/`week` moeten binnen je trainingsdata vallen"
     `run_pipeline_from_dataframes` controleert — net als de CLI — of `year` en `week`

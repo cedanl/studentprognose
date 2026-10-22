@@ -21,6 +21,7 @@
   --series-2: #eb6834;
   --series-3: #1baf7a;
   --series-ens: #e87ba4;
+  --series-4: #7b5cd6;
   --baseline: #898781;
   --good: #006300;
   --bad: #b3261e;
@@ -50,6 +51,7 @@
     --series-2: #d95926;
     --series-3: #199e70;
     --series-ens: #d55181;
+    --series-4: #9479e8;
     --baseline: #8d8b85;
     --good: #0ca30c;
     --bad: #e66767;
@@ -72,6 +74,7 @@
   --series-2: #d95926;
   --series-3: #199e70;
   --series-ens: #d55181;
+  --series-4: #9479e8;
   --baseline: #8d8b85;
   --good: #0ca30c;
   --bad: #e66767;
@@ -118,6 +121,12 @@ select:focus-visible, input:focus-visible, button:focus-visible, summary:focus-v
 .badge.laag { background: var(--status-bad-wash); }
 .badge.laag::before { background: var(--status-bad); }
 .badge.onbekend { background: var(--status-none-wash); color: var(--text-2); }
+.badge.Groen { background: var(--status-good-wash); }
+.badge.Groen::before { background: var(--status-good); }
+.badge.Oranje { background: var(--status-warn-wash); }
+.badge.Oranje::before { background: var(--status-warn); }
+.badge.Rood { background: var(--status-bad-wash); }
+.badge.Rood::before { background: var(--status-bad); }
 .table-tools { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 4px 0 10px; }
 .table-tools input { min-width: 240px; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; }
@@ -193,6 +202,9 @@ tr.origin-row .badge { font-size: 11.5px; padding: 1px 8px 1px 6px; }
 table { width: 100%; border-collapse: collapse; font-size: 14px; font-variant-numeric: tabular-nums; margin-top: 8px; }
 th, td { text-align: right; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
 th:first-child, td:first-child { text-align: left; }
+/* CWF-tabel: opleiding, examentype, herkomst en label zijn tekst. */
+#table-cwf th:nth-child(-n+3), #table-cwf td:nth-child(-n+3),
+#table-cwf th:nth-child(6), #table-cwf td:nth-child(6) { text-align: left; }
 th { font-weight: 600; color: var(--text-2); font-size: 13px; }
 td.best { font-weight: 700; }
 .table-scroll { overflow-x: auto; }
@@ -356,6 +368,20 @@ code.plain { background: none; padding: 0; }
       </article>
     </section>
 
+    <article data-block="cwf" class="card" id="cwf-card" hidden>
+      <h2>Predictie-interval en betrouwbaarheid</h2>
+      <p class="lede">Per opleiding × herkomst de CWF-prognose met 95%-predictie-interval en een
+        betrouwbaarheidslabel. <b>Groen</b>: de cyclus is ver gevorderd en het model zat in eerdere
+        jaren op dit moment steeds dichtbij. <b>Oranje</b>: bruikbare indicatie. <b>Rood</b>: alleen
+        een indicatie (weinig historie, vroeg in de cyclus of grote fouten in het verleden).</p>
+      <div class="tiles" id="cwf-tiles"></div>
+      <div class="table-tools">
+        <input type="search" id="cwf-search" placeholder="Zoek opleiding" aria-label="Zoek opleiding in de intervaltabel">
+      </div>
+      <div class="table-wrap"><table id="table-cwf"></table></div>
+      <p class="chart-note" id="cwf-note"></p>
+    </article>
+
     <section data-block="empty" class="notice" id="perf-empty" hidden>
       <h2>Nog geen modelperformance te tonen</h2>
       <p>Er is geen realisatie (werkelijke instroom) voor de voorspelde collegejaren, dus de fout valt nog niet te meten.
@@ -395,6 +421,7 @@ code.plain { background: none; padding: 0; }
   let PERF = DATA.performance;
   const NAIVE = "Naief_vorig_jaar";
   const IS_FINAL = META.track === "final";
+  const CWF = DATA.cwf;
 
   const pct = new Intl.NumberFormat("nl-NL", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 });
   const pct0 = new Intl.NumberFormat("nl-NL", { style: "percent", maximumFractionDigits: 0 });
@@ -411,7 +438,7 @@ code.plain { background: none; padding: 0; }
     return {
       text: v("--text"), text2: v("--text-2"), muted: v("--muted"), grid: v("--grid"), axis: v("--axis"),
       surface: v("--surface"), history: v("--history"), historyStrong: v("--history-strong"),
-      s1: v("--series-1"), s2: v("--series-2"), s3: v("--series-3"), ens: v("--series-ens"),
+      s1: v("--series-1"), s2: v("--series-2"), s3: v("--series-3"), s4: v("--series-4"), ens: v("--series-ens"),
       baseline: v("--baseline"), good: v("--good"), bad: v("--bad"), statusBad: v("--status-bad"),
     };
   }
@@ -421,6 +448,7 @@ code.plain { background: none; padding: 0; }
     if (key === "SARIMA_cumulative") return t.s1;
     if (key === "Prognose_ratio") return t.s2;
     if (key === "SARIMA_individual") return t.s3;
+    if (key === "Prognose_cwf") return t.s4;
     return t.ens;
   }
   function baseLayout(t, extra) {
@@ -452,13 +480,14 @@ code.plain { background: none; padding: 0; }
 
   const LAYOUT = IS_FINAL
     ? ["forecast", "controls", "view-note", "table", "forecast-extra", "tiles", "groups", "units", "empty"]
-    : ["controls", "view-note", "tiles", "groups", "units", "table", "empty", "trend"];
+    : ["cwf", "controls", "view-note", "tiles", "groups", "units", "table", "empty", "trend"];
   document.querySelectorAll("[data-block]").forEach(el => {
     const i = LAYOUT.indexOf(el.dataset.block);
     el.style.order = i < 0 ? 99 : i;
     if (i < 0) el.hidden = true;
   });
   if (!hasTrend) block("trend").hidden = true;
+  if (CWF) block("cwf").hidden = false;
   if (IS_FINAL && FC) { block("forecast").hidden = false; block("forecast-extra").hidden = false; }
 
   document.getElementById("page-title").textContent = PAGE.title;
@@ -1236,8 +1265,51 @@ code.plain { background: none; padding: 0; }
     }).join("");
   }
 
+  // ── CWF: interval en betrouwbaarheid ─────────────────────────────
+  function renderCwf() {
+    if (!CWF) return;
+    const counts = CWF.labels || {};
+    const cov = CWF.coverage || {};
+    const total = ["Groen", "Oranje", "Rood"].reduce((acc, l) => acc + (counts[l] || 0), 0);
+    const tiles = ["Groen", "Oranje", "Rood"].map(l =>
+      `<div class="tile"><div class="label"><span class="badge ${l}">${l}</span></div>
+        <div class="value">${num.format(counts[l] || 0)}</div>
+        <div class="sub">${total ? pct0.format((counts[l] || 0) / total) : "–"} van de prognoses</div></div>`);
+    if (cov.all) {
+      tiles.push(`<div class="tile"><div class="label">Werkelijk binnen interval</div>
+        <div class="value">${fmtPct(cov.all.share)}</div>
+        <div class="sub">van ${num.format(cov.all.n)} combinaties met bekende realisatie</div></div>`);
+    }
+    document.getElementById("cwf-tiles").innerHTML = tiles.join("");
+    const q = document.getElementById("cwf-search").value.trim().toLowerCase();
+    const rows = CWF.rows.filter(r => !q || [r.p, r.e, r.h, r.f].join(" ").toLowerCase().includes(q));
+    const order = { Rood: 0, Oranje: 1, Groen: 2 };
+    rows.sort((a, b) => (order[a.label] - order[b.label]) || ((b.pred || 0) - (a.pred || 0)));
+    const head = "<thead><tr><th>Opleiding</th><th>Examentype</th><th>Herkomst</th>" +
+      "<th>Prognose</th><th>Interval</th><th>Betrouwbaarheid</th>" +
+      "<th>Vulgraad</th>" + (rows.some(r => r.a != null) ? "<th>Werkelijk</th>" : "") +
+      "</tr></thead>";
+    const showActual = rows.some(r => r.a != null);
+    const body = rows.map(r => "<tr>" +
+      `<td>${esc(r.p)}</td><td>${esc(r.e)}</td><td>${esc(r.h || "")}</td>` +
+      `<td>${r.pred == null ? "–" : num.format(r.pred)}</td>` +
+      `<td>${r.lo == null ? "–" : num.format(r.lo) + "–" + num.format(r.hi)}</td>` +
+      `<td><span class="badge ${esc(r.label)}">${esc(r.label)}</span></td>` +
+      `<td>${r.fill == null ? "–" : pct0.format(r.fill)}</td>` +
+      (showActual ? `<td>${r.a == null ? "–" : num.format(r.a)}</td>` : "") +
+      "</tr>").join("");
+    document.getElementById("table-cwf").innerHTML = head + "<tbody>" + body + "</tbody>";
+    const byLabel = cov.byLabel || {};
+    const parts = Object.keys(byLabel).map(l => `${l} ${fmtPct(byLabel[l].share)} (n=${num.format(byLabel[l].n)})`);
+    document.getElementById("cwf-note").textContent =
+      `${num.format(rows.length)} van ${num.format(CWF.rows.length)} combinaties. ` +
+      (parts.length ? `Dekking van het interval per label: ${parts.join(", ")}. ` : "") +
+      "Intervallen per herkomst zijn niet op te tellen tot een interval per opleiding.";
+  }
+  if (CWF) document.getElementById("cwf-search").addEventListener("input", renderCwf);
+
   // ── Init ─────────────────────────────────────────────────────────
-  function renderAll() { renderPerf(); renderTrend(); }
+  function renderAll() { renderPerf(); renderTrend(); renderCwf(); }
   const startOrigin = readHash();
   if (ORIGINS.length) document.getElementById("origin-filter").value = startOrigin;
   setView(startOrigin);

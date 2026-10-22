@@ -21,7 +21,7 @@ class AppState:
             ``studentprognose init`` de structuur heeft aangemaakt). ``None`` tot
             de gebruiker een project kiest of aanmaakt.
         wizard_mode: Modus gekozen in wizard-stap 4 (``"cumulative"``,
-            ``"individual"`` of ``"both"``). ``None`` als de wizard nog niet
+            ``"individual"``, ``"both"`` of ``"cwf"``). ``None`` als de wizard nog niet
             doorlopen is. Wordt door de run-pagina als standaardwaarde gebruikt.
         config_saved: True zodra de gebruiker de configuratie deze sessie heeft
             opgeslagen. Voedt de "afgerond"-markering van stap 2 in de zijbalk;

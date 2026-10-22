@@ -19,7 +19,13 @@ _PREDICTION_COLUMNS = [
     "Ensemble_prediction",
     "SARIMA_cumulative",
     "SARIMA_individual",
+    "Prognose_cwf",
 ]
+
+#: Interval- en labelkolommen van het CWF-model.
+_CWF_LOWER = "cwf_ondergrens"
+_CWF_UPPER = "cwf_bovengrens"
+_CWF_LABEL = "cwf_betrouwbaarheid"
 
 #: Kolomprefixen van foutmaten die als "model" in de vergelijking meetellen.
 _MAE_PREFIX = "MAE_"
@@ -162,7 +168,8 @@ def programme_rows(df: pd.DataFrame) -> list[dict]:
     """Bouw de tabelrijen voor het overzicht, gesorteerd op absolute afwijking.
 
     Elke rij bevat opleiding, herkomst, examentype, voorspelling, werkelijk,
-    afwijking, mape en een kleurbucket.
+    afwijking, mape en een kleurbucket. Bij CWF-output ook ``ondergrens``,
+    ``bovengrens`` en ``betrouwbaarheid`` (Groen/Oranje/Rood).
     """
     rows = prediction_rows(df)
     pred_col = primary_prediction_column(rows)
@@ -180,8 +187,17 @@ def programme_rows(df: pd.DataFrame) -> list[dict]:
         mape = None
         if mape_col and mape_col in rows.columns:
             mape = _safe_float(r.get(mape_col))
+        cwf = {}
+        if _CWF_LABEL in rows.columns:
+            label = r.get(_CWF_LABEL)
+            cwf = {
+                "ondergrens": _safe_float(r.get(_CWF_LOWER)),
+                "bovengrens": _safe_float(r.get(_CWF_UPPER)),
+                "betrouwbaarheid": None if pd.isna(label) else str(label),
+            }
         records.append(
             {
+                **cwf,
                 "opleiding": str(r.get(PROGRAMME_COL, "")),
                 "herkomst": str(r.get("Herkomst", "")),
                 "examentype": str(r.get("Examentype", "")),

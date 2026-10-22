@@ -587,6 +587,9 @@ class TestRequiredFilesFor:
     def test_cumulative_requires_only_telbestanden(self):
         assert _required_files_for(DataOption.CUMULATIVE) == (True, False)
 
+    def test_cwf_requires_only_telbestanden(self):
+        assert _required_files_for(DataOption.CWF) == (True, False)
+
 
 # ---------------------------------------------------------------------------
 # Unit tests for new helpers

@@ -4,7 +4,7 @@ Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt
 
 !!! abstract "In het kort"
     - **Wat je hier vindt:** per model hoe het werkt, waarom die keuze is gemaakt, en wanneer je de output kritisch moet beoordelen.
-    - **Twee sporen:** de pipeline draait een cumulatief spoor (telbestanden) en een individueel spoor (per-student data) en combineert ze in het ensemble.
+    - **Twee sporen + CWF:** de pipeline draait een cumulatief spoor (telbestanden) en een individueel spoor (per-student data) en combineert ze in het ensemble. Daarnaast is er het zelfstandige CWF-model, dat een prognose met predictie-interval en betrouwbaarheidslabel geeft.
     - **Nieuw hier?** Begin bij de modellenkaart hieronder en klik door naar het model dat je gebruikt.
 
 ## Modellen in het ensemble
@@ -19,6 +19,12 @@ Deze sectie legt per model uit **hoe het werkt**, **waarom deze keuze is gemaakt
 | Ensemble | [Ensemble](ensemble.md) | Gewogen combinatie van bovenstaande modellen |
 | Benchmarks | [Benchmarks](benchmarks.md) | Vergelijking van alternatieve modellen |
 
+## Zelfstandig model: CWF
+
+| Model | Pagina | Rol in de pipeline |
+|-------|--------|--------------------|
+| CWF-model (confidence-weighted forecast) | [CWF-model](cwf.md) | Eindinstroom uit pijplijn × recency-gewogen ratio, met predictie-interval en betrouwbaarheidslabel (`-d cwf`) |
+
 Twee termen die in de tabel terugkomen: een **geaggregeerde curve** ontstaat door de losse voorspellingen op te tellen tot één wekelijkse lijn per opleiding, en **extrapolatie** is het doortrekken van die lijn naar het einde van het jaar (week 38).
 
 Het cumulatieve spoor is configureerbaar: via `model_config.cumulative_timeseries` en `model_config.cumulative_regressor` in de [configuratie](../configuratie-referentie.md#cumulative_timeseries) kies je welk tijdreeksmodel en welk regressiemodel wordt gebruikt.
@@ -30,9 +36,13 @@ flowchart LR
     SL["Studielink\ntelbestanden"] --> CUM["Cumulatief spoor\n(-d c)"]
     SIS["Osiris / Usis\nper-student"] --> IND["Individueel spoor\n(-d i)"]
     CUM & IND --> ENS["Ensemble\n(-d b)"]
+    SL --> CWF["CWF-model\n(-d cwf)"]
+    OKT["Oktobertelling"] --> CWF
 ```
 
 De twee sporen zijn bewust onafhankelijk van elkaar ontworpen zodat instellingen die geen toegang hebben tot individuele aanmelddata toch een voorspelling kunnen maken via het cumulatieve spoor. Een end-to-end uitleg van het individueel spoor staat op [Individueel model](individueel.md).
+
+Het [CWF-model](cwf.md) draait los van beide sporen: het gebruikt dezelfde telbestanden als het cumulatieve spoor, plus de gerealiseerde instroom uit de oktobertelling, en levert een eigen prognose met onzekerheidsmarge. Het maakt geen deel uit van het ensemble.
 
 ### Welk model draait per modus?
 
@@ -41,6 +51,7 @@ De twee sporen zijn bewust onafhankelijk van elkaar ontworpen zodat instellingen
 | `-d c` | ✅ | ✅ | ✅ | ❌ (twee losse kolommen) |
 | `-d i` | ✅ | ✅ (classifier) | ❌ | ❌ |
 | `-d b` | ✅ | ✅ | ✅ | ✅ |
+| `-d cwf` | ❌ | ❌ | ❌ (eigen CWF-model) | ❌ |
 
 Alleen in `-d b` worden `SARIMA_individual` en `SARIMA_cumulative` samengevoegd tot één `Ensemble_prediction`; in `-d c` blijven het twee losse outputkolommen en in `-d i` is er maar één spoor en dus niets om te combineren. Zie [Ensemble](ensemble.md) voor de gewichtenlogica.
 

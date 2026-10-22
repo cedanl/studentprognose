@@ -52,6 +52,7 @@ _WIZARD_MODE_TO_DATASET = {
     "cumulative": "Cumulatief",
     "individual": "Individueel",
     "both": "Beide",
+    "cwf": "CWF",
 }
 
 
@@ -292,7 +293,7 @@ class _RunView:
 
                 # ── Dataset ─────────────────────────────────────────────────
                 self._dataset = ui.select(
-                    ["Cumulatief", "Individueel", "Beide"],
+                    ["Cumulatief", "Individueel", "Beide", "CWF"],
                     value=self._settings["dataset"],
                     label="Dataset (voorspelspoor)",
                 ).classes("w-full")

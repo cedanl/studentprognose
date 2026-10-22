@@ -1,7 +1,7 @@
 """Startpagina van de GUI.
 
 Toont voor nieuwe gebruikers de zakelijke meerwaarde van instroom-prognoses
-en de drie voorspelsporen; voor terugkerende gebruikers een projectdashboard
+en de voorspelsporen; voor terugkerende gebruikers een projectdashboard
 met snelkoppelingen. Bevat ook een één-klik demo die de volledige flow
 automatisch met demodata uitvoert in een tijdelijke map.
 """

@@ -39,6 +39,7 @@ _CANDIDATE_PREDICTIONS = (
     "Prognose_ratio",
     "SARIMA_cumulative",
     "SARIMA_individual",
+    "Prognose_cwf",
 )
 
 # Volgorde van de metriekkolommen in het resultaat-DataFrame.

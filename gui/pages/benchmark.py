@@ -18,7 +18,7 @@ from gui.components.log_stream import ProcessPanel
 from gui.components.states import empty_state, section_title
 from gui.state import STATE
 
-_DATASET_CODE = {"Cumulatief": "c", "Individueel": "i"}
+_DATASET_CODE = {"Cumulatief": "c", "Individueel": "i", "CWF": "cwf"}
 _TUNE_CODE = {"Regressor": "regressor", "SARIMA": "sarima", "Beide": "both"}
 
 #: Aanbevolen predict-week — ook de fallback als het invoerveld leeg is.
@@ -75,11 +75,11 @@ class _BenchmarkSection:
     def __init__(self) -> None:
         with ui.row().classes("w-full items-end gap-4 flex-wrap"):
             self._dataset = ui.select(
-                ["Cumulatief", "Individueel"],
+                ["Cumulatief", "Individueel", "CWF"],
                 value="Cumulatief",
                 label="Dataset (voorspelspoor)",
             ).classes("w-48")
-            self._dataset.tooltip(tracks.dataset_tooltip(["Cumulatief", "Individueel"]))
+            self._dataset.tooltip(tracks.dataset_tooltip(["Cumulatief", "Individueel", "CWF"]))
             with ui.column().classes("gap-0"):
                 self._week = ui.number("Predict week", value=_RECOMMENDED_WEEK, min=1, max=52).classes(
                     "w-40"

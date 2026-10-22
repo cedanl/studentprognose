@@ -109,10 +109,13 @@ def main(argv):
         from studentprognose.benchmark.runner import main as run_benchmark
 
         if not cfg.dataset_specified:
-            print("Geef -d c (cumulatief) of -d i (individueel) mee bij benchmark.")
+            print("Geef -d c (cumulatief), -d i (individueel) of -d cwf mee bij benchmark.")
             sys.exit(1)
         if cfg.data_option == DataOption.BOTH_DATASETS:
-            print("Benchmark ondersteunt geen -d both. Kies -d c (cumulatief) of -d i (individueel).")
+            print(
+                "Benchmark ondersteunt geen -d both. Kies -d c (cumulatief), "
+                "-d i (individueel) of -d cwf."
+            )
             sys.exit(1)
 
         predict_week = cfg.weeks[0] if cfg.weeks else 12
@@ -132,6 +135,10 @@ def main(argv):
         predict_week = cfg.weeks[0] if cfg.weeks else 12
         run_tuning(cfg.configuration_path, predict_week, cfg.data_option, cfg.tune_target)
         return
+
+    if cfg.data_option == DataOption.CWF and cfg.skip_years > 0:
+        print("Fout: het CWF-model ondersteunt geen -sk/--skipyears. Laat de vlag weg.")
+        sys.exit(1)
 
     # Step 0: Validate raw input data, then run ETL (skip both with --noetl)
     print("Loading configuration...")
@@ -166,6 +173,14 @@ def main(argv):
         sys.exit(1)
     if cfg.ci_test_n is not None:
         datasets = apply_ci_test_subset(cfg.ci_test_n, *datasets)
+
+    if cfg.data_option == DataOption.CWF and datasets[2] is None:
+        print(
+            "\nFout: het CWF-model heeft de eerstejaars-studentaantallen nodig "
+            f"({configuration['paths'].get('path_student_count_first-years')!r} ontbreekt)."
+        )
+        print("  Zet het oktoberbestand in data/input_raw/ en draai zonder --noetl.")
+        sys.exit(1)
 
     _apply_auto_defaults(datasets, cfg, configuration)
     _check_data_range(datasets, cfg)
@@ -242,15 +257,19 @@ def run_pipeline_from_dataframes(
         year: Academisch jaar om te voorspellen (bijv. ``2025``).
         week: ISO-weeknummer waarvandaan voorspeld wordt (bijv. ``10``).
         data_cumulative: Cumulatief vooraanmeld-DataFrame. Vereist wanneer
-            ``dataset`` ``CUMULATIVE`` of ``BOTH_DATASETS`` is.
+            ``dataset`` ``CUMULATIVE``, ``BOTH_DATASETS`` of ``CWF`` is.
         data_individual: Individueel aanmeld-DataFrame. Vereist wanneer
             ``dataset`` ``INDIVIDUAL`` of ``BOTH_DATASETS`` is.
         configuration: Configuratiedict (zelfde structuur als ``configuration.json``).
             Bij ``None`` worden de gebundelde package-defaults gebruikt.
-        data_student_numbers: Studentaantallen eerstejaars DataFrame (optioneel).
+        data_student_numbers: Studentaantallen eerstejaars DataFrame (optioneel;
+            vereist bij ``CWF``).
         data_latest: Laatste output Excel DataFrame voor hogerejaarsvoorspellingen (optioneel).
         data_weighted_ensemble: Ensemble-gewichten DataFrame (optioneel).
-        dataset: Welke dataset(s) te gebruiken. Standaard ``BOTH_DATASETS``.
+        dataset: Welk model/welke dataset(s) te gebruiken. Standaard ``BOTH_DATASETS``;
+            ``DataOption.CWF`` draait het confidence-weighted forecast-model
+            (kolommen ``Prognose_cwf``, ``cwf_ondergrens``, ``cwf_bovengrens``,
+            ``cwf_betrouwbaarheid``, ``cwf_vulgraad``, ``cwf_ratiofactor``).
         student_year_prediction: Welke studentcohort te voorspellen. Standaard ``FIRST_YEARS``.
         skip_years: Aantal meest recente jaren om uit training te sluiten (backtesting).
         filtering: Filteringdict (zelfde structuur als een filtering-JSON-bestand).
@@ -276,7 +295,8 @@ def run_pipeline_from_dataframes(
             de configuratie zodat je ze kunt vastleggen. Het kandidatenoverzicht
             (met ✓ op de winnaar) gaat naar de console; de functie retourneert het
             voorspellings-DataFrame. Heeft alleen effect op het cumulatieve spoor
-            (``CUMULATIVE``/``BOTH_DATASETS``).
+            (``CUMULATIVE``/``BOTH_DATASETS``); bij ``CWF`` geeft tuning een
+            ``ValueError``.
 
     Returns:
         Het gepostprocessde voorspellings-DataFrame, of ``None`` als geen rijen
@@ -356,16 +376,18 @@ def build_dashboard_from_dataframes(
             is; het laatste jaar is het voorspeljaar.
         week: ISO-weeknummer waarvandaan voorspeld wordt (bijv. ``10``).
         data_cumulative: Cumulatief vooraanmeld-DataFrame. Vereist wanneer ``dataset``
-            ``CUMULATIVE`` of ``BOTH_DATASETS`` is.
+            ``CUMULATIVE``, ``BOTH_DATASETS`` of ``CWF`` is.
         data_individual: Individueel aanmeld-DataFrame. Vereist wanneer ``dataset``
             ``INDIVIDUAL`` of ``BOTH_DATASETS`` is.
         configuration: Configuratiedict (zelfde structuur als ``configuration.json``).
             Bij ``None`` worden de gebundelde package-defaults gebruikt.
         data_student_numbers: Studentaantallen eerstejaars DataFrame (optioneel, maar
-            nodig voor de modelperformance en de naïeve baseline in het dashboard).
+            nodig voor de modelperformance en de naïeve baseline in het dashboard;
+            vereist bij ``CWF``).
         data_latest: Laatste output Excel DataFrame voor hogerejaarsvoorspellingen (optioneel).
         data_weighted_ensemble: Ensemble-gewichten DataFrame (optioneel).
-        dataset: Welke dataset(s) te gebruiken. Standaard ``BOTH_DATASETS``.
+        dataset: Welk model/welke dataset(s) te gebruiken. Standaard ``BOTH_DATASETS``;
+            ``DataOption.CWF`` levert een eigen dashboardpagina met interval en label.
         student_year_prediction: Welke studentcohort te voorspellen. Standaard ``FIRST_YEARS``.
         skip_years: Aantal meest recente jaren om uit training te sluiten (backtesting).
         filtering: Filteringdict (zelfde structuur als een filtering-JSON-bestand).
@@ -489,6 +511,11 @@ def _prepare_in_memory_run(
     # aanroeper niet muteren (de strategy schrijft de gevonden params terug in
     # deze kopie).
     tune_targets = _resolve_tune_targets(tune)
+    if tune_targets and dataset == DataOption.CWF:
+        raise ValueError(
+            "tune wordt niet ondersteund voor het CWF-model (dataset=DataOption.CWF); "
+            "de CWF-parameters stel je in via model_config.cwf_params."
+        )
     if tune_targets:
         import copy
 
@@ -736,9 +763,13 @@ def _print_summary(datasets, cfg, strategy):
     print(f"  Dataset:       {cfg.data_option.filename_suffix}")
     print(f"  Trainingsdata: jaren {train_year_str}")
     print(f"  Voorspelling:  jaar {cfg.years}, vanaf week {cfg.weeks}")
-    for i, detail in enumerate(pred_details):
-        prefix = "                 " if i > 0 else "  Voorspelt:     "
-        print(f"{prefix}{detail}")
+    if cfg.data_option == DataOption.CWF:
+        # CWF voorspelt direct de eindinstroom, geen weekreeks vooruit.
+        print("  Voorspelt:     eindinstroom (met predictie-interval en betrouwbaarheidslabel)")
+    else:
+        for i, detail in enumerate(pred_details):
+            prefix = "                 " if i > 0 else "  Voorspelt:     "
+            print(f"{prefix}{detail}")
     print(f"  Opleidingen:   {', '.join(str(p) for p in programmes)}")
     print(f"{'=' * 40}\n")
 
@@ -755,7 +786,7 @@ def _preprocess(strategy, student_year_prediction):
         if strategy.postprocessor.data_latest is None:
             print("\nFout: geen 'totaal'-bestand gevonden voor hogerjaarsvoorspelling.")
             print("  Dit bestand wordt aangemaakt na een eerste first-years run.")
-            print("  Draai eerst: studentprognose -d cumulative (of -d both)")
+            print("  Draai eerst: studentprognose -d cumulative (of -d both / -d cwf)")
             sys.exit(1)
         strategy.postprocessor.data = strategy.postprocessor.data_latest[
             HIGHER_YEARS_COLUMNS
@@ -793,6 +824,8 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_ou
             if cfg.data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS):
                 strategy.postprocessor.predict_with_ratio(data_cumulative, year)
                 strategy.postprocessor.add_applicant_data(data_cumulative, year, week)
+            elif cfg.data_option == DataOption.CWF:
+                strategy.postprocessor.add_applicant_data(data_cumulative, year, week)
             print("Postprocessing...")
             strategy.postprocessor.postprocess(year, week)
 
@@ -804,9 +837,17 @@ def _predict_and_postprocess(strategy, cfg, data_cumulative, year, week, save_ou
                     week,
                     strategy.numerus_fixus_list,
                     strategy.final_academic_week,
+                    cwf_params=_cwf_params_of(strategy),
                 )
 
     strategy.postprocessor.ready_new_data()
+
+
+def _cwf_params_of(strategy) -> dict:
+    """``model_config.cwf_params`` van de strategy-configuratie (leeg als afwezig)."""
+    return (getattr(strategy, "configuration", {}) or {}).get("model_config", {}).get(
+        "cwf_params"
+    ) or {}
 
 
 def _save_results(strategy, cfg):

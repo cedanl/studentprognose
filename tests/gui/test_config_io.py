@@ -100,3 +100,14 @@ def test_excluded_years_ignores_rules_without_year():
 
 def test_excluded_years_empty_input():
     assert config_io.excluded_years([]) == []
+
+
+def test_validate_config_reports_invalid_cwf_params():
+    config = load_defaults()
+    config["model_config"]["cwf_params"]["confidence_level"] = 2
+    errors = config_io.validate_config(config)
+    assert any("confidence_level" in e for e in errors)
+
+
+def test_validate_config_accepts_default_cwf_params():
+    assert config_io.validate_config(load_defaults()) == []

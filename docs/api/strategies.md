@@ -23,3 +23,13 @@
       members:
         - CombinedStrategy
         - predict_nr_of_students
+
+## CWF
+
+::: studentprognose.strategies.cwf
+    options:
+      members:
+        - CWFStrategy
+        - build_cwf_history
+        - redistribute_unknown_origin
+        - apply_numerus_fixus_caps

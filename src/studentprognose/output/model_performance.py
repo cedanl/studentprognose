@@ -65,6 +65,7 @@ MODEL_LABELS: dict[str, str] = {
     "SARIMA_cumulative": "XGBoost (cumulatief)",
     "SARIMA_individual": "Individueel model",
     "Prognose_ratio": "Ratiomodel",
+    "Prognose_cwf": "CWF-model",
     NAIVE: NAIVE_LABEL,
 }
 SHORT_LABELS: dict[str, str] = {
@@ -74,6 +75,7 @@ SHORT_LABELS: dict[str, str] = {
     "SARIMA_cumulative": "XGBoost",
     "SARIMA_individual": "Individueel",
     "Prognose_ratio": "Ratio",
+    "Prognose_cwf": "CWF",
     NAIVE: "Naïef",
 }
 
@@ -83,12 +85,14 @@ SHORT_LABELS: dict[str, str] = {
 TRACK_MODELS: dict[str, list[str]] = {
     "cumulative": ["SARIMA_cumulative", "Prognose_ratio"],
     "individual": ["SARIMA_individual"],
+    "cwf": ["Prognose_cwf"],
     "final": [
         "Weighted_ensemble_prediction",
         "Ensemble_prediction",
         "SARIMA_cumulative",
         "SARIMA_individual",
         "Prognose_ratio",
+        "Prognose_cwf",
     ],
 }
 # Standaard (en terugwaarts compatibel): het cumulatieve spoor.

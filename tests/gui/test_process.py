@@ -72,3 +72,10 @@ def test_build_run_args_skip_zero_omitted():
     from gui.process import build_run_args
 
     assert "-sk" not in build_run_args(skip_years=0, yes=False)
+
+
+def test_build_run_args_cwf():
+    from gui.process import build_run_args
+
+    args = build_run_args(dataset="CWF")
+    assert args[:2] == ["-d", "cwf"]

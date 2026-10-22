@@ -3,7 +3,7 @@
 De tool schrijft je resultaten naar `data/output/`. Het belangrijkste bestand is **`output_first-years_{modus}.xlsx`** — de prognose per opleiding.
 
 !!! abstract "In het kort"
-    - **Waar staat mijn prognose?** In `output_first-years_{modus}.xlsx`, kolom `Ensemble_prediction` (of `SARIMA_cumulative` bij alleen `-d c`).
+    - **Waar staat mijn prognose?** In `output_first-years_{modus}.xlsx`, kolom `Ensemble_prediction` (of `SARIMA_cumulative` bij alleen `-d c`, `Prognose_cwf` bij `-d cwf`).
     - **Kan ik hem vertrouwen?** Liggen de modellen dicht bij elkaar en is de historische fout (`MAE`/`MAPE`) klein? Zie [Wanneer is een prognose betrouwbaar?](#wanneer-is-een-prognose-betrouwbaar).
     - **Wat betekent een getal?** Zie [Kolomdefinities](#kolomdefinities). Onbekende term? Zie [Begrippen](begrippen.md).
 
@@ -19,7 +19,7 @@ De tool schrijft je resultaten naar `data/output/`. Het belangrijkste bestand is
 | `output_volume_{modus}.xlsx` | Eindresultaat | Totaal studentvolume-voorspellingen (alleen bij `-sy v`) |
 | `_totaal_{studentjaar}_{modus}.xlsx` | Audittrail | Doorlopend bestand waar elke run zijn rijen aan toevoegt. Wordt nooit als input ingelezen. Zie [Audittrail](#audittrail-_totaal_xlsx). |
 
-`{modus}` is `cumulatief`, `individueel` of `beide`, afhankelijk van de gebruikte `-d` vlag.
+`{modus}` is `cumulatief`, `individueel`, `beide` of `cwf`, afhankelijk van de gebruikte `-d` vlag.
 `{studentjaar}` is `first-years`, `higher-years` of `volume`, afhankelijk van `-sy`.
 
 ## Audittrail (`_totaal_*.xlsx`)
@@ -57,6 +57,23 @@ Elke rij in de output beschrijft een combinatie van **opleiding × herkomst × e
 
 Als `-d b` is gebruikt maar individuele data ontbreekt, zijn `SARIMA_individual` en `Ensemble_prediction` leeg — zie [bekende valkuil](aan-de-slag.md#bekende-valkuil-stille-modus-downgrade).
 
+### CWF-model (`-d cwf`)
+
+Bij `-d cwf` bevat de output geen SARIMA-, ratio- of ensemblekolommen, maar de kolommen van het [CWF-model](methodologie/cwf.md). Ze staan alleen op de rij van de voorspelweek.
+
+| Kolom | Omschrijving |
+|-------|-------------|
+| `Prognose_cwf` | Verwachte eindinstroom (heel getal) |
+| `cwf_ondergrens` / `cwf_bovengrens` | 95%-predictie-interval rond de prognose |
+| `cwf_betrouwbaarheid` | `Groen` (zeer waarschijnlijk solide), `Oranje` (bruikbare indicatie) of `Rood` (alleen een indicatie) |
+| `cwf_vulgraad` | Welk deel van de aanmeldpiek de opleiding in eerdere jaren op dit moment al had bereikt (0–1, alleen uit eerdere jaren berekend) |
+| `cwf_ratiofactor` | De gebruikte verhouding instroom / pijplijn (na shrinkage naar vergelijkbare opleidingen) |
+
+Een lege `Prognose_cwf` betekent dat er voor deze combinatie én voor vergelijkbare opleidingen geen enkele gerealiseerde instroom bekend is (bijvoorbeeld een examentype dat niet in de oktobertelling staat). De run meldt welke combinaties dat zijn.
+
+!!! warning "Intervallen niet optellen"
+    Het interval geldt per opleiding × herkomst × examentype. De grenzen van verschillende herkomsten optellen geeft een veel te breed interval voor de hele opleiding, omdat de fouten niet allemaal tegelijk dezelfde kant op gaan.
+
 ### Actuele aanmeldcijfers in de output
 
 De output bevat naast voorspellingen ook de actuele Studielink-cijfers voor het voorspelmoment:
@@ -93,6 +110,7 @@ Foutmaten zijn gebaseerd op **historische modelfouten** — hoe goed presteerde 
 | `MAPE_Prognose_ratio` | Gemiddelde procentuele fout van het ratio-model |
 | `MAPE_SARIMA_cumulative` | Gemiddelde procentuele fout van SARIMA cumulatief |
 | `MAPE_SARIMA_individual` | Gemiddelde procentuele fout van SARIMA individueel |
+| `MAE_Prognose_cwf` / `MAPE_Prognose_cwf` | Absolute en procentuele fout van het CWF-model (bij `-d cwf`) |
 
 **MAE** (Mean Absolute Error): gemiddeld aantal studenten waarmee het model afweek.
 Een MAE van 8 betekent: het model zat in het verleden gemiddeld 8 studenten naast de werkelijkheid.
@@ -121,6 +139,8 @@ Er is geen harde drempel, maar de volgende signalen helpen:
 - Vroeg in het jaar (vóór week 6) — de tijdreeks is dan erg kort
 - Het jaar na een uitzonderlijk jaar (COVID, beleidswijziging)
 
+Bij `-d cwf` geeft het model zelf al een onzekerheidsmaat: het interval (`cwf_ondergrens`–`cwf_bovengrens`) en het label (`cwf_betrouwbaarheid`). Een Rode prognose is een indicatie, geen planningsgetal.
+
 De individuele modelkolommen staan bewust naast `Ensemble_prediction`, zodat je kunt controleren of de modellen het eens zijn, kunt signaleren welk model structureel afwijkt, en de baseline (ratio-model) tegen de complexere modellen kunt afzetten. Zie [Ensemble](methodologie/ensemble.md) voor hoe de gewichten tot stand komen.
 
 ## Foutmaten en numerus-fixusopleidingen
@@ -141,6 +161,7 @@ Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren 
 |---|---|---|
 | **Individueel** (`individual/dashboard.html`) | `-d i` of `-d b`, zodra het individuele model voorspellingen heeft | Hoe goed voorspelt het individuele model? |
 | **Cumulatief** (`cumulative/dashboard.html`) | `-d c` of `-d b` | Hoe goed voorspelt het cumulatieve model? |
+| **CWF** (`cwf/dashboard.html`) | `-d cwf` | Hoe goed voorspelt het CWF-model, en hoe zeker is elke prognose? |
 | **Eindoverzicht** (`final/dashboard.html`) | Altijd | Wat is de prognose, en hoeveel vertrouwen verdient die? |
 
 Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. Alle pagina's hebben dezelfde opzet: een [herkomstfilter](#herkomstfilter-en-fout-naar-herkomst) bovenaan, kerncijfers, de fout naar opleidingsgrootte, examentype en herkomst, een tabel per opleiding met een **betrouwbaarheidslabel**, en (bij de modelpagina's) het verloop per opleiding. Elk model heeft op alle pagina's dezelfde kleur. De dashboards zijn zelfstandige HTML-bestanden (geen server of internet nodig) en openen in elke browser.
@@ -274,3 +295,13 @@ Een opleiding met een redelijke totale fout kan zo een herkomstgroep verbergen d
 Beschikbaar bij `-d i` of `-d b`, zodra het individuele model voorspellingen heeft. De opzet is gelijk aan het cumulatieve dashboard: herkomstfilter, kerncijfers, fout naar opleidingsgrootte, examentype en herkomst, fout per opleiding en de tabel met betrouwbaarheid.
 
 Het **verloop per opleiding** laat hier iets anders zien: het verwachte aantal inschrijvingen per week. Dat is de som van de inschrijfkansen die XGBoost per aanmelder berekent (tot en met de voorspelweek), doorgetrokken naar het eind van het seizoen met SARIMA. Rechts staan de werkelijke instroom van eerdere jaren (★) en de voorspelde instroom (◆).
+
+### CWF-dashboard (`cwf/dashboard.html`)
+
+Bij `-d cwf`. Dezelfde opzet als de andere modelpagina's (kerncijfers, fout naar grootte, examentype en herkomst, tabel per opleiding, verloop van de aanmeldingen), met bovenaan een extra blok **Predictie-interval en betrouwbaarheid**:
+
+- **Tegels per label**: hoeveel prognoses Groen, Oranje en Rood zijn.
+- **Werkelijk binnen interval**: voor de jaren in de output met een bekende realisatie, hoe vaak de werkelijke instroom binnen het interval viel. Bij een goed gekalibreerd interval ligt dat rond de 95%.
+- **Tabel per opleiding × herkomst**: prognose, interval, label, vulgraad en (indien bekend) de werkelijke instroom. Rode prognoses staan bovenaan.
+
+Draai voor een eerlijke meting van het interval een backtest met `studentprognose benchmark -d cwf`.

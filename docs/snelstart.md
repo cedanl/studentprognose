@@ -37,14 +37,15 @@ Wat er op het scherm verschijnt:
 
   Bestand                                     Status    Nodig voor
   ──────────────────────────────────────────────────────────────────
-  data/input_raw/telbestanden                 ✓         -d cumulative, -d both
+  data/input_raw/telbestanden                 ✓         -d cumulative, -d both, -d cwf
   data/input_raw/individuele_aanmelddata.csv  ✓         -d individual, -d both
-  data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (optioneel)
+  data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (verplicht voor -d cwf, anders optioneel)
 
   Beschikbare modi:
     -d cumulative      ✓
     -d individual      ✓
     -d both            ✓
+    -d cwf             ✓
 
 ==== Processing raw input data ====
 [1/4] Rowbinding telbestanden...        → data/input/vooraanmeldingen_cumulatief.csv
@@ -93,6 +94,7 @@ studentprognose -d c -y 2024 --dashboard
 |---------|---------|
 | Mijn eigen data gebruiken | [Je data klaarzetten](je-data-voorbereiden.md) |
 | Begrijpen wat `-w`, `-y` en `-d` doen | [Draaien & CLI](aan-de-slag.md) |
+| Een prognose mét onzekerheidsmarge (`-d cwf`) | [CWF-model](methodologie/cwf.md) |
 | De output-cijfers interpreteren | [Output lezen](output-begrijpen.md) |
 | Mijn eigen instelling instellen | [Configuratie](configuratie.md) |
 | Weten hoe de modellen werken | [Methodologie](methodologie/index.md) |

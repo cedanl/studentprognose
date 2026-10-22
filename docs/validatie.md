@@ -15,14 +15,15 @@ Bij het starten van de validatie toont de pipeline een overzichtstabel met de st
 
   Bestand                                     Status    Nodig voor
   ──────────────────────────────────────────────────────────────────
-  data/input_raw/telbestanden                 ✓         -d cumulative, -d both
+  data/input_raw/telbestanden                 ✓         -d cumulative, -d both, -d cwf
   data/input_raw/individuele_aanmelddata.csv  ✗         -d individual, -d both
-  data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (optioneel, telbestand studenten)
+  data/input_raw/oktober_bestand.xlsx         ✓         studentaantallen (verplicht voor -d cwf, anders optioneel)
 
   Beschikbare modi:
     -d cumulative      ✓
     -d individual      ✗  individuele_aanmelddata.csv ontbreekt
     -d both            ✗  individuele_aanmelddata.csv ontbreekt
+    -d cwf             ✓
 ```
 
 De ✓ en ✗ symbolen worden in kleur weergegeven (groen/rood) als de terminal dat ondersteunt. Als alle bestanden aanwezig zijn, wordt de modi-sectie vervangen door een compacte bevestiging.
@@ -79,7 +80,7 @@ De data wordt automatisch gecorrigeerd. Overweeg de brondata te corrigeren om di
 
 ### Telbestand studenten (`data/input_raw/oktober_bestand.xlsx`)
 
-Telbestand met studentaantallen, door de instelling zelf aangeleverd — zie [Je data klaarzetten](je-data-voorbereiden.md#telbestand-studenten). De bestandsnaam heet historisch `oktober_bestand.xlsx`.
+Telbestand met studentaantallen, door de instelling zelf aangeleverd — zie [Je data klaarzetten](je-data-voorbereiden.md#telbestand-studenten). De bestandsnaam heet historisch `oktober_bestand.xlsx`. Voor `-d cwf` is dit bestand verplicht: het CWF-model rekent met de gerealiseerde instroom van eerdere jaren. Ontbreekt het, dan stopt de run met exitcode 1.
 
 | Controle | Type | Wat wordt gecheckt |
 |----------|------|-------------------|
@@ -183,7 +184,7 @@ Als een numerus-fixus-sleutel niet exact overeenkomt met een opleiding in je dat
 
 ## Post-prediction checks
 
-Nadat het ensemble zijn voorspellingen heeft opgeleverd, krijg je nog twee informatieve checks. Ze stoppen de pipeline **nooit** — je ziet alleen een waarschuwing in de console als de uitkomst opvalt.
+Nadat het ensemble (of bij `-d cwf` het CWF-model) zijn voorspellingen heeft opgeleverd, krijg je nog een paar informatieve checks. Ze stoppen de pipeline **nooit** — je ziet alleen een waarschuwing in de console als de uitkomst opvalt.
 
 | Check | Wat wordt gecheckt |
 |-------|-------------------|
@@ -193,10 +194,22 @@ Nadat het ensemble zijn voorspellingen heeft opgeleverd, krijg je nog twee infor
 
 Pre-master-rijen worden uitgesloten van de NF-cap-check: ze tellen niet mee als nieuwe eerstejaars.
 
+Bij `-d cwf` draaien dezelfde checks op `Prognose_cwf`, aangevuld met:
+
+| Check | Wat wordt gecheckt |
+|-------|-------------------|
+| Interval-consistentie | `cwf_ondergrens ≤ Prognose_cwf ≤ cwf_bovengrens`, ondergrens ≥ 0 en alles hele getallen |
+| Betrouwbaarheidslabel | `cwf_betrouwbaarheid` is `Groen`, `Oranje` of `Rood` |
+| Fysiek plafond | Bij een vulgraad ≥ `upper_bound_cap_fill_rate` ligt de bovengrens niet boven ongewogen aanmelders + inschrijvingen |
+
+Deze checks bewaken het model zelf: een waarschuwing hier wijst op een fout in de berekening, niet op een opvallende prognose.
+
+Zonder eigen historie of zonder enige gerealiseerde instroom (ook niet bij vergelijkbare opleidingen) meldt de CWF-run dat vóór het voorspellen, met één samenvattende waarschuwing per soort.
+
 De week-op-week-check slaat de eerste week van elke run over (geen vorige week beschikbaar) en week 39 (eerste week van het nieuwe aanmeldseizoen — de vorige week, 38, is het einde van het vorige seizoen en geen zinvolle referentie).
 
-!!! note "Alleen beschikbaar in combinatiemodus"
-    De post-prediction checks zijn alleen actief als de pipeline wordt gestart met `-d both` of `-d b`. In cumulatief-enkel (`-d c`) of individueel-enkel (`-d i`) modus bestaat de `Ensemble_prediction`-kolom niet en worden de checks stilzwijgend overgeslagen.
+!!! note "Alleen beschikbaar in combinatiemodus en bij `-d cwf`"
+    De post-prediction checks zijn actief bij `-d both` (op `Ensemble_prediction`) en bij `-d cwf` (op `Prognose_cwf`). In cumulatief-enkel (`-d c`) of individueel-enkel (`-d i`) modus bestaat geen van beide kolommen en worden de checks stilzwijgend overgeslagen.
 
 ## Drempels aanpassen
 

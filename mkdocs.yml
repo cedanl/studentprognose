@@ -107,6 +107,7 @@ nav:
     - XGBoost: methodologie/xgboost.md
     - Ratio-model: methodologie/ratio-model.md
     - Ensemble: methodologie/ensemble.md
+    - CWF-model: methodologie/cwf.md
     - Benchmarks: methodologie/benchmarks.md
   - Gevorderd & naslag:
     - Gevorderd gebruik: gevorderd-gebruik.md

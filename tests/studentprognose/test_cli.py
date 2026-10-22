@@ -177,6 +177,39 @@ class TestParseArgs:
         cfg = parse_args(["prog", "-d", "i"])
         assert cfg.data_option == DataOption.INDIVIDUAL
 
+    def test_dataset_cwf(self):
+        cfg = parse_args(["prog", "-d", "cwf"])
+        assert cfg.data_option == DataOption.CWF
+        assert cfg.dataset_specified is True
+
+    def test_dataset_default_stays_both(self):
+        cfg = parse_args(["prog"])
+        assert cfg.data_option == DataOption.BOTH_DATASETS
+        assert cfg.dataset_specified is False
+
+    def test_benchmark_accepts_cwf(self):
+        cfg = parse_args(["prog", "benchmark", "-d", "cwf"])
+        assert cfg.command == "benchmark"
+        assert cfg.data_option == DataOption.CWF
+
     def test_dataset_both(self):
         cfg = parse_args(["prog", "-d", "b"])
         assert cfg.data_option == DataOption.BOTH_DATASETS
+
+
+class TestCWFMainGuards:
+    """``main`` weigert combinaties die het CWF-model niet ondersteunt (exitcode 1)."""
+
+    def test_tune_with_cwf_exits_1(self):
+        from studentprognose.main import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(["prog", "tune", "-d", "cwf"])
+        assert exc.value.code == 1
+
+    def test_skipyears_with_cwf_exits_1(self):
+        from studentprognose.main import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(["prog", "-d", "cwf", "-sk", "1"])
+        assert exc.value.code == 1

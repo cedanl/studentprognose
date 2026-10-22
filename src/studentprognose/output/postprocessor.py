@@ -13,6 +13,18 @@ from studentprognose.utils.programme_key import merge_on_programme_key
 from studentprognose.models.ratio import predict_with_ratio as _predict_with_ratio
 from studentprognose.data.transforms import replace_latest_data
 
+# Outputkolommen van het CWF-spoor (zie strategies/cwf.py). Hier gedupliceerd
+# i.p.v. geïmporteerd om een circulaire import (strategies → postprocessor) te
+# vermijden; test_cwf bewaakt dat beide lijsten gelijk blijven.
+CWF_OUTPUT_COLUMNS = [
+    "Prognose_cwf",
+    "cwf_ondergrens",
+    "cwf_bovengrens",
+    "cwf_betrouwbaarheid",
+    "cwf_vulgraad",
+    "cwf_ratiofactor",
+]
+
 
 class PostProcessor:
     """Handles output preparation, ensemble calculation, error metrics, and file saving.
@@ -197,6 +209,10 @@ class PostProcessor:
         ]
         if skip_years > 0:
             columns_to_select = columns_to_select + ["Skip_prediction"]
+        # Het CWF-spoor levert geen SARIMA-kolommen maar eigen modelkolommen;
+        # de overige sporen leveren altijd de volledige lijst hierboven.
+        columns_to_select = [c for c in columns_to_select if c in self.data.columns]
+        columns_to_select += [c for c in CWF_OUTPUT_COLUMNS if c in self.data.columns]
         self.data = self.data[columns_to_select]
 
         if self.data_studentcount is not None:
@@ -460,6 +476,12 @@ class PostProcessor:
                 "Prognose_ratio",
                 "SARIMA_cumulative",
             ]
+        elif self.data_option == DataOption.CWF:
+            predictions = [
+                "Prognose_cwf",
+            ]
+        else:
+            raise ValueError(f"Onbekende data_option voor foutkolommen: {self.data_option}")
 
         predictions = [p for p in predictions if p in self.data.columns]
 

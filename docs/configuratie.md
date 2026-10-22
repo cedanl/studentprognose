@@ -49,7 +49,7 @@ Het bestand heeft de onderstaande secties. De kolom **Pas je aan?** geeft aan ho
 | `cumulative_input` | Zelden | Zet ruwe telbestanden om; staat standaard op het Studielink SQL-formaat. |
 | `validation` | Zelden | Overschrijft validatiedrempels; alleen wat afwijkt van de standaard. |
 | `runtime` | Zelden | Uitvoerparameters zoals het aantal CPU-cores. |
-| `model_config` | Zelden | Modelparameters (statusmapping, trainingsjaren, modelkeuze). |
+| `model_config` | Zelden | Modelparameters (statusmapping, trainingsjaren, modelkeuze) en de parameters van het CWF-model (`cwf_params`, zie [hieronder](#model_configcwf_params-het-cwf-model)). |
 | `excluded_data_points` | Zelden | Sluit bekende probleemjaren uit de trainingsdata; standaard leeg. |
 | `ensemble_weights` | Zelden | Weegt het individuele en cumulatieve model in het ensemble. |
 | `model_features` | Zelden | Bepaalt welke kolommen als features in de modellen gaan. |
@@ -151,6 +151,24 @@ De waarde in de demo-configuratie is Radboud-specifiek. **Vervang of maak deze l
 
 !!! tip "In de grafische interface bewerk je deze lijst via een kaart"
     Werk je via de [grafische interface](gui.md), dan biedt de tab **Geavanceerd** een kaart *Uitgesloten van combined-modus* met dezelfde zoekbare opleiding-keuzelijst (Isatcode of vrij getypte naam).
+
+## `model_config.cwf_params` — het CWF-model
+
+Alleen relevant als je met `-d cwf` het [CWF-model](methodologie/cwf.md) draait. De standaardwaarden zijn een goed startpunt. Twee sleutels zijn het waard om na te lopen voor je eigen instelling:
+
+- **`year_weight_overrides`**: zat er een uitzonderlijk jaar in je historie (bijv. een coronajaar)? Geef het een lager gewicht, bijv. `{"2021": 0.5}`.
+- **`predefined_priors`**: start er een nieuwe opleiding zonder historie? Geef de verwachte instroom per examentype en herkomst op. Zonder prior leunt de prognose volledig op vergelijkbare opleidingen en krijgt hij label Rood.
+
+```json
+"model_config": {
+    "cwf_params": {
+        "year_weight_overrides": { "2021": 0.5 },
+        "predefined_priors": { "34567": { "Bachelor": { "NL": 40, "EER": 10 } } }
+    }
+}
+```
+
+Alle parameters, met hun betekenis, staan in de [referentie](configuratie-referentie.md#cwf_params). Ongeldige waarden of onbekende sleutels stoppen de run met een foutmelding. In de [grafische interface](gui.md) bewerk je de belangrijkste parameters via de kaart *CWF-model*.
 
 ## Overige secties (referentie)
 

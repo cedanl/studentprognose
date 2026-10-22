@@ -42,7 +42,7 @@ def locate_cli() -> str:
 
 
 #: GUI-labels → CLI-codes voor dataset en cohort.
-DATASET_CODES = {"Individueel": "i", "Cumulatief": "c", "Beide": "b"}
+DATASET_CODES = {"Individueel": "i", "Cumulatief": "c", "Beide": "b", "CWF": "cwf"}
 COHORT_CODES = {"Eerstejaars": "f", "Hogerejaars": "h", "Volume": "v"}
 
 
@@ -65,7 +65,7 @@ def build_run_args(
     doorgegeven; de CLI zelf verwerkt bereiksyntaxis zoals ``10:20`` of ``10 : 20``.
 
     Args:
-        dataset: GUI-label (Individueel/Cumulatief/Beide) of ``None`` (default b).
+        dataset: GUI-label (Individueel/Cumulatief/Beide/CWF) of ``None`` (default b).
         cohort: GUI-label (Eerstejaars/Hogerejaars/Volume) of ``None``.
         years: Vrije tekst met jaartallen/bereiken (bijv. ``"2023 2024"``).
         weeks: Vrije tekst met weeknummers/bereiken (bijv. ``"1:38"``).

@@ -7,6 +7,7 @@ class DataOption(Enum):
     INDIVIDUAL = 1
     CUMULATIVE = 2
     BOTH_DATASETS = 3
+    CWF = 4
 
     @property
     def filename_suffix(self):
@@ -14,6 +15,7 @@ class DataOption(Enum):
             DataOption.INDIVIDUAL: "individueel",
             DataOption.CUMULATIVE: "cumulatief",
             DataOption.BOTH_DATASETS: "beide",
+            DataOption.CWF: "cwf",
         }[self]
 
 

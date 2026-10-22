@@ -16,6 +16,7 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_cumulative_new` | `""` | Optioneel nieuw cumulatief bestand; wordt ingemergt en daarna verwijderd — zie [waarschuwing](je-data-voorbereiden.md#bekende-valkuil-path_cumulative_new) |
 | `path_latest_cumulative` | `data/input/totaal_cumulatief.xlsx` | Historische cumulatieve voorspellingen (post-processing output) |
 | `path_latest_individual` | `data/input/totaal_individueel.xlsx` | Historische individuele voorspellingen (post-processing output) |
+| `path_latest_cwf` | `data/input/totaal_cwf.xlsx` | Eerdere CWF-output (optioneel); het label van vorige week geeft hysterese op het betrouwbaarheidslabel |
 | `path_ensemble_weights` | `data/input/ensemble_weights.xlsx` | Ensemble-gewichten per opleiding/herkomst/examentype |
 | `path_raw_october` | `data/input_raw/oktober_bestand.xlsx` | Telbestand studenten (ruwe bron, eigen levering instelling). De sleutel heet `_october` om historische redenen. |
 | `path_raw_telbestanden` | `data/input_raw/telbestanden` | Map met Studielink telbestanden |
@@ -211,6 +212,70 @@ Een verkeerde waarde laat de cumulatieve voorspelling crashen (de pipeline slice
 
 !!! warning "Kies de week waarin je data écht eindigt"
     Zet `36` alleen als je bron na week 36 niets meer levert. Loopt je data door tot week 38 (Studielink-telbestanden), dan belanden weken 37–38 (het eind van de aanmeldcyclus) aan het begin van het jaar. De instroomvoorspelling kan dan fors te hoog of te laag uitvallen. De pipeline waarschuwt hiervoor vóór elke voorspelling (zie [Validatie → Weekdekking en eindweek](validatie.md#weekdekking-en-eindweek)).
+
+### `cwf_params`
+
+Parameters van het [CWF-model](methodologie/cwf.md) (`-d cwf`). Alle sleutels zijn optioneel: een ontbrekende sleutel krijgt de standaardwaarde. Een onbekende sleutel, een verkeerd type of een waarde buiten het geldige bereik stopt de pipeline met een duidelijke foutmelding, zodat een tikfout niet stil op de standaard terugvalt.
+
+De meeste instellingen hoeven niets aan te passen. Deze sleutels zijn het meest relevant:
+
+| Sleutel | Standaard | Omschrijving |
+|---------|-----------|-------------|
+| `training_start_year` | `null` | Eerste collegejaar dat het model als historie gebruikt; `null` = `min_training_year` |
+| `year_weight_overrides` | `{}` | Extra gewicht per jaar, bijv. `{"2021": 0.5}` om een uitzonderlijk jaar minder mee te laten tellen |
+| `predefined_priors` | `{}` | Verwachte instroom voor nieuwe opleidingen zonder historie: `{"<opleiding>": {"<examentype>": {"<herkomst>": aantal}}}` |
+| `redistribute_unknown_origin` | `true` | Herkomst *Onbekend* gelijk verdelen over NL, EER en Niet-EER |
+| `confidence_level` | `0.95` | Nominale dekking van het predictie-interval |
+| `interval_min_half_width` | `2.0` | Het interval ligt aan elke kant minstens zoveel studenten van de prognose |
+| `upper_bound_cap_fill_rate` | `0.98` | Vanaf deze vulgraad ligt de bovengrens nooit boven ongewogen aanmelders + inschrijvingen |
+| `upper_bound_cap_exam_types` | `["Bachelor", "Master"]` | Examentypes waarvoor dat plafond geldt (bij pre-masters komt een deel van de instroom niet via een vooraanmelding binnen) |
+| `pool_shrinkage_k` | `3.0` | Aantal eigen jaren waarbij de eigen ratio en die van vergelijkbare opleidingen even zwaar wegen |
+| `mean_alpha` | `0.8` | Recency-decay van de ratio: gewicht `exp(-alpha · jaren terug)` |
+| `fill_rate_recency_alpha` | `0.8` | Recency-decay van de vulgraad over eerdere jaren |
+
+Het betrouwbaarheidslabel stel je in met:
+
+| Sleutel | Standaard | Omschrijving |
+|---------|-----------|-------------|
+| `reliability_orange_min_fill` | `0.2` | Onder deze vulgraad is het label altijd Rood |
+| `reliability_green_min_fill` | `0.9` | Groen kan pas vanaf deze vulgraad |
+| `reliability_min_own_years` | `3` | Minimaal aantal eigen backtestjaren voor Oranje of Groen |
+| `reliability_green_max_own_error` | `0.15` | Grootste eigen backtest-fout \|log(voorspeld/werkelijk)\| voor Groen (≈ 16%) |
+| `reliability_green_max_own_error_by_exam_type` | `{"Pre-master": 0.10}` | Strengere Groen-drempel per examentype |
+| `reliability_green_max_own_mean_error` | `0.075` | Recency-gewogen gemiddelde eigen fout voor Groen |
+| `reliability_red_min_own_error` | `0.7` | Boven deze grootste eigen fout is het label Rood (≈ factor 2) |
+| `reliability_*_leave_*_add` | `0.05` / `0.10` / `0.025` | Hysterese: hoeveel ruimer de drempel is als het label vorige week al Groen of Oranje was |
+
+??? note "Overige parameters (puntmodel en interval)"
+    | Sleutel | Standaard | Omschrijving |
+    |---------|-----------|-------------|
+    | `cv_lambda` | `0.3` | Schaal van de stabiliteit: `exp(-cv / cv_lambda)` |
+    | `max_history_years` | `4` | Aantal jaren waarbij de steekproefbetrouwbaarheid maximaal is |
+    | `ratio_tolerance` / `size_factor` | `0.15` / `2.0` | Hoe vergelijkbaar een pool-opleiding moet zijn (relatieve ratio, factor in grootte) |
+    | `max_group_programmes` | `15` | Maximaal aantal vergelijkbare opleidingen |
+    | `trend_r2_threshold` / `trend_damping` / `ratio_trend_damping` | `0.85` / `0.5` / `0.15` | Wanneer en hoeveel een trend wordt doorgetrokken (prior, ratio) |
+    | `outlier_z_threshold` / `min_relative_std` | `2.5` / `0.08` | Uitschieterdetectie voor de prior |
+    | `variance_alpha` | `0.15` | Recency-decay voor de spreiding |
+    | `ratio_floor` | `0.001` | Ondergrens voor ratio's vóór de log |
+    | `min_trusted_confidence` | `0.3` | Onder deze betrouwbaarheid krijgt het ratiosignaal naar rato minder gewicht |
+    | `margin_scale` | `1.6` | Verbreding van het foutinterval |
+    | `own_error_weight` | `5.0` | Gewicht van een eigen backtestfout t.o.v. een poolfout |
+    | `pool_outlier_quantile` / `pool_winsor_min_n` | `0.9` / `3` | Winsorisering van poolfouten |
+    | `cap_min_weight` / `cap_smooth` | `1.0` / `true` | Welke fouten de bovengrens van de marge mogen bepalen |
+    | `yoy_margin_scale` / `yoy_poisson_floor_z` / `yoy_absolute_weight` / `yoy_level_weight_count` | `1.0` / `1.96` / `0.5` / `5.0` | Het jaar-op-jaar-interval |
+    | `pool_min_candidates` / `pool_yoy_min_candidates` / `pool_floor_min_candidates` | `0` / `3` / `2` | Minimale omvang van de vergelijkingsgroep per onderdeel |
+    | `pool_only_blend_power` | `2.0` | Zonder eigen backtestfouten telt het poolfoutinterval pas laat in de cyclus mee |
+    | `own_error_recency` | `true` | Eigen fouten krijgen dezelfde recency-decay als de ratio's |
+    | `pool_spread_floor` | `1.0` | De spreiding wordt niet kleiner dan die van vergelijkbare opleidingen |
+
+```json
+"model_config": {
+    "cwf_params": {
+        "year_weight_overrides": { "2021": 0.5 },
+        "predefined_priors": { "34567": { "Bachelor": { "NL": 40, "EER": 10 } } }
+    }
+}
+```
 
 ## `cumulative_input` — UvA SQL-telbestand omzetten
 

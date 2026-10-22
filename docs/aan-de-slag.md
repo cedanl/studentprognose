@@ -4,7 +4,7 @@ Deze pagina legt uit wat de CLI-vlaggen doen en hoe je gerichte runs draait. Wil
 
 !!! abstract "In het kort"
     - `studentprognose` (zonder vlaggen) draait beide sporen op de laatste beschikbare week/jaar.
-    - `-w` = **peilweek**, `-y` = **collegejaar**, `-d` = welk(e) **spoor/sporen**.
+    - `-w` = **peilweek**, `-y` = **collegejaar**, `-d` = welk(e) **spoor/sporen** of het **CWF-model** (`-d cwf`).
     - Output staat in `data/output/`. Zie [Output lezen](output-begrijpen.md).
 
 ## Projectmap aanmaken
@@ -49,6 +49,7 @@ Laat je `-w` en `-y` weg, dan kiest de pipeline automatisch de **laatste beschik
 studentprognose                    # beide sporen, laatste week/jaar (standaard)
 studentprognose -w 10 -y 2024      # specifieke week en jaar
 studentprognose -d c               # alleen cumulatief spoor
+studentprognose -d cwf             # CWF-model: prognose + interval + betrouwbaarheidslabel
 studentprognose --noetl            # data al eerder verwerkt — sla ETL over
 ```
 
@@ -61,7 +62,7 @@ Alle opties: `studentprognose --help`.
 | Commando | Beschrijving |
 |----------|-------------|
 | `init` | Maak een nieuwe projectmap aan met configuratie en mappenstructuur |
-| `benchmark` | Vergelijk alternatieve modellen (`-d c` of `-d i` verplicht, zie [Benchmarks](methodologie/benchmarks.md)) |
+| `benchmark` | Vergelijk alternatieve modellen (`-d c`, `-d i` of `-d cwf` verplicht, zie [Benchmarks](methodologie/benchmarks.md)) |
 | `tune` | Stem het cumulatieve spoor af (`-d c` verplicht, zie [Hyperparameter tuning](gevorderd-gebruik.md#hyperparameter-tuning)) |
 
 ### Vlaggen
@@ -70,12 +71,12 @@ Alle opties: `studentprognose --help`.
 |------|---------|-----------|-------------|
 | `-w` | weeknummer(s) | laatste week in data | Voorspelweek(en), bijv. `-w 10` of `-w 8:12` |
 | `-y` | jaar(en) | laatste jaar in data | Voorspeljaar(en), bijv. `-y 2024` of `-y 2023 2024` |
-| `-d` | `b` / `c` / `i` | `b` | Dataset: `both`, `cumulative`, `individual` |
+| `-d` | `b` / `c` / `i` / `cwf` | `b` | Dataset of model: `both`, `cumulative`, `individual` of `cwf` (zie [hieronder](#-d-cwf-het-cwf-model)) |
 | `-sy` | `f` / `h` / `v` | `f` | Studentjaar: `first-years`, `higher-years`, `volume` |
 | `-c` | pad | `configuration/configuration.json` | Configuratiebestand |
 | `-f` | pad | `configuration/filtering/base.json` | Filterbestand |
 | `--institution` | instellingscode(s) | alle instellingen | Beperk de teldata tot één of meer instellingen — zie [hieronder](#-institution) |
-| `-sk` | getal | `0` | Skip N jaren (backtesting) |
+| `-sk` | getal | `0` | Skip N jaren (backtesting); niet met `-d cwf` |
 | `--noetl` | — | uit | Sla ETL én validatie over |
 | `--yes` | — | uit | Sla validatieprompts over (voor CI/CD) |
 | `--no-warnings` | — | uit | Onderdruk UserWarning-meldingen (historisch realisme, ontbrekende lag-fallback) |
@@ -101,6 +102,20 @@ De vlag overschrijft de config-key [`institution_filter`](configuratie.md#instit
 
 !!! warning "Standaard reken je over álle instellingen"
     Zonder filter rekent het cumulatieve spoor over de héle landelijke teldata — zelden wat je wilt. De run print bij elke start één regel met de scope, zodat je nooit ongemerkt over de verkeerde (of alle) instellingen rekent. Zet daarom je eigen Brincode vast via [`institution_filter`](configuratie.md#institution_filter-beperk-de-teldata-tot-een-of-meer-instellingen).
+
+### `-d cwf`: het CWF-model
+
+`-d cwf` draait het [CWF-model](methodologie/cwf.md) (confidence-weighted forecast) als zelfstandig derde spoor. Het voorspelt de eindinstroom rechtstreeks uit de telbestanden en geeft per prognose een 95%-predictie-interval en een betrouwbaarheidslabel (Groen/Oranje/Rood).
+
+```bash
+studentprognose -d cwf -w 16 -y 2025 --dashboard
+studentprognose benchmark -d cwf -w 16           # backtest per afgerond collegejaar
+```
+
+- Nodig: telbestanden én het oktoberbestand (studentaantallen). Individuele aanmelddata is niet nodig.
+- Output: `data/output/output_first-years_cwf.xlsx` met de kolommen `Prognose_cwf`, `cwf_ondergrens`, `cwf_bovengrens`, `cwf_betrouwbaarheid`, `cwf_vulgraad` en `cwf_ratiofactor`. Zie [Output lezen](output-begrijpen.md#cwf-model-d-cwf).
+- `-d both` verandert niet: CWF zit niet in het ensemble.
+- Niet ondersteund: `-sk` (het model backtest zichzelf al zonder look-ahead; gebruik `benchmark -d cwf`) en `tune`.
 
 ## De tool vanuit Python of de cloud aansturen
 

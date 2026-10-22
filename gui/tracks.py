@@ -1,4 +1,4 @@
-"""Uitleg over de drie voorspelsporen — één bron van waarheid.
+"""Uitleg over de voorspelsporen — één bron van waarheid.
 
 Gebruikt door de startpagina (uitlegkaart), de pipeline-runner en de benchmark-
 tab (tooltips), zodat de omschrijving overal identiek is. Pure data, geen NiceGUI.
@@ -30,7 +30,7 @@ class Track:
     short: str
 
 
-#: De drie sporen, in weergavevolgorde.
+#: De sporen, in weergavevolgorde.
 TRACKS: list[Track] = [
     Track(
         "Cumulatief",
@@ -50,6 +50,13 @@ TRACKS: list[Track] = [
         "combineert het cumulatieve en individuele spoor tot één "
         "ensemble-voorspelling — meestal het nauwkeurigst.",
     ),
+    Track(
+        "CWF",
+        "verified",
+        "voorspelt de eindinstroom uit de aanmeldingen met een recency-gewogen "
+        "ratio t.o.v. eerdere jaren, inclusief predictie-interval en "
+        "betrouwbaarheidslabel (Groen/Oranje/Rood).",
+    ),
 ]
 
 
@@ -62,7 +69,7 @@ def dataset_tooltip(labels: list[str] | None = None) -> str:
     """Bouw een tooltip die de gevraagde sporen uitlegt (één regel per spoor).
 
     Args:
-        labels: Welke sporen op te nemen (default: alle drie).
+        labels: Welke sporen op te nemen (default: alle).
     """
     chosen = TRACKS if labels is None else [t for t in TRACKS if t.label in labels]
     lines = [f"{t.label}: {t.short}" for t in chosen]

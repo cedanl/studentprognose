@@ -71,6 +71,15 @@ De interface leidt je langs vijf stappen, in volgorde:
 4. **Uitvoeren** — start de voorspelling en volg de voortgang live.
 5. **Resultaten** — bekijk een overzicht van de voorspellingen.
 
+In stap 1 kies je ook de **modus**: *Cumulatief*, *Individueel*, *Beide* of
+*CWF*. De modus bepaalt welke bestanden je moet uploaden. Voor *CWF* zijn dat de
+telbestanden en het oktober-bestand; individuele aanmelddata is niet nodig. Op de
+**Uitvoeren**-pagina kies je dezelfde vier opties in de keuzelijst *Dataset*
+(*CWF* = `-d cwf`). Bij een CWF-run toont de **Resultaten**-pagina per opleiding
+ook het predictie-interval en het betrouwbaarheidslabel (Groen/Oranje/Rood); de
+detailgrafiek van een opleiding tekent het interval als foutbalk. Zie
+[CWF-model](methodologie/cwf.md) voor wat de labels betekenen.
+
 Nieuwe gebruikers volgen deze stappen van boven naar beneden; de stap-indicator
 bovenaan toont waar je bent. Terugkerende gebruikers springen via de zijbalk
 direct naar de gewenste pagina. Stappen die een project vereisen zijn
@@ -145,6 +154,13 @@ het JSON-tabblad te bewerken waren:
 - **Modelkeuze** bevat naast de drie modelkeuzes ook het **vroegste
   trainingsjaar** (`min_training_year`) — de ondergrens voor het
   traindata-bereik dat de Uitvoeren-pagina hierboven beschrijft.
+- **CWF-model** bewerkt de belangrijkste parameters van het CWF-model
+  (`model_config.cwf_params`): de betrouwbaarheid en minimale breedte van het
+  interval, de shrinkage naar vergelijkbare opleidingen, de recency-alpha, de
+  drempels van het betrouwbaarheidslabel, het eerste trainingsjaar en het
+  verdelen van herkomst *Onbekend*. De overige CWF-parameters (bijv.
+  `predefined_priors` en `year_weight_overrides`) staan in het tabblad **JSON**.
+  Ongeldige waarden worden bij het opslaan geweigerd met een melding.
 - **Ensemble-uitzondering** (`ensemble_override_cumulative`) en **Uitgesloten
   van combined-modus** (`exclude_from_combined`) gebruiken dezelfde zoekbare
   opleiding-keuzelijst als *Filteren* en *Numerus fixus*, met dit verschil: je
@@ -174,7 +190,14 @@ laatst opslaat wint.
 
 Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de
-gevonden parameters met één klik naar de configuratie kopieert.
+gevonden parameters met één klik naar de configuratie kopieert. Kies je bij de
+benchmark de dataset *CWF*, dan draait een backtest van het CWF-model per
+afgerond collegejaar en zet de tabel het CWF-model af tegen de naïeve
+voorspelling (instroom van vorig jaar).
+
+De pagina **Methodologie** (via de startpagina) beschrijft alle vier de sporen en
+toont ze in het stroomdiagram; het CWF-model staat daar als eigen band die direct
+naar de voorspelde instroom loopt.
 
 ## Wanneer gebruik je wat?
 

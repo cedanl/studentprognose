@@ -1,7 +1,7 @@
-"""Methodologie-pagina: het interactieve drie-sporen-schema.
+"""Methodologie-pagina: het interactieve sporen-schema.
 
 Bereikbaar via de "Methodologie"-knop op de startpagina. Toont de flow van de
-drie voorspelsporen; hover geeft korte uitleg, klik op een spoor opent de
+voorspelsporen; hover geeft korte uitleg, klik op een spoor opent de
 uitgebreide methodologie-documentatie.
 """
 
@@ -50,6 +50,20 @@ _TRACK_DETAILS: list[tuple[str, str, str | None, str, str]] = [
         "samenstelling. Het gewogen gemiddelde is aanpasbaar via de configuratie. "
         "Kies dit spoor tenzij je bewust één model wil isoleren.",
     ),
+    (
+        "verified",
+        "CWF",
+        None,
+        "Voorspelt de eindinstroom rechtstreeks uit de aanmeldingen, met een "
+        "predictie-interval en een betrouwbaarheidslabel per prognose.",
+        "Het confidence-weighted forecast-model vermenigvuldigt de huidige "
+        "aanmeldingen met een recency-gewogen ratio uit eerdere jaren en weegt dat "
+        "af tegen de instroom van vorig jaar, afhankelijk van hoe ver de "
+        "aanmeldcyclus is. Opleidingen met weinig historie lenen van vergelijkbare "
+        "opleidingen. Het label (Groen/Oranje/Rood) vertelt hoe goed het model het "
+        "op dit moment van het jaar in het verleden deed. Gebaseerd op het model "
+        "van Radboud Institutional Research.",
+    ),
 ]
 
 
@@ -62,11 +76,12 @@ def create() -> None:
         A = theme.ACCENT
         with page_shell(active="/methodologie", title="Methodologie", show_stepper=False):
 
-            # ── Drie voorspelsporen — tekstuele uitleg ────────────────────────
+            # ── Voorspelsporen — tekstuele uitleg ─────────────────────────────
             section_title(
-                "Drie voorspelsporen",
-                "Kies hoe de tool instroom voorspelt — of combineer alles in één "
-                "ensemble.",
+                "Voorspelsporen",
+                "Kies hoe de tool instroom voorspelt — combineer cumulatief en "
+                "individueel in één ensemble, of draai het CWF-model met interval "
+                "en betrouwbaarheidslabel.",
             )
             with ui.card().classes("w-full"):
                 with ui.column().classes("w-full gap-0"):
