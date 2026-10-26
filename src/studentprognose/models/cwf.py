@@ -14,8 +14,7 @@ eigen historie wordt ``R`` naar vergelijkbare opleidingen ("de pool")
 getrokken. Het predictie-interval staat in :mod:`studentprognose.models.cwf_interval`.
 
 Gebaseerd op het model van Radboud Institutional Research
-(https://github.com/radboudir/studentprognose, MIT-licentie,
-© 2026 Radboud Institutional Research).
+(MIT-licentie, © 2026 Radboud Institutional Research; zie ``NOTICE``).
 """
 
 from __future__ import annotations

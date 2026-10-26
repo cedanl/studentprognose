@@ -174,7 +174,7 @@ studentprognose tune -d c -w 12                # stem hyperparameters af (cumula
 | **Beide** | `b` | Beide | Ensemble van het cumulatieve en individuele spoor |
 | **CWF** | `cwf` | Telbestanden + oktobertelling | Eindinstroom uit de aanmeldingen met een recency-gewogen ratio, inclusief **95%-predictie-interval** en **betrouwbaarheidslabel** (Groen/Oranje/Rood) |
 
-Het [CWF-model](https://cedanl.github.io/studentprognose/methodologie/cwf/) (confidence-weighted forecast) is gebaseerd op het model van Radboud Institutional Research ([radboudir/studentprognose](https://github.com/radboudir/studentprognose), MIT) en draait los van het ensemble.
+Het [CWF-model](https://cedanl.github.io/studentprognose/methodologie/cwf/) (confidence-weighted forecast) is gebaseerd op het model van Radboud Institutional Research (MIT-licentie) en draait los van het ensemble.
 
 Naast voorspellen kun je met het `benchmark`-subcommando alternatieve ML-modellen vergelijken op je eigen data:
 
@@ -245,7 +245,7 @@ Zie [`doc/PIPELINE.md`](doc/PIPELINE.md) voor de gedetailleerde end-to-end pipel
 
 ## 📜 Licentie en bronvermelding
 
-Studentprognose is uitgebracht onder de [MIT-licentie](LICENSE). Het CWF-model is gebaseerd op het model van Radboud Institutional Research ([radboudir/studentprognose](https://github.com/radboudir/studentprognose), MIT-licentie); zie [`NOTICE`](NOTICE).
+Studentprognose is uitgebracht onder de [MIT-licentie](LICENSE). Het CWF-model is gebaseerd op het model van Radboud Institutional Research (MIT-licentie); zie [`NOTICE`](NOTICE).
 
 ---
 

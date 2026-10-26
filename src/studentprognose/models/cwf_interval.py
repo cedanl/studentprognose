@@ -13,8 +13,7 @@ Vroeg in de aanmeldcyclus domineert het jaar-op-jaar-interval (de ratio heeft
 dan weinig signaal), later het foutinterval.
 
 Gebaseerd op het model van Radboud Institutional Research
-(https://github.com/radboudir/studentprognose, MIT-licentie,
-© 2026 Radboud Institutional Research).
+(MIT-licentie, © 2026 Radboud Institutional Research; zie ``NOTICE``).
 """
 
 from __future__ import annotations

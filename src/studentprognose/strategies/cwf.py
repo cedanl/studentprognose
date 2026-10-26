@@ -7,8 +7,7 @@ berekenen), bouwt per combinatie de trainingshistorie en vergelijkingspool, en
 past de nabewerking toe (plafond, minimale intervalbreedte, numerus fixus).
 
 Gebaseerd op het model van Radboud Institutional Research
-(https://github.com/radboudir/studentprognose, MIT-licentie,
-© 2026 Radboud Institutional Research).
+(MIT-licentie, © 2026 Radboud Institutional Research; zie ``NOTICE``).
 """
 
 from __future__ import annotations
