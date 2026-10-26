@@ -112,6 +112,70 @@ def _add_engineered_features(
     return full_data
 
 
+def _cast_string_to_float(data: pd.DataFrame, key: str) -> pd.DataFrame:
+    if pd.api.types.is_string_dtype(data[key].dtype):
+        data[key] = data[key].str.replace(".", "")
+        data[key] = data[key].str.replace(",", ".")
+    data[key] = pd.to_numeric(data[key], errors="coerce")
+    data[key] = data[key].astype("float64")
+    return data
+
+
+def prepare_cumulative_data(data: pd.DataFrame) -> pd.DataFrame:
+    """Breng de ruwe cumulatieve vooraanmelddata naar het formaat van de modellen.
+
+    Gedeeld door het cumulatieve spoor en het CWF-model: castet de numerieke
+    kolommen, hernoemt de bronkolommen, normaliseert de programmesleutel, houdt
+    alleen eerstejaars (``Hogerejaars == "Nee"``, Pre-master altijd) over en
+    aggregeert naar opleiding × herkomst × examentype × faculteit × jaar × week.
+
+    Args:
+        data: Cumulatieve data zoals ``load_data`` hem oplevert.
+
+    Returns:
+        Een DataFrame met de kolommen ``Weeknummer``, ``Collegejaar``,
+        ``Faculteit``, ``Examentype``, ``Herkomst``, ``Croho groepeernaam`` en de
+        vier aanmeldkolommen.
+    """
+    data = _cast_string_to_float(data, "Ongewogen vooraanmelders")
+    data = _cast_string_to_float(data, "Gewogen vooraanmelders")
+    data = _cast_string_to_float(data, "Aantal aanmelders met 1 aanmelding")
+    data = _cast_string_to_float(data, "Inschrijvingen")
+
+    data = data.rename(
+        columns={
+            "Type hoger onderwijs": "Examentype",
+            "Groepeernaam Croho": "Croho groepeernaam",
+        }
+    )
+
+    # Croho groepeernaam is in het legacy-formaat een leesbare string ("B
+    # Psychologie"); bij het UvA SQL-formaat is het (voorlopig, #232) de
+    # numerieke Isatcode. Normaliseer naar één canoniek dtype (Int64 voor
+    # isatcodes, string voor namen) zodat downstream-merges op deze sleutel
+    # (ratio-model, student_count, audittrail) en .isin-filters niet op
+    # gemengde types struikelen. Zie utils.programme_key.
+    data["Croho groepeernaam"] = normalize_programme_series(data["Croho groepeernaam"])
+
+    data.loc[(data["Examentype"] == "Pre-master"), "Hogerejaars"] = "Nee"
+    data = data[data["Hogerejaars"] == "Nee"]
+
+    data = (
+        data.groupby([
+            "Collegejaar", "Croho groepeernaam", "Faculteit",
+            "Examentype", "Herkomst", "Weeknummer",
+        ])
+        .sum(numeric_only=False)
+        .reset_index()
+    )
+    return data[[
+        "Weeknummer", "Collegejaar", "Faculteit", "Examentype",
+        "Herkomst", "Croho groepeernaam", "Gewogen vooraanmelders",
+        "Ongewogen vooraanmelders", "Aantal aanmelders met 1 aanmelding",
+        "Inschrijvingen",
+    ]]
+
+
 class CumulativeStrategy(PredictionStrategy):
     def __init__(self, data_cumulative, data_studentcount, configuration,
                  data_latest, ensemble_weights, cwd, data_option, ci_test_n):
@@ -158,61 +222,13 @@ class CumulativeStrategy(PredictionStrategy):
         return {"cumulatief": self.data_cumulative[col]}
 
     def preprocess(self):
-        data = self.data_cumulative
-
-        data = self._cast_string_to_float(data, "Ongewogen vooraanmelders")
-        data = self._cast_string_to_float(data, "Gewogen vooraanmelders")
-        data = self._cast_string_to_float(data, "Aantal aanmelders met 1 aanmelding")
-        data = self._cast_string_to_float(data, "Inschrijvingen")
-
-        data = data.rename(
-            columns={
-                "Type hoger onderwijs": "Examentype",
-                "Groepeernaam Croho": "Croho groepeernaam",
-            }
-        )
-
-        # Croho groepeernaam is in het legacy-formaat een leesbare string ("B
-        # Psychologie"); bij het UvA SQL-formaat is het (voorlopig, #232) de
-        # numerieke Isatcode. Normaliseer naar één canoniek dtype (Int64 voor
-        # isatcodes, string voor namen) zodat downstream-merges op deze sleutel
-        # (ratio-model, student_count, audittrail) en .isin-filters niet op
-        # gemengde types struikelen. Zie utils.programme_key.
-        data["Croho groepeernaam"] = normalize_programme_series(data["Croho groepeernaam"])
-
-        data.loc[(data["Examentype"] == "Pre-master"), "Hogerejaars"] = "Nee"
-        data = data[data["Hogerejaars"] == "Nee"]
-
-        data = (
-            data.groupby([
-                "Collegejaar", "Croho groepeernaam", "Faculteit",
-                "Examentype", "Herkomst", "Weeknummer",
-            ])
-            .sum(numeric_only=False)
-            .reset_index()
-        )
-        data = data[[
-            "Weeknummer", "Collegejaar", "Faculteit", "Examentype",
-            "Herkomst", "Croho groepeernaam", "Gewogen vooraanmelders",
-            "Ongewogen vooraanmelders", "Aantal aanmelders met 1 aanmelding",
-            "Inschrijvingen",
-        ]]
-
-        self.data_cumulative = data.sort_values(
-            by=["Croho groepeernaam", "Herkomst", "Collegejaar", "Weeknummer"]
-        )
-        self.data_cumulative = data
+        self.data_cumulative = prepare_cumulative_data(self.data_cumulative)
         self.data_cumulative_backup = self.data_cumulative
 
         return self.data_cumulative
 
     def _cast_string_to_float(self, data, key):
-        if pd.api.types.is_string_dtype(data[key].dtype):
-            data[key] = data[key].str.replace(".", "")
-            data[key] = data[key].str.replace(",", ".")
-        data[key] = pd.to_numeric(data[key], errors="coerce")
-        data[key] = data[key].astype("float64")
-        return data
+        return _cast_string_to_float(data, key)
 
     def predict_nr_of_students(self, predict_year, predict_week, skip_years=0):
         self.data_cumulative = self.data_cumulative_backup.copy(deep=True)

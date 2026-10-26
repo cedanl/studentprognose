@@ -193,7 +193,12 @@ _MODE_OPTS: list[tuple[str, str, str, str, str, bool]] = [
     ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden",       True),
     ("individual", "Individueel", "person",    "-d individual", "Alleen aanmelddata",         False),
     ("both",       "Beide",       "bolt",      "-d both",       "Telbestanden + aanmelddata", False),
+    ("cwf",        "CWF",         "verified",  "-d cwf",        "Telbestanden · met interval", False),
 ]
+
+# Modi die de telbestanden resp. de individuele aanmelddata nodig hebben.
+_TEL_MODES = ("cumulative", "both", "cwf")
+_IND_MODES = ("individual", "both")
 
 
 def _coverage_html(cov: TelCoverage) -> str:
@@ -1231,7 +1236,8 @@ class _WizardView:
             self._project_dir = os.path.join(
                 os.path.expanduser("~"), "tmp", f"studentprognose{stamp}"
             )
-        self._mode: str = "cumulative"
+        # Een eerder in deze sessie gekozen modus blijft staan bij terugkeer.
+        self._mode: str = STATE.wizard_mode or "cumulative"
         self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
@@ -1571,7 +1577,7 @@ class _WizardView:
     def _refresh_overlap(self) -> None:
         """Toon overlap-visualisatie zodra zowel telbestanden als oktober geldig zijn."""
         self._overlap_slot.clear()
-        if self._mode not in ("cumulative", "both"):
+        if self._mode not in _TEL_MODES:
             return
         cov = compute_tel_coverage(self._zone_tel._results)
         okt_result = next(iter(self._zone_okt._results.values()), None)
@@ -1584,7 +1590,10 @@ class _WizardView:
     # ── Modus-logica ────────────────────────────────────────────────────────
 
     def _select_mode(self, mode: str) -> None:
+        from gui.pages.run import remember_wizard_mode
+
         self._mode = mode
+        remember_wizard_mode(mode)
         self._apply_mode()
 
     def _apply_mode(self) -> None:
@@ -1600,8 +1609,8 @@ class _WizardView:
             else:
                 card.style("border-radius: 8px; border: 2px solid #e8e8e8;")
 
-        needs_tel = self._mode in ("cumulative", "both")
-        needs_ind = self._mode in ("individual", "both")
+        needs_tel = self._mode in _TEL_MODES
+        needs_ind = self._mode in _IND_MODES
 
         self._tel_wrapper.set_visibility(needs_tel)
         self._ind_wrapper.set_visibility(needs_ind)
@@ -1618,8 +1627,8 @@ class _WizardView:
         ind_ok = self._zone_ind.has_valid
         okt_ok = self._zone_okt.has_valid
 
-        needs_tel = self._mode in ("cumulative", "both")
-        needs_ind = self._mode in ("individual", "both")
+        needs_tel = self._mode in _TEL_MODES
+        needs_ind = self._mode in _IND_MODES
 
         # Oktober is altijd vereist (bevat de labels voor het model).
         ready = (

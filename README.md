@@ -148,8 +148,10 @@ studentprognose -w 10 : 20 -y 2023            # weekbereik
 studentprognose -d c                           # alleen cumulatief spoor
 studentprognose -d c --institution 21PC        # scoop de teldata op je eigen instelling
 studentprognose -y 2023 2024 -w 10 : 20 -d b  # meerdere jaren, beide sporen
+studentprognose -d cwf -w 16 -y 2025           # CWF-model: prognose + interval + betrouwbaarheidslabel
 
 studentprognose benchmark -d c -w 12           # vergelijk alternatieve modellen
+studentprognose benchmark -d cwf -w 12         # backtest van het CWF-model
 studentprognose tune -d c -w 12                # stem hyperparameters af (cumulatieve regressor)
 ```
 
@@ -157,11 +159,22 @@ studentprognose tune -d c -w 12                # stem hyperparameters af (cumula
 |------|-------------|--------|
 | `-w` | Voorspelweek(en) | weeknummers of bereik, bijv. `10 : 20` |
 | `-y` | Voorspeljaar(en) | bijv. `2024` of `2023 2024` |
-| `-d` | Dataset | `i`ndividual, `c`umulative, `b`oth (standaard) |
+| `-d` | Dataset / model | `i`ndividual, `c`umulative, `b`oth (standaard), `cwf` |
 | `--institution` | Beperk teldata tot instelling(en) | Brincode(s), bijv. `21PC`; standaard alle |
 | `--noetl` | Sla ETL over | als je al verwerkte data in `data/input/` hebt |
 | `--yes` | Sla interactieve prompts over | voor CI/CD en cron |
 | `--no-warnings` | Onderdruk UserWarning-meldingen | als bekende warnings de uitvoer onoverzichtelijk maken |
+
+### Modellen
+
+| Model | `-d` | Data | Wat je krijgt |
+|-------|------|------|---------------|
+| **Cumulatief** | `c` | Studielink-telbestanden | SARIMA-extrapolatie van de aanmeldcurve → XGBoost-regressor, plus het ratio-model |
+| **Individueel** | `i` | Individuele aanmelddata | Inschrijfkans per aanmelder (XGBoost-classifier), opgeteld en doorgetrokken met SARIMA |
+| **Beide** | `b` | Beide | Ensemble van het cumulatieve en individuele spoor |
+| **CWF** | `cwf` | Telbestanden + oktobertelling | Eindinstroom uit de aanmeldingen met een recency-gewogen ratio, inclusief **95%-predictie-interval** en **betrouwbaarheidslabel** (Groen/Oranje/Rood) |
+
+Het [CWF-model](https://cedanl.github.io/studentprognose/methodologie/cwf/) (confidence-weighted forecast) is gebaseerd op het model van Radboud Institutional Research ([radboudir/studentprognose](https://github.com/radboudir/studentprognose), MIT) en draait los van het ensemble.
 
 Naast voorspellen kun je met het `benchmark`-subcommando alternatieve ML-modellen vergelijken op je eigen data:
 
@@ -182,7 +195,7 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 | **individual** | Individuele (voor)aanmeldingen per student. Voedt het [individueel model](https://cedanl.github.io/studentprognose/methodologie/individueel/) (XGBoost classifier + SARIMA) en levert de `SARIMA_individual` voorspelling. |
 | **cumulative** | Aantal aanmeldingen per opleiding, herkomst, jaar, week en herinschrijving. Wordt gebruikt voor de SARIMA_cumulative voorspelling. Verkregen via Studielink. |
 | **latest** | Per opleiding, herkomst, jaar en week: aanmeldingen, voorspellingen en foutwaarden (MAE/MAPE). |
-| **student_count_first-years** | Werkelijk aantal eerstejaars studenten per jaar, opleiding en herkomst. |
+| **student_count_first-years** | Werkelijk aantal eerstejaars studenten per jaar, opleiding en herkomst. Verplicht voor `-d cwf`. |
 | **student_volume** | Werkelijk totaal aantal ingeschreven studenten per jaar, opleiding en herkomst (alleen nodig bij `-sy v`). |
 | **weighted_ensemble** | Gewichten per model voor de ensemble-voorspelling. |
 
@@ -193,6 +206,8 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 | **output_prelim.xlsx** | Voorlopige output met alle voorspellingen van de huidige run. |
 | **output_first-years.xlsx** | Volledige output met voorspellingen voor eerstejaars studenten. |
 | **output_volume.xlsx** | Volledige output met volume-voorspellingen (totaal). |
+
+Bij `-d cwf` heten de bestanden `output_first-years_cwf.xlsx` enz., met de kolommen `Prognose_cwf`, `cwf_ondergrens`, `cwf_bovengrens`, `cwf_betrouwbaarheid`, `cwf_vulgraad` en `cwf_ratiofactor`.
 
 ---
 
@@ -213,18 +228,24 @@ Zie de [documentatie](https://cedanl.github.io/studentprognose/aan-de-slag/#cli-
 
 **Modus-specifieke stappen** (vervolgen op de gedeelde stappen):
 
-| Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
-|------|------|---------------------|---------------------|---------------|
-| 7 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative |
-| 8 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` |
-| 9 | Classificatie | `models/xgboost_classifier` | — | `models/xgboost_classifier` |
-| 10 | Transformatie | `data/transforms` | — | `data/transforms` |
-| 11 | SARIMA | `models/sarima` (individual) | `models/sarima` → `data/transforms` | `models/sarima` (both) |
-| 12 | XGBoost regressor | — | `models/xgboost_regressor` | `models/xgboost_regressor` |
-| 13 | Ratio model | — | `models/ratio` | `models/ratio` |
-| 14 | Postprocessing + Opslaan | `output/postprocessor` | `output/postprocessor` | `output/postprocessor` |
+| Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) | CWF (`-d cwf`) |
+|------|------|---------------------|---------------------|---------------|----------------|
+| 7 | Preprocessing | `strategies/individual` | `strategies/cumulative` | individual → cumulative | `strategies/cumulative` → `strategies/cwf` (vulgraad, herkomst *Onbekend*) |
+| 8 | Filtering | `strategies/base` | `strategies/base` | `strategies/base` | `strategies/base` |
+| 9 | Classificatie | `models/xgboost_classifier` | — | `models/xgboost_classifier` | — |
+| 10 | Transformatie | `data/transforms` | — | `data/transforms` | — |
+| 11 | SARIMA | `models/sarima` (individual) | `models/sarima` → `data/transforms` | `models/sarima` (both) | — |
+| 12 | XGBoost regressor | — | `models/xgboost_regressor` | `models/xgboost_regressor` | — |
+| 13 | Ratio model / CWF-model | — | `models/ratio` | `models/ratio` | `models/cwf` + `models/cwf_interval` (prognose, interval, label, NF-cap) |
+| 14 | Postprocessing + Opslaan | `output/postprocessor` | `output/postprocessor` | `output/postprocessor` | `output/postprocessor` (geen ensemble) |
 
 Zie [`doc/PIPELINE.md`](doc/PIPELINE.md) voor de gedetailleerde end-to-end pipeline (inclusief Mermaid-diagrammen). Voor een uitleg van het individueel spoor, zie [Individueel model](https://cedanl.github.io/studentprognose/methodologie/individueel/) in de methodologische documentatie.
+
+---
+
+## 📜 Licentie en bronvermelding
+
+Studentprognose is uitgebracht onder de [MIT-licentie](LICENSE). Het CWF-model is gebaseerd op het model van Radboud Institutional Research ([radboudir/studentprognose](https://github.com/radboudir/studentprognose), MIT-licentie); zie [`NOTICE`](NOTICE).
 
 ---
 

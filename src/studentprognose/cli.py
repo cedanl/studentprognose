@@ -62,6 +62,7 @@ DATASET_MAP = {
     "cumulative": DataOption.CUMULATIVE,
     "b": DataOption.BOTH_DATASETS,
     "both": DataOption.BOTH_DATASETS,
+    "cwf": DataOption.CWF,
 }
 
 STUDENT_YEAR_MAP = {
@@ -83,7 +84,7 @@ def parse_args(argv):
         nargs="?",
         choices=["init", "benchmark", "tune"],
         help="init       Maak een nieuwe projectmap aan met configuratie en mappenstructuur\n"
-             "benchmark  Vergelijk alternatieve modellen (-d c of -d i verplicht)\n"
+             "benchmark  Vergelijk alternatieve modellen (-d c, -d i of -d cwf verplicht)\n"
              "tune       Hyperparameter tuning voor het cumulatieve spoor (-d c verplicht)",
     )
     parser.add_argument(
@@ -103,6 +104,10 @@ def parse_args(argv):
         choices=list(DATASET_MAP.keys()),
         default=None,
         dest="dataset",
+        help="Model/dataset: c|cumulative (SARIMA + XGBoost + ratio), "
+             "i|individual (XGBoost per aanmelder), b|both (ensemble van beide, default) "
+             "of cwf (confidence-weighted forecast, met predictie-interval en "
+             "betrouwbaarheidslabel).",
     )
     parser.add_argument(
         "-c",

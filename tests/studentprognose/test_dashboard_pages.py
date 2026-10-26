@@ -841,3 +841,41 @@ def test_origin_row_without_prediction_stays_visible_but_outside_programme(
     assert eer["a"] == 20
     total = payload["performance"]["current"]["D|Bachelor"]
     assert total["am"]["SARIMA_cumulative"] == 30
+
+
+def _cwf_output():
+    rows = []
+    for year, actual in ((2023, 50), (2024, 60)):
+        for herkomst in ("NL", "EER"):
+            rows.append({
+                "Collegejaar": year, "Croho groepeernaam": "A", "Herkomst": herkomst,
+                "Examentype": "Bachelor", "Faculteit": "Faculteit X", "Weeknummer": 10,
+                "Aantal_studenten": actual, "Prognose_cwf": actual + 4,
+                "cwf_ondergrens": actual - 6, "cwf_bovengrens": actual + 12,
+                "cwf_betrouwbaarheid": "Oranje" if herkomst == "NL" else "Rood",
+                "cwf_vulgraad": 0.6, "cwf_ratiofactor": 0.5,
+                "Gewogen vooraanmelders": 100.0,
+            })
+    return pd.DataFrame(rows)
+
+
+def test_cwf_payload_has_intervals_labels_and_coverage(studentcount):
+    payload = performance_page.build_payload(
+        _cwf_output(), _cumulative(), studentcount, 2024, 10,
+        [str(w) for w in range(1, 53)], 38, track="cwf",
+    )
+    json.dumps(payload, allow_nan=False)
+    cwf = payload["cwf"]
+    assert len(cwf["rows"]) == 2
+    assert cwf["labels"] == {"Groen": 0, "Oranje": 1, "Rood": 1}
+    assert cwf["coverage"]["all"] == {"n": 4, "share": 1.0}
+    assert [m["key"] for m in payload["performance"]["models"]][0] == "Prognose_cwf"
+
+
+def test_cwf_page_is_written_with_nav(tmp_path, studentcount):
+    b = _builder(tmp_path, _cwf_output(), studentcount, option=DataOption.CWF)
+    b.build_and_save()
+    page = (tmp_path / "data/output/visualisations/cwf/dashboard.html").read_text("utf-8")
+    assert "Predictie-interval en betrouwbaarheid" in page
+    assert "../cumulative/dashboard.html" not in page
+    assert "../final/dashboard.html" in page

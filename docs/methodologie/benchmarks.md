@@ -9,7 +9,7 @@ Het benchmarkcommando vergelijkt alle beschikbare modellen op jouw eigen data, z
 
 ## Draaien
 
-De `-d` flag is verplicht bij benchmark: kies `-d c` (cumulatief) of `-d i` (individueel). `-d both` is niet toegestaan.
+De `-d` flag is verplicht bij benchmark: kies `-d c` (cumulatief), `-d i` (individueel) of `-d cwf` (CWF-model). `-d both` is niet toegestaan.
 
 ```bash
 # Cumulatief spoor
@@ -17,6 +17,9 @@ studentprognose benchmark -d c -w 12
 
 # Individueel spoor
 studentprognose benchmark -d i -w 12
+
+# CWF-model
+studentprognose benchmark -d cwf -w 12
 ```
 
 ### Cumulatief spoor
@@ -26,6 +29,19 @@ De cumulatieve benchmark evalueert alle combinaties van tijdreeksmodellen (SARIM
 ### Individueel spoor
 
 De individuele benchmark evalueert classificatiemodellen (XGBoost, Random Forest, Logistic Regression) die voorspellen of een aanmelder zich daadwerkelijk inschrijft.
+
+### CWF-model
+
+De CWF-benchmark is een **backtest** van het [CWF-model](cwf.md): voor elk afgerond collegejaar (met minstens twee eerdere jaren met realisatie) voorspelt het model de instroom vanaf de gekozen week, met alleen de jaren ervóór als historie. Omdat de vulgraad geen look-ahead heeft, ziet het model per testjaar precies wat het live zou hebben gezien.
+
+Per testjaar en per betrouwbaarheidslabel meet de benchmark:
+
+- **MAE, MAPE en WAPE** van `Prognose_cwf`;
+- **dekking**: welk deel van de werkelijke instroom binnen het 95%-interval viel (hoort rond 0,95 te liggen);
+- **mediane relatieve breedte** van het interval (`(bovengrens − ondergrens) / prognose`);
+- de **naïeve voorspelling** (instroom van vorig jaar) als referentie.
+
+Numerus-fixusopleidingen tellen niet mee, net als in de overige evaluaties. Er is één model en er zijn dus geen alternatieven om uit te kiezen: de benchmark beantwoordt of het CWF-model op jouw data de naïeve voorspelling verslaat en of het interval en de labels kloppen (Groen hoort duidelijk nauwkeuriger te zijn dan Rood).
 
 ## Methodologie
 
@@ -83,6 +99,11 @@ De benchmark slaat resultaten op in:
 
 - `data/output/benchmark_classifier.csv` — resultaten per classificatiemodel
 
+**CWF-model (`-d cwf`):**
+
+- `data/output/benchmark_cwf.csv` — backtest per testjaar × opleiding × herkomst × examentype (prognose, interval, label, realisatie, naïef)
+- `data/output/benchmark/benchmark_cwf.html` — samenvatting per testjaar en per betrouwbaarheidslabel
+
 Kolommen bevatten model, testjaar, metrics, trainingssetgrootte en (bij cumulatief) convergentie-informatie.
 
 ## Interpretatie
@@ -90,3 +111,4 @@ Kolommen bevatten model, testjaar, metrics, trainingssetgrootte en (bij cumulati
 - **Kleine datasets** (< 10 trainingsrijen, typisch bij numerus fixus): Ridge regression presteert hier vaak beter dan XGBoost door de L2-regularisatie.
 - **Convergentie-failures**: als SARIMA voor veel combinaties faalt, overweeg ETS of Theta — deze zijn stabieler bij korte reeksen.
 - **Trainingstijd**: AutoARIMA is aanzienlijk trager dan de andere modellen door de automatische orde-selectie.
+- **CWF-dekking ver onder 0,95**: het interval is te smal voor jouw data. Kijk welke weken of examentypes afwijken; vaak zit er een systematische verschuiving in de data (zie [CWF → Wanneer vertrouw je het niet?](cwf.md#wanneer-vertrouw-je-het-niet)).

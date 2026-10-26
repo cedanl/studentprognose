@@ -72,3 +72,25 @@ def test_build_run_args_skip_zero_omitted():
     from gui.process import build_run_args
 
     assert "-sk" not in build_run_args(skip_years=0, yes=False)
+
+
+def test_build_run_args_cwf():
+    from gui.process import build_run_args
+
+    args = build_run_args(dataset="CWF")
+    assert args[:2] == ["-d", "cwf"]
+
+
+def test_wizard_mode_choice_overrides_stored_run_dataset(monkeypatch):
+    from types import SimpleNamespace
+
+    from gui.pages import run
+
+    fake_app = SimpleNamespace(storage=SimpleNamespace(general={
+        "run_settings": {"dataset": "Cumulatief", "weeks": "16"}
+    }))
+    monkeypatch.setattr(run, "app", fake_app)
+    run.remember_wizard_mode("cwf")
+    assert fake_app.storage.general["run_settings"] == {"dataset": "CWF", "weeks": "16"}
+    run.remember_wizard_mode("onbekend")
+    assert fake_app.storage.general["run_settings"]["dataset"] == "CWF"

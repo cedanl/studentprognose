@@ -3,7 +3,7 @@
 Je zet je **ruwe** bestanden in `data/input_raw/`. De tool verwerkt die automatisch (ETL) naar de modelklare bestanden in `data/input/` — die tweede map raak je zelf niet aan. Beide mappen worden voor je aangemaakt door `studentprognose init` en de ETL.
 
 !!! tip "Minimaal nodig voor je eerste eigen run"
-    - [ ] **Studielink-telbestanden** in `data/input_raw/telbestanden/` — voor het cumulatieve spoor (`-d c`/`-d b`)
+    - [ ] **Studielink-telbestanden** in `data/input_raw/telbestanden/` — voor het cumulatieve spoor en het CWF-model (`-d c`/`-d b`/`-d cwf`)
     - [ ] **`individuele_aanmelddata.csv`** in `data/input_raw/` — voor het individuele spoor (`-d i`/`-d b`)
     - [ ] **`oktober_bestand.xlsx`** in `data/input_raw/` — altijd nodig (studentaantallen / ground truth)
 
@@ -164,12 +164,13 @@ Dit zijn de bestanden die het model direct inleest. De ETL maakt ze aan; bij `--
 
 | Bestand | Wanneer nodig | Bron |
 |---------|---------------|------|
-| `vooraanmeldingen_cumulatief.csv` | `-d c` of `-d b` | ETL stap 1+2 |
+| `vooraanmeldingen_cumulatief.csv` | `-d c`, `-d b` of `-d cwf` | ETL stap 1+2 |
 | `vooraanmeldingen_individueel.csv` | `-d i` of `-d b` | ETL stap 4 |
 | `student_count_first-years.xlsx` | Altijd | ETL stap 3 |
 | `student_volume.xlsx` | Alleen bij `-sy v` | ETL stap 3 |
 | `ensemble_weights.xlsx` | Optioneel | `scripts/calculate_ensemble_weights.py` |
 | `totaal_cumulatief.xlsx` / `totaal_individueel.xlsx` | Optioneel | `scripts/append_studentcount_and_compute_errors.py` |
+| `totaal_cwf.xlsx` | Optioneel (`-d cwf`) | Eerdere CWF-output; het label van vorige week geeft hysterese op het betrouwbaarheidslabel |
 
 ## Institutiespecifieke kolomnamen
 

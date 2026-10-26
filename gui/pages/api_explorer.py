@@ -26,7 +26,7 @@ _ENDPOINTS = [
             ("croho", "string", "CROHO-code (bijv. 34397)", True),
             ("week",  "integer", "ISO-weeknummer (1–53)", True),
             ("year",  "integer", "Studiejaar (bijv. 2025)", True),
-            ("model", "string", "ensemble | sarima | xgboost (default: ensemble)", False),
+            ("model", "string", "ensemble | sarima | xgboost | cwf (default: ensemble)", False),
         ],
         "response": '''{
   "programme": "Technische Informatica",

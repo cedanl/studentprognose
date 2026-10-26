@@ -62,6 +62,7 @@ def load_configuration(file_path: str) -> dict:
     if "excluded_data_points" in cfg:
         _validate_excluded_data_points(cfg["excluded_data_points"], file_path)
     _validate_model_config(cfg, file_path)
+    _validate_cwf_params(cfg, file_path)
     _validate_runtime(cfg, file_path)
     _validate_telbestand_filename_patterns(cfg, file_path)
     _validate_institution_filter(cfg, file_path)
@@ -282,6 +283,140 @@ def _validate_model_config(cfg, file_path):
             f"'model_config.sarima_tuning_grid' moet een object zijn "
             f"(ordenaam → lijst van waarden), niet {type(sarima_tuning_grid).__name__}."
         )
+        sys.exit(1)
+
+
+# Bereikeisen per numerieke CWF-parameter: (ondergrens, bovengrens, ondergrens
+# exclusief). Parameters die hier ontbreken moeten alleen ≥ 0 zijn.
+_CWF_RANGES = {
+    "cv_lambda": (0, None, True),
+    "max_history_years": (1, None, False),
+    "ratio_tolerance": (0, None, True),
+    "size_factor": (1, None, True),
+    "max_group_programmes": (1, None, False),
+    "trend_r2_threshold": (0, 1, False),
+    "ratio_floor": (0, None, True),
+    "confidence_level": (0, 1, True),
+    "pool_outlier_quantile": (0, 1, True),
+    "yoy_absolute_weight": (0, 1, False),
+    "fill_rate_recency_alpha": (0, None, False),
+    "upper_bound_cap_fill_rate": (0, 1, False),
+    "reliability_orange_min_fill": (0, 1, False),
+    "reliability_green_min_fill": (0, 1, False),
+}
+
+
+def cwf_params_errors(raw) -> list[str]:
+    """Foutmeldingen voor een ``model_config.cwf_params``-object (leeg = geldig).
+
+    Controleert onbekende sleutels, types en bereiken. Gedeeld door de CLI
+    (:func:`_validate_cwf_params`, stopt bij de eerste fout) en de GUI-editor
+    (toont alle fouten).
+
+    Args:
+        raw: De waarde van ``model_config.cwf_params``.
+
+    Returns:
+        Lijst met leesbare foutmeldingen.
+    """
+    from studentprognose.models.cwf import CWFParams
+
+    prefix = "'model_config.cwf_params"
+    if not isinstance(raw, dict):
+        return [f"{prefix}' moet een object zijn, niet {type(raw).__name__}."]
+
+    defaults = CWFParams.defaults_as_dict()
+    errors: list[str] = []
+    unknown = sorted(set(raw) - set(defaults))
+    if unknown:
+        errors.append(
+            f"{prefix}' bevat onbekende sleutel(s) {unknown}. Geldige sleutels: {sorted(defaults)}."
+        )
+
+    def _is_number(v):
+        return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+    for key, value in raw.items():
+        if key not in defaults:
+            continue
+        default = defaults[key]
+        if key == "training_start_year":
+            if value is not None and not (isinstance(value, int) and not isinstance(value, bool)):
+                errors.append(f"{prefix}.{key}' moet een jaartal of null zijn, niet {value!r}.")
+            continue
+        if isinstance(default, bool):
+            if not isinstance(value, bool):
+                errors.append(f"{prefix}.{key}' moet true of false zijn, niet {value!r}.")
+            continue
+        if isinstance(default, list):
+            if not isinstance(value, list) or not all(isinstance(v, str) for v in value):
+                errors.append(f"{prefix}.{key}' moet een lijst van examentypes zijn, niet {value!r}.")
+            continue
+        if isinstance(default, dict):
+            if not isinstance(value, dict):
+                errors.append(f"{prefix}.{key}' moet een object zijn, niet {type(value).__name__}.")
+            continue
+        if isinstance(default, int) and not (isinstance(value, int) and not isinstance(value, bool)):
+            errors.append(f"{prefix}.{key}' moet een geheel getal zijn, niet {value!r}.")
+            continue
+        if isinstance(default, float) and not _is_number(value):
+            errors.append(f"{prefix}.{key}' moet een getal zijn, niet {value!r}.")
+            continue
+
+        low, high, exclusive = _CWF_RANGES.get(key, (0, None, False))
+        too_low = value <= low if exclusive else value < low
+        if too_low or (high is not None and value > high):
+            bound = f"> {low}" if exclusive else f">= {low}"
+            if high is not None:
+                bound += f" en <= {high}"
+            errors.append(f"{prefix}.{key}' moet {bound} zijn, niet {value!r}.")
+
+    overrides = raw.get("year_weight_overrides", {})
+    if isinstance(overrides, dict):
+        for year, weight in overrides.items():
+            if not str(year).isdigit() or not _is_number(weight) or weight < 0:
+                errors.append(
+                    f"{prefix}.year_weight_overrides' verwacht jaartal → gewicht >= 0, "
+                    f"niet {year!r}: {weight!r}."
+                )
+
+    by_exam = raw.get("reliability_green_max_own_error_by_exam_type", {})
+    if isinstance(by_exam, dict):
+        for exam_type, value in by_exam.items():
+            if not _is_number(value) or value < 0:
+                errors.append(
+                    f"{prefix}.reliability_green_max_own_error_by_exam_type.{exam_type}' moet "
+                    f"een getal >= 0 zijn, niet {value!r}."
+                )
+
+    priors = raw.get("predefined_priors", {})
+    if isinstance(priors, dict):
+        for programme, per_exam in priors.items():
+            if not isinstance(per_exam, dict) or not all(
+                isinstance(per_origin, dict)
+                and all(_is_number(v) and v >= 0 for v in per_origin.values())
+                for per_origin in per_exam.values()
+            ):
+                errors.append(
+                    f"{prefix}.predefined_priors.{programme}' moet de vorm "
+                    "{examentype: {herkomst: aantal}} hebben met aantallen >= 0."
+                )
+    return errors
+
+
+def _validate_cwf_params(cfg, file_path):
+    """Valideer ``model_config.cwf_params`` (CWF-model).
+
+    Onbekende sleutels, verkeerde types en waarden buiten het geldige bereik
+    stoppen de pipeline met exitcode 1, zodat een tikfout niet stil op de
+    default terugvalt.
+    """
+    raw = cfg.get("model_config", {}).get("cwf_params")
+    if raw is None:
+        return
+    errors = cwf_params_errors(raw)
+    if errors:
+        print(f"Configuratiefout in {file_path}: {errors[0]}")
         sys.exit(1)
 
 

@@ -1,12 +1,15 @@
-"""Dashboardpagina's rond modelperformance: cumulatief, individueel en eindoverzicht.
+"""Dashboardpagina's rond modelperformance: cumulatief, individueel, CWF en eindoverzicht.
 
-Alle drie de pagina's delen één opzet en één template. Ze beantwoorden:
+Alle pagina's delen één opzet en één template. Ze beantwoorden:
 
 1. Hoe groot is de fout in het algemeen, en verslaat het model de naïeve baseline?
 2. Waar zit de fout: bij kleine of grote opleidingen, bij bachelors of masters?
 3. Per opleiding: hoe goed was het model, en hoeveel vertrouwen verdient de prognose?
 4. (Cumulatief/individueel) Hoe verloopt het seizoen van één opleiding?
 5. (Eindoverzicht) Wat is de totale prognose, per herkomst en voor numerus fixus?
+6. (CWF) Hoe breed is het predictie-interval, welk betrouwbaarheidslabel heeft elke
+   prognose, en hoe vaak viel de werkelijke instroom in eerdere jaren binnen het
+   interval?
 
 Elke pagina kan worden gefilterd op herkomst (NL, EER, Niet-EER). De standaard is
 "alle herkomsten", waarin de herkomstgroepen per opleiding zijn opgeteld; per
@@ -73,6 +76,21 @@ PAGES: dict[str, dict] = {
         },
         "backtest": "-d i",
     },
+    "cwf": {
+        "title": "CWF-model",
+        "nav": "CWF",
+        "question": "Hoe goed voorspelt het CWF-model de instroom, en hoe zeker is elke prognose?",
+        "trend": {
+            "title": "Verloop per opleiding",
+            "yTitle": "Gewogen vooraanmelders",
+            "lede": "Gewogen vooraanmelders per week. Grijs zijn eerdere jaren, de donkere lijn is het "
+            "voorspeljaar tot de voorspelweek. Rechts: werkelijke instroom (★) en de "
+            "CWF-prognose (◆).",
+            "current": "t/m voorspelweek",
+            "forecast": "",
+        },
+        "backtest": "-d cwf",
+    },
     "final": {
         "title": "Eindoverzicht",
         "nav": "Eindoverzicht",
@@ -116,7 +134,7 @@ def track_models(track: str, data: pd.DataFrame) -> list[str]:
         ensemble = next((c for c in ENSEMBLE_COLUMNS if _filled(c)), None)
         parts = [
             c
-            for c in ("SARIMA_cumulative", "SARIMA_individual", "Prognose_ratio")
+            for c in ("SARIMA_cumulative", "SARIMA_individual", "Prognose_ratio", "Prognose_cwf")
             if _filled(c)
         ]
         return ([ensemble] if ensemble else []) + parts
@@ -671,6 +689,69 @@ def _forecast_overview(
     )
 
 
+CWF_LABEL_ORDER = ("Groen", "Oranje", "Rood")
+
+
+def _cwf_payload(
+    data: pd.DataFrame, prediction_year: int, predict_week: int | None
+) -> dict | None:
+    """Interval en betrouwbaarheidslabel per combinatie voor de CWF-pagina.
+
+    ``rows`` bevat de prognoses van het voorspeljaar in de voorspelweek;
+    ``coverage`` meet voor alle jaren in de output met een bekende realisatie
+    (backtest) hoe vaak de werkelijke instroom binnen het interval viel, totaal en
+    per label.
+    """
+    needed = ("Prognose_cwf", "cwf_ondergrens", "cwf_bovengrens", "cwf_betrouwbaarheid")
+    if any(c not in data.columns for c in needed):
+        return None
+    rows = data[data["Prognose_cwf"].notna()]
+    if predict_week is not None:
+        rows = rows[rows[mp.WEEK] == int(predict_week)]
+    current = rows[rows[mp.YEAR] == int(prediction_year)]
+
+    def _row(r: dict) -> dict:
+        return {
+            "p": str(r[mp.PROGRAMME]),
+            "e": r[mp.EXAM_TYPE],
+            "h": r.get(mp.ORIGIN, ""),
+            "f": r.get("Faculteit", ""),
+            "pred": r["Prognose_cwf"],
+            "lo": r["cwf_ondergrens"],
+            "hi": r["cwf_bovengrens"],
+            "label": r["cwf_betrouwbaarheid"],
+            "fill": r.get("cwf_vulgraad"),
+            "a": r.get(mp.ACTUAL),
+        }
+
+    counts = current["cwf_betrouwbaarheid"].value_counts()
+    coverage: dict = {}
+    if mp.ACTUAL in rows.columns:
+        known = rows.dropna(subset=[mp.ACTUAL, "cwf_ondergrens", "cwf_bovengrens"])
+        if not known.empty:
+            inside = (known[mp.ACTUAL] >= known["cwf_ondergrens"]) & (
+                known[mp.ACTUAL] <= known["cwf_bovengrens"]
+            )
+            coverage = {
+                "all": {"n": int(len(known)), "share": float(inside.mean())},
+                "byLabel": {
+                    label: {
+                        "n": int((known["cwf_betrouwbaarheid"] == label).sum()),
+                        "share": float(inside[known["cwf_betrouwbaarheid"] == label].mean()),
+                    }
+                    for label in CWF_LABEL_ORDER
+                    if (known["cwf_betrouwbaarheid"] == label).any()
+                },
+            }
+    return _clean(
+        {
+            "rows": [_row(r) for r in current.to_dict(orient="records")],
+            "labels": {label: int(counts.get(label, 0)) for label in CWF_LABEL_ORDER},
+            "coverage": coverage,
+        }
+    )
+
+
 # ── Samenstellen ──────────────────────────────────────────────────────
 
 
@@ -689,7 +770,7 @@ def build_payload(
     """Alle data die een performancepagina nodig heeft, JSON-serialiseerbaar.
 
     Args:
-        track: ``"cumulative"``, ``"individual"`` of ``"final"``.
+        track: ``"cumulative"``, ``"individual"``, ``"cwf"`` of ``"final"``.
         xgboost_curve: Geaggregeerde XGBoost-curve van het individuele spoor; nodig
             voor het verloop op de individuele pagina.
 
@@ -728,7 +809,7 @@ def build_payload(
             )
         )
 
-    if track == "cumulative":
+    if track in ("cumulative", "cwf"):
         curves, value, source = (
             _applicant_curves(data_cumulative),
             APPLICANTS,
@@ -796,6 +877,7 @@ def build_payload(
             else None
         ),
         "trend": trend,
+        "cwf": _cwf_payload(data, prediction_year, predict_week) if track == "cwf" else None,
     }
 
 

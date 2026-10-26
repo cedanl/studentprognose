@@ -52,7 +52,26 @@ _WIZARD_MODE_TO_DATASET = {
     "cumulative": "Cumulatief",
     "individual": "Individueel",
     "both": "Beide",
+    "cwf": "CWF",
 }
+
+
+def remember_wizard_mode(mode: str) -> None:
+    """Neem een in de wizard gekozen modus over als dataset op Uitvoeren.
+
+    De Uitvoeren-pagina bewaart zijn instellingen in ``app.storage.general``
+    (blijft bestaan over herstarts). Zonder deze koppeling zou een expliciete
+    modusklik in de wizard genegeerd worden zodra er al eens is gedraaid.
+
+    Args:
+        mode: Wizardmodus (``cumulative``/``individual``/``both``/``cwf``).
+    """
+    dataset = _WIZARD_MODE_TO_DATASET.get(mode)
+    if dataset is None:
+        return
+    stored = dict(app.storage.general.get(_STORAGE_KEY, {}))
+    stored["dataset"] = dataset
+    app.storage.general[_STORAGE_KEY] = stored
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +311,7 @@ class _RunView:
 
                 # ── Dataset ─────────────────────────────────────────────────
                 self._dataset = ui.select(
-                    ["Cumulatief", "Individueel", "Beide"],
+                    ["Cumulatief", "Individueel", "Beide", "CWF"],
                     value=self._settings["dataset"],
                     label="Dataset (voorspelspoor)",
                 ).classes("w-full")

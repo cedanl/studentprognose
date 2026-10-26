@@ -8,5 +8,5 @@ Voor een conceptuele uitleg van de modellen, zie [Methodologie](../methodologie/
 
 | Module | Beschrijving |
 |--------|-------------|
-| [`studentprognose.models`](models.md) | SARIMA, XGBoost classifier/regressor, ratio-model, base class |
-| [`studentprognose.strategies`](strategies.md) | Preprocessing per spoor (individual, cumulative, combined) |
+| [`studentprognose.models`](models.md) | SARIMA, XGBoost classifier/regressor, ratio-model, CWF-model, base class |
+| [`studentprognose.strategies`](strategies.md) | Preprocessing per spoor (individual, cumulative, combined, CWF) |

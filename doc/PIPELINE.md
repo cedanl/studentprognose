@@ -83,7 +83,7 @@ flowchart TD
 
         LOAD["<b>loader</b> → <b>preprocessing/add_zero_weeks</b> *<br/><i>data laden + nulweken toevoegen</i>"]:::script
 
-        LOAD --> IND_PATH & CUM_PATH & BOTH_PATH
+        LOAD --> IND_PATH & CUM_PATH & BOTH_PATH & CWF_PATH
 
         subgraph IND_PATH ["-d individual"]
             direction TD
@@ -112,6 +112,13 @@ flowchart TD
             B_PRE --> B_S05 --> B_S06 --> B_S07 --> B_S08
         end
 
+        subgraph CWF_PATH ["-d cwf"]
+            direction TD
+            W_PRE["strategies/cwf<br/><i>preprocessing + vulgraad</i>"]
+            W_S07["<b>cwf</b> + <b>cwf_interval</b><br/><i>prognose, interval, label</i>"]
+            W_PRE --> W_S07
+        end
+
         subgraph S10 ["postprocessor"]
             direction TD
             S10A["<b>prepare_data_for_output_prelim</b><br/><i>NF-cap, kolommen, merges</i>"]:::script
@@ -123,6 +130,7 @@ flowchart TD
         I_S07 --> S10A
         C_S08 --> S10A
         B_S08 --> S10A
+        W_S07 --> S10A
     end
 
     %% ══════════════════════════════════════
@@ -192,18 +200,18 @@ Het ETL-script draait standaard en transformeert ruwe data in `data/input_raw/` 
 
 **Gedeelde stappen (alle modi):** `main.py` → `cli.py` → `etl`* → `config.py` → `loader` → `preprocessing/add_zero_weeks` → `utils/ci_subset`*
 
-| Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) |
-|------|------|---------------------|---------------------|---------------|
-| 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | `strategies/combined` (individual → cumulative) |
-| 7 | Classificatie | `xgboost_classifier` | — | `xgboost_classifier` |
-| 8 | Transformatie | `transforms` | — | `transforms` |
-| 9 | SARIMA | `sarima` (individual) | `sarima` → `transforms` | `sarima` (both) |
-| 10 | XGBoost regressor | — | `xgboost_regressor` | `xgboost_regressor` |
-| 11 | Prelim output | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` |
-| | | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` |
-| 12 | Ratio model | — | `predict_with_ratio` (`ratio`) | `predict_with_ratio` (`ratio`) |
-| 13 | Postprocessing | `postprocess` | `postprocess` | `postprocess` (incl. ensemble) |
-| 14 | Output opslaan | `save_output` | `save_output` | `save_output` |
+| Stap | Fase | Individual (`-d i`) | Cumulative (`-d c`) | Both (`-d b`) | CWF (`-d cwf`) |
+|------|------|---------------------|---------------------|---------------|----------------|
+| 6 | Preprocessing | `strategies/individual` | `strategies/cumulative` | `strategies/combined` (individual → cumulative) | `strategies/cwf` (cumulatief + vulgraad) |
+| 7 | Classificatie | `xgboost_classifier` | — | `xgboost_classifier` | — |
+| 8 | Transformatie | `transforms` | — | `transforms` | — |
+| 9 | SARIMA | `sarima` (individual) | `sarima` → `transforms` | `sarima` (both) | — |
+| 10 | XGBoost regressor / CWF | — | `xgboost_regressor` | `xgboost_regressor` | `cwf` + `cwf_interval` |
+| 11 | Prelim output | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` | `prepare_data_for_output_prelim` |
+| | | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` | → `output_prelim_*.xlsx` | → `output_prelim_cwf.xlsx` |
+| 12 | Ratio model | — | `predict_with_ratio` (`ratio`) | `predict_with_ratio` (`ratio`) | — |
+| 13 | Postprocessing | `postprocess` | `postprocess` | `postprocess` (incl. ensemble) | `postprocess` (foutmaten, geen ensemble) |
+| 14 | Output opslaan | `save_output` | `save_output` | `save_output` | `save_output` |
 
 <small>* standaard aan (skip met `--noetl`) resp. alleen met `--ci test N`</small>
 

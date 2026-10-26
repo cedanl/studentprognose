@@ -2,6 +2,7 @@ from studentprognose.utils.weeks import DataOption
 from studentprognose.strategies.individual import IndividualStrategy
 from studentprognose.strategies.cumulative import CumulativeStrategy
 from studentprognose.strategies.combined import CombinedStrategy
+from studentprognose.strategies.cwf import CWFStrategy
 
 
 def create_strategy(cfg, datasets, configuration, cwd):
@@ -18,6 +19,21 @@ def create_strategy(cfg, datasets, configuration, cwd):
         data_latest,
         ensemble_weights,
     ) = datasets
+
+    if cfg.data_option == DataOption.CWF:
+        if cfg.skip_years > 0:
+            raise ValueError("Het CWF-model ondersteunt geen --skipyears (-sk).")
+        if data_cumulative is None:
+            raise Exception("Cumulative dataset not found")
+        if data_student_numbers is None:
+            raise ValueError(
+                "Het CWF-model heeft de eerstejaars-studentaantallen nodig "
+                "(paths.path_student_count_first-years)."
+            )
+        return CWFStrategy(
+            data_cumulative, data_student_numbers, configuration,
+            data_latest, ensemble_weights, cwd, cfg.data_option, cfg.ci_test_n,
+        )
 
     if cfg.skip_years > 0 or cfg.data_option == DataOption.CUMULATIVE:
         if data_cumulative is None:

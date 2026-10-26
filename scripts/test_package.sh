@@ -19,6 +19,9 @@
 #   9. Multi-instelling filter (#200) — --institution scoopt de teldata tot één
 #      instelling (pipeline slaagt), en een onbekende instelling faalt hard
 #      (exitcode != 0) i.p.v. stil een lege pipeline te draaien.
+#  10. CWF-model (-d cwf, #308) — run met dashboard levert output met
+#      Prognose_cwf, een consistent interval en geldige labels; -sk wordt
+#      geweigerd.
 #
 # Gebruik: bash scripts/test_package.sh [--skip-build]
 
@@ -156,6 +159,29 @@ echo "$NOFILTER_LOG" | grep -q "Instellingsfilter: geen — alle" \
 # Een onbekende instelling mag NIET stil een lege pipeline draaien: harde fout.
 if uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution ZZZZ 2>/dev/null; then
     echo "FOUT: exitcode 0 verwacht bij onbekende instelling, maar pipeline slaagde"
+    exit 1
+fi
+echo "OK"
+
+echo ""
+echo "=== [10] CWF-model (-d cwf) ==="
+rm -f data/output/output_first-years_cwf.xlsx
+uv run studentprognose -w 6 -y 2024 -d cwf --noetl --yes --dashboard > /dev/null
+[ -f data/output/output_first-years_cwf.xlsx ] || { echo "FOUT: CWF-output ontbreekt"; exit 1; }
+[ -f data/output/visualisations/cwf/dashboard.html ] || { echo "FOUT: CWF-dashboard ontbreekt"; exit 1; }
+uv run python - <<'PYEOF'
+import pandas as pd
+d = pd.read_excel("data/output/output_first-years_cwf.xlsx")
+rows = d[(d["Collegejaar"] == 2024) & (d["Weeknummer"] == 6) & d["Prognose_cwf"].notna()]
+assert not rows.empty, "geen CWF-voorspellingen in de voorspelweek"
+assert (rows["cwf_ondergrens"] <= rows["Prognose_cwf"]).all(), "ondergrens boven prognose"
+assert (rows["Prognose_cwf"] <= rows["cwf_bovengrens"]).all(), "bovengrens onder prognose"
+assert rows["cwf_betrouwbaarheid"].isin(["Groen", "Oranje", "Rood"]).all(), "onbekend label"
+assert "MAE_Prognose_cwf" in d.columns, "foutkolom ontbreekt"
+print(f"  {len(rows)} CWF-prognoses gecontroleerd")
+PYEOF
+if uv run studentprognose -w 6 -y 2024 -d cwf -sk 1 --noetl --yes > /dev/null 2>&1; then
+    echo "FOUT: -d cwf -sk 1 moet falen"
     exit 1
 fi
 echo "OK"

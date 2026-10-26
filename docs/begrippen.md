@@ -21,6 +21,7 @@ De tool kan langs twee routes voorspellen, afhankelijk van je data:
 | **Cumulatief spoor** (`-d c`) | Werkt met de opgetelde aanmeldaantallen per opleiding en week (Studielink-telbestanden). Trekt de aanmeldcurve door naar het einde van het seizoen. |
 | **Individueel spoor** (`-d i`) | Werkt met één regel per aanmelder (Osiris/Usis). Schat per persoon de kans op inschrijving en telt die op. |
 | **Beide** (`-d b`) | Draait beide sporen en combineert ze tot één [ensemble](#modellen)-voorspelling. Dit is de standaard. |
+| **CWF-model** (`-d cwf`) | Zelfstandig model dat de eindinstroom voorspelt uit de huidige aanmeldingen × de verhouding instroom/aanmeldingen van eerdere jaren, met een onzekerheidsmarge en een betrouwbaarheidslabel. Zie [CWF-model](methodologie/cwf.md). |
 
 ## Data
 
@@ -44,6 +45,9 @@ De tool kan langs twee routes voorspellen, afhankelijk van je data:
 | **Ensemble** | De gewogen combinatie van de losse modellen tot één eindvoorspelling. Zie [Ensemble](methodologie/ensemble.md). |
 | **Baseline** | Een bewust simpele referentievoorspelling (gelijk aan het ratio-model) om de complexere modellen tegen af te zetten. |
 | **Numerus fixus** | Opleiding met een vast maximum aantal plaatsen; de voorspelling wordt afgekapt op dat maximum. |
+| **Vulgraad** | Welk deel van zijn uiteindelijke aanmeldpiek een opleiding in eerdere jaren op dit moment van het jaar al had bereikt. Het CWF-model gebruikt dit om te bepalen hoeveel het op de huidige aanmeldingen vertrouwt. |
+| **Predictie-interval** | Een onder- en bovengrens rond de voorspelling waarbinnen de werkelijke instroom met 95% waarschijnlijkheid valt (bij `-d cwf`). |
+| **Betrouwbaarheidslabel** | Groen / Oranje / Rood per CWF-voorspelling: hoe goed het model het op dit moment van het jaar in het verleden deed. |
 
 ## Evaluatie
 

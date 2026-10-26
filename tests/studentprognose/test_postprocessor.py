@@ -407,3 +407,61 @@ class TestSaveTotaalAuditTrail:
         pp.data = _make_run_data()
         with pytest.raises(RuntimeError, match="column_roles.*origin"):
             pp.save_totaal_audit_trail(StudentYearPrediction.FIRST_YEARS)
+
+
+class TestCWFOutput:
+    """CWF-modus: eigen modelkolommen in de prelim-output en eigen foutkolommen."""
+
+    def _postprocessor(self, tmp_path, data_option=DataOption.CWF):
+        os.makedirs(tmp_path / "data" / "output", exist_ok=True)
+        return PostProcessor(
+            configuration={"numerus_fixus": {}},
+            data_latest=None,
+            ensemble_weights=None,
+            data_studentcount=pd.DataFrame({
+                "Croho groepeernaam": ["Opleiding A"],
+                "Collegejaar": [2024],
+                "Herkomst": ["NL"],
+                "Examentype": ["Bachelor"],
+                "Aantal_studenten": [100],
+            }),
+            cwd=str(tmp_path),
+            data_option=data_option,
+            ci_test_n=None,
+        )
+
+    def _cwf_data(self):
+        return pd.DataFrame({
+            "Croho groepeernaam": ["Opleiding A"],
+            "Faculteit": ["Faculteit X"],
+            "Examentype": ["Bachelor"],
+            "Collegejaar": [2024],
+            "Herkomst": ["NL"],
+            "Weeknummer": [10],
+            "Prognose_cwf": [90.0],
+            "cwf_ondergrens": [80.0],
+            "cwf_bovengrens": [105.0],
+            "cwf_betrouwbaarheid": ["Oranje"],
+            "cwf_vulgraad": [0.6],
+            "cwf_ratiofactor": [0.5],
+        })
+
+    def test_prelim_keeps_cwf_columns_without_sarima(self, tmp_path):
+        pp = self._postprocessor(tmp_path)
+        pp.prepare_data_for_output_prelim(self._cwf_data(), 2024, 10)
+        assert "Prognose_cwf" in pp.data.columns
+        assert "cwf_betrouwbaarheid" in pp.data.columns
+        assert "SARIMA_cumulative" not in pp.data.columns
+
+    def test_error_columns_for_cwf(self, tmp_path):
+        pp = self._postprocessor(tmp_path)
+        pp.prepare_data_for_output_prelim(self._cwf_data(), 2024, 10)
+        pp.postprocess(2024, 10)
+        assert pp.data["MAE_Prognose_cwf"].iloc[0] == 10
+        assert pp.data["MAPE_Prognose_cwf"].iloc[0] == 0.1
+        assert "Ensemble_prediction" not in pp.data.columns
+
+    def test_existing_modes_select_identical_prelim_columns(self, tmp_path):
+        pp = _make_postprocessor(tmp_path, None)
+        pp.prepare_data_for_output_prelim(_make_input_data(), 2024, 10)
+        assert list(pp.data.columns) == list(_make_input_data().columns)

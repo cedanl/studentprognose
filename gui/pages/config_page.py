@@ -44,6 +44,32 @@ def _load_brincodes(project_dir: str) -> list[str]:
     return sorted(codes)
 
 
+#: CWF-parameters die de editor als losse velden toont: (sleutel, label, min, max,
+#: stap, uitleg). De overige ``cwf_params`` zijn via het JSON-tabblad te wijzigen.
+_CWF_FIELDS: list[tuple[str, str, float, float | None, float, str]] = [
+    ("confidence_level", "Betrouwbaarheid interval", 0.5, 0.99, 0.01,
+     "Nominale dekking van het predictie-interval (0.95 = 95%)."),
+    ("interval_min_half_width", "Minimale halfbreedte (studenten)", 0, 50, 1,
+     "Het interval ligt aan elke kant minstens zoveel studenten van de prognose."),
+    ("pool_shrinkage_k", "Pool-shrinkage k", 0, 20, 0.5,
+     ("Aantal eigen jaren waarbij de eigen ratio en die van vergelijkbare opleidingen "
+      "even zwaar wegen. Hoger = meer lenen van de pool.")),
+    ("mean_alpha", "Recency-alpha ratio", 0, 5, 0.05,
+     "Hoe snel oudere jaren minder meetellen in de ratio (exp(-alpha · jaren terug))."),
+    ("upper_bound_cap_fill_rate", "Vulgraad voor plafond", 0, 1, 0.01,
+     ("Vanaf deze vulgraad ligt de bovengrens nooit boven ongewogen aanmelders + "
+      "inschrijvingen.")),
+    ("reliability_orange_min_fill", "Vulgraad vanaf Oranje", 0, 1, 0.05,
+     "Onder deze vulgraad is het label altijd Rood."),
+    ("reliability_green_min_fill", "Vulgraad vanaf Groen", 0, 1, 0.05,
+     "Groen kan pas vanaf deze vulgraad."),
+    ("reliability_green_max_own_error", "Max. fout voor Groen", 0, 2, 0.01,
+     ("Grootste eigen backtest-fout |log(voorspeld/werkelijk)| waarbij Groen nog kan "
+      "(0.15 ≈ 16%).")),
+    ("reliability_red_min_own_error", "Fout vanaf Rood", 0, 5, 0.05,
+     "Boven deze grootste eigen backtest-fout is het label Rood."),
+]
+
 HELP = {
     "cumulative_timeseries": (
         "Tijdreeksmodel voor stap 1 van het cumulatieve spoor: extrapoleert de "
@@ -533,6 +559,7 @@ class _ConfigView:
 
         self._filtering_section()
         self._model_section()
+        self._cwf_section()
         self._ensemble_section()
         self._programme_multiselect_section(
             config_key="ensemble_override_cumulative",
@@ -980,6 +1007,70 @@ class _ConfigView:
                     self._mark_dirty()
 
                 my_inp.on_value_change(_on_min_training_year)
+
+    def _cwf_section(self) -> None:
+        from studentprognose.models.cwf import CWFParams
+
+        mc = self._config.setdefault("model_config", {})
+        defaults = CWFParams.defaults_as_dict()
+        current = mc.get("cwf_params") or {}
+        with ui.expansion("CWF-model", icon="verified", value=False).classes(
+            "w-full mb-3"
+        ).style(
+            f"background: white; border-radius: 10px; overflow: hidden; "
+            f"border: 1px solid {theme.ACCENT}20; border-left: 4px solid {theme.ACCENT}; "
+            f"box-shadow: 0 1px 6px rgba(221,120,75,0.08);"
+        ):
+            ui.label(
+                "Parameters van het confidence-weighted forecast-model (-d cwf). De "
+                "standaardwaarden zijn een goed startpunt; alle overige parameters staan "
+                "in het JSON-tabblad onder model_config.cwf_params."
+            ).classes("text-sm opacity-60 mb-3")
+
+            def _set(key, value) -> None:
+                mc.setdefault("cwf_params", {})[key] = value
+                self._mark_dirty()
+
+            with ui.grid(columns=3).classes("w-full gap-4"):
+                for key, label, low, high, step, help_text in _CWF_FIELDS:
+                    inp = ui.number(
+                        label=label,
+                        value=current.get(key, defaults[key]),
+                        min=low,
+                        max=high,
+                        step=step,
+                    ).props("outlined").classes("w-full")
+                    inp.tooltip(help_text)
+
+                    def _on_change(e, k=key) -> None:
+                        if e.value is None:
+                            return
+                        value = int(e.value) if isinstance(defaults[k], int) else float(e.value)
+                        _set(k, value)
+
+                    inp.on_value_change(_on_change)
+
+                start = ui.number(
+                    label="Eerste trainingsjaar (leeg = min_training_year)",
+                    value=current.get("training_start_year"),
+                    min=1990,
+                    max=2100,
+                    step=1,
+                    precision=0,
+                ).props("outlined clearable").classes("w-full")
+                start.tooltip("Vanaf welk collegejaar het CWF-model historie gebruikt.")
+                start.on_value_change(
+                    lambda e: _set("training_start_year", None if e.value is None else int(e.value))
+                )
+
+            sw = ui.switch(
+                "Herkomst 'Onbekend' verdelen over NL/EER/Niet-EER",
+                value=current.get("redistribute_unknown_origin", True),
+            )
+            sw.tooltip(
+                "Aanmeldingen zonder bekende herkomst gelijk verdelen i.p.v. negeren."
+            )
+            sw.on_value_change(lambda e: _set("redistribute_unknown_origin", bool(e.value)))
 
     def _adv_select(
         self, label, choices, target, key, default, *, help=None, recommend=None

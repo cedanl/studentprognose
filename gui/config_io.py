@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 
-from studentprognose.config import load_defaults
+from studentprognose.config import cwf_params_errors, load_defaults
 from studentprognose.models import (
     CLASSIFIER_REGISTRY,
     FORECASTER_REGISTRY,
@@ -81,6 +81,9 @@ def validate_config(config: dict) -> list[str]:
     """Voer alle validaties uit en geef een gecombineerde lijst met fouten terug."""
     errors: list[str] = []
     errors.extend(validate_ensemble_weights(config.get("ensemble_weights", {})))
+    cwf_params = config.get("model_config", {}).get("cwf_params")
+    if cwf_params is not None:
+        errors.extend(cwf_params_errors(cwf_params))
     return errors
 
 

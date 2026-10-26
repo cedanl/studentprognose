@@ -212,7 +212,7 @@ def _required_files_for(data_option):
 
     if data_option == DataOption.INDIVIDUAL:
         return False, True
-    if data_option == DataOption.CUMULATIVE:
+    if data_option in (DataOption.CUMULATIVE, DataOption.CWF):
         return True, False
     return True, True
 
@@ -242,9 +242,9 @@ def _check_file_presence(cwd, paths, telbestand_patterns=None):
     oktober_ok = os.path.exists(os.path.join(cwd, oktober_rel)) if oktober_rel else False
 
     return [
-        (telbestanden_rel, telbestanden_ok, "-d cumulative, -d both"),
+        (telbestanden_rel, telbestanden_ok, "-d cumulative, -d both, -d cwf"),
         (individueel_rel, individueel_ok, "-d individual, -d both"),
-        (oktober_rel, oktober_ok, "studentaantallen (optioneel, telbestand studenten)"),
+        (oktober_rel, oktober_ok, "studentaantallen (verplicht voor -d cwf, anders optioneel)"),
     ]
 
 
@@ -274,6 +274,7 @@ def _print_file_overview(cwd, paths, telbestand_patterns=None):
         ("-d cumulative", telbestanden_ok, [files[0][0]]),
         ("-d individual", individueel_ok, [files[1][0]]),
         ("-d both", telbestanden_ok and individueel_ok, [f[0] for f in files[:2] if not f[1]]),
+        ("-d cwf", telbestanden_ok and files[2][1], [f[0] for f in (files[0], files[2]) if not f[1]]),
     ]
 
     any_unavailable = any(not available for _, available, _ in modes)

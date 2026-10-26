@@ -1,7 +1,7 @@
 """Interactieve dashboards voor de studentprognose-pipeline.
 
 Schrijft zelfstandige HTML-pagina's (geen server nodig) naar
-``data/output/visualisations[_ci_test_N{n}]/{individual,cumulative,final}/dashboard.html``.
+``data/output/visualisations[_ci_test_N{n}]/{individual,cumulative,cwf,final}/dashboard.html``.
 
 Alle pagina's delen één opzet rond modelperformance en betrouwbaarheid; zie
 :mod:`studentprognose.output.performance_page` voor de inhoud en
@@ -126,6 +126,13 @@ class DashboardBuilder:
             c in self.data.columns for c in ("SARIMA_cumulative", "Prognose_ratio")
         )
 
+    def _builds_cwf(self) -> bool:
+        return (
+            self.data_option == DataOption.CWF
+            and "Prognose_cwf" in self.data.columns
+            and self.data["Prognose_cwf"].notna().any()
+        )
+
     def _pages(self) -> list[tuple[str, str, str]]:
         """``(track, label, href)`` van de pagina's die :meth:`build_and_save` schrijft.
 
@@ -137,6 +144,8 @@ class DashboardBuilder:
             pages.append(("individual", "Individueel", "../individual/dashboard.html"))
         if self._builds_cumulative():
             pages.append(("cumulative", "Cumulatief", "../cumulative/dashboard.html"))
+        if self._builds_cwf():
+            pages.append(("cwf", "CWF", "../cwf/dashboard.html"))
         pages.append(("final", "Eindoverzicht", "../final/dashboard.html"))
         return pages
 

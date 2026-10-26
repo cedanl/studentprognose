@@ -1,4 +1,4 @@
-"""Tests voor de sporen-metadata (één bron van waarheid over de drie sporen)."""
+"""Tests voor de sporen-metadata (één bron van waarheid over de sporen)."""
 
 from gui import tracks
 
@@ -15,17 +15,17 @@ def test_track_unknown_label_returns_none():
     assert tracks.track("Bestaat niet") is None
 
 
-def test_all_three_tracks_present():
+def test_all_tracks_present():
     labels = {t.label for t in tracks.TRACKS}
-    assert labels == {"Cumulatief", "Individueel", "Beide"}
+    assert labels == {"Cumulatief", "Individueel", "Beide", "CWF"}
     assert tracks.RECOMMENDED in labels
 
 
 def test_dataset_tooltip_default_lists_all_and_hint():
     tip = tracks.dataset_tooltip()
     lines = tip.splitlines()
-    # Drie sporen + één hint-regel (Beide zit erin).
-    assert len(lines) == 4
+    # Vier sporen + één hint-regel (Beide zit erin).
+    assert len(lines) == len(tracks.TRACKS) + 1
     for t in tracks.TRACKS:
         assert any(line.startswith(f"{t.label}: ") for line in lines)
     assert lines[-1] == f"Niet zeker? Kies '{tracks.RECOMMENDED}'."

@@ -17,7 +17,27 @@ BENCHMARK_METRICS = {
     "benchmark_timeseries.csv": ("mape", False, "MAPE"),
     "benchmark_regressor.csv": ("mape", False, "MAPE"),
     "benchmark_classifier.csv": ("auc_roc", True, "AUC-ROC"),
+    "benchmark_cwf.csv": ("mape", False, "MAPE"),
 }
+
+
+def _cwf_as_models(df: pd.DataFrame) -> pd.DataFrame:
+    """Zet de CWF-backtest (één rij per combinatie) om naar het model-formaat.
+
+    ``benchmark_cwf.csv`` heeft geen ``model``-kolom maar per combinatie de
+    CWF-prognose, de naïeve voorspelling en de realisatie; we leiden per rij de
+    absolute procentuele fout af voor beide, zodat :func:`summarize` ze als twee
+    modellen kan vergelijken.
+    """
+    actual = pd.to_numeric(df["Aantal_studenten"], errors="coerce")
+    frames = []
+    for column, name in (("Prognose_cwf", "CWF"), ("Naief_vorig_jaar", "Naïef (vorig jaar)")):
+        if column not in df.columns:
+            continue
+        pred = pd.to_numeric(df[column], errors="coerce")
+        ape = ((actual - pred).abs() / actual).where(actual > 0)
+        frames.append(pd.DataFrame({"model": name, "mape": ape}))
+    return pd.concat(frames, ignore_index=True) if frames else df
 
 
 def summarize(
@@ -34,6 +54,8 @@ def summarize(
         Lijst met dicts ``{model, metric, n, winner}`` — beste model eerst,
         ``winner=True`` op de beste rij.
     """
+    if "model" not in df.columns and "Prognose_cwf" in df.columns:
+        df = _cwf_as_models(df)
     if "model" not in df.columns or metric not in df.columns:
         return []
 

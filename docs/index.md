@@ -18,13 +18,14 @@ studentprognose -d c -y 2024      # eerste prognose (cumulatief spoor)
 
 ## Wat doet de tool?
 
-Je kiest een **peilweek** en een **collegejaar**, en de tool geeft een prognose van het uiteindelijke aantal inschrijvingen. Onder water lopen tot drie sporen, afhankelijk van je data:
+Je kiest een **peilweek** en een **collegejaar**, en de tool geeft een prognose van het uiteindelijke aantal inschrijvingen. Onder water lopen tot drie sporen, afhankelijk van je data, plus het zelfstandige CWF-model:
 
 | Modus | Vlag | Databron | Wat het doet |
 |-------|------|----------|--------------|
 | Cumulatief | `-d c` | Studielink-telbestanden | Trekt de aanmeldcurve door naar het einde van het seizoen |
 | Individueel | `-d i` | Osiris/Usis per student | Schat per aanmelder de inschrijfkans, telt die op |
 | Beide | `-d b` | Beide bronnen (standaard) | Combineert beide sporen tot één ensemble-voorspelling |
+| CWF | `-d cwf` | Studielink-telbestanden + oktobertelling | Voorspelt de eindinstroom met een predictie-interval en een betrouwbaarheidslabel (Groen/Oranje/Rood) — zie [CWF-model](methodologie/cwf.md) |
 
 Zie [Methodologie](methodologie/index.md) voor de uitleg per model en [Begrippen](begrippen.md) voor onbekende termen.
 

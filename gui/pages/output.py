@@ -302,6 +302,17 @@ class _ResultsView:
                 },
                 {"name": "mape", "label": "MAPE", "field": "mape", "sortable": True},
             ]
+            has_cwf = any("betrouwbaarheid" in r for r in records)
+            if has_cwf:
+                columns[4:4] = [
+                    {"name": "interval", "label": "Interval", "field": "ondergrens"},
+                    {
+                        "name": "betrouwbaarheid",
+                        "label": "Betrouwbaarheid",
+                        "field": "betrouwbaarheid",
+                        "sortable": True,
+                    },
+                ]
             table = ui.table(
                 columns=columns,
                 rows=records,
@@ -317,6 +328,25 @@ class _ResultsView:
                 </q-td>
                 """,
             )
+            if has_cwf:
+                table.add_slot(
+                    "body-cell-interval",
+                    r"""
+                    <q-td :props="props">
+                        {{ props.row.ondergrens === null ? '—' : props.row.ondergrens + '–' + props.row.bovengrens }}
+                    </q-td>
+                    """,
+                )
+                table.add_slot(
+                    "body-cell-betrouwbaarheid",
+                    r"""
+                    <q-td :props="props">
+                        <q-badge v-if="props.value"
+                                 :color="{Groen: 'positive', Oranje: 'warning', Rood: 'negative'}[props.value]"
+                                 :label="props.value" />
+                    </q-td>
+                    """,
+                )
             table.on("rowClick", self._on_row_click)
             self._records_by_key = {
                 (r["opleiding"], r["herkomst"], r["examentype"]): r for r in records
@@ -344,13 +374,32 @@ class _ResultsView:
                 values.append(row["werkelijk"])
                 colors.append(POSITIVE)
             if labels:
-                fig = go.Figure(go.Bar(x=labels, y=values, marker_color=colors))
+                error_y = None
+                if row.get("ondergrens") is not None and row.get("voorspelling") is not None:
+                    # Predictie-interval van het CWF-model rond de voorspelling.
+                    error_y = dict(
+                        type="data",
+                        symmetric=False,
+                        array=[row["bovengrens"] - row["voorspelling"]] + [0] * (len(labels) - 1),
+                        arrayminus=[row["voorspelling"] - row["ondergrens"]]
+                        + [0] * (len(labels) - 1),
+                    )
+                fig = go.Figure(
+                    go.Bar(x=labels, y=values, marker_color=colors, error_y=error_y)
+                )
                 fig.update_layout(margin=dict(l=10, r=10, t=10, b=10), height=260)
                 ui.plotly(fig).classes("w-full")
             else:
                 ui.label("Geen numerieke waarden om te tonen.").classes(
                     "text-sm opacity-60"
                 )
+            if row.get("betrouwbaarheid"):
+                ui.label(
+                    f"Interval {row['ondergrens']:.0f}–{row['bovengrens']:.0f} · "
+                    f"betrouwbaarheid {row['betrouwbaarheid']}"
+                    if row.get("ondergrens") is not None
+                    else f"Betrouwbaarheid {row['betrouwbaarheid']}"
+                ).classes("text-sm")
             if row.get("mape") is not None:
                 ui.label(f"MAPE: {row['mape'] * 100:.1f}%").style(
                     f"color: {_BUCKET_COLOR.get(row['kleur'], '#000')}"

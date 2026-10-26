@@ -1243,3 +1243,63 @@ def generate_individual_report(
         meta, body, chart_js, footer,
     )
     _write(os.path.join(output_dir, "benchmark", "benchmark_individual.html"), html)
+
+
+def _cwf_table(frame: pd.DataFrame, first_col: str, first_label: str) -> str:
+    def _cell(v, kind):
+        if pd.isna(v):
+            return "—"
+        return _pct(v) if kind == "pct" else (f"{v:.2f}" if kind == "ratio" else f"{v:.1f}")
+
+    cols = [
+        ("n", "N", "int"), ("mae", "MAE", "num"), ("mape", "MAPE", "pct"),
+        ("wape", "WAPE", "pct"), ("coverage", "Binnen interval", "pct"),
+        ("median_rel_width", "Mediane relatieve breedte", "ratio"),
+        ("naive_mae", "MAE naïef", "num"), ("naive_wape", "WAPE naïef", "pct"),
+    ]
+    head = f"<th>{first_label}</th>" + "".join(f"<th>{label}</th>" for _, label, _ in cols)
+    rows = []
+    for _, r in frame.iterrows():
+        cells = "".join(
+            f"<td>{int(r[c]) if kind == 'int' else _cell(r[c], kind)}</td>" for c, _, kind in cols
+        )
+        rows.append(f"<tr><td>{r[first_col]}</td>{cells}</tr>")
+    return f"<table><thead><tr>{head}</tr></thead><tbody>{''.join(rows)}</tbody></table>"
+
+
+def generate_cwf_report(
+    by_year: pd.DataFrame,
+    by_label: pd.DataFrame,
+    predict_week: int,
+    output_dir: str,
+) -> None:
+    """Generate benchmark_cwf.html met de backtest per testjaar en per label."""
+    total = by_year[by_year["test_year"] == "alle"].iloc[0]
+    years = [y for y in by_year["test_year"] if y != "alle"]
+    meta = (
+        _meta_card(_pct(total["wape"]), "WAPE (alle testjaren)")
+        + _meta_card(_pct(total["coverage"]), "Werkelijk binnen 95%-interval")
+        + _meta_card(str(len(years)), f"Test-jaren ({years[0]}–{years[-1]})" if years else "Test-jaren")
+    )
+    body = (
+        '<section><h2>Per testjaar</h2>'
+        "<p>Elk testjaar is voorspeld vanaf dezelfde week, met alleen de jaren ervoor als "
+        "historie. De naïeve voorspelling is de instroom van het jaar ervoor.</p>"
+        + _cwf_table(by_year, "test_year", "Testjaar")
+        + "</section>"
+        '<section><h2>Per betrouwbaarheidslabel</h2>'
+        "<p>Groen hoort duidelijk nauwkeuriger te zijn dan Rood; de dekking van het "
+        "interval zou bij elk label rond de 95% moeten liggen.</p>"
+        + _cwf_table(by_label, "label", "Label")
+        + "</section>"
+    )
+    footer = (
+        "Gegenereerd door studentprognose benchmark &middot; "
+        f"CWF-model, voorspelweek {predict_week}, {int(total['n'])} combinaties"
+    )
+    html = _html_wrap(
+        "Benchmark — CWF-model",
+        f"Backtest van het confidence-weighted forecast-model vanaf week {predict_week}",
+        meta, body, "", footer,
+    )
+    _write(os.path.join(output_dir, "benchmark", "benchmark_cwf.html"), html)

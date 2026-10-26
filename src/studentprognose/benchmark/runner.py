@@ -5,7 +5,12 @@ import pandas as pd
 from studentprognose.benchmark.evaluate_ts import evaluate_timeseries_model
 from studentprognose.benchmark.evaluate_regressor import evaluate_regressor_model
 from studentprognose.benchmark.evaluate_classifier import evaluate_classifier_model
-from studentprognose.benchmark.report import generate_cumulative_report, generate_individual_report
+from studentprognose.benchmark.evaluate_cwf import backtest_cwf, summarise_cwf
+from studentprognose.benchmark.report import (
+    generate_cumulative_report,
+    generate_cwf_report,
+    generate_individual_report,
+)
 from studentprognose.config import load_configuration, get_columns, get_final_academic_week
 from studentprognose.data.loader import load_data
 from studentprognose.models import (
@@ -37,6 +42,67 @@ def main(
         _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_dir)
     elif data_option == DataOption.INDIVIDUAL:
         _run_individual_benchmark(config, predict_week, min_year, output_dir)
+    elif data_option == DataOption.CWF:
+        _run_cwf_benchmark(config, predict_week, nf_list, output_dir)
+
+
+def _run_cwf_benchmark(config, predict_week, nf_list, output_dir):
+    """Backtest het CWF-model per afgerond collegejaar vanaf dezelfde voorspelweek."""
+    print("Benchmark: CWF-model (backtest per collegejaar)\n")
+    try:
+        _, data_cumulative, data_studentcount, _, _ = load_data(config, DataOption.CWF)
+    except Exception:
+        data_cumulative = data_studentcount = None
+    if data_cumulative is None or data_studentcount is None:
+        print("Cumulatieve data of studentaantallen ontbreken. Benchmark afgebroken.")
+        return
+
+    print(f"Predict week: {predict_week}\n")
+    results = backtest_cwf(data_cumulative, data_studentcount, config, predict_week)
+    if results.empty:
+        print("Geen testjaren met realisatie en data in de voorspelweek. Benchmark afgebroken.")
+        return
+
+    # Zelfde uitsluiting als de overige evaluaties: bij numerus fixus bepaalt de
+    # capaciteit de instroom, niet de aanmeldingen.
+    nf = {str(p) for p in nf_list}
+    results = results[~results["Croho groepeernaam"].astype(str).isin(nf)]
+
+    by_year, by_label = summarise_cwf(results)
+    _print_cwf_summary(by_year, by_label)
+
+    path = os.path.join(output_dir, "benchmark_cwf.csv")
+    results.to_csv(path, index=False)
+    print(f"\nCWF-backtest per combinatie: {path}")
+    generate_cwf_report(by_year, by_label, predict_week, output_dir)
+
+    print("\nBenchmark voltooid.")
+
+
+def _print_cwf_summary(by_year, by_label):
+    """Print samenvattingstabellen voor de CWF-backtest."""
+    def _f(v, fmt):
+        return format(v, fmt) if pd.notna(v) else "—"
+
+    header = (
+        f"{'Jaar':<8} {'N':>5} {'MAE':>8} {'MAPE':>8} {'WAPE':>8} "
+        f"{'Dekking':>8} {'Breedte':>8} {'MAE naïef':>10}"
+    )
+    print(f"  CWF per testjaar\n  {header}\n  {'─' * len(header)}")
+    for _, r in by_year.iterrows():
+        print(
+            f"  {str(r['test_year']):<8} {int(r['n']):>5} {_f(r['mae'], '.1f'):>8} "
+            f"{_f(r['mape'], '.1%'):>8} {_f(r['wape'], '.1%'):>8} {_f(r['coverage'], '.1%'):>8} "
+            f"{_f(r['median_rel_width'], '.2f'):>8} {_f(r['naive_mae'], '.1f'):>10}"
+        )
+    if not by_label.empty:
+        header = f"{'Label':<8} {'N':>5} {'MAPE':>8} {'WAPE':>8} {'Dekking':>8}"
+        print(f"\n  CWF per betrouwbaarheidslabel\n  {header}\n  {'─' * len(header)}")
+        for _, r in by_label.iterrows():
+            print(
+                f"  {r['label']:<8} {int(r['n']):>5} {_f(r['mape'], '.1%'):>8} "
+                f"{_f(r['wape'], '.1%'):>8} {_f(r['coverage'], '.1%'):>8}"
+            )
 
 
 def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_dir):

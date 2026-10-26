@@ -309,3 +309,62 @@ class TestCheckNumerusFixusCaps:
             warnings.simplefilter("always")
             _check_numerus_fixus_caps(preds, {}, 2024, 10)
         assert not w
+
+
+# ---------------------------------------------------------------------------
+# CWF-checks (-d cwf)
+# ---------------------------------------------------------------------------
+
+def _cwf_predictions(**overrides):
+    row = {
+        "Collegejaar": 2024, "Weeknummer": 10, "Croho groepeernaam": "B Opleiding",
+        "Herkomst": "NL", "Examentype": "Bachelor", "Prognose_cwf": 50.0,
+        "cwf_ondergrens": 40.0, "cwf_bovengrens": 60.0, "cwf_betrouwbaarheid": "Oranje",
+        "cwf_vulgraad": 0.5, "Ongewogen vooraanmelders": 80.0, "Inschrijvingen": 0.0,
+    }
+    row.update(overrides)
+    return pd.DataFrame([row])
+
+
+class TestCWFChecks:
+    def test_valid_output_gives_no_warning(self):
+        from studentprognose.output.validator import run_post_prediction_checks
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            run_post_prediction_checks(_cwf_predictions(), None, 2024, 10, {})
+
+    def test_inconsistent_interval_warns(self):
+        from studentprognose.output.validator import _check_cwf_interval
+
+        with pytest.warns(UserWarning, match="CWF-interval"):
+            _check_cwf_interval(_cwf_predictions(cwf_ondergrens=55.0), 2024, 10)
+
+    def test_fractional_bounds_warn(self):
+        from studentprognose.output.validator import _check_cwf_interval
+
+        with pytest.warns(UserWarning, match="heel getal"):
+            _check_cwf_interval(_cwf_predictions(cwf_bovengrens=60.5), 2024, 10)
+
+    def test_unknown_label_warns(self):
+        from studentprognose.output.validator import _check_cwf_labels
+
+        with pytest.warns(UserWarning, match="onbekend label"):
+            _check_cwf_labels(_cwf_predictions(cwf_betrouwbaarheid="Paars"), 2024, 10)
+
+    def test_ceiling_breach_warns_only_late_in_cycle(self):
+        from studentprognose.output.validator import _check_cwf_ceiling
+
+        late = _cwf_predictions(cwf_vulgraad=0.99, cwf_bovengrens=95.0)
+        with pytest.warns(UserWarning, match="CWF-plafond"):
+            _check_cwf_ceiling(late, 2024, 10, None)
+        early = _cwf_predictions(cwf_vulgraad=0.5, cwf_bovengrens=95.0)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            _check_cwf_ceiling(early, 2024, 10, None)
+
+    def test_nf_cap_check_uses_cwf_column(self):
+        with pytest.warns(UserWarning, match="NF-cap"):
+            _check_numerus_fixus_caps(
+                _cwf_predictions(), {"B Opleiding": 30}, 2024, 10, prediction_col="Prognose_cwf"
+            )

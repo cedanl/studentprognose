@@ -94,3 +94,17 @@ def test_audit_diff_detects_new_and_shifts():
     assert diff["available"] is True
     assert any("B NEW" in p for p in diff["new_programmes"])
     assert diff["shifts"] and abs(diff["shifts"][0]["verschil"] - 0.30) < 1e-9
+
+
+def test_programme_rows_include_cwf_interval_and_label():
+    df = pd.DataFrame({
+        "Croho groepeernaam": ["A"], "Herkomst": ["NL"], "Examentype": ["Bachelor"],
+        "Collegejaar": [2024], "Weeknummer": [10], "Prognose_cwf": [90.0],
+        "cwf_ondergrens": [80.0], "cwf_bovengrens": [104.0],
+        "cwf_betrouwbaarheid": ["Groen"], "Aantal_studenten": [100.0],
+    })
+    assert results_io.primary_prediction_column(df) == "Prognose_cwf"
+    row = results_io.programme_rows(df)[0]
+    assert row["voorspelling"] == 90.0
+    assert (row["ondergrens"], row["bovengrens"]) == (80.0, 104.0)
+    assert row["betrouwbaarheid"] == "Groen"

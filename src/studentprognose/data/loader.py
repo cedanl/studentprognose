@@ -165,6 +165,8 @@ def get_path_latest(paths, data_option):
         return paths.get("path_latest_individual", "")
     elif data_option == DataOption.CUMULATIVE:
         return paths.get("path_latest_cumulative", "")
+    elif data_option == DataOption.CWF:
+        return paths.get("path_latest_cwf", "")
     return ""
 
 
@@ -180,7 +182,7 @@ def load_data(configuration, data_option):
         )
 
     data_cumulative = None
-    if data_option == DataOption.CUMULATIVE or data_option == DataOption.BOTH_DATASETS:
+    if data_option in (DataOption.CUMULATIVE, DataOption.BOTH_DATASETS, DataOption.CWF):
         data_cumulative = (
             pd.read_csv(paths["path_cumulative"], sep=";", skiprows=[1], low_memory=True)
             if (paths["path_cumulative"] != "" and os.path.exists(paths["path_cumulative"]))

@@ -38,7 +38,7 @@ Of met een dashboard:
   studentprognose -d b -y 2024 --dashboard
 
 De demodata bevat zowel telbestanden (cumulatief spoor) als individuele
-aanmelddata (individueel spoor), dus -d c, -d i en -d b werken allemaal.
+aanmelddata (individueel spoor), dus -d c, -d i, -d b en -d cwf werken allemaal.
 Zie: https://cedanl.github.io/studentprognose/je-data-voorbereiden/
 """
 
@@ -51,8 +51,9 @@ Of met een dashboard:
 
   studentprognose -d c -y 2024 --dashboard
 
-Deze demodata bevat alleen telbestanden (cumulatief spoor). Voor het individuele
-spoor (-d i of -d b) heb je eigen individuele aanmelddata nodig.
+Deze demodata bevat alleen telbestanden (cumulatief spoor); -d c en -d cwf werken
+dus. Voor het individuele spoor (-d i of -d b) heb je eigen individuele aanmelddata
+nodig.
 Zie: https://cedanl.github.io/studentprognose/je-data-voorbereiden/
 """
 
@@ -69,10 +70,12 @@ Volgende stappen:
   3. Optioneel — telbestand studenten:
                                     data/input_raw/oktober_bestand.xlsx
                                     (eigen levering instelling, voor
-                                    berekening van studentaantallen)
+                                    berekening van studentaantallen;
+                                    verplicht voor -d cwf)
 
   Draaien:
     studentprognose -w <week> -y <jaar>
+    studentprognose -w <week> -y <jaar> -d cwf   # CWF-model met interval en label
 
   Voor geautomatiseerde runs (cron, taakplanner):
     studentprognose -w <week> -y <jaar> --yes

@@ -1,6 +1,6 @@
-"""Interactieve schematische weergave van de drie voorspelsporen (inline SVG).
+"""Interactieve schematische weergave van de voorspelsporen (inline SVG).
 
-Eén on-brand SVG-flow. Elk spoor (cumulatief / individueel / beide) is
+Eén on-brand SVG-flow. Elk spoor (cumulatief / individueel / beide / CWF) is
 hoverbaar — dan verschijnt een korte uitleg — en klikbaar: het linkt door naar de
 uitgebreide methodologie-documentatie. Bedoeld om inline gerenderd te worden
 (``ui.html``) zodat de CSS-hover en links werken.
@@ -15,24 +15,26 @@ _DOCS = "https://cedanl.github.io/studentprognose/methodologie"
 DOC_CUMULATIEF = f"{_DOCS}/sarima/"
 DOC_INDIVIDUEEL = f"{_DOCS}/individueel/"
 DOC_BEIDE = f"{_DOCS}/ensemble/"
+DOC_CWF = f"{_DOCS}/cwf/"
 
 #: Algemene methodologie-link (gebruikt onder het schema).
 DOCS = f"{_DOCS}/"
 
 
 def flow_svg() -> str:
-    """Geef de interactieve drie-sporen-SVG als HTML-string.
+    """Geef de interactieve sporen-SVG als HTML-string.
 
     Hover over een spoor toont een korte uitleg; klikken opent de uitgebreide
     methodologie. Klassen zijn geprefixt met ``sp-`` om botsingen te voorkomen.
     """
     return f"""
-<svg width="100%" viewBox="0 0 940 306" xmlns="http://www.w3.org/2000/svg"
+<svg width="100%" viewBox="0 0 940 420" xmlns="http://www.w3.org/2000/svg"
      font-family="'Segoe UI',system-ui,Arial,sans-serif">
   <defs>
     <marker id="aB" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" fill="#3D68EC"/></marker>
     <marker id="aG" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" fill="#00AF81"/></marker>
     <marker id="aO" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" fill="#DD784B"/></marker>
+    <marker id="aP" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" fill="#7B5CD6"/></marker>
     <marker id="aK" markerWidth="9" markerHeight="9" refX="6.5" refY="3" orient="auto"><path d="M0,0 L6.5,3 L0,6 Z" fill="#111"/></marker>
     <filter id="sh" x="-20%" y="-20%" width="140%" height="150%">
       <feDropShadow dx="0" dy="1.5" stdDeviation="2.2" flood-color="#000" flood-opacity="0.12"/></filter>
@@ -109,6 +111,31 @@ def flow_svg() -> str:
       <text x="532" y="260" font-size="11" fill="#e8e8ea">Combineert beide sporen tot één ensemble — nauwkeurigst.</text>
     </g>
   </a>
+
+  <!-- ===================== CWF (klikbaar + hover) ===================== -->
+  <a class="sp-hz" href="{DOC_CWF}" target="_blank" rel="noopener">
+    <rect class="sp-band" x="12" y="316" width="572" height="92" rx="16" fill="#7B5CD60d"
+          stroke="#7B5CD6" stroke-width="1.4" stroke-opacity="0.5" fill-opacity="0.05" stroke-dasharray="5 4"/>
+    <text x="30" y="338" font-size="11.5" font-weight="700" fill="#7B5CD6" letter-spacing="1.5">CWF-MODEL</text>
+    <g filter="url(#sh)">
+      <rect x="30" y="348" width="150" height="48" rx="10" fill="#fff" stroke="#7B5CD6" stroke-width="1.5"/>
+      <rect x="222" y="348" width="150" height="48" rx="10" fill="#fff" stroke="#7B5CD6" stroke-width="1.5"/>
+      <rect x="414" y="348" width="150" height="48" rx="10" fill="#fff" stroke="#7B5CD6" stroke-width="1.5"/></g>
+    <text x="105" y="368" text-anchor="middle" font-size="12.5" font-weight="600" fill="#111">Aanmeldingen</text>
+    <text x="105" y="384" text-anchor="middle" font-size="12.5" font-weight="600" fill="#111">deze week</text>
+    <text x="297" y="370" text-anchor="middle" font-size="13" font-weight="600" fill="#111">Ratio × vulgraad</text>
+    <text x="297" y="386" text-anchor="middle" font-size="10" fill="#6b6b6b">+ prior vorig jaar</text>
+    <text x="489" y="370" text-anchor="middle" font-size="13" font-weight="600" fill="#111">Interval + label</text>
+    <text x="489" y="386" text-anchor="middle" font-size="10" fill="#6b6b6b">Groen / Oranje / Rood</text>
+    <line x1="180" y1="372" x2="218" y2="372" stroke="#7B5CD6" stroke-width="1.8" marker-end="url(#aP)"/>
+    <line x1="372" y1="372" x2="410" y2="372" stroke="#7B5CD6" stroke-width="1.8" marker-end="url(#aP)"/>
+    <g class="sp-tip">
+      <rect x="30" y="256" width="460" height="50" rx="8" fill="#111" fill-opacity="0.95"/>
+      <text x="46" y="276" font-size="11.5" font-weight="700" fill="#b9a6ff">CWF-model</text>
+      <text x="46" y="294" font-size="11" fill="#e8e8ea">Eindinstroom uit de aanmeldingen, met predictie-interval en label.</text>
+    </g>
+  </a>
+  <path d="M564,372 C740,372 866,300 866,210" fill="none" stroke="#7B5CD6" stroke-width="1.9" marker-end="url(#aP)"/>
 
   <!-- instroom -->
   <g filter="url(#sh)"><rect x="806" y="146" width="120" height="60" rx="13" fill="#111"/></g>

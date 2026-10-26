@@ -33,3 +33,17 @@
     options:
       members:
         - predict_with_ratio
+
+## CWF-model
+
+::: studentprognose.models.cwf
+    options:
+      members:
+        - CWFParams
+        - ConfidenceWeightedForecast
+        - reliability_label
+
+::: studentprognose.models.cwf_interval
+    options:
+      members:
+        - PredictionIntervalForecaster

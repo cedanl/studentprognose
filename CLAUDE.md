@@ -38,11 +38,14 @@ src/studentprognose/
 │   ├── regressors.py    # OOP-regressors + build_preprocessor (benchmark)
 │   ├── xgboost_regressor.py   # predict_with_xgboost() — cumulatief spoor
 │   ├── importance.py    # Feature-importance-aggregatie
-│   └── ratio.py         # Ratio-model
+│   ├── ratio.py         # Ratio-model
+│   ├── cwf.py           # CWF-model: puntvoorspelling, CWFParams, betrouwbaarheidslabel
+│   └── cwf_interval.py  # CWF-model: predictie-interval
 ├── strategies/
 │   ├── individual.py    # Individueel spoor preprocessing
 │   ├── cumulative.py    # Cumulatief spoor preprocessing
-│   └── combined.py      # Both-modus
+│   ├── combined.py      # Both-modus
+│   └── cwf.py           # CWF-model (-d cwf): vulgraad, pool, NF-cap
 ├── data/                # ETL, loader, validatie, transforms, preprocessing/
 ├── output/              # PostProcessor, dashboard, evaluation, validator
 ├── benchmark/           # `studentprognose benchmark` — alternatieve modellen vergelijken
@@ -67,6 +70,7 @@ docs/                    # MkDocs bronbestanden
     ├── sarima.md
     ├── xgboost.md
     ├── ratio-model.md
+    ├── cwf.md
     └── ensemble.md
 ```
 
@@ -137,6 +141,7 @@ Gebruik de onderstaande mapping om te bepalen welke pagina('s) bijgewerkt moeten
 | `models/sarima.py` / SARIMA-parameters | `docs/methodologie/sarima.md` |
 | `models/xgboost_*.py` / XGBoost-features of -parameters | `docs/methodologie/xgboost.md` |
 | `models/ratio.py` / ratio-logica | `docs/methodologie/ratio-model.md` |
+| `models/cwf*.py` / `strategies/cwf.py` / `cwf_params` | `docs/methodologie/cwf.md` |
 | `benchmark/` / `models/{classifiers,regressors,forecasters}.py` | `docs/methodologie/benchmarks.md` |
 | `strategies/individual.py` / individueel-pipeline / filterregels | `docs/methodologie/individueel.md` |
 | Ensemble-logica / gewichten / postprocessor | `docs/methodologie/ensemble.md` |
