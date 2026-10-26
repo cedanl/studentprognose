@@ -1236,7 +1236,8 @@ class _WizardView:
             self._project_dir = os.path.join(
                 os.path.expanduser("~"), "tmp", f"studentprognose{stamp}"
             )
-        self._mode: str = "cumulative"
+        # Een eerder in deze sessie gekozen modus blijft staan bij terugkeer.
+        self._mode: str = STATE.wizard_mode or "cumulative"
         self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
@@ -1589,7 +1590,10 @@ class _WizardView:
     # ── Modus-logica ────────────────────────────────────────────────────────
 
     def _select_mode(self, mode: str) -> None:
+        from gui.pages.run import remember_wizard_mode
+
         self._mode = mode
+        remember_wizard_mode(mode)
         self._apply_mode()
 
     def _apply_mode(self) -> None:

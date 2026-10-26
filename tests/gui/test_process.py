@@ -79,3 +79,18 @@ def test_build_run_args_cwf():
 
     args = build_run_args(dataset="CWF")
     assert args[:2] == ["-d", "cwf"]
+
+
+def test_wizard_mode_choice_overrides_stored_run_dataset(monkeypatch):
+    from types import SimpleNamespace
+
+    from gui.pages import run
+
+    fake_app = SimpleNamespace(storage=SimpleNamespace(general={
+        "run_settings": {"dataset": "Cumulatief", "weeks": "16"}
+    }))
+    monkeypatch.setattr(run, "app", fake_app)
+    run.remember_wizard_mode("cwf")
+    assert fake_app.storage.general["run_settings"] == {"dataset": "CWF", "weeks": "16"}
+    run.remember_wizard_mode("onbekend")
+    assert fake_app.storage.general["run_settings"]["dataset"] == "CWF"
