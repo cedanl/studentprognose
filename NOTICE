@@ -10,8 +10,7 @@ De modules
   src/studentprognose/models/cwf_interval.py
   src/studentprognose/strategies/cwf.py
 
-zijn gebaseerd op het model van Radboud Institutional Research:
-https://github.com/radboudir/studentprognose
+zijn gebaseerd op het model van Radboud Institutional Research.
 
 Dat model is uitgebracht onder de MIT-licentie:
 

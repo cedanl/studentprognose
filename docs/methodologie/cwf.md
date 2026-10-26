@@ -6,7 +6,7 @@
     - **Wees voorzichtig als:** het label Rood is, het nog vroeg in de cyclus is, de opleiding nieuw is of numerus fixus heeft.
     - **Ten opzichte van de andere sporen:** een zelfstandig derde model (`-d cwf`), niet onderdeel van het ensemble. Het heeft alleen telbestanden en studentaantallen nodig.
 
-Het CWF-model is gebaseerd op het model van Radboud Institutional Research ([radboudir/studentprognose](https://github.com/radboudir/studentprognose), MIT-licentie). Studentprognose neemt de methode over en maakt hem configureerbaar voor elke instelling.
+Het CWF-model is gebaseerd op het model van Radboud Institutional Research (MIT-licentie; zie `NOTICE`). Studentprognose neemt de methode over en maakt hem configureerbaar voor elke instelling.
 
 ## Wat doet het?
 
