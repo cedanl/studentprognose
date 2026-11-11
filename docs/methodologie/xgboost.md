@@ -73,7 +73,10 @@ De weekkolommen van het voorspeljaar zijn tot en met de voorspelweek echte waarn
 
 ### Terugblik op een afgerond jaar
 
-Voorspel je een jaar dat al voorbij is (een backtest, of terugblikjaren in dezelfde run), dan bevat de input ook de weken ná de voorspelweek. Die lagen op het voorspelmoment in de toekomst. Het model ziet ze niet: van het voorspeljaar gebruikt de pipeline alleen de weken tot en met de voorspelweek. Een terugblik geeft daardoor exact dezelfde voorspelling als een live run in die week, en de fout die je meet is een eerlijke maat voor de live nauwkeurigheid. Het dashboard toont wel de volledige, echte curve.
+Voorspel je een jaar dat al voorbij is (een backtest, of terugblikjaren in dezelfde run), dan bevat de input ook de weken ná de voorspelweek. Die lagen op het voorspelmoment in de toekomst. Het model ziet ze niet: van het voorspeljaar gebruikt de pipeline alleen de weken tot en met de voorspelweek. Een terugblik geeft daardoor voor `SARIMA_cumulative` exact dezelfde voorspelling als een live run in die week, en de fout die je meet is een eerlijke maat voor de live nauwkeurigheid. Het dashboard toont wel de volledige, echte curve.
+
+!!! warning "Geldt alleen voor het cumulatieve spoor"
+    Deze garantie geldt voor `SARIMA_cumulative`. In de both-modus telt ook het individuele spoor mee in de ensemblevoorspelling. Of dat spoor bij een terugblik informatie van ná de voorspelweek gebruikt, is nog niet onderzocht. Beoordeel een terugblik in de both-modus daarom voorzichtiger: de gemeten fout kan te rooskleurig zijn.
 
 Tot [#318](https://github.com/cedanl/studentprognose/issues/318) gold dat niet. Lukte SARIMA niet voor een opleiding, dan bleven de echte latere weken in de features staan en "wist" de regressor de eindstand al. Terugblikken en daarop gebaseerde betrouwbaarheidsinschattingen konden daardoor te rooskleurig uitvallen. Vergelijk je met resultaten van vóór die fix, houd daar dan rekening mee.
 
