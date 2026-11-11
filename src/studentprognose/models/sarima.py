@@ -3,7 +3,7 @@ from numpy import linalg as LA
 from statsforecast.models import ARIMA
 
 from studentprognose.models.base import BaseForecaster
-from studentprognose.data.transforms import ensure_start_week
+from studentprognose.data.transforms import drop_weeks_after_predict_week, ensure_start_week
 from studentprognose.utils.weeks import (
     get_all_weeks_valid, get_all_weeks_ordered, get_forecast_weeks, compute_pred_len,
 )
@@ -195,6 +195,11 @@ def predict_with_sarima_cumulative(
 
     data_cumulative = data_cumulative.astype(
         {"Weeknummer": "int32", "Collegejaar": "int32"}
+    )
+    # Weken ná de voorspelweek bestonden op het voorspelmoment nog niet. Weghalen
+    # vóór de pivot, zodat de interpolatie van tussenweken ze niet gebruikt (#318).
+    data_cumulative = drop_weeks_after_predict_week(
+        data_cumulative, predict_year - skip_years, predict_week, final_week
     )
     data = _get_transformed_data(data_cumulative.copy(deep=True), min_training_year, final_week)
 

@@ -82,9 +82,12 @@ Dit bootst de productiescenario na: het model traint op historische data en voor
 Het cumulatieve spoor heeft twee stappen. De benchmark meet beide apart:
 
 1. **Stap 1 (tijdreeks):** hoe goed extrapoleert het model de vooraanmelderscurve? Gemeten als MAPE/MAE/RMSE op de curve zelf. De curve wordt op precies dezelfde manier op de voorspelweek afgekapt als in productie: alleen weken die in de data voorkomen tellen mee (zie [SARIMA → Ontbrekende weken](sarima.md#ontbrekende-weken-afkappen-op-de-voorspelweek)).
-2. **Stap 2 (regressie):** hoe goed vertaalt het model vooraanmelders naar inschrijvingen? Gemeten op het eindaantal studenten. De regressors krijgen dezelfde features als in productie: vroege weken zonder data in elk jaar vallen weg (zie [XGBoost → Features](xgboost.md#features_1)).
+2. **Stap 2 (regressie):** hoe goed vertaalt het model vooraanmelders naar inschrijvingen? Gemeten op het eindaantal studenten. De regressors krijgen dezelfde features als in productie: vroege weken zonder data in elk jaar vallen weg (zie [XGBoost → Features](xgboost.md#features_1)). De lag-features tellen terug in academische weekvolgorde, net als in productie.
 
 Door apart te meten kun je zien waar de fout zit: in de extrapolatie of in de vertaling.
+
+!!! warning "Stap 2 krijgt een perfecte stap 1"
+    In de stap-2-meting krijgt de regressor voor het testjaar de **echte** weekwaarden ná de voorspelweek, niet de SARIMA-prognose. Zo meet je de vertaling los van de extrapolatie. In productie zijn die weken een prognose en dus onzeker. De stap-2-fout is daarom een **ondergrens**: de fout van het hele cumulatieve spoor ligt in de praktijk hoger. Dat geldt ook voor de regressor-tuning, die deze meting hergebruikt. Wil je de nauwkeurigheid van het hele spoor kennen, draai dan een terugblik met de pipeline zelf (bijv. `-y 2023 2024 -w 16`); die rekent wel met de SARIMA-prognose.
 
 ## Output
 

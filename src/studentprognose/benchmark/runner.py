@@ -142,7 +142,7 @@ def _run_cumulative_benchmark(config, predict_week, min_year, nf_list, output_di
     final_week = get_final_academic_week(config)
     full_data = _get_transformed_data(data_cumulative.copy(), min_year, final_week)
     full_data = ensure_start_week(full_data, final_week)
-    full_data = _add_engineered_features(full_data, data_cumulative, predict_week)
+    full_data = _add_engineered_features(full_data, data_cumulative, predict_week, final_week)
 
     reg_results = []
     for name, factory in REGRESSOR_REGISTRY.items():
