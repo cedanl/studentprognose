@@ -59,13 +59,23 @@ De regressor voorspelt het **totaal aantal inschrijvingen** per opleiding/herkom
 | Afgeleid — commitment | `exclusivity_ratio`: aandeel aanmelders dat exclusief voor deze opleiding kiest — `Aantal aanmelders met 1 aanmelding / (Ongewogen vooraanmelders + ε)`. Hogere waarde = grotere commitment. |
 | Categorisch | Examentype, Faculteit, Croho groepeernaam, Herkomst |
 
-De lagged en afgeleide features worden per (opleiding × herkomst × examentype × jaar) berekend ten opzichte van de voorspelweek. Ontbreekt een referentieweek dan wordt als fallback week 1 gebruikt; is ook die afwezig dan wordt 0 ingevuld.
+De lagged en afgeleide features worden per (opleiding × herkomst × examentype × jaar) berekend ten opzichte van de voorspelweek. "2 weken eerder" telt in de volgorde van het academisch jaar: in week 1 is dat week 51 van het kalenderjaar ervoor, en aan het begin van het seizoen stopt de telling bij de startweek. Ontbreekt een referentieweek, dan wordt als fallback week 1 gebruikt, maar alleen als week 1 op dat moment al voorbij is. Anders, of als ook week 1 ontbreekt, wordt 0 ingevuld.
+
+**Waarom in academische volgorde?** Tot [#318](https://github.com/cedanl/studentprognose/issues/318) werd gewoon `voorspelweek − 2` gerekend. Aan het begin van het seizoen (bijv. week 37 bij `final_academic_week = 36`) wees dat naar week 35: het *eind* van hetzelfde collegejaar. Bij een terugblik op een afgerond jaar keek de feature dan in de toekomst. In een live run bestaat die week nog niet en was de feature 0.
 
 **Vroege weken zonder data in elk jaar vallen weg.** Een weekkolom aan het begin van het academisch jaar gaat alleen als feature mee als *elk* collegejaar (training én voorspeljaar) vanaf die week data heeft. Mist één jaar zijn eerste weken, door een gemist telbestand of doordat de aanmeldcyclus later opende, dan staan daar nullen die in de trainingsjaren nooit voorkomen. Het model ziet het jaar dan als iets wat het niet kent, en de voorspelling kan een factor naast zitten. Die vroege weken bevatten nauwelijks informatie over de uiteindelijke instroom, dus weglaten kost weinig. De startweek (`final_academic_week + 1`) is in elk jaar 0 en valt om dezelfde reden altijd weg.
 
 **Wanneer vertrouw je het niet?** Als er veel vroege weken wegvallen, bijvoorbeeld omdat één trainingsjaar pas laat begint. Het model kijkt dan alleen naar latere weken. De pipeline [waarschuwt](../validatie.md#weekdekking-en-eindweek) als het voorspeljaar weken mist die eerdere jaren wel hebben.
 
 De weekkolommen van het voorspeljaar zijn tot en met de voorspelweek echte waarnemingen; de weken daarna zijn de SARIMA-prognose. Een fout in die prognose werkt dus direct door in `SARIMA_cumulative`. Een week die binnen een jaar tussen twee waarnemingen ontbreekt, wordt in de weekkolommen geïnterpoleerd in plaats van op 0 gezet, in training én in het voorspeljaar (zie [SARIMA → Ontbrekende weken](sarima.md#ontbrekende-weken-afkappen-op-de-voorspelweek)).
+
+**Als SARIMA geen prognose oplevert.** Voor sommige combinaties lukt de SARIMA-fit niet, bijvoorbeeld bij een te korte of vlakke reeks. De weken na de voorspelweek krijgen dan de **laatst bekende waarde** (de stand in de voorspelweek): "er komt niets meer bij". De regressor rekent daarmee en de console meldt welke combinaties het betreft. Dat is een bewust voorzichtige aanname. Bij een opleiding die nog flink groeit valt `SARIMA_cumulative` daardoor te laag uit. De output bevat voor die opleiding geen `Voorspelde vooraanmelders` voor de latere weken, want er is geen prognose. Zie je de melding voor een opleiding die je belangrijk vindt, beoordeel die voorspelling dan kritisch.
+
+### Terugblik op een afgerond jaar
+
+Voorspel je een jaar dat al voorbij is (een backtest, of terugblikjaren in dezelfde run), dan bevat de input ook de weken ná de voorspelweek. Die lagen op het voorspelmoment in de toekomst. Het model ziet ze niet: van het voorspeljaar gebruikt de pipeline alleen de weken tot en met de voorspelweek. Een terugblik geeft daardoor exact dezelfde voorspelling als een live run in die week, en de fout die je meet is een eerlijke maat voor de live nauwkeurigheid. Het dashboard toont wel de volledige, echte curve.
+
+Tot [#318](https://github.com/cedanl/studentprognose/issues/318) gold dat niet. Lukte SARIMA niet voor een opleiding, dan bleven de echte latere weken in de features staan en "wist" de regressor de eindstand al. Terugblikken en daarop gebaseerde betrouwbaarheidsinschattingen konden daardoor te rooskleurig uitvallen. Vergelijk je met resultaten van vóór die fix, houd daar dan rekening mee.
 
 ### Waarom XGBoost hier?
 
@@ -133,6 +143,8 @@ Het commando print een overzicht van alle geteste parametersets met hun MAPE —
 ### Hoe wordt geëvalueerd?
 
 Identiek aan de [benchmark](benchmarks.md): **tijd-bewuste cross-validatie** (train op jaren tot en met N−1, valideer op jaar N, minimaal drie trainingsjaren) met MAPE als selectiemetriek. Elke kandidaat-parameterset wordt over alle folds beoordeeld; de laagste gemiddelde MAPE wint. Random k-fold wordt **niet** gebruikt: dat zou toekomstige jaren in de trainingsset lekken en de scores te optimistisch maken.
+
+Tune je binnen een voorspelrun (`tune=True` in de API), dan gebruikt de tuning alleen jaren **vóór** het voorspeljaar. Bij een terugblik op een afgerond jaar zou dat jaar anders zelf een testfold zijn, en kiest de tuning parameters die de uitkomst al kennen. Er wordt één keer getuned, bij het eerste jaar van de run. Geef bij meerdere jaren die jaren daarom in oplopende volgorde op. Doe je dat niet, dan volgt een waarschuwing.
 
 ### Waarom een kleine grid en geen zware optimizer?
 

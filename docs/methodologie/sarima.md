@@ -117,7 +117,7 @@ Het praktische signaal: **krijg je een prognose die ná de piek omhoog drijft in
 
 ## Ontbrekende weken: afkappen op de voorspelweek
 
-Het model krijgt alle bekende weken tot en met de voorspelweek en voorspelt de rest van het jaar. Dat afkappen moet precies op de voorspelweek vallen. Daarom telt de horizon alleen de weken die **echt in de data voorkomen** na de voorspelweek, niet alle kalenderweken tot `final_academic_week`. Ontbreekt een week in de hele dataset (bijv. eindweken onder de openbaarmakingsdrempel of nooit aangeleverde telbestanden), dan krijgt die week **geen voorspelling** en verschijnt hij niet in de output.
+Het model krijgt alle bekende weken tot en met de voorspelweek en voorspelt de rest van het jaar. Dat afkappen moet precies op de voorspelweek vallen. Bij een terugblik op een afgerond jaar staan de echte latere weken wel in de input. Die worden vóór het pivotteren en interpoleren weggehaald, zodat de reeks er precies zo uitziet als in een live run in die week ([#318](https://github.com/cedanl/studentprognose/issues/318)). Daarom telt de horizon alleen de weken die **echt in de data voorkomen** na de voorspelweek, niet alle kalenderweken tot `final_academic_week`. Ontbreekt een week in de hele dataset (bijv. eindweken onder de openbaarmakingsdrempel of nooit aangeleverde telbestanden), dan krijgt die week **geen voorspelling** en verschijnt hij niet in de output.
 
 Een week die binnen één jaar ontbreekt maar tussen twee waarnemingen ligt (bijv. een ontbrekend telbestand), wordt **lineair geïnterpoleerd** in plaats van op 0 gezet. De reeks is cumulatief, dus een val naar nul midden in het jaar is vrijwel altijd een artefact en geen echte waarneming. Start- en eindweken zonder waarneming blijven 0.
 

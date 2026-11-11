@@ -99,7 +99,9 @@ def run_tuning(
             final_week = get_final_academic_week(config)
             full_data = _get_transformed_data(data_cumulative.copy(), min_year, final_week)
             full_data = ensure_start_week(full_data, final_week)
-            full_data = _add_engineered_features(full_data, data_cumulative, predict_week)
+            full_data = _add_engineered_features(
+                full_data, data_cumulative, predict_week, final_week
+            )
 
             grid_used = grid if grid is not None else DEFAULT_PARAM_GRIDS.get(name, {})
             print(f"── Regressor (stap 2: {name}) ──")

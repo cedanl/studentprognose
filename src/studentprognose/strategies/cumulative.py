@@ -9,13 +9,16 @@ from studentprognose.config import get_cpu_count
 from studentprognose.utils.parallel import run_parallel_with_fallback
 from studentprognose.utils.programme_key import normalize_programme_series
 from studentprognose.strategies.base import PredictionStrategy
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 from studentprognose.utils.weeks import (
-    increment_week, compute_pred_len, get_all_weeks_ordered,
+    compute_pred_len, get_all_weeks_ordered, week_sort_key,
 )
 from studentprognose.models import create_forecaster, create_regressor
 from studentprognose.models.sarima import predict_with_sarima_cumulative, _get_transformed_data
 from studentprognose.models.xgboost_regressor import predict_with_xgboost
-from studentprognose.data.transforms import TRANSFORM_GROUP_COLS, ensure_start_week
+from studentprognose.data.transforms import (
+    TRANSFORM_GROUP_COLS, drop_weeks_after_predict_week, ensure_start_week,
+)
 from studentprognose.data.preprocessing.excluded_data_points import apply_excluded_data_points
 
 _EPS = 1e-8
@@ -26,24 +29,64 @@ ENGINEERED_FEATURE_COLS = (
 )
 
 
+def _academic_weeks_until(predict_week: int, final_week: int = FINAL_ACADEMIC_WEEK) -> list[int]:
+    """De weken van het academisch jaar t/m ``predict_week``, in seizoensvolgorde.
+
+    ISO-week 53 telt mee als ``predict_week`` 53 is; hij valt tussen 52 en 1.
+    """
+    weeks = {int(w) for w in get_all_weeks_ordered(final_week)} | {int(predict_week)}
+    limit = week_sort_key(int(predict_week), final_week)
+    return sorted(
+        (w for w in weeks if week_sort_key(w, final_week) <= limit),
+        key=lambda w: week_sort_key(w, final_week),
+    )
+
+
+def _lag_reference_week(
+    predict_week: int, lag: int, final_week: int = FINAL_ACADEMIC_WEEK
+) -> int:
+    """De week ``lag`` weken vóór ``predict_week``, in academische volgorde.
+
+    Telt terug binnen hetzelfde academisch jaar en stopt bij de startweek. Een
+    kale ``predict_week - lag`` wijst aan het begin van het seizoen (bv. week 37
+    bij ``final_week`` 36) naar het éínde van hetzelfde collegejaar: in een
+    afgerond jaar is dat de toekomst, in een live run bestaat die week nog niet
+    (#318).
+    """
+    past = _academic_weeks_until(predict_week, final_week)
+    return past[max(len(past) - 1 - lag, 0)]
+
+
 def _add_engineered_features(
     full_data: pd.DataFrame,
     data_cumulative: pd.DataFrame,
     predict_week: int,
+    final_week: int = FINAL_ACADEMIC_WEEK,
 ) -> pd.DataFrame:
     """Add lagged features, Gewogen_acceleration en exclusivity_ratio to wide-format data.
 
     Computes lags (defined by _LAGS) relative to predict_week from the long-format source
-    data and merges them into the pivoted XGBoost feature matrix. Missing reference weeks
-    fall back to week 1; if week 1 is also absent the value is filled with 0.
+    data and merges them into the pivoted XGBoost feature matrix. Lags count back in
+    academic week order (see ``_lag_reference_week``), so a feature never uses a week
+    after ``predict_week``. Missing reference weeks fall back to week 1 when week 1 lies
+    at or before ``predict_week``; otherwise, or if week 1 is also absent, the value is
+    filled with 0.
 
-    The columns added are exactly those listed in ENGINEERED_FEATURE_COLS.
+    Args:
+        full_data: Wide-format feature matrix (one row per group and year).
+        data_cumulative: Long-format source data.
+        predict_week: Week from which is predicted.
+        final_week: Last week of the academic year; determines the week order.
+
+    Returns:
+        ``full_data`` with exactly the columns in ENGINEERED_FEATURE_COLS added.
     """
     src = data_cumulative
     grp = TRANSFORM_GROUP_COLS
+    week1_known = week_sort_key(1, final_week) <= week_sort_key(int(predict_week), final_week)
 
     for lag in _LAGS:
-        ref_week = max(predict_week - lag, 1)
+        ref_week = _lag_reference_week(int(predict_week), lag, final_week)
         col_name = f"Gewogen_t-{lag}"
 
         ref_values = (
@@ -57,8 +100,10 @@ def _add_engineered_features(
 
         missing_mask = full_data[col_name].isna()
         if missing_mask.any():
+            # Week 1 als terugval alleen als die op het voorspelmoment al bekend was.
+            fallback_src = src[src["Weeknummer"] == 1] if week1_known else src.iloc[0:0]
             fallback = (
-                src[src["Weeknummer"] == 1]
+                fallback_src
                 .groupby(grp)["Gewogen vooraanmelders"]
                 .mean()
                 .rename("_fallback")
@@ -208,6 +253,8 @@ class CumulativeStrategy(PredictionStrategy):
         self._tune_sarima = "sarima" in tune_targets
         self._sarima_tuning_grid = tune_targets.get("sarima")
         self._tuned = False
+        # Eerste voorspeljaar bij het tunen; tuning gebruikte alleen jaren daarvóór.
+        self._tuned_before_year: int | None = None
 
     def get_dashboard_data(self) -> dict:
         return {
@@ -242,25 +289,36 @@ class CumulativeStrategy(PredictionStrategy):
             {"Weeknummer": "int32", "Collegejaar": "int32"}
         )
 
-        full_data = _get_transformed_data(
-            self.data_cumulative.copy(deep=True), self.min_training_year, self.final_academic_week
-        )
-        full_data = ensure_start_week(full_data, self.final_academic_week)
-        full_data = _add_engineered_features(full_data, self.data_cumulative, int(self.predict_week))
+        target_year = int(self.predict_year) - int(skip_years)
+        model_data, full_data = self._build_model_input(target_year)
 
         if not self._tuned and (self._tune or self._tune_sarima):
+            # Tuning ziet alleen jaren vóór het voorspeljaar: met het voorspeljaar
+            # (of later) als testfold kiest hij parameters die de uitkomst al kennen.
+            # Getuned wordt één keer, bij het eerste voorspelde jaar.
             # Elke trap wordt apart getuned en apart gelogd (eigen ✓-tabel).
             if self._tune_sarima:
-                self._tune_sarima_orders()
+                self._tune_sarima_orders(
+                    self.data_cumulative[self.data_cumulative["Collegejaar"] < target_year]
+                )
             if self._tune:
-                self._tune_regressor(full_data)
+                self._tune_regressor(full_data[full_data["Collegejaar"] < target_year])
             self._tuned = True
+            self._tuned_before_year = target_year
+        elif self._tuned_before_year is not None and target_year < self._tuned_before_year:
+            warnings.warn(
+                f"De tuning is gedaan op alle jaren vóór {self._tuned_before_year}, dus ook op "
+                f"{target_year}. De voorspelling voor {target_year} is daardoor geen eerlijke "
+                "terugblik. Geef de jaren in oplopende volgorde op.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         self.skip_years = skip_years
 
-        data_to_predict = self.data_cumulative[
-            (self.data_cumulative["Collegejaar"] == self.predict_year)
-            & (self.data_cumulative["Weeknummer"] == self.predict_week)
+        data_to_predict = model_data[
+            (model_data["Collegejaar"] == self.predict_year)
+            & (model_data["Weeknummer"] == self.predict_week)
         ]
         if self.programme_filtering != []:
             data_to_predict = data_to_predict[
@@ -311,6 +369,34 @@ class CumulativeStrategy(PredictionStrategy):
 
         return data_to_predict
 
+    def _build_model_input(self, target_year: int) -> tuple[pd.DataFrame, pd.DataFrame]:
+        """Bouw de modelinput: alleen wat op het voorspelmoment bekend was.
+
+        Van ``target_year`` (en later) blijven de weken t/m de voorspelweek over;
+        de trainingsjaren blijven volledig (#318). ``self.data_cumulative`` wordt
+        niet aangepast, zodat het dashboard de echte curve blijft tonen. Gedeeld
+        met de both-modus (``CombinedStrategy``).
+
+        Args:
+            target_year: Het collegejaar waarin de voorspelweek valt
+                (``predict_year - skip_years``).
+
+        Returns:
+            ``(model_data, full_data)``: de afgekapte data in lang formaat en de
+            wide-format feature-matrix met engineered features.
+        """
+        model_data = drop_weeks_after_predict_week(
+            self.data_cumulative, target_year, int(self.predict_week), self.final_academic_week
+        )
+        full_data = _get_transformed_data(
+            model_data.copy(deep=True), self.min_training_year, self.final_academic_week
+        )
+        full_data = ensure_start_week(full_data, self.final_academic_week)
+        full_data = _add_engineered_features(
+            full_data, model_data, int(self.predict_week), self.final_academic_week
+        )
+        return model_data, full_data
+
     def _tune_regressor(self, full_data):
         """Tune de cumulatieve regressor op de feature-matrix en vervang ``self._regressor``.
 
@@ -353,7 +439,7 @@ class CumulativeStrategy(PredictionStrategy):
         model_config.setdefault("regressor_params", {})[name] = best
         self._regressor = REGRESSOR_REGISTRY[name](**best)
 
-    def _tune_sarima_orders(self):
+    def _tune_sarima_orders(self, data_cumulative: pd.DataFrame | None = None):
         """Tune de SARIMA-ordes (stap 1) en vervang ``self._forecaster_factory``.
 
         Draait een tijd-bewuste grid search over ARIMA-ordes (zie
@@ -363,12 +449,17 @@ class CumulativeStrategy(PredictionStrategy):
         ze zichtbaar/te-bevriezen zijn — en wordt de tijdreeks-factory ermee
         herbouwd. Bij te weinig trainingsjaren blijft het standaardmodel staan en
         volgt een waarschuwing.
+
+        Args:
+            data_cumulative: Lang-formaat data om op te tunen. ``None`` gebruikt
+                ``self.data_cumulative``; de pipeline geeft alleen jaren vóór het
+                voorspeljaar mee.
         """
         from studentprognose.models.sarima import SARIMAForecaster
         from studentprognose.models.tuning import format_tuning_results, tune_sarima
 
         result = tune_sarima(
-            self.data_cumulative,
+            self.data_cumulative if data_cumulative is None else data_cumulative,
             int(self.predict_week),
             self.configuration,
             grid=self._sarima_tuning_grid,
@@ -416,8 +507,65 @@ class CumulativeStrategy(PredictionStrategy):
             final_week=self.final_academic_week,
         )
 
+    def _fill_future_weeks(
+        self, data: pd.DataFrame, mask: pd.Series, forecast: list[float] | np.ndarray
+    ) -> bool:
+        """Vul de weekkolommen ná de voorspelweek met de SARIMA-forecast.
+
+        ``forecast`` heeft één waarde per kalenderweek ná de voorspelweek (zie
+        ``align_forecast_to_calendar``). Een week zonder (eindige) forecast krijgt
+        de laatst ingevulde waarde, te beginnen bij de voorspelweek zelf
+        (persistentie). Dat gebeurt ook als SARIMA helemaal niets oplevert
+        (lege ``forecast``). De regressor rekent dan met "er komt niets meer
+        bij" in plaats van met nullen; de data van het voorspeljaar is vooraf al
+        afgekapt, dus echte latere waarden zijn er niet (#318).
+
+        Alleen bestaande weekkolommen worden gevuld: bij een dalende reeks valt
+        de laatste weekkolom soms weg (combinaties zakken onder de
+        openbaarmakingsdrempel).
+
+        Args:
+            data: Wide-format feature-matrix; wordt in place aangepast.
+            mask: Rijen van deze combinatie in het voorspeljaar.
+            forecast: Forecast per kalenderweek ná de voorspelweek, of leeg.
+
+        Returns:
+            True als elke gevulde week uit de forecast kwam, False als
+            persistentie nodig was.
+        """
+        ordered = get_all_weeks_ordered(self.final_academic_week)
+        limit = week_sort_key(int(self.predict_week), self.final_academic_week)
+        calendar = [w for w in ordered if week_sort_key(int(w), self.final_academic_week) > limit]
+        future = [w for w in calendar if w in data.columns]
+        if not future or not mask.any():
+            return True
+
+        forecast = np.asarray(forecast, dtype=np.float64)
+        by_week = {
+            wk: forecast[k]
+            for k, wk in enumerate(calendar)
+            if k < len(forecast) and np.isfinite(forecast[k])
+        }
+
+        predict_col = str(int(self.predict_week))
+        n_rows = int(mask.sum())
+        if predict_col in data.columns:
+            last = data.loc[mask, predict_col].to_numpy(dtype=np.float64)
+        else:
+            last = np.zeros(n_rows)
+        values = np.empty((n_rows, len(future)))
+        complete = True
+        for j, wk in enumerate(future):
+            if wk in by_week:
+                last = np.full(n_rows, by_week[wk])
+            else:
+                complete = False
+            values[:, j] = last
+        data.loc[mask, future] = values
+        return complete
+
     def _predict_students_with_preapplicants(self, data, predictions, data_to_predict):
-        index = str(increment_week(self.predict_week))
+        persisted: list[str] = []
         i = 0
         for _, row in data_to_predict.iterrows():
             programme = row["Croho groepeernaam"]
@@ -427,29 +575,15 @@ class CumulativeStrategy(PredictionStrategy):
             if i == len(predictions):
                 break
 
-            if self.predict_week != self.final_academic_week and len(predictions[i]) > 0:
+            if self.predict_week != self.final_academic_week:
                 mask = (
                     (data["Collegejaar"] == self.predict_year - self.skip_years)
                     & (data["Croho groepeernaam"] == programme)
                     & (data["Herkomst"] == herkomst)
                     & (data["Examentype"] == examentype)
                 )
-                # Vul de voorspelde weken (index .. final_week, academische volgorde)
-                # in. Robuust tegen ontbrekende eind-weekkolommen: bij een dalende
-                # reeks valt de final_academic_week-kolom soms weg (combinaties zakken
-                # onder de openbaarmakingsdrempel). Een vaste label-slice index:"36"
-                # crasht dan op een non-monotone index; daarom alleen bestaande
-                # weekkolommen vullen, uitgelijnd op de voorspelvolgorde.
-                ordered = get_all_weeks_ordered(self.final_academic_week)
-                if index in ordered:
-                    target_weeks = ordered[ordered.index(index):]
-                    cols, vals = [], []
-                    for k, wk in enumerate(target_weeks):
-                        if k < len(predictions[i]) and wk in data.columns:
-                            cols.append(wk)
-                            vals.append(predictions[i][k])
-                    if cols:
-                        data.loc[mask, cols] = vals
+                if not self._fill_future_weeks(data, mask, predictions[i]):
+                    persisted.append(f"{programme} | {herkomst} | {examentype}")
             i += 1
 
             if programme in self.numerus_fixus_list:
@@ -467,6 +601,17 @@ class CumulativeStrategy(PredictionStrategy):
                     & (data_to_predict["Herkomst"] == herkomst)
                     & (data_to_predict["Examentype"] == examentype),
                 )
+
+        if persisted:
+            shown = ", ".join(persisted[:10]) + (" …" if len(persisted) > 10 else "")
+            warnings.warn(
+                f"SARIMA gaf voor {len(persisted)} combinatie(s) geen (volledige) prognose van "
+                f"de vooraanmeldingen: {shown}. De ontbrekende weken na week {self.predict_week} "
+                "zijn gevuld met de laatst bekende waarde. De regressor rekent daarmee, dus "
+                "de voorspelling voor deze combinaties kan te laag uitvallen.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         all_examtypes = data_to_predict["Examentype"].unique()
         for examtype in all_examtypes:

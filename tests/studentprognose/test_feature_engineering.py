@@ -101,8 +101,11 @@ class TestLaggedFeatures:
         assert any("week-1 fallback" in str(w.message) for w in caught)
 
     @pytest.mark.filterwarnings("ignore::UserWarning")
-    def test_predict_week_1_clamps_ref_to_week1(self):
-        """predict_week=1 → max(1-2,1)=1 → lag uses week 1."""
+    def test_predict_week_1_lags_into_previous_calendar_year(self):
+        """predict_week=1 → lag telt terug over de jaarwisseling (week 51 en 48).
+
+        Die weken ontbreken hier, dus de lag valt terug op week 1 zelf (#318).
+        """
         long = _make_long([
             {"Weeknummer": 1, "Gewogen vooraanmelders": 99.0},
         ])
@@ -112,6 +115,20 @@ class TestLaggedFeatures:
 
         assert result.loc[0, "Gewogen_t-2"] == pytest.approx(99.0)
         assert result.loc[0, "Gewogen_t-5"] == pytest.approx(99.0)
+
+    def test_predict_week_1_uses_december_weeks(self):
+        """Bestaan de decemberweken wel, dan gebruikt de lag die (niet week 1)."""
+        long = _make_long([
+            {"Weeknummer": 48, "Gewogen vooraanmelders": 20.0},
+            {"Weeknummer": 51, "Gewogen vooraanmelders": 30.0},
+            {"Weeknummer": 1, "Gewogen vooraanmelders": 99.0},
+        ])
+        wide = _make_wide([{}])
+
+        result = _add_engineered_features(wide, long, predict_week=1)
+
+        assert result.loc[0, "Gewogen_t-2"] == pytest.approx(30.0)
+        assert result.loc[0, "Gewogen_t-5"] == pytest.approx(20.0)
 
 
 # ---------------------------------------------------------------------------

@@ -7,10 +7,10 @@ from studentprognose.utils.parallel import run_parallel_with_fallback
 from studentprognose.utils.programme_key import normalize_programme_values, merge_on_programme_key
 from studentprognose.strategies.base import PredictionStrategy
 from studentprognose.strategies.individual import IndividualStrategy
-from studentprognose.strategies.cumulative import CumulativeStrategy, _add_engineered_features
+from studentprognose.strategies.cumulative import CumulativeStrategy
 from studentprognose.utils.weeks import get_weeks_list
-from studentprognose.data.transforms import ensure_start_week, transform_data
-from studentprognose.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative, _get_transformed_data
+from studentprognose.data.transforms import transform_data
+from studentprognose.models.sarima import predict_with_sarima_individual, predict_with_sarima_cumulative
 
 
 class CombinedStrategy(PredictionStrategy):
@@ -112,12 +112,11 @@ class CombinedStrategy(PredictionStrategy):
 
         self.cumulative._prepare_data()
 
-        full_data = _get_transformed_data(
-            self.cumulative.data_cumulative.copy(deep=True), self.min_training_year,
-            self.cumulative.final_academic_week,
+        # Zelfde modelinput als het cumulatieve spoor: van het voorspeljaar alleen
+        # de weken t/m de voorspelweek (#318).
+        _, full_data = self.cumulative._build_model_input(
+            int(self.predict_year) - int(self.cumulative.skip_years)
         )
-        full_data = ensure_start_week(full_data, self.cumulative.final_academic_week)
-        full_data = _add_engineered_features(full_data, self.cumulative.data_cumulative, int(self.predict_week))
 
         self.skip_years = skip_years
 

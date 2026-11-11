@@ -1,5 +1,5 @@
-from studentprognose.utils.weeks import academic_start_week, get_all_weeks_valid
-from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
+from studentprognose.utils.weeks import academic_start_week, get_all_weeks_valid, week_sort_key
+from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, WEEKS_PER_YEAR
 
 import pandas as pd
 
@@ -52,6 +52,39 @@ def transform_data(
     data = data.fillna(0)
 
     return data
+
+
+def drop_weeks_after_predict_week(
+    data: pd.DataFrame,
+    from_year: int,
+    predict_week: int,
+    final_week: int = FINAL_ACADEMIC_WEEK,
+) -> pd.DataFrame:
+    """Verwijder waarnemingen die op het voorspelmoment nog niet bestonden.
+
+    Een run voor een afgerond collegejaar bevat ook de weken ná de voorspelweek.
+    Die lagen op het voorspelmoment in de toekomst. Zonder afkappen kunnen ze via
+    interpolatie, features of een mislukte SARIMA-forecast in de voorspelling
+    terechtkomen, en lijkt een terugblik beter dan een live run (#318). Na deze
+    stap ziet het model exact wat een live run in die week zou zien.
+
+    Args:
+        data: Cumulatieve data in lang formaat (``Collegejaar``, ``Weeknummer``).
+        from_year: Eerste collegejaar dat wordt afgekapt; dit en latere jaren
+            houden alleen de weken t/m ``predict_week`` (academische volgorde).
+            Eerdere jaren (de trainingsjaren) blijven volledig.
+        predict_week: Laatste bekende week.
+        final_week: Laatste week van het academisch jaar.
+
+    Returns:
+        ``data`` zonder de rijen van ``from_year`` en later ná ``predict_week``.
+    """
+    week_key = {w: week_sort_key(w, final_week) for w in range(1, WEEKS_PER_YEAR + 2)}
+    limit = week_sort_key(int(predict_week), final_week)
+    later = (data["Collegejaar"].astype(int) >= int(from_year)) & (
+        data["Weeknummer"].astype(int).map(week_key) > limit
+    )
+    return data.loc[~later]
 
 
 def ensure_start_week(data: pd.DataFrame, final_week: int = FINAL_ACADEMIC_WEEK) -> pd.DataFrame:
