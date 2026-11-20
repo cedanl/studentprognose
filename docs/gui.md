@@ -19,7 +19,7 @@ uit. Alles wat in de GUI kan, kan dus ook op de opdrachtregel — en omgekeerd.
     <source src="assets/studentprognose-walkthrough.mp4" type="video/mp4">
     <img src="assets/studentprognose-walkthrough.gif" alt="Walkthrough van de grafische interface">
   </video>
-  <figcaption>Van startpagina tot prognose — de vijf stappen in de grafische interface.</figcaption>
+  <figcaption>Van startpagina tot prognose — de vier stappen in de grafische interface.</figcaption>
 </figure>
 
 ## Installeren en starten
@@ -47,13 +47,19 @@ toepassingen van instroom-prognoses.
 
 Op de startpagina staat een knop **"Probeer direct met demodata"**. Die zet
 automatisch een tijdelijk project op, downloadt de demodataset en draait de
-pipeline — allemaal met live voortgang. Voor de snelheid beperkt de demo zich tot
+pipeline, inclusief de interactieve dashboards — allemaal met live voortgang. Voor de snelheid beperkt de demo zich tot
 een subset (Master, Niet-EER). Na afloop open je met één klik het
 resultatenoverzicht. Ideaal om de tool te verkennen zonder eigen data.
 
+Tijdens het downloaden zie je hoeveel procent binnen is. Lukt de download niet
+(bijvoorbeeld door een trage of wegvallende verbinding), dan stopt hij na hooguit
+vijf minuten met een duidelijke melding en een knop terug naar de startpagina.
+Daar kun je het opnieuw proberen of meteen een project opzetten met je eigen
+bestanden.
+
 ## Zo werkt de interface
 
-De interface leidt je langs vijf stappen, in volgorde:
+De interface leidt je langs vier stappen, in volgorde:
 
 1. **Project** — kies of maak een projectmap met de juiste structuur. Je kunt
    hier optioneel de demodataset downloaden om het model direct te proberen.
@@ -61,15 +67,24 @@ De interface leidt je langs vijf stappen, in volgorde:
    vandaan haalt: telbestanden komen van **Studielink** (op te vragen bij je
    Studielink-aansluitpunt of -beheerder, met een link naar de
    leveringsspecificatie), en het oktober-bestand komt uit je **eigen
-   instelling** (SIS/datawarehouse zoals Osiris of Usis). Onderaan de uploadzone
+   instelling** (het studentinformatiesysteem of datawarehouse). Onderaan de uploadzone
    staat daarnaast een klikbare link **"Verwacht formaat"**: klik die uit om een
    tabel te zien met verwachte kolomnamen, beschrijvingen en voorbeeldwaarden.
-2. **Configuratie** — stel de modelparameters en paden in. Wijzigingen worden
-   kort na het typen automatisch bewaard; met **"Volgende"** sla je expliciet op
-   en ga je door naar de volgende stap.
-3. **Filteren** — bepaal op welke opleidingen, herkomst en examentypes je draait.
-4. **Uitvoeren** — start de voorspelling en volg de voortgang live.
-5. **Resultaten** — bekijk een overzicht van de voorspellingen.
+2. **Configuratie** — kies je instelling en stel de modelparameters in. Op het
+   tabblad **Geavanceerd** bepaal je onder *Filteren* op welke opleidingen,
+   herkomst en examentypes je draait. Wijzigingen worden kort na het typen
+   automatisch bewaard; met **"Volgende"** sla je expliciet op en ga je door naar
+   de volgende stap.
+3. **Uitvoeren** — start de voorspelling en volg de voortgang live.
+4. **Resultaten** — bekijk een overzicht van de voorspellingen.
+
+!!! warning "Kies je instelling"
+    Telbestanden van Studielink bevatten vaak meerdere instellingen. Kies op het
+    tabblad **Basis** onder *Jouw instelling* je eigen Brincode (meerdere mag).
+    Laat je dit leeg, dan telt de prognose **alle** instellingen in je
+    telbestanden bij elkaar op. De **Uitvoeren**-pagina toont bovenaan altijd
+    voor welke instelling(en) je voorspelt, met een waarschuwing als er geen is
+    gekozen.
 
 In stap 1 kies je ook de **modus**: *Cumulatief*, *Individueel*, *Beide* of
 *CWF*. De modus bepaalt welke bestanden je moet uploaden. Voor *CWF* zijn dat de
@@ -126,6 +141,28 @@ data 2020 of 2021 dekt. Zolang je nog geen tel- én oktober-bestand hebt
 geüpload, is er geen bereik bekend en meldt de sectie dat je die bestanden eerst
 moet uploaden.
 
+De **Uitvoeren**-pagina voorkomt combinaties die de pipeline niet kan draaien,
+zodat je niet pas na een mislukte run ontdekt dat iets niet kan:
+
+- Bij dataset **CWF** staat *Jaren overslaan* vast op 0: het CWF-model kent
+  geen backtest.
+- Cohort **Hogerejaars** werkt alleen als het project eerdere prognoses met
+  realisaties bevat (het bestand uit `paths.path_latest_<modus>`, standaard
+  `data/input/totaal_<modus>.xlsx`), en niet met dataset *Beide*. Ontbreekt dat,
+  dan legt de pagina uit wat er nodig is en start de run niet.
+
+Er is geen vinkje voor de validatieprompt: de GUI draait altijd met `--yes`,
+omdat ze geen vragen kan beantwoorden terwijl de pipeline loopt. Gevonden
+datakwaliteitsproblemen staan in het logboek van de run (zie
+[Validatie](validatie.md)). Een run die mislukt of die je met **Stop** afbreekt,
+laat de resultaten van je vorige geslaagde run intact. Een gestopte run heet
+daarom ook *Gestopt* en niet *Mislukt*.
+
+Heb je bij het uitvoeren **Dashboards genereren** aangevinkt, dan staan op de
+**Resultaten**-pagina knoppen die de interactieve dashboards van die run in een
+nieuw tabblad openen: de pagina van het model en het eindoverzicht (zie
+[Output begrijpen](output-begrijpen.md#interactief-dashboard)).
+
 Die uitsluiting is ook zichtbaar op het moment dat je de voorspelling start:
 bovenaan de **Uitvoeren**-pagina staat een uitklapbare sectie **"Uitgesloten
 jaren"** met de actieve jaren (of expliciet "geen") en een link terug naar de
@@ -170,7 +207,8 @@ het JSON-tabblad te bewerken waren:
 - **Validatie — telbestand** stelt de datakwaliteitscontrole in die vóór de
   pipeline start draait: het scheidingsteken, de kolom waarop validatiefouten
   worden gegroepeerd, de toegestane herkomstcodes en de verplichte kolommen.
-  Zonder deze kaart gebruikte de GUI altijd de ingebouwde package-defaults en
+  De kop toont het ingestelde scheidingsteken (bijv. *komma* voor een
+  SQL-export, *puntkomma* voor het legacy Studielink-formaat). Zonder deze kaart gebruikte de GUI altijd de ingebouwde package-defaults en
   negeerde ze een eventueel `validation`-blok in je `configuration.json`.
   Toegestane herkomstcodes en verplichte kolommen bewerk je als een lijst
   chips: typ een waarde en klik *Toevoegen*, of klik de **×** op een chip om
@@ -188,7 +226,7 @@ pagina, zodat de tabbladen Basis en Geavanceerd de nieuwe waarden tonen.
 Bewerk daarom niet gelijktijdig in de JSON-tab en de andere tabbladen — wat je
 laatst opslaat wint.
 
-Naast de vijf stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
+Naast de vier stappen is er een **Benchmark & tune**-tab: vergelijk alternatieve
 modellen (met de winnaar gemarkeerd) en stem hyperparameters af, waarna je de
 gevonden parameters met één klik naar de configuratie kopieert. Kies je bij de
 benchmark de dataset *CWF*, dan draait een backtest van het CWF-model per
@@ -207,6 +245,13 @@ naar de voorspelde instroom loopt.
 | Geautomatiseerde runs (cron, taakplanner) | CLI met `--yes` |
 | Reproduceerbare scripts / CI | CLI |
 | Cloud / notebooks (data in geheugen) | Python-API (`run_pipeline_from_dataframes`) |
+
+## Feedback geven
+
+Linksonder in de zijbalk staat **Feedback geven**. Na het typen van je feedback
+opent **"Open in mail"** je eigen mailprogramma met een kant-en-klaar bericht aan
+`ceda@surf.nl`; de mail verstuur je daar zelf. De GUI verstuurt niets op de
+achtergrond.
 
 ## Verhouding tot de CLI
 

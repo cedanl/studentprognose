@@ -74,6 +74,9 @@ class AppState:
             name = os.path.basename(path)
             if name.startswith("output_prelim") or "_ci_test" in name:
                 continue
+            if os.path.getsize(path) == 0:
+                # Restant van een mislukte run (#322): geen echte output.
+                continue
             return True
         return False
 

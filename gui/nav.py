@@ -42,14 +42,6 @@ TOOLS: list[NavItem] = [
     NavItem("/benchmark", "Benchmark & tune", "science"),
 ]
 
-#: Concept-features — interactieve mockups, nog niet operationeel.
-CONCEPTS: list[NavItem] = [
-    NavItem("/scenarios",       "Scenario's",      "analytics"),
-    NavItem("/peer-benchmark",  "Peer benchmark",  "leaderboard"),
-    NavItem("/api",             "API & integraties","api"),
-    NavItem("/explainability",  "Verklaarbaar AI", "psychology"),
-]
-
 #: Startpagina (geen stap, altijd bereikbaar).
 HOME = NavItem("/", "Start", "home")
 
@@ -74,11 +66,6 @@ def is_available(route: str) -> bool:
 def all_items() -> list[NavItem]:
     """Alle navigatie-items in weergavevolgorde (home, flow, tools)."""
     return [HOME, *WIZARD_FLOW, *TOOLS]
-
-
-def is_concept(route: str) -> bool:
-    """True als de route een concept-feature is."""
-    return any(c.route == route for c in CONCEPTS)
 
 
 # Routes die buiten de lineaire wizard-flow terugwijzen naar een vaste pagina.

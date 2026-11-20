@@ -2,7 +2,7 @@
 
 import os
 
-from gui.process import locate_cli, preview_command
+from gui.process import higher_years_source, locate_cli, preview_command, run_conflicts
 
 
 def test_locate_cli_finds_console_script():
@@ -94,3 +94,63 @@ def test_wizard_mode_choice_overrides_stored_run_dataset(monkeypatch):
     assert fake_app.storage.general["run_settings"] == {"dataset": "CWF", "weeks": "16"}
     run.remember_wizard_mode("onbekend")
     assert fake_app.storage.general["run_settings"]["dataset"] == "CWF"
+
+
+# ── Conflicterende run-parameters (#322) ────────────────────────────────────
+
+
+_CONFIG = {
+    "paths": {
+        "path_latest_cumulative": "data/input/totaal_cumulatief.xlsx",
+        "path_latest_cwf": "data/input/totaal_cwf.xlsx",
+    }
+}
+
+
+def _conflicts(tmp_path, **overrides):
+    params = {
+        "dataset": "Cumulatief",
+        "cohort": "Eerstejaars",
+        "skip_years": 0,
+        "project_dir": str(tmp_path),
+        "config": _CONFIG,
+    }
+    params.update(overrides)
+    return run_conflicts(**params)
+
+
+def test_run_conflicts_none_for_default_run(tmp_path):
+    assert _conflicts(tmp_path) == []
+
+
+def test_run_conflicts_cwf_with_skip_years(tmp_path):
+    errors = _conflicts(tmp_path, dataset="CWF", skip_years=2)
+    assert len(errors) == 1 and "backtest" in errors[0]
+
+
+def test_run_conflicts_skip_years_fine_for_cumulative(tmp_path):
+    assert _conflicts(tmp_path, skip_years=2) == []
+
+
+def test_run_conflicts_higher_years_without_source_file(tmp_path):
+    errors = _conflicts(tmp_path, cohort="Hogerejaars")
+    assert len(errors) == 1
+    assert "data/input/totaal_cumulatief.xlsx" in errors[0]
+
+
+def test_run_conflicts_higher_years_with_source_file(tmp_path):
+    src = tmp_path / "data" / "input" / "totaal_cwf.xlsx"
+    src.parent.mkdir(parents=True)
+    src.write_bytes(b"x")
+    assert _conflicts(tmp_path, dataset="CWF", cohort="Hogerejaars") == []
+
+
+def test_run_conflicts_higher_years_impossible_for_both(tmp_path):
+    errors = _conflicts(tmp_path, dataset="Beide", cohort="Hogerejaars")
+    assert len(errors) == 1 and "Beide" in errors[0]
+
+
+def test_higher_years_source_reads_config_paths():
+    assert higher_years_source("CWF", _CONFIG) == "data/input/totaal_cwf.xlsx"
+    assert higher_years_source("Beide", _CONFIG) is None
+    assert higher_years_source("Individueel", {}) is None

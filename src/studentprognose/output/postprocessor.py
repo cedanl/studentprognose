@@ -26,6 +26,28 @@ CWF_OUTPUT_COLUMNS = [
 ]
 
 
+def write_excel_atomic(df: pd.DataFrame, path: str) -> None:
+    """Schrijf ``df`` naar ``path`` zonder ooit een half bestand achter te laten.
+
+    Het bestand wordt eerst naar een verborgen tijdelijk bestand in dezelfde map
+    geschreven en daarna in één stap (``os.replace``) over het doel gezet. Mislukt
+    het schrijven, dan blijft het oude bestand ongewijzigd en wordt het
+    tijdelijke bestand opgeruimd.
+
+    Args:
+        df: Het te schrijven DataFrame.
+        path: Doelpad (``.xlsx``).
+    """
+    directory, name = os.path.split(path)
+    tmp_path = os.path.join(directory, f".{name}.tmp.xlsx")
+    try:
+        df.to_excel(tmp_path, index=False)
+        os.replace(tmp_path, path)
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 class PostProcessor:
     """Handles output preparation, ensemble calculation, error metrics, and file saving.
 
@@ -41,27 +63,36 @@ class PostProcessor:
 
     @staticmethod
     def check_output_writable(data_option, student_year_prediction, ci_test_n):
-        """Verify output files can be written (not locked by Excel)."""
+        """Controleer vóór de run of de outputbestanden geschreven kunnen worden.
+
+        De check is bewust niet-destructief: bestaande outputbestanden worden
+        alleen in append-modus geopend (dat faalt nog steeds als Excel het
+        bestand vergrendelt), nooit leeggemaakt, en ontbrekende bestanden worden
+        niet alvast aangemaakt. Zo laat een run die later mislukt of wordt
+        afgebroken de output van de vorige geslaagde run intact en blijven er
+        geen lege bestanden achter (#322).
+        """
         mode_suffix = data_option.filename_suffix
         ci_suffix = f"_ci_test_N{ci_test_n}" if ci_test_n is not None else ""
         output_dir = os.path.join(os.getcwd(), "data", "output")
         os.makedirs(output_dir, exist_ok=True)
+
+        paths = [os.path.join(output_dir, f"output_prelim_{mode_suffix}{ci_suffix}.xlsx")]
+        if ci_test_n is None:
+            sy_label = PostProcessor._SY_LABELS.get(student_year_prediction)
+            if sy_label is not None:
+                paths.append(
+                    os.path.join(output_dir, f"output_{sy_label}_{mode_suffix}{ci_suffix}.xlsx")
+                )
+                paths.append(os.path.join(output_dir, f"_totaal_{sy_label}_{mode_suffix}.xlsx"))
+
         try:
-            open(f"data/output/output_prelim_{mode_suffix}{ci_suffix}.xlsx", "w").close()
-            if ci_test_n is None:
-                sy_label = PostProcessor._SY_LABELS.get(student_year_prediction)
-                if sy_label is not None:
-                    open(f"data/output/output_{sy_label}_{mode_suffix}{ci_suffix}.xlsx", "w").close()
-                    # _totaal mag NIET worden getrunceerd: het bevat de
-                    # historie van eerdere runs. "a" opent zonder leeg te
-                    # maken en faalt alsnog als Excel het bestand
-                    # vergrendelt — exact wat we hier willen detecteren.
-                    totaal_path = os.path.join(
-                        output_dir, f"_totaal_{sy_label}_{mode_suffix}.xlsx"
-                    )
-                    if os.path.exists(totaal_path):
-                        open(totaal_path, "a").close()
-        except IOError:
+            if not os.access(output_dir, os.W_OK):
+                raise PermissionError(output_dir)
+            for path in paths:
+                if os.path.exists(path):
+                    open(path, "a").close()
+        except OSError:
             print(
                 "Fout: outputbestand kan niet geopend worden, waarschijnlijk staat het nog open in Excel. "
                 "Sluit het bestand en probeer opnieuw."
@@ -265,7 +296,7 @@ class PostProcessor:
             "output",
             f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx",
         )
-        self.data.to_excel(output_path, index=False)
+        write_excel_atomic(self.data, output_path)
 
     def predict_with_ratio(self, data_cumulative, predict_year):
         self.data = _predict_with_ratio(
@@ -518,7 +549,7 @@ class PostProcessor:
             ignore_index=True,
         )
 
-        self.data.to_excel(output_path, index=False)
+        write_excel_atomic(self.data, output_path)
 
     # Sleutel- en sorteer-volgorde van de audittrail, uitgedrukt in
     # column_roles. De concrete kolomnamen verschillen per instelling
@@ -589,4 +620,4 @@ class PostProcessor:
         norm_key = combined[key_cols].astype(str)
         combined = combined[~norm_key.duplicated(keep="last")].reset_index(drop=True)
         combined = combined.sort_values(by=sort_cols, ignore_index=True)
-        combined.to_excel(path, index=False)
+        write_excel_atomic(combined, path)

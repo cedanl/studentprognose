@@ -54,7 +54,7 @@ def _build_gui_validation_cfg() -> dict:
     niet stil uiteendrijven met de pipeline. Daarop passen we twee **bewuste**
     versoepelingen toe, omdat de wizard *ruwe* bestanden vóór de ETL valideert:
 
-    * ``Groepeernaam`` is niet vereist — het UvA SQL (SL) formaat levert die niet
+    * ``Groepeernaam`` is niet vereist — een SQL-export (SL-formaat) levert die niet
       en de ETL genereert de kolom zelf uit ``Isatcode`` (#232).
     * ``Herkomst`` mag ook ``"O"`` (onbekend) bevatten naast ``N``/``E``/``R``;
       de pipeline normaliseert dat verderop.

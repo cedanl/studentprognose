@@ -141,6 +141,14 @@ class _BenchmarkSection:
             </q-td>
             """,
         )
+        if label == "MAPE":
+            # Als percentage tonen, net als op de resultatenpagina (#322).
+            table.add_slot(
+                "body-cell-metric",
+                r"""
+                <q-td :props="props">{{ (props.value * 100).toFixed(1) }}%</q-td>
+                """,
+            )
 
     async def _run(self) -> None:
         self._start.props("loading")

@@ -89,6 +89,9 @@ Weekbereiken mogen: `-w 8:12` = `-w 8 9 10 11 12`.
 !!! note "Eerstejaars als focus"
     De tool draait standaard op `-sy f` (eerstejaars). Volume (`-sy v`) is een vervolgstap — gebruik die pas als je eerstejaarsvoorspelling op orde is.
 
+!!! info "Hogerejaars (`-sy h`) heeft eerdere prognoses nodig"
+    Een hogerejaarsvoorspelling bouwt voort op eerdere prognoses met realisaties, uit het bestand in `paths.path_latest_<modus>` (standaard `data/input/totaal_<modus>.xlsx`). Een gewone run maakt dat bestand **niet** aan; je maakt het met `scripts/append_studentcount_and_compute_errors.py`. Ontbreekt het, dan stopt de run met exitcode 1. Met `-d both` is hogerejaars niet mogelijk.
+
 ### `--institution`
 
 De landelijke Studielink-teldata bevat rijen van álle instellingen. Met `--institution` scoop je de run op je eigen instelling(en):
@@ -129,6 +132,9 @@ Wil je `studentprognose` aanroepen vanuit een notebook, MS Fabric, Databricks of
     Verwacht je het ensemble? Controleer of de `SARIMA_individual`-kolommen in je output staan.
 
 ## Veelvoorkomende fouten
+
+!!! tip "Een mislukte run kost je geen eerdere resultaten"
+    Mislukt een run of breek je hem af, dan blijven de outputbestanden van je vorige geslaagde run staan. Nieuwe bestanden worden pas aan het eind van een run, in één stap, over de oude heen gezet.
 
 Installatiefouten (`command not found`, `ModuleNotFoundError`) staan bij [Installeren → Installatie mislukt?](installeren.md#installatie-mislukt).
 

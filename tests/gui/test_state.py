@@ -34,3 +34,14 @@ def test_is_initialised_reflects_config_file(tmp_path):
     config_file.write_text("{}", encoding="utf-8")
 
     assert state.is_initialised is True
+
+
+def test_has_output_ignores_empty_leftover_files(tmp_path):
+    # Een mislukte run in een oudere versie liet 0-byte-bestanden achter (#322).
+    out = tmp_path / "data" / "output"
+    out.mkdir(parents=True)
+    (out / "output_first-years_cumulatief.xlsx").write_bytes(b"")
+    state = AppState(project_dir=str(tmp_path))
+    assert state.has_output is False
+    (out / "output_first-years_cwf.xlsx").write_bytes(b"PK")
+    assert state.has_output is True

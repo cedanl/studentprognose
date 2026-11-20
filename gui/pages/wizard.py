@@ -58,8 +58,8 @@ _TEL_PREVIEW: dict = {
     "note": "CSV · puntkomma- of kommagescheiden · één bestand per rapportageweek",
     "filenames": [
         ("telbestandY2024W10.csv",                 "instellingsformaat"),
-        ("telbestand_sl_20241007_v01_2024.csv",    "UvA SQL (datum eerst)"),
-        ("Telbestand_SL_2020_V96_20210802.csv",    "UvA SQL (jaar eerst)"),
+        ("telbestand_sl_20241007_v01_2024.csv",    "SQL-export (datum eerst)"),
+        ("Telbestand_SL_2020_V96_20210802.csv",    "SQL-export (jaar eerst)"),
     ],
     "columns": [
         ("Studiejaar",      "Collegejaar (integer)",             "2024"),
@@ -90,8 +90,8 @@ _OKT_SOURCE: dict = {
     "label": "Je eigen instelling",
     "icon": "account_balance",
     "detail": (
-        "Genereer dit uit je SIS/datawarehouse — bijvoorbeeld Osiris, Usis "
-        "of een vergelijkbaar bronsysteem."
+        "Genereer dit uit het studentinformatiesysteem of datawarehouse van je "
+        "instelling."
     ),
     "url": None,
     "url_label": None,
@@ -99,7 +99,7 @@ _OKT_SOURCE: dict = {
 
 _OKT_PREVIEW: dict = {
     "title": "Verwacht formaat — Oktober-bestand",
-    "description": "Werkelijke eerstejaars inschrijvingen per opleiding en herkomstgroep, peildatum 1 oktober. Aangeleverd door de instelling vanuit SIS/datawarehouse (Osiris, Usis of vergelijkbaar).",
+    "description": "Werkelijke eerstejaars inschrijvingen per opleiding en herkomstgroep, peildatum 1 oktober. Aangeleverd door de instelling vanuit het studentinformatiesysteem of datawarehouse.",
     "note": "Excel (.xlsx) · peildatum 1 oktober · één rij per opleiding × herkomstgroep",
     "filenames": [
         ("oktober_bestand.xlsx", "elke .xlsx-naam is toegestaan — wordt hernoemd bij upload"),
@@ -1313,7 +1313,7 @@ class _WizardView:
             self._confirm_path = ui.label().classes("text-sm font-mono opacity-60 mb-2")
             with ui.row().classes("items-center gap-4 flex-wrap"):
                 self._demo_checkbox = ui.checkbox(
-                    "Demo Studielink-data downloaden (≈6 MB, beide sporen)",
+                    "Demo Studielink-data downloaden (≈6 MB, geschikt voor alle modi)",
                     value=False,
                 )
                 # Vertikale scheidingslijn
@@ -1803,7 +1803,10 @@ class _WizardView:
             with self._create_feedback:
                 error_banner(
                     "Demodata downloaden mislukt.",
-                    f"Controleer je internetverbinding. Details: {exc}",
+                    "Controleer je internetverbinding. Het project is wel "
+                    "aangemaakt: upload hieronder je eigen bestanden, of klik "
+                    "rechtsboven op Reset om het opnieuw te proberen met "
+                    f"demodata. Details: {exc}",
                 )
         finally:
             timer.cancel()

@@ -785,8 +785,16 @@ def _preprocess(strategy, student_year_prediction):
     if student_year_prediction == StudentYearPrediction.HIGHER_YEARS:
         if strategy.postprocessor.data_latest is None:
             print("\nFout: geen 'totaal'-bestand gevonden voor hogerjaarsvoorspelling.")
-            print("  Dit bestand wordt aangemaakt na een eerste first-years run.")
-            print("  Draai eerst: studentprognose -d cumulative (of -d both / -d cwf)")
+            print(
+                "  Hogerejaars voorspellen leest eerdere prognoses met realisaties uit het "
+                "bestand in 'paths.path_latest_<modus>' (standaard "
+                "data/input/totaal_<modus>.xlsx)."
+            )
+            print(
+                "  Een gewone run maakt dat bestand niet aan; maak het met "
+                "scripts/append_studentcount_and_compute_errors.py. Met -d both kan "
+                "geen hogerejaarsvoorspelling worden gemaakt."
+            )
             sys.exit(1)
         strategy.postprocessor.data = strategy.postprocessor.data_latest[
             HIGHER_YEARS_COLUMNS

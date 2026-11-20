@@ -15,6 +15,7 @@ Zie ``gui/DESIGN.md`` voor de stijlgids.
 from __future__ import annotations
 
 import os
+import urllib.parse
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -201,6 +202,29 @@ def _stepper(active: str) -> None:
                 ui.separator().props("vertical").classes("mx-1")
 
 
+#: Ontvanger van feedback uit de GUI.
+FEEDBACK_ADDRESS = "ceda@surf.nl"
+
+
+def feedback_mailto(text: str) -> str:
+    """Bouw een ``mailto:``-link met de feedback als berichttekst.
+
+    De GUI heeft geen eigen verzendkanaal; de feedback gaat via het
+    mailprogramma van de gebruiker, zodat er niets stil verloren gaat (#322).
+
+    Args:
+        text: De door de gebruiker ingevoerde feedback.
+
+    Returns:
+        Een URL-gecodeerde ``mailto:``-link.
+    """
+    query = urllib.parse.urlencode(
+        {"subject": "Feedback Studentprognose-GUI", "body": text.strip()},
+        quote_via=urllib.parse.quote,
+    )
+    return f"mailto:{FEEDBACK_ADDRESS}?{query}"
+
+
 def _feedback_dialog() -> ui.dialog:
     """Bouw het feedback-dialoogvenster en geef de referentie terug."""
     with ui.dialog() as dialog, ui.card().style(
@@ -220,15 +244,16 @@ def _feedback_dialog() -> ui.dialog:
 
         with ui.column().classes("w-full gap-4 px-5 pt-4 pb-5"):
             ui.label(
-                "Deel jouw gedachten, ideeën of meldingen — wij lezen alles."
+                "Deel jouw gedachten, ideeën of meldingen. Je mailprogramma opent "
+                "met je tekst; verstuur de mail daar."
             ).classes("text-sm leading-relaxed").style("color: #666;")
-            ui.textarea(placeholder="Typ hier jouw feedback…").props(
+            feedback_text = ui.textarea(placeholder="Typ hier jouw feedback…").props(
                 "outlined autogrow"
             ).classes("w-full").style("font-size: 14px;")
             with ui.row().classes("w-full items-center justify-between no-wrap gap-2"):
                 with ui.row().classes("items-center gap-1 no-wrap"):
                     ui.icon("mail_outline").classes("text-sm").style("color: #aaa;")
-                    ui.label("ceda@surf.nl").classes("text-xs font-mono").style(
+                    ui.label(FEEDBACK_ADDRESS).classes("text-xs font-mono").style(
                         "color: #aaa;"
                     )
                 with ui.row().classes("gap-2 no-wrap"):
@@ -237,15 +262,20 @@ def _feedback_dialog() -> ui.dialog:
                     )
 
                     def _send() -> None:
+                        text = feedback_text.value or ""
+                        if not text.strip():
+                            ui.notify("Typ eerst je feedback.", type="warning", position="top")
+                            return
                         dialog.close()
+                        ui.navigate.to(feedback_mailto(text))
                         ui.notify(
-                            "Bedankt voor je feedback!",
-                            type="positive",
+                            "Je mailprogramma wordt geopend — verstuur de mail daar.",
+                            type="info",
                             position="top",
-                            timeout=3000,
+                            timeout=5000,
                         )
 
-                    ui.button("Versturen", icon="send", on_click=_send).props(
+                    ui.button("Open in mail", icon="send", on_click=_send).props(
                         "unelevated color=accent"
                     )
     return dialog
