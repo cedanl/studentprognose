@@ -25,6 +25,13 @@ from gui.state import STATE
 _AUTOSAVE_DELAY_S = 0.6
 
 
+def _separator_name(sep: str) -> str:
+    """Leesbare naam van een scheidingsteken voor in een kop (bijv. ``,`` → komma)."""
+    return {";": "puntkomma", ",": "komma", "\t": "tab", "|": "verticale streep"}.get(
+        sep, f"'{sep}'"
+    )
+
+
 def _institution_values(value) -> list[str]:
     """Normaliseer de waarde van de instellingskiezer naar een lijst codes.
 
@@ -116,7 +123,7 @@ HELP = {
     "final_academic_week": (
         "De laatste week van het academisch jaar in de Studielink-cyclus. Bepaalt "
         "de seizoensvolgorde van de voorspelhorizon en de reset-week in "
-        "het cumulatieve spoor. Vaak 38; bij de UvA 36."
+        "het cumulatieve spoor. Meestal 38; sommige instellingen gebruiken 36 of 37."
     ),
     "ensemble_weights": (
         "Gewicht van het individuele versus het cumulatieve spoor bij het "
@@ -152,13 +159,13 @@ HELP = {
     ),
     "validation_separator": (
         "Scheidingsteken waarmee de validatie het ruwe telbestand inleest. "
-        "';' voor het legacy Studielink-formaat, ',' voor het UvA SQL-formaat "
+        "';' voor het legacy Studielink-formaat, ',' voor een SQL-export "
         "— moet gelijk zijn aan cumulative_input.separator."
     ),
     "validation_programme_column": (
         "Kolom waarop validatiefouten worden gegroepeerd. Meestal "
         "'Groepeernaam'; zet dit op 'Isatcode' als je databron die kolom niet "
-        "levert (bijv. UvA)."
+        "levert (zoals bij een SQL-export)."
     ),
     "validation_herkomst_allowed": (
         "Toegestane waarden in de Herkomst-kolom van het telbestand. Een "
@@ -169,13 +176,14 @@ HELP = {
         "Ontbreekt er één, dan stopt de validatie met een foutmelding."
     ),
     "aggregate": (
-        "Tel fijnmazige invoerrijen op naar de canonieke grain. Nodig voor o.a. de "
-        "UvA-levering (bereken 'Gewogen' per rij, sommeer daarna); anders crasht "
-        "de pivot op dubbele indexrijen."
+        "Tel fijnmazige invoerrijen op naar de canonieke grain. Nodig als je "
+        "databron meerdere rijen per opleiding, week en herkomst levert (bereken "
+        "'Gewogen' per rij, sommeer daarna); anders crasht de pivot op dubbele "
+        "indexrijen."
     ),
     "drop_deleted": (
-        "Filter rijen met de soft-delete-vlag (etl_is_deleted ≠ 0) uit de UvA "
-        "SQL-levering weg."
+        "Filter rijen met een soft-delete-vlag (etl_is_deleted ≠ 0) weg, als je "
+        "databron die kolom levert."
     ),
     "cpu_count": (
         "Aantal CPU-cores voor de parallelle voorspelling. Leeg = automatisch "
@@ -354,7 +362,7 @@ class _ConfigView:
                         self._inst_select = (
                             ui.input(
                                 value=", ".join(current),
-                                label="Brincode (bijv. 25DW)",
+                                label="Brincode (bijv. 00AA)",
                                 placeholder="Voer de Brincode in (meerdere: komma-gescheiden)",
                             )
                             .props("outlined clearable")
@@ -684,7 +692,7 @@ class _ConfigView:
 
         Voor CSV's zonder expliciete ``sep`` wordt de scheidingstekens
         automatisch bepaald: telbestanden komen zowel puntkomma-gescheiden
-        (legacy Studielink) als komma-gescheiden (UvA SQL-export) voor. We
+        (legacy Studielink) als komma-gescheiden (SQL-export) voor. We
         proberen beide en kiezen de variant die meer dan één kolom oplevert.
         """
         if not os.path.isfile(path):
@@ -776,7 +784,7 @@ class _ConfigView:
         )
         # 2. Telbestanden — beschikbaar vóór de run; naam waar aanwezig.
         # Telbestanden komen puntkomma- (legacy Studielink) én komma-gescheiden
-        # (UvA SQL-export, o.a. de demodataset) voor. Bepaal het scheidingsteken
+        # (SQL-export, o.a. de demodataset) voor. Bepaal het scheidingsteken
         # één keer uit het eerste bestand en hergebruik dat, zodat we niet elk van
         # honderden bestanden twee keer hoeven te lezen.
         tel_paths = sorted(glob.glob(os.path.join(raw_dir, "telbestanden", "*.csv")))
@@ -1405,7 +1413,9 @@ class _ConfigView:
         )
         sep_val = telbestand_cfg.get("separator", ";")
         with ui.expansion(
-            f"Validatie — telbestand ({sep_val})", icon="fact_check", value=False
+            f"Validatie — telbestand (scheidingsteken: {_separator_name(sep_val)})",
+            icon="fact_check",
+            value=False,
         ).classes("w-full mb-3").style(
             f"background: white; border-radius: 10px; overflow: hidden; "
             f"border: 1px solid {theme.INFO}20; border-left: 4px solid {theme.INFO}; "
@@ -1414,13 +1424,13 @@ class _ConfigView:
             ui.label(
                 "Datakwaliteitscontrole vóór de pipeline start. Deze instellingen "
                 "overschrijven de ingebouwde validatiedefaults voor telbestanden — "
-                "handig als je databron een afwijkend formaat levert (bijv. UvA "
-                "SQL i.p.v. legacy Studielink)."
+                "handig als je databron een afwijkend formaat levert (bijv. een "
+                "SQL-export i.p.v. het legacy Studielink-formaat)."
             ).classes("text-sm opacity-60 mb-3")
 
             with ui.row().classes("w-full gap-4 flex-wrap mb-4"):
                 current_sep = telbestand_cfg.get("separator", ";")
-                sep_options = {";": "; (legacy Studielink)", ",": ", (UvA SQL)"}
+                sep_options = {";": "; (legacy Studielink)", ",": ", (SQL-export)"}
                 # Het scheidingsteken is vrije tekst in configuration.json — een
                 # afwijkende waarde (niet ';' of ',') tonen we alsnog als optie,
                 # zodat de keuzelijst hem niet stilzwijgend overschrijft.

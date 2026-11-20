@@ -739,16 +739,17 @@ class _HomeView:
         ).classes("text-xs opacity-60 leading-relaxed mb-1")
 
         self._uc_section("HBO Informatica — instroom 2021–2025")
-        # Fictieve benchmark: 5 instellingen, eigen instelling = HvA
+        # Fictieve benchmark met geanonimiseerde peers: verzonnen cijfers horen
+        # niet bij de naam van een echte instelling.
         bench_data = [
-            ("Jouw instelling (HvA)", 245, 278, 312, 356, 400, True),
-            ("Hogeschool Rotterdam",  220, 241, 259, 271, 280, False),
-            ("Fontys Hogeschool",     310, 328, 345, 370, 395, False),
-            ("Saxion Hogeschool",     180, 188, 195, 204, 210, False),
-            ("Windesheim",            260, 272, 284, 301, 318, False),
+            ("Jouw instelling", 245, 278, 312, 356, 400, True),
+            ("Hogeschool A",    220, 241, 259, 271, 280, False),
+            ("Hogeschool B",    330, 352, 378, 404, 430, False),
+            ("Hogeschool C",    180, 188, 195, 204, 210, False),
+            ("Hogeschool D",    260, 272, 284, 301, 318, False),
         ]
         years = [2021, 2022, 2023, 2024, 2025]
-        peak = 400
+        peak = max(max(vals) for _, *vals, _ in bench_data)
         rows_html = ""
         for inst, *vals, is_own in bench_data:
             last = vals[-1]
@@ -808,7 +809,7 @@ class _HomeView:
                border-radius:8px;background:{A}08;border:1px solid {A}20;">
             <span style="font-size:14px;flex-shrink:0;">📈</span>
             <div style="font-size:11px;color:#444;line-height:1.55;">
-              <strong>Jij groeit het snelst (+63%)</strong> — maar Fontys heeft meer absolute volume.
+              <strong>Jij groeit het snelst (+63%)</strong> — maar Hogeschool B heeft meer absolute volume.
               Schaalvoordelen zijn daar mogelijk groter.
             </div>
           </div>
@@ -816,7 +817,7 @@ class _HomeView:
                border-radius:8px;background:#f7f7f7;border:1px solid #e8e8e8;">
             <span style="font-size:14px;flex-shrink:0;">💡</span>
             <div style="font-size:11px;color:#555;line-height:1.55;">
-              Windesheim groeit stabiel (+22%) zonder grote pieken — mogelijk een
+              Hogeschool D groeit stabiel (+22%) zonder grote pieken — mogelijk een
               stabieler aanmeldpatroon om van te leren voor prognose-nauwkeurigheid.
             </div>
           </div>
@@ -824,7 +825,7 @@ class _HomeView:
                border-radius:8px;background:#f7f7f7;border:1px solid #e8e8e8;">
             <span style="font-size:14px;flex-shrink:0;">⚠️</span>
             <div style="font-size:11px;color:#555;line-height:1.55;">
-              Saxion en Rotterdam groeien nauwelijks — vergelijkbare regio, andere uitkomst.
+              Hogeschool A en C groeien nauwelijks — vergelijkbare regio, andere uitkomst.
               Aanleiding voor strategisch gesprek.
             </div>
           </div>

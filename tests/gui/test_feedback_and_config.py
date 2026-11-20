@@ -15,14 +15,22 @@ def test_feedback_mailto_contains_address_and_text():
 
 
 def test_institution_values_from_multiselect():
-    assert _institution_values(["21PC", "22OJ", "21PC"]) == ["21PC", "22OJ"]
+    assert _institution_values(["00AA", "00BB", "00AA"]) == ["00AA", "00BB"]
 
 
 def test_institution_values_from_text_input():
-    assert _institution_values(" 21PC, 22OJ  25DW ") == ["21PC", "22OJ", "25DW"]
+    assert _institution_values(" 00AA, 00BB  00CC ") == ["00AA", "00BB", "00CC"]
 
 
 def test_institution_values_empty():
     assert _institution_values(None) == []
     assert _institution_values("") == []
     assert _institution_values([]) == []
+
+
+def test_separator_name_is_readable():
+    from gui.pages.config_page import _separator_name
+
+    assert _separator_name(",") == "komma"
+    assert _separator_name(";") == "puntkomma"
+    assert _separator_name("#") == "'#'"

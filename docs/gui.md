@@ -67,7 +67,7 @@ De interface leidt je langs vier stappen, in volgorde:
    vandaan haalt: telbestanden komen van **Studielink** (op te vragen bij je
    Studielink-aansluitpunt of -beheerder, met een link naar de
    leveringsspecificatie), en het oktober-bestand komt uit je **eigen
-   instelling** (SIS/datawarehouse zoals Osiris of Usis). Onderaan de uploadzone
+   instelling** (het studentinformatiesysteem of datawarehouse). Onderaan de uploadzone
    staat daarnaast een klikbare link **"Verwacht formaat"**: klik die uit om een
    tabel te zien met verwachte kolomnamen, beschrijvingen en voorbeeldwaarden.
 2. **Configuratie** — kies je instelling en stel de modelparameters in. Op het
@@ -207,7 +207,8 @@ het JSON-tabblad te bewerken waren:
 - **Validatie — telbestand** stelt de datakwaliteitscontrole in die vóór de
   pipeline start draait: het scheidingsteken, de kolom waarop validatiefouten
   worden gegroepeerd, de toegestane herkomstcodes en de verplichte kolommen.
-  Zonder deze kaart gebruikte de GUI altijd de ingebouwde package-defaults en
+  De kop toont het ingestelde scheidingsteken (bijv. *komma* voor een
+  SQL-export, *puntkomma* voor het legacy Studielink-formaat). Zonder deze kaart gebruikte de GUI altijd de ingebouwde package-defaults en
   negeerde ze een eventueel `validation`-blok in je `configuration.json`.
   Toegestane herkomstcodes en verplichte kolommen bewerk je als een lijst
   chips: typ een waarde en klik *Toevoegen*, of klik de **×** op een chip om
