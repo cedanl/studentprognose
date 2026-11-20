@@ -362,7 +362,7 @@ class _ConfigView:
                         self._inst_select = (
                             ui.input(
                                 value=", ".join(current),
-                                label="Brincode (bijv. 00AA)",
+                                label="Brincode (bijv. 25DW)",
                                 placeholder="Voer de Brincode in (meerdere: komma-gescheiden)",
                             )
                             .props("outlined clearable")

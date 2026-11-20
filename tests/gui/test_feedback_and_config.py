@@ -15,11 +15,11 @@ def test_feedback_mailto_contains_address_and_text():
 
 
 def test_institution_values_from_multiselect():
-    assert _institution_values(["00AA", "00BB", "00AA"]) == ["00AA", "00BB"]
+    assert _institution_values(["21PC", "22OJ", "21PC"]) == ["21PC", "22OJ"]
 
 
 def test_institution_values_from_text_input():
-    assert _institution_values(" 00AA, 00BB  00CC ") == ["00AA", "00BB", "00CC"]
+    assert _institution_values(" 21PC, 22OJ  25DW ") == ["21PC", "22OJ", "25DW"]
 
 
 def test_institution_values_empty():
