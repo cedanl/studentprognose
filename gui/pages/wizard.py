@@ -1313,7 +1313,7 @@ class _WizardView:
             self._confirm_path = ui.label().classes("text-sm font-mono opacity-60 mb-2")
             with ui.row().classes("items-center gap-4 flex-wrap"):
                 self._demo_checkbox = ui.checkbox(
-                    "Demo Studielink-data downloaden (≈6 MB, beide sporen)",
+                    "Demo Studielink-data downloaden (≈6 MB, geschikt voor alle modi)",
                     value=False,
                 )
                 # Vertikale scheidingslijn
@@ -1803,7 +1803,10 @@ class _WizardView:
             with self._create_feedback:
                 error_banner(
                     "Demodata downloaden mislukt.",
-                    f"Controleer je internetverbinding. Details: {exc}",
+                    "Controleer je internetverbinding. Het project is wel "
+                    "aangemaakt: upload hieronder je eigen bestanden, of klik "
+                    "rechtsboven op Reset om het opnieuw te proberen met "
+                    f"demodata. Details: {exc}",
                 )
         finally:
             timer.cancel()

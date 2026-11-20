@@ -25,6 +25,29 @@ from gui.state import STATE
 _AUTOSAVE_DELAY_S = 0.6
 
 
+def _institution_values(value) -> list[str]:
+    """Normaliseer de waarde van de instellingskiezer naar een lijst codes.
+
+    De kiezer is een multiselect (lijst) of, zonder gedetecteerde codes, een
+    tekstveld waarin meerdere codes komma- of spatiegescheiden mogen staan.
+
+    Args:
+        value: Lijst, string of ``None``.
+
+    Returns:
+        Unieke, niet-lege codes in invoervolgorde.
+    """
+    if value is None:
+        return []
+    items = value if isinstance(value, list) else str(value).replace(",", " ").split()
+    seen: list[str] = []
+    for item in items:
+        code = str(item).strip()
+        if code and code not in seen:
+            seen.append(code)
+    return seen
+
+
 def _load_brincodes(project_dir: str) -> list[str]:
     """Lees unieke Brincodes uit de telbestanden van het project, gesorteerd."""
     tel_dir = os.path.join(project_dir, "data", "input_raw", "telbestanden")
@@ -281,8 +304,7 @@ class _ConfigView:
         self._week_card()
 
     def _institution_card(self) -> None:
-        current = self._config.setdefault("institution_filter", [])
-        current_code = current[0] if current else None
+        current = [str(c) for c in self._config.setdefault("institution_filter", [])]
 
         try:
             project_dir = os.path.dirname(os.path.dirname(self._path))
@@ -301,19 +323,22 @@ class _ConfigView:
                         ui.label("Jouw instelling").classes("text-base font-medium")
                         ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
                     ui.label(
-                        "Selecteer je Brincode. De prognose filtert de teldata automatisch op deze code."
+                        "Selecteer je Brincode (meerdere mag). De prognose gebruikt dan "
+                        "alleen de teldata van die instelling(en)."
                     ).classes("text-sm opacity-60 mt-1")
 
                     if data_codes:
-                        options = data_codes if not (current_code and current_code not in data_codes) else [current_code, *data_codes]
+                        extra = [c for c in current if c not in data_codes]
+                        options = [*extra, *data_codes]
 
                         self._inst_select = (
                             ui.select(
                                 options=options,
-                                value=current_code,
+                                value=current,
                                 label="Selecteer Brincode",
+                                multiple=True,
                             )
-                            .props("outlined use-input input-debounce=0 clearable")
+                            .props("outlined use-input use-chips input-debounce=0 clearable")
                             .classes("w-full mt-2")
                         )
                         self._inst_select.on_value_change(self._on_institution_change)
@@ -328,9 +353,9 @@ class _ConfigView:
                     else:
                         self._inst_select = (
                             ui.input(
-                                value=current_code or "",
+                                value=", ".join(current),
                                 label="Brincode (bijv. 25DW)",
-                                placeholder="Voer de Brincode in",
+                                placeholder="Voer de Brincode in (meerdere: komma-gescheiden)",
                             )
                             .props("outlined clearable")
                             .classes("w-full mt-2")
@@ -342,6 +367,12 @@ class _ConfigView:
                             ui.label(
                                 "Upload telbestanden om de beschikbare Brincodes te detecteren."
                             ).classes("text-xs").style("color: #aaa;")
+
+                    self._inst_empty_hint = ui.label(
+                        "Nog geen instelling gekozen: de prognose telt nu alle "
+                        "instellingen in je telbestanden bij elkaar op."
+                    ).classes("text-xs font-medium mt-1").style(f"color: {theme.WARNING}")
+                    self._inst_empty_hint.set_visibility(not current)
 
     def _week_card(self) -> None:
         mc = self._config.setdefault("model_config", {})
@@ -1849,7 +1880,8 @@ class _ConfigView:
         return True
 
     def _on_institution_change(self, e) -> None:
-        self._config["institution_filter"] = [e.value] if e.value else []
+        self._config["institution_filter"] = _institution_values(e.value)
+        self._inst_empty_hint.set_visibility(not self._config["institution_filter"])
         self._mark_dirty()
 
     # ─── Dirty-tracking ───────────────────────────────────────────────────────

@@ -22,6 +22,8 @@ De tool schrijft je resultaten naar `data/output/`. Het belangrijkste bestand is
 `{modus}` is `cumulatief`, `individueel`, `beide` of `cwf`, afhankelijk van de gebruikte `-d` vlag.
 `{studentjaar}` is `first-years`, `higher-years` of `volume`, afhankelijk van `-sy`.
 
+De bestanden worden pas aan het eind van een run geschreven, via een tijdelijk bestand dat in één stap het oude vervangt. Mislukt een run of breek je hem af, dan blijven de bestanden van je vorige geslaagde run dus ongewijzigd staan; je krijgt nooit een half of leeg outputbestand. Staat een outputbestand nog open in Excel, dan stopt de run vooraf met een melding.
+
 ## Audittrail (`_totaal_*.xlsx`)
 
 Naast de week-specifieke `output_*.xlsx`-bestanden — die elke run worden overschreven — onderhoudt de pipeline een doorlopend audittrail per modus. Elke run voegt zijn rijen idempotent toe aan `data/output/_totaal_{studentjaar}_{modus}.xlsx`:
@@ -162,7 +164,7 @@ Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren 
 | **Individueel** (`individual/dashboard.html`) | `-d i` of `-d b`, zodra het individuele model voorspellingen heeft | Hoe goed voorspelt het individuele model? |
 | **Cumulatief** (`cumulative/dashboard.html`) | `-d c` of `-d b` | Hoe goed voorspelt het cumulatieve model? |
 | **CWF** (`cwf/dashboard.html`) | `-d cwf` | Hoe goed voorspelt het CWF-model, en hoe zeker is elke prognose? |
-| **Eindoverzicht** (`final/dashboard.html`) | Altijd | Wat is de prognose, en hoeveel vertrouwen verdient die? |
+| **Eindoverzicht** (`final/dashboard_<modus>.html`) | Altijd | Wat is de prognose, en hoeveel vertrouwen verdient die? |
 
 Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. Alle pagina's hebben dezelfde opzet: een [herkomstfilter](#herkomstfilter-en-fout-naar-herkomst) bovenaan, kerncijfers, de fout naar opleidingsgrootte, examentype en herkomst, een tabel per opleiding met een **betrouwbaarheidslabel**, en (bij de modelpagina's) het verloop per opleiding. Elk model heeft op alle pagina's dezelfde kleur. De dashboards zijn zelfstandige HTML-bestanden (geen server of internet nodig) en openen in elke browser.
 
@@ -178,9 +180,9 @@ Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. A
 !!! note "Dashboard toont alleen de laatste week"
     Bij een multi-week run (bijv. `-w 10:20`) toont het dashboard alleen de prognose van de **laatste week** in de reeks. De Excel-output bevat wel alle weken.
 
-### Eindoverzicht (`final/dashboard.html`)
+### Eindoverzicht (`final/dashboard_<modus>.html`)
 
-Altijd beschikbaar. Het eindoverzicht gaat over de **eindprognose**: het ensemble als dat er is, anders het model dat de prognose levert. Bovenaan staan de totale verwachte instroom, de verandering ten opzichte van vorig jaar, en welk deel van de verwachte studenten een prognose met betrouwbaarheid hoog of middel heeft. Daaronder volgen:
+Altijd beschikbaar. Het eindoverzicht wordt per modus bewaard, bijvoorbeeld `final/dashboard_cumulatief.html` en `final/dashboard_cwf.html`, zodat een CWF-run het eindoverzicht van een cumulatieve run niet overschrijft. `final/dashboard.html` is altijd het eindoverzicht van de **laatste** run; die naam blijft bestaan voor bestaande scripts en notebooks. Het eindoverzicht gaat over de **eindprognose**: het ensemble als dat er is, anders het model dat de prognose levert. Bovenaan staan de totale verwachte instroom, de verandering ten opzichte van vorig jaar, en welk deel van de verwachte studenten een prognose met betrouwbaarheid hoog of middel heeft. Daaronder volgen:
 
 - **Prognose per opleiding**: prognose ± marge, werkelijke instroom vorig jaar, het verschil en het betrouwbaarheidslabel. Zoeken, sorteren, filteren en downloaden als CSV kan hier ook.
 - **Prognose per herkomst**: NL, EER en niet-EER naast de instroom van vorig jaar. Deze grafiek toont altijd alle herkomstgroepen; kies je bovenaan een herkomst, dan wordt die groep uitgelicht.

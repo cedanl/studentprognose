@@ -117,3 +117,83 @@ def preview_command(args: list[str]) -> str:
     """
     parts = ["studentprognose", *args]
     return " ".join(parts)
+
+
+#: Config-sleutel per dataset met de eerdere-runsdata die ``-sy h`` nodig heeft.
+#: ``Beide`` heeft geen eigen bron en kan daarom geen hogerejaars voorspellen.
+_HIGHER_YEARS_SOURCE_KEYS = {
+    "Cumulatief": "path_latest_cumulative",
+    "Individueel": "path_latest_individual",
+    "CWF": "path_latest_cwf",
+}
+
+
+def higher_years_source(dataset: str | None, config: dict | None) -> str | None:
+    """Geef het (relatieve) pad dat een hogerejaarsrun voor ``dataset`` inleest.
+
+    Args:
+        dataset: GUI-label van de dataset.
+        config: Geladen projectconfiguratie (mag ``None`` zijn).
+
+    Returns:
+        Het pad uit ``paths.path_latest_*``, of ``None`` als de dataset geen
+        hogerejaarsbron heeft (``Beide``) of het pad niet is ingesteld.
+    """
+    key = _HIGHER_YEARS_SOURCE_KEYS.get(dataset or "")
+    if key is None:
+        return None
+    path = ((config or {}).get("paths") or {}).get(key) or None
+    return path
+
+
+def run_conflicts(
+    *,
+    dataset: str | None,
+    cohort: str | None,
+    skip_years: int,
+    project_dir: str | None,
+    config: dict | None,
+) -> list[str]:
+    """Vind parametercombinaties die de CLI gegarandeerd zou weigeren.
+
+    Zo krijgt de gebruiker de uitleg vóór de run, in plaats van een mislukte
+    run na minuten wachten (#322).
+
+    Args:
+        dataset: GUI-label van de dataset (Cumulatief/Individueel/Beide/CWF).
+        cohort: GUI-label van het cohort (Eerstejaars/Hogerejaars/Volume).
+        skip_years: Aantal jaren overslaan (backtesting).
+        project_dir: Projectmap (voor het controleren van invoerbestanden).
+        config: Geladen projectconfiguratie.
+
+    Returns:
+        Leesbare foutmeldingen; leeg als de combinatie uitvoerbaar is.
+    """
+    errors: list[str] = []
+    if dataset == "CWF" and skip_years > 0:
+        errors.append(
+            "Het CWF-model ondersteunt geen backtest: zet 'Jaren overslaan' op 0."
+        )
+    if cohort == "Hogerejaars":
+        source = higher_years_source(dataset, config)
+        if source is None:
+            errors.append(
+                f"Hogerejaars voorspellen kan niet met dataset '{dataset}'. "
+                "Kies Cumulatief, Individueel of CWF."
+            )
+        else:
+            full = (
+                source
+                if os.path.isabs(source)
+                else os.path.join(project_dir or "", source)
+            )
+            if not os.path.isfile(full):
+                errors.append(
+                    "Hogerejaars voorspellen kan in dit project nog niet: daarvoor "
+                    "zijn eerdere prognoses mét de gerealiseerde aantallen nodig in "
+                    f"'{source}', en dat bestand ontbreekt. Een gewone run maakt "
+                    "het niet aan. Zie in de documentatie 'Draaien & CLI' → "
+                    "Hogerejaars hoe je het maakt; tot die tijd voorspel je "
+                    "Eerstejaars of Volume."
+                )
+    return errors

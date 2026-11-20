@@ -44,7 +44,6 @@ _DEFAULTS: dict = {
     "noetl": False,
     "dashboard": False,
     "no_warnings": False,
-    "yes": True,
 }
 
 
@@ -161,7 +160,10 @@ class _RunView:
         # bereik zolang de data nog niet is geüpload.
         self._bounds: DataYearBounds | None = self._scan_bounds()
         self._data_start, self._data_end, self._forecast_years = self._resolve_years()
-        self._excluded_years: list[int] = self._load_excluded_years()
+        self._config: dict = self._load_config()
+        self._excluded_years: list[int] = config_io.excluded_years(
+            self._config.get("excluded_data_points", [])
+        )
         self._default_year: int = (
             self._data_end + 1
             if self._data_end is not None and (self._data_end + 1) in self._forecast_years
@@ -211,16 +213,15 @@ class _RunView:
             return None
 
     @staticmethod
-    def _load_excluded_years() -> list[int]:
-        """Lees de uitgesloten jaren uit ``excluded_data_points`` in de config."""
+    def _load_config() -> dict:
+        """Lees de projectconfiguratie (leeg dict als die onleesbaar is)."""
         if not STATE.config_path:
-            return []
+            return {}
         try:
-            config = config_io.load_config(STATE.config_path)
+            return config_io.load_config(STATE.config_path)
         except Exception:
             # Onleesbare of nog niet opgeslagen configuratie mag de pagina nooit breken.
-            return []
-        return config_io.excluded_years(config.get("excluded_data_points", []))
+            return {}
 
     def _resolve_years(self) -> tuple[int, int | None, list[int]]:
         """Leid (start-jaar, eind-jaar, prognosejaar-opties) af.
@@ -303,7 +304,44 @@ class _RunView:
 
     # ── UI-opbouw ────────────────────────────────────────────────────────────
 
+    def _institution_banner(self) -> None:
+        """Toon voor welke instelling(en) de prognose wordt gemaakt.
+
+        Zonder ``institution_filter`` telt de pipeline alle instellingen in de
+        telbestanden bij elkaar op. Dat is zelden de bedoeling, dus maak het
+        expliciet zichtbaar vóór de run (#322).
+        """
+        codes = [str(c) for c in (self._config.get("institution_filter") or [])]
+        color = theme.ACCENT if codes else theme.WARNING
+        with ui.row().classes("w-full items-center gap-3 no-wrap mb-4 px-4 py-3").style(
+            "background: white; border-radius: 10px; "
+            f"border: 1px solid {color}30; border-left: 4px solid {color}; "
+            "box-shadow: 0 1px 5px rgba(0,0,0,0.05);"
+        ):
+            ui.icon("account_balance" if codes else "warning_amber").classes(
+                "text-xl"
+            ).style(f"color: {color}")
+            with ui.column().classes("gap-0 grow"):
+                if codes:
+                    ui.label(f"Instelling: {', '.join(codes)}").classes("font-medium")
+                    ui.label(
+                        "De prognose gebruikt alleen de teldata van deze instelling(en)."
+                    ).classes("text-sm opacity-60")
+                else:
+                    ui.label("Geen instelling gekozen").classes("font-medium")
+                    ui.label(
+                        "De prognose telt alle instellingen in je telbestanden bij "
+                        "elkaar op. Kies je eigen Brincode in Configuratie › Basis."
+                    ).classes("text-sm opacity-70")
+            if not codes and nav.is_available("/config"):
+                ui.button(
+                    "Kies instelling",
+                    icon="tune",
+                    on_click=lambda: ui.navigate.to("/config"),
+                ).props("flat dense color=accent")
+
     def _build(self) -> None:
+        self._institution_banner()
         self._excl_years_banner()
 
         with ui.card().classes("w-full"):
@@ -317,7 +355,11 @@ class _RunView:
                 ).classes("w-full")
                 self._dataset.tooltip(tracks.dataset_tooltip())
                 self._dataset.on_value_change(
-                    lambda _e: (self._update_dataset_hint(), self._update_preview())
+                    lambda _e: (
+                        self._update_dataset_hint(),
+                        self._apply_dataset_constraints(),
+                        self._update_preview(),
+                    )
                 )
 
                 # ── Cohort ──────────────────────────────────────────────────
@@ -389,11 +431,19 @@ class _RunView:
                     self._skip_years.on_value_change(lambda _e: self._update_preview())
 
             # ── Dataset-hint ─────────────────────────────────────────────────
-            with ui.row().classes("items-center gap-2 w-full"):
+            with ui.row().classes("items-start gap-2 w-full no-wrap"):
                 self._dataset_hint_icon = (
-                    ui.icon("info").classes("text-sm").style(f"color: {theme.ACCENT}")
+                    ui.icon("info")
+                    .classes("text-sm flex-none mt-0.5")
+                    .style(f"color: {theme.ACCENT}")
                 )
-                self._dataset_hint = ui.label("").classes("text-sm opacity-80")
+                self._dataset_hint = ui.label("").classes("text-sm opacity-80 grow")
+            self._conflict_label = (
+                ui.label("")
+                .classes("text-sm font-medium")
+                .style(f"color: {theme.NEGATIVE}")
+            )
+            self._conflict_label.set_visibility(False)
             self._update_dataset_hint()
 
             # ── Checkboxen ──────────────────────────────────────────────────
@@ -419,15 +469,13 @@ class _RunView:
                     "Onderdruk UserWarning-meldingen over historisch realisme en ontbrekende "
                     "lag-fallback (--no-warnings). Gebruik dit als de warnings bekend zijn."
                 )
-                self._yes = ui.checkbox(
-                    "Validatieprompt overslaan", value=self._settings["yes"]
-                )
-                self._yes.tooltip(
-                    "Sla de interactieve validatieprompt over (--yes). "
-                    "Aanbevolen aan: een GUI-run heeft geen interactieve invoer."
-                )
-                for cb in (self._noetl, self._dashboard, self._no_warnings, self._yes):
+                for cb in (self._noetl, self._dashboard, self._no_warnings):
                     cb.on_value_change(lambda _e: self._update_preview())
+            ui.label(
+                "Gevonden datakwaliteitsproblemen verschijnen in het logboek; de "
+                "run gaat dan toch door, omdat de GUI geen vragen tussendoor kan "
+                "stellen."
+            ).classes("text-xs opacity-60")
 
         # ── Dataverdeling-visualisatie ────────────────────────────────────────
         with ui.card().classes("w-full pr-16"):
@@ -461,6 +509,7 @@ class _RunView:
 
         # Initialiseer skip-hint, weeks-validatie en preview op basis van
         # opgeslagen waarden.
+        self._apply_dataset_constraints()
         self._on_weeks_change()
         self._on_years_change()  # roept ook _update_preview() aan
 
@@ -530,7 +579,9 @@ class _RunView:
             noetl=self._noetl.value,
             dashboard=self._dashboard.value,
             no_warnings=self._no_warnings.value,
-            yes=self._yes.value,
+            # Altijd --yes: de GUI start de CLI zonder interactieve invoer, dus
+            # een validatieprompt kan nooit beantwoord worden (#322).
+            yes=True,
         )
 
     def _update_dataset_hint(self) -> None:
@@ -541,8 +592,31 @@ class _RunView:
         suffix = " (aanbevolen)" if t.label == tracks.RECOMMENDED else ""
         self._dataset_hint.set_text(f"{t.label} — {t.short}{suffix}")
 
+    def _conflicts(self) -> list[str]:
+        return process.run_conflicts(
+            dataset=self._dataset.value,
+            cohort=self._cohort.value,
+            skip_years=int(self._skip_years.value or 0),
+            project_dir=STATE.project_dir,
+            config=self._config,
+        )
+
+    def _apply_dataset_constraints(self) -> None:
+        """Schakel opties uit die het gekozen model niet ondersteunt."""
+        if self._dataset.value == "CWF":
+            # CWF kent geen backtest (de CLI weigert -sk): veld op 0 en uit.
+            if int(self._skip_years.value or 0) != 0:
+                self._skip_years.set_value(0)
+            self._skip_years.disable()
+            self._skip_years.tooltip("Het CWF-model ondersteunt geen backtest.")
+        else:
+            self._skip_years.enable()
+
     def _update_preview(self) -> None:
         self._preview.set_text(process.preview_command(self._current_args()))
+        conflicts = self._conflicts()
+        self._conflict_label.set_text(" ".join(conflicts))
+        self._conflict_label.set_visibility(bool(conflicts))
         self._update_viz()
 
     def _update_viz(self) -> None:
@@ -582,6 +656,7 @@ class _RunView:
         if weeks_err:
             errors.append(f"Weken: {weeks_err}")
 
+        errors.extend(self._conflicts())
         return errors
 
     # ── Persistentie ─────────────────────────────────────────────────────────
@@ -596,7 +671,6 @@ class _RunView:
             "noetl": self._noetl.value,
             "dashboard": self._dashboard.value,
             "no_warnings": self._no_warnings.value,
-            "yes": self._yes.value,
         }
 
     # ── Starten ──────────────────────────────────────────────────────────────
@@ -655,7 +729,7 @@ class _RunView:
                 cwd=STATE.project_dir,
                 on_line=self._progress.on_line,
             )
-            self._progress.complete(success=returncode == 0)
+            self._progress.complete(success=returncode == 0, stopped=self._panel.stopped)
             if returncode == 0:
                 self._show_results_link()
         finally:

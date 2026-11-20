@@ -12,6 +12,7 @@ import asyncio
 import os
 
 from fastapi import File, HTTPException, Query, UploadFile
+from fastapi.responses import FileResponse
 from nicegui import app, ui
 
 #: Poort waarop de GUI draait. Vast, zodat de gedocumenteerde URL klopt.
@@ -62,6 +63,25 @@ async def _api_upload_telbestand(
     }
 
 
+@app.get("/project-dashboards/{rel_path:path}")
+async def _serve_dashboard(rel_path: str) -> FileResponse:
+    """Serveer een gegenereerd dashboard uit het actieve project.
+
+    Alleen ``.html`` binnen ``<project>/data/output/visualisations`` (zie
+    :func:`gui.results_io.resolve_dashboard`), zodat de route geen willekeurige
+    bestanden van de schijf kan uitlezen.
+    """
+    from gui import results_io
+    from gui.state import STATE
+
+    if STATE.output_dir is None:
+        raise HTTPException(status_code=404, detail="Geen actief project.")
+    path = results_io.resolve_dashboard(STATE.output_dir, rel_path)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Dashboard niet gevonden.")
+    return FileResponse(path, media_type="text/html")
+
+
 def _register_pages() -> None:
     """Registreer alle paginaroutes.
 
@@ -70,38 +90,22 @@ def _register_pages() -> None:
     niet mee met elke feature-issue.
     """
     from gui.pages import (
-        api_explorer,
         benchmark,
-        concept_hub,
         config_page,
-        explainability,
-        filtering,
         home,
         methodology,
         output,
-        peer_benchmark,
         run,
-        scenarios,
-        uxflow,
         wizard,
     )
 
     home.create()
     wizard.create()
     config_page.create()
-    filtering.create()
     run.create()
     output.create()
     benchmark.create()
     methodology.create()
-    # UX Flow
-    uxflow.create()
-    # Concept-features
-    concept_hub.create()
-    scenarios.create()
-    peer_benchmark.create()
-    api_explorer.create()
-    explainability.create()
 
 
 def main() -> None:

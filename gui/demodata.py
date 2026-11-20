@@ -9,6 +9,7 @@ getest kan worden.
 from __future__ import annotations
 
 import os
+import time
 import zipfile
 from collections.abc import Callable
 
@@ -54,8 +55,22 @@ def extract_zip(zip_path: str, dest_dir: str) -> list[str]:
     return extracted
 
 
+#: Maximale wachttijd (seconden) per netwerkstap. Zonder timeout blijft de wizard
+#: bij een haperende verbinding eindeloos "bezig" zonder melding (#322).
+DOWNLOAD_TIMEOUT_S = 30
+
+#: Maximale totale downloadtijd (seconden). Een verbinding die blijft sijpelen
+#: haalt de timeout per stap nooit, maar mag de gebruiker niet eindeloos laten
+#: wachten (#322).
+DOWNLOAD_MAX_SECONDS = 300
+
+
 def download_file(
-    url: str, dest_path: str, progress_cb: Callable[[float], None] | None = None
+    url: str,
+    dest_path: str,
+    progress_cb: Callable[[float], None] | None = None,
+    timeout: float = DOWNLOAD_TIMEOUT_S,
+    max_seconds: float = DOWNLOAD_MAX_SECONDS,
 ) -> None:
     """Download ``url`` naar ``dest_path`` met optionele voortgang.
 
@@ -64,13 +79,19 @@ def download_file(
         dest_path: Doelbestand.
         progress_cb: Callback met een fractie 0.0–1.0 (of ``-1`` als de grootte
             onbekend is). Optioneel.
+        timeout: Maximale wachttijd in seconden voor verbinden en voor elk
+            gelezen blok.
+        max_seconds: Maximale totale duur van de download in seconden.
 
     Raises:
         urllib.error.URLError: Bij netwerkfouten.
+        TimeoutError: Als de server te lang niets terugstuurt, of als de hele
+            download langer duurt dan ``max_seconds``.
     """
     import urllib.request
 
-    with urllib.request.urlopen(url) as response:  # noqa: S310 (vaste https-URL)
+    deadline = time.monotonic() + max_seconds
+    with urllib.request.urlopen(url, timeout=timeout) as response:  # noqa: S310 (vaste https-URL)
         total = int(response.headers.get("Content-Length", 0))
         read = 0
         chunk = 64 * 1024
@@ -79,6 +100,10 @@ def download_file(
                 block = response.read(chunk)
                 if not block:
                     break
+                if time.monotonic() > deadline:
+                    raise TimeoutError(
+                        f"de download duurde langer dan {int(max_seconds)} seconden"
+                    )
                 out.write(block)
                 read += len(block)
                 if progress_cb is not None:

@@ -174,7 +174,9 @@ class _ResultsView:
         with self._body:
             try:
                 df = results_io.load_output(self._path)
-            except (OSError, ValueError, KeyError) as exc:
+            except Exception as exc:  # noqa: BLE001 — elk onleesbaar bestand (ook BadZipFile)
+                # Een kapot of half geschreven bestand mag de pagina nooit laten
+                # crashen; toon wat er mis is en laat de rest bruikbaar (#322).
                 error_banner(
                     "Het resultaatbestand kon niet worden gelezen.",
                     f"Bestand: {self._path}. Details: {exc}",
@@ -184,9 +186,44 @@ class _ResultsView:
             self._render_kpis(df)
             self._render_model_comparison(df)
             self._render_programme_table(df)
+            self._render_dashboards()
             with ui.row().classes("items-center gap-2"):
                 self._render_audit_button()
                 self._render_share_button()
+
+    def _render_dashboards(self) -> None:
+        """Knoppen naar de interactieve dashboards van deze run (#322)."""
+        output_dir = os.path.dirname(self._path)
+        if STATE.output_dir is None or os.path.realpath(output_dir) != os.path.realpath(
+            STATE.output_dir
+        ):
+            return  # historische run: dashboards horen bij een ander project
+        links = results_io.dashboard_links(output_dir, os.path.basename(self._path))
+        with ui.card().classes("w-full"):
+            ui.label("Interactieve dashboards").classes("font-medium")
+            if not links:
+                ui.label(
+                    "Voor deze run zijn geen dashboards gemaakt. Vink op de pagina "
+                    "Uitvoeren 'Dashboards genereren' aan en draai opnieuw."
+                ).classes("text-sm opacity-60")
+                return
+            ui.label(
+                "Opent in een nieuw tabblad: per opleiding het verloop, de fout en "
+                "de betrouwbaarheid."
+            ).classes("text-sm opacity-60")
+            with ui.row().classes("gap-2 flex-wrap"):
+                for label, rel in links:
+                    # ui.link i.p.v. navigate.to(new_tab=True): dat laatste kan
+                    # door een pop-upblokker worden tegengehouden.
+                    with ui.link(target=f"/project-dashboards/{rel}", new_tab=True).classes(
+                        "no-underline"
+                    ).style(
+                        f"border: 1px solid {ACCENT}; color: {ACCENT}; border-radius: 4px; "
+                        "padding: 6px 14px; display: inline-flex; align-items: center; "
+                        "gap: 6px; font-weight: 500; font-size: 14px;"
+                    ):
+                        ui.icon("open_in_new").classes("text-base")
+                        ui.label(label)
 
     def _on_file_change(self, e) -> None:
         # Herlaad het overzicht voor het gekozen bestand, mét behoud van de keuze.
@@ -206,7 +243,7 @@ class _ResultsView:
                 "Beste model (MAPE)",
                 f"{mape * 100:.1f}%" if mape is not None else "—",
                 "emoji_events",
-                subtitle=best or "",
+                subtitle=results_io.model_label(best),
             )
             self._kpi(
                 "Voorspelling",
@@ -243,7 +280,8 @@ class _ResultsView:
             values = [comparison[n] for n in names]
             best_idx = values.index(min(values))
             colors = [POSITIVE if i == best_idx else INFO for i in range(len(names))]
-            fig = go.Figure(go.Bar(x=names, y=values, marker_color=colors))
+            labels = [results_io.model_label(n) for n in names]
+            fig = go.Figure(go.Bar(x=labels, y=values, marker_color=colors))
             fig.update_layout(
                 margin=dict(l=10, r=10, t=10, b=10),
                 height=280,
@@ -255,13 +293,29 @@ class _ResultsView:
 
     def _render_programme_table(self, df) -> None:
         records = results_io.programme_rows(df)
+        has_actuals = any(r.get("werkelijk") is not None for r in records)
         with ui.card().classes("w-full"):
             ui.label(
                 "Opleidingen — gesorteerd op absolute afwijking (grootste eerst)"
+                if has_actuals
+                else "Opleidingen"
             ).classes("font-medium")
             ui.label("Klik op een rij voor een detailgrafiek.").classes(
                 "text-sm opacity-60"
             )
+            if not has_actuals:
+                # Voor een prognosejaar bestaat de werkelijke instroom nog niet;
+                # zonder uitleg lijken de lege kolommen een fout (#322).
+                with ui.row().classes("items-start gap-2 no-wrap"):
+                    ui.icon("info").classes("text-sm flex-none mt-0.5").style(
+                        f"color: {INFO}"
+                    )
+                    ui.label(
+                        "De werkelijke instroom voor dit jaar is nog niet bekend. "
+                        "Werkelijk, Afwijking en MAPE vullen zich zodra je "
+                        "oktober-bestand dit jaar bevat, of als je een afgerond "
+                        "jaar terugkijkend voorspelt."
+                    ).classes("text-sm opacity-70")
             columns = [
                 {
                     "name": "opleiding",

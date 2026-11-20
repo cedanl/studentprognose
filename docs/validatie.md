@@ -38,6 +38,18 @@ De ✓ en ✗ symbolen worden in kleur weergegeven (groen/rood) als de terminal 
 
 In geautomatiseerde runs (CI/CD) gebruik je `--yes` om de soft-error prompt te omzeilen.
 
+Hoe de pipeline stopt, zie je aan de exitcode:
+
+| Situatie | Exitcode |
+|---|---|
+| Hard error | 1 |
+| Soft error, je antwoordt zelf `n` (of Ctrl+C) | 0 — je koos er bewust voor te stoppen |
+| Soft error zonder interactieve invoer (bijv. GUI, CI, cronjob) en zonder `--yes` | **1** — er komt geen prognose, dus de run telt als mislukt |
+
+Die laatste regel voorkomt dat een script of de GUI een run die nooit een prognose
+maakte als geslaagd ziet. De [grafische interface](gui.md) draait daarom altijd met
+`--yes` en toont de gevonden problemen in het logboek.
+
 ## Een validatiefout oplossen
 
 **Hard error — ontbrekende kolommen:**

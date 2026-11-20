@@ -64,7 +64,7 @@ _USE_CASES: list[tuple[str, str, str]] = [
     ),
     (
         "leaderboard",
-        "Benchmark",
+        "Peer-vergelijking",
         "Vergelijk jouw instellingstrend met vergelijkbare instellingen — zie waar je staat.",
     ),
 ]
@@ -192,7 +192,7 @@ class _HomeView:
                     )
 
                 # Headline + subtitel
-                ui.label("Weet in maart wat september brengt").classes(
+                ui.label("Weet in februari wat september brengt").classes(
                     "text-2xl font-bold"
                 ).style("letter-spacing:-0.3px;line-height:1.2;")
                 ui.label(
@@ -1024,23 +1024,57 @@ class _HomeView:
             )
 
             self._step("Demodata downloaden…")
-            await self._download_demodata(project_dir)
+            try:
+                await self._download_demodata(project_dir)
+            except Exception as exc:  # noqa: BLE001
+                self._demo_failed(
+                    "De demodata kon niet worden gedownload.",
+                    "Controleer je internetverbinding en probeer het opnieuw. "
+                    "Je kunt ook direct een project opzetten met je eigen "
+                    f"bestanden. Details: {exc}",
+                )
+                return
 
             self._step("Voorspelling draaien (cumulatief spoor)…")
             self._pipeline_progress.start()
             rc = await panel.run(
-                ["-d", "c", "-w", _DEMO_WEEK, "-y", _DEMO_YEAR, "--yes"],
+                # --dashboard: de interactieve dashboards horen bij de eerste
+                # indruk en zijn via Resultaten direct te openen (#322).
+                ["-d", "c", "-w", _DEMO_WEEK, "-y", _DEMO_YEAR, "--yes", "--dashboard"],
                 cwd=project_dir,
                 on_line=self._pipeline_progress.on_line,
             )
-            self._pipeline_progress.complete(success=rc == 0)
+            self._pipeline_progress.complete(success=rc == 0, stopped=panel.stopped)
         except Exception as exc:  # noqa: BLE001
-            with self._error:
-                error_banner("De demo kon niet worden voltooid.", f"Details: {exc}")
+            self._demo_failed("De demo kon niet worden voltooid.", f"Details: {exc}")
             return
 
         if rc == 0:
             self._on_demo_done()
+        elif not panel.stopped:
+            self._demo_failed(
+                "De demo-voorspelling is niet gelukt.",
+                "Open hierboven het Uitvoerlog voor de details.",
+            )
+
+    def _demo_failed(self, message: str, hint: str) -> None:
+        """Toon een mislukte demo en geef de gebruiker de startpagina terug.
+
+        Het half aangemaakte demoproject wordt losgelaten, zodat de knoppen
+        "Project opzetten" en "Probeer direct met demodata" weer werken (#322).
+        """
+        STATE.project_dir = None
+        try:
+            with self._error:
+                error_banner(message, hint)
+                ui.button(
+                    "Terug naar start",
+                    icon="home",
+                    on_click=lambda: ui.navigate.to("/"),
+                ).props("unelevated").classes("mt-2")
+        except RuntimeError:
+            # De gebruiker heeft de pagina al verlaten; niets meer te tonen.
+            pass
 
     def _on_demo_done(self) -> None:
         self._step("Klaar!", done=True)
@@ -1050,7 +1084,8 @@ class _HomeView:
                 icon="insights",
                 on_click=lambda: ui.navigate.to("/output"),
             ).props("unelevated").classes("mt-1")
-        ui.timer(0.8, lambda: ui.navigate.to("/output"), once=True)
+            # In een levende container: de startknop van de demo bestaat niet meer.
+            ui.timer(0.8, lambda: ui.navigate.to("/output"), once=True)
 
     def _step(self, text: str, *, done: bool = False) -> None:
         self._step_n += 1
@@ -1070,16 +1105,38 @@ class _HomeView:
 
     async def _download_demodata(self, project_dir: str) -> None:
         dest = os.path.join(project_dir, "data", "input_raw")
-        self._progress.props("indeterminate")
+        # Echte voortgang i.p.v. een eindeloze balk: de gebruiker ziet of de
+        # download vordert of vastzit.
+        holder: dict = {"value": 0.0}
+        self._progress.props(remove="indeterminate")
+        self._progress.set_value(0.0)
         self._progress.set_visibility(True)
+
+        def _tick() -> None:
+            frac = max(holder["value"], 0.0)
+            self._progress.set_value(frac)
+            pct_label.set_text(f"{frac * 100:.0f}% gedownload")
+
+        # Label én timer in een bestaande container aanmaken: de knop waarmee de
+        # demo startte is na container.clear() al verwijderd, dus de huidige
+        # slot-context is niet meer bruikbaar.
+        with self._steps:
+            pct_label = ui.label("0% gedownload").classes("text-xs opacity-60 ml-9")
+            timer = ui.timer(0.2, _tick)
 
         def _work() -> None:
             with tempfile.TemporaryDirectory() as tmp:
                 zip_path = os.path.join(tmp, "demo-data.zip")
-                demodata.download_file(demodata.DEMO_URL, zip_path)
+                demodata.download_file(
+                    demodata.DEMO_URL,
+                    zip_path,
+                    progress_cb=lambda f: holder.__setitem__("value", f),
+                )
                 demodata.extract_zip(zip_path, dest)
 
         try:
             await asyncio.to_thread(_work)
         finally:
+            timer.cancel()
             self._progress.set_visibility(False)
+            pct_label.delete()

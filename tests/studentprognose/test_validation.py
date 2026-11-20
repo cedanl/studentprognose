@@ -209,12 +209,25 @@ class TestHandleResult:
                 _handle_result(r, yes=False)
         assert exc_info.value.code == 0
 
-    def test_soft_error_eof_exits_gracefully_with_code_0(self):
+    def test_soft_error_eof_exits_with_code_1(self, capsys):
+        # Geen interactieve invoer (GUI/CI): er komt geen prognose, dus de
+        # aanroeper moet een mislukking zien i.p.v. exitcode 0 (#322).
         r = ValidationResult()
         r.soft_errors.append("klein probleem")
         with patch("builtins.input", side_effect=EOFError):
             with pytest.raises(SystemExit) as exc_info:
                 _handle_result(r, yes=False)
+        assert exc_info.value.code == 1
+        assert "--yes" in capsys.readouterr().out
+
+    def test_soft_error_keyboard_interrupt_exits_with_code_0(self):
+        r = ValidationResult()
+        r.soft_errors.append("klein probleem")
+        with (
+            patch("builtins.input", side_effect=KeyboardInterrupt),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            _handle_result(r, yes=False)
         assert exc_info.value.code == 0
 
 
