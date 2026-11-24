@@ -87,10 +87,13 @@ De interface leidt je langs vier stappen, in volgorde:
     gekozen.
 
 In stap 1 kies je ook de **modus**: *Cumulatief*, *Individueel*, *Beide* of
-*CWF*. De modus bepaalt welke bestanden je moet uploaden. Voor *CWF* zijn dat de
+*CWF*. *CWF* is gemarkeerd als aanbevolen. De modus bepaalt welke bestanden je moet uploaden. Voor *CWF* zijn dat de
 telbestanden en het oktober-bestand; individuele aanmelddata is niet nodig. Op de
-**Uitvoeren**-pagina kies je dezelfde vier opties in de keuzelijst *Dataset*
-(*CWF* = `-d cwf`). Bij een CWF-run toont de **Resultaten**-pagina per opleiding
+**Uitvoeren**-pagina zie je deze keuze terug in het veld *Dataset*
+(*CWF* = `-d cwf`). Dat veld kun je daar niet wijzigen: de modus kies je op één
+plek, in de wizard, zodat hij altijd past bij de bestanden die je hebt
+geüpload. Met **Wijzigen** ga je terug naar de modus-keuze. Kies je niets, dan
+staat de modus op *Cumulatief*. Bij een CWF-run toont de **Resultaten**-pagina per opleiding
 ook het predictie-interval en het betrouwbaarheidslabel (Groen/Oranje/Rood); de
 detailgrafiek van een opleiding tekent het interval als foutbalk. Zie
 [CWF-model](methodologie/cwf.md) voor wat de labels betekenen.

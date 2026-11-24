@@ -190,10 +190,10 @@ _STATUS_VISUAL: dict[FileStatus, tuple[str, str, str]] = {
 # Beschikbare pipeline-modi met bijbehorende metadata.
 # Tuple: (key, label, icon, cli_flag, beschrijving, aanbevolen)
 _MODE_OPTS: list[tuple[str, str, str, str, str, bool]] = [
-    ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden",       True),
+    ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden",       False),
     ("individual", "Individueel", "person",    "-d individual", "Alleen aanmelddata",         False),
     ("both",       "Beide",       "bolt",      "-d both",       "Telbestanden + aanmelddata", False),
-    ("cwf",        "CWF",         "verified",  "-d cwf",        "Telbestanden · met interval", False),
+    ("cwf",        "CWF",         "verified",  "-d cwf",        "Telbestanden · met interval", True),
 ]
 
 # Modi die de telbestanden resp. de individuele aanmelddata nodig hebben.
@@ -1236,8 +1236,11 @@ class _WizardView:
             self._project_dir = os.path.join(
                 os.path.expanduser("~"), "tmp", f"studentprognose{stamp}"
             )
-        # Een eerder in deze sessie gekozen modus blijft staan bij terugkeer.
-        self._mode: str = STATE.wizard_mode or "cumulative"
+        # Een eerder gekozen modus blijft staan bij terugkeer — ook na een
+        # herstart, via de opgeslagen run-dataset (die Uitvoeren toont).
+        from gui.pages.run import stored_wizard_mode
+
+        self._mode: str = STATE.wizard_mode or stored_wizard_mode() or "cumulative"
         self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
@@ -1444,8 +1447,9 @@ class _WizardView:
                     on_click=lambda: ui.navigate.to("/config"),
                 ).props("unelevated color=accent disabled")
 
-            # Initialiseer visuele staat nadat alle elementen bestaan.
-            self._apply_mode()
+            # Initialiseer visuele staat nadat alle elementen bestaan. Leg de
+            # getoonde modus ook vast, zodat Uitvoeren exact deze keuze draait.
+            self._select_mode(self._mode)
 
     # ── Telbestand-dekking ───────────────────────────────────────────────────
 

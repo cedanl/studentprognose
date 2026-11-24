@@ -36,7 +36,7 @@ def _default_week() -> str:
 
 
 _DEFAULTS: dict = {
-    "dataset": "Beide",
+    "dataset": "Cumulatief",
     "cohort": "Eerstejaars",
     "years": [_CURRENT_YEAR],
     "weeks": "38",
@@ -52,6 +52,23 @@ _WIZARD_MODE_TO_DATASET = {
     "both": "Beide",
     "cwf": "CWF",
 }
+
+
+_DATASET_TO_WIZARD_MODE = {v: k for k, v in _WIZARD_MODE_TO_DATASET.items()}
+
+
+def stored_wizard_mode() -> str | None:
+    """Geef de wizardmodus die hoort bij de opgeslagen run-dataset.
+
+    De modus wordt alleen in de wizard gekozen; Uitvoeren toont hem slechts.
+    Zo openen beide pagina's altijd met dezelfde keuze, ook na een herstart.
+
+    Returns:
+        Wizardmodus (``cumulative``/``individual``/``both``/``cwf``) of
+        ``None`` als er nog niets is opgeslagen.
+    """
+    stored = app.storage.general.get(_STORAGE_KEY, {})
+    return _DATASET_TO_WIZARD_MODE.get(stored.get("dataset"))
 
 
 def remember_wizard_mode(mode: str) -> None:
@@ -347,12 +364,28 @@ class _RunView:
             with ui.grid(columns=2).classes("w-full gap-4"):
 
                 # ── Dataset ─────────────────────────────────────────────────
-                self._dataset = ui.select(
-                    ["Cumulatief", "Individueel", "Beide", "CWF"],
-                    value=self._settings["dataset"],
-                    label="Dataset (voorspelspoor)",
-                ).classes("w-full")
-                self._dataset.tooltip(tracks.dataset_tooltip())
+                # Alleen-lezen: de modus kies je in 1. Project (wizard), zodat
+                # de keuze niet dubbel gemaakt wordt en altijd past bij de
+                # geüploade bestanden.
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    self._dataset = (
+                        ui.select(
+                            ["Cumulatief", "Individueel", "Beide", "CWF"],
+                            value=self._settings["dataset"],
+                            label="Dataset (gekozen in 1. Project)",
+                        )
+                        .props("readonly hide-dropdown-icon")
+                        .classes("grow")
+                    )
+                    self._dataset.tooltip(
+                        "De dataset kies je in stap 1. Project, samen met de "
+                        "bestanden die erbij horen."
+                    )
+                    ui.button(
+                        "Wijzigen",
+                        icon="edit",
+                        on_click=lambda: ui.navigate.to("/wizard"),
+                    ).props("flat dense color=accent")
                 self._dataset.on_value_change(
                     lambda _e: (
                         self._update_dataset_hint(),
@@ -584,8 +617,7 @@ class _RunView:
         if t is None:
             self._dataset_hint.set_text("")
             return
-        suffix = " (aanbevolen)" if t.label == tracks.RECOMMENDED else ""
-        self._dataset_hint.set_text(f"{t.label} — {t.short}{suffix}")
+        self._dataset_hint.set_text(f"{t.label} — {t.short}")
 
     def _conflicts(self) -> list[str]:
         return process.run_conflicts(

@@ -97,6 +97,23 @@ def test_wizard_mode_choice_overrides_stored_run_dataset(monkeypatch):
     assert fake_app.storage.general["run_settings"]["dataset"] == "CWF"
 
 
+def test_stored_wizard_mode_follows_run_dataset(monkeypatch):
+    """Wizard en Uitvoeren delen één keuze: de opgeslagen dataset."""
+    from types import SimpleNamespace
+
+    from gui.pages import run
+
+    fake_app = SimpleNamespace(storage=SimpleNamespace(general={}))
+    monkeypatch.setattr(run, "app", fake_app)
+    assert run.stored_wizard_mode() is None
+
+    run.remember_wizard_mode("cwf")
+    assert run.stored_wizard_mode() == "cwf"
+
+    fake_app.storage.general["run_settings"] = {"dataset": "Beide"}
+    assert run.stored_wizard_mode() == "both"
+
+
 # ── Conflicterende run-parameters (#322) ────────────────────────────────────
 
 
