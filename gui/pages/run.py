@@ -42,7 +42,6 @@ _DEFAULTS: dict = {
     "weeks": "38",
     "skip_years": 0,
     "noetl": False,
-    "dashboard": False,
     "no_warnings": False,
 }
 
@@ -455,13 +454,6 @@ class _RunView:
                     "Sla ETL én validatie over (--noetl). "
                     "Gebruik dit alleen als de data al eerder is verwerkt."
                 )
-                self._dashboard = ui.checkbox(
-                    "Dashboards genereren",
-                    value=self._settings["dashboard"],
-                )
-                self._dashboard.tooltip(
-                    "Genereer interactieve Plotly-dashboards in data/output/visualisations/ (--dashboard)."
-                )
                 self._no_warnings = ui.checkbox(
                     "Waarschuwingen onderdrukken", value=self._settings["no_warnings"]
                 )
@@ -469,12 +461,13 @@ class _RunView:
                     "Onderdruk UserWarning-meldingen over historisch realisme en ontbrekende "
                     "lag-fallback (--no-warnings). Gebruik dit als de warnings bekend zijn."
                 )
-                for cb in (self._noetl, self._dashboard, self._no_warnings):
+                for cb in (self._noetl, self._no_warnings):
                     cb.on_value_change(lambda _e: self._update_preview())
             ui.label(
-                "Gevonden datakwaliteitsproblemen verschijnen in het logboek; de "
-                "run gaat dan toch door, omdat de GUI geen vragen tussendoor kan "
-                "stellen."
+                "Elke run maakt ook de interactieve dashboards; je opent ze via "
+                "Resultaten. Gevonden datakwaliteitsproblemen verschijnen in het "
+                "logboek; de run gaat dan toch door, omdat de GUI geen vragen "
+                "tussendoor kan stellen."
             ).classes("text-xs opacity-60")
 
         # ── Dataverdeling-visualisatie ────────────────────────────────────────
@@ -577,7 +570,9 @@ class _RunView:
             weeks=self._weeks.value or "",
             skip_years=int(self._skip_years.value or 0),
             noetl=self._noetl.value,
-            dashboard=self._dashboard.value,
+            # Altijd dashboards: zo hoort het dashboard op Resultaten altijd bij
+            # de laatste run en blijft er geen verouderd exemplaar staan (#322).
+            dashboard=True,
             no_warnings=self._no_warnings.value,
             # Altijd --yes: de GUI start de CLI zonder interactieve invoer, dus
             # een validatieprompt kan nooit beantwoord worden (#322).
@@ -669,7 +664,6 @@ class _RunView:
             "weeks": self._weeks.value or "",
             "skip_years": int(self._skip_years.value or 0),
             "noetl": self._noetl.value,
-            "dashboard": self._dashboard.value,
             "no_warnings": self._no_warnings.value,
         }
 

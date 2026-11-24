@@ -21,8 +21,9 @@ def test_preview_command_formats_readable():
 def test_build_run_args_defaults():
     from gui.process import build_run_args
 
-    # Alleen --yes staat standaard aan.
-    assert build_run_args() == ["--yes"]
+    # --dashboard en --yes staan in de GUI altijd aan (#322): zo hoort het
+    # dashboard op Resultaten altijd bij de laatste run.
+    assert build_run_args() == ["--dashboard", "--yes"]
 
 
 def test_build_run_args_full():
@@ -64,7 +65,7 @@ def test_build_run_args_full():
 def test_build_run_args_splits_ranges_into_tokens():
     from gui.process import build_run_args
 
-    args = build_run_args(weeks="10 : 20", yes=False)
+    args = build_run_args(weeks="10 : 20", yes=False, dashboard=False)
     assert args == ["-w", "10", ":", "20"]
 
 

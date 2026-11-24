@@ -203,8 +203,9 @@ class _ResultsView:
             ui.label("Interactieve dashboards").classes("font-medium")
             if not links:
                 ui.label(
-                    "Voor deze run zijn geen dashboards gemaakt. Vink op de pagina "
-                    "Uitvoeren 'Dashboards genereren' aan en draai opnieuw."
+                    "Voor deze run zijn geen dashboards gemaakt (bijvoorbeeld een "
+                    "run vanaf de opdrachtregel zonder --dashboard). Draai de "
+                    "voorspelling opnieuw via Uitvoeren; de GUI maakt ze altijd."
                 ).classes("text-sm opacity-60")
                 return
             ui.label(

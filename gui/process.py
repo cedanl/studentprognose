@@ -55,7 +55,7 @@ def build_run_args(
     institutions: list[str] | None = None,
     skip_years: int = 0,
     noetl: bool = False,
-    dashboard: bool = False,
+    dashboard: bool = True,
     no_warnings: bool = False,
     yes: bool = True,
 ) -> list[str]:
@@ -72,7 +72,8 @@ def build_run_args(
         institutions: Brincodes/instellingsnamen (leeg = alle).
         skip_years: Aantal jaren overslaan (backtesting); 0 = geen.
         noetl: Sla ETL + validatie over.
-        dashboard: Genereer dashboards.
+        dashboard: Genereer dashboards (default True voor de GUI, zodat het
+            dashboard op Resultaten altijd bij de laatste run hoort).
         no_warnings: Onderdruk UserWarnings.
         yes: Sla de interactieve validatieprompt over (default True voor de GUI,
             omdat een subprocess geen interactieve invoer heeft).

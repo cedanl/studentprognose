@@ -158,10 +158,12 @@ datakwaliteitsproblemen staan in het logboek van de run (zie
 laat de resultaten van je vorige geslaagde run intact. Een gestopte run heet
 daarom ook *Gestopt* en niet *Mislukt*.
 
-Heb je bij het uitvoeren **Dashboards genereren** aangevinkt, dan staan op de
-**Resultaten**-pagina knoppen die de interactieve dashboards van die run in een
-nieuw tabblad openen: de pagina van het model en het eindoverzicht (zie
-[Output begrijpen](output-begrijpen.md#interactief-dashboard)).
+Elke run via de GUI maakt ook de interactieve dashboards (de GUI geeft altijd
+`--dashboard` mee; op de opdrachtregel blijft dat een keuze). Op de
+**Resultaten**-pagina openen knoppen ze in een nieuw tabblad: de pagina van het
+model en het eindoverzicht (zie
+[Output begrijpen](output-begrijpen.md#interactief-dashboard)). Omdat elke run
+ze opnieuw maakt, horen ze altijd bij je laatste voorspelling.
 
 Die uitsluiting is ook zichtbaar op het moment dat je de voorspelling start:
 bovenaan de **Uitvoeren**-pagina staat een uitklapbare sectie **"Uitgesloten
