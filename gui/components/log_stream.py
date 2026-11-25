@@ -159,6 +159,7 @@ class ProcessPanel:
 
         if returncode == 0:
             self._set_status("success")
+            self._render_overridden_problems()
             if on_success is not None:
                 on_success()
         elif self._stopped:
@@ -176,6 +177,28 @@ class ProcessPanel:
             self._set_status("failed")
             self._render_error("\n".join(tail))
         return returncode
+
+    def _render_overridden_problems(self) -> None:
+        """Toon validatieproblemen die door ``--yes`` niet tot een stop leidden.
+
+        Zonder deze banner eindigt een run met bijvoorbeeld een extreme
+        afwijking ten opzichte van vorig jaar als gewoon "Geslaagd" (#322).
+        """
+        from gui.components.states import warning_banner
+        from gui.process import overridden_problems
+
+        problems = overridden_problems(self._all_lines)
+        if not problems:
+            return
+        with self._error_slot:
+            warning_banner(
+                "De run is geslaagd, maar de validatie vond problemen die de "
+                "prognose onbetrouwbaar kunnen maken. Vanaf de opdrachtregel "
+                "zou de run hier stoppen of om bevestiging vragen. Controleer "
+                "je data voordat je deze resultaten gebruikt.",
+                problems[:10]
+                + ([f"… en nog {len(problems) - 10} meldingen (zie de log)"] if len(problems) > 10 else []),
+            )
 
     def _render_error(self, raw: str) -> None:
         """Toon een actiegerichte foutmelding onder de log."""

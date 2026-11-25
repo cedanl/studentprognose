@@ -157,7 +157,8 @@ def parse_args(argv):
         "--no-warnings",
         action="store_true",
         dest="no_warnings",
-        help="Onderdruk UserWarning-meldingen (historisch realisme, ontbrekende lag-fallback). "
+        help="Onderdruk UserWarning-meldingen (historisch realisme, ontbrekende lag-fallback); "
+        "een met --yes overgeslagen hard stop blijft altijd zichtbaar. "
              "Gebruik dit als de warnings bekend zijn en je de uitvoer overzichtelijk wil houden.",
     )
     parser.add_argument(

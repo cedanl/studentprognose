@@ -198,3 +198,37 @@ def run_conflicts(
                     "Eerstejaars of Volume."
                 )
     return errors
+
+
+#: Markeringen in de CLI-uitvoer van problemen die zonder ``--yes`` de run
+#: hadden gestopt (hard stop) of een vraag hadden gesteld (soft-validatie).
+#: De hard stop komt als Python-warning binnen ("...: UserWarning: [--yes] ...");
+#: op die volledige vorm matchen voorkomt dat de bronregel die Python eronder
+#: print (``warnings.warn(f"[--yes] {msg}", ...)``) als melding meetelt.
+_OVERRIDE_MARKERS = ("UserWarning: [--yes] ", "[PROBLEEM] ")
+
+
+def overridden_problems(lines: list[str]) -> list[str]:
+    """Vind validatieproblemen die de GUI via ``--yes`` heeft overgeslagen.
+
+    De GUI draait altijd met ``--yes`` (er is geen interactieve invoer). Een
+    hard stop of validatievraag wordt dan een regel in de log. Deze functie
+    haalt die regels eruit, zodat de GUI ze na een geslaagde run zichtbaar kan
+    maken in plaats van stil "Geslaagd" te tonen (#322).
+
+    Args:
+        lines: Uitvoerregels van de CLI (stdout + stderr).
+
+    Returns:
+        De meldingen zonder markering, uniek en in volgorde van voorkomen.
+    """
+    found: list[str] = []
+    for line in lines:
+        for marker in _OVERRIDE_MARKERS:
+            idx = line.find(marker)
+            if idx != -1:
+                msg = line[idx + len(marker):].strip()
+                if msg and msg not in found:
+                    found.append(msg)
+                break
+    return found

@@ -79,7 +79,7 @@ Alle opties: `studentprognose --help`.
 | `-sk` | getal | `0` | Skip N jaren (backtesting); niet met `-d cwf` |
 | `--noetl` | — | uit | Sla ETL én validatie over |
 | `--yes` | — | uit | Sla validatieprompts over (voor CI/CD) |
-| `--no-warnings` | — | uit | Onderdruk UserWarning-meldingen (historisch realisme, ontbrekende lag-fallback) |
+| `--no-warnings` | — | uit | Onderdruk UserWarning-meldingen (historisch realisme, ontbrekende lag-fallback). Een met `--yes` overgeslagen hard stop (`[--yes]`) blijft altijd zichtbaar |
 | `--dashboard` | — | uit | Genereer interactieve dashboards (`data/output/visualisations/`) |
 | `--tune-target` | `regressor` / `sarima` / `both` | `regressor` | Welke trap `tune` afstemt |
 | `--ci test N` | getal | — | Testmodus: beperkt tot N opleidingen |

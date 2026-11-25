@@ -114,6 +114,30 @@ def test_stored_wizard_mode_follows_run_dataset(monkeypatch):
     assert run.stored_wizard_mode() == "both"
 
 
+def test_overridden_problems_extracts_yes_and_soft_validation_lines():
+    from gui.process import overridden_problems
+
+    lines = [
+        "Predicting first-years: 2026-10...",
+        "/x/prediction_validator.py:210: UserWarning: [--yes] Historisch realisme: extreme afwijking",
+        # Python print de bronregel van de warning eronder; die is geen melding.
+        '  warnings.warn(f"[--yes] {msg}", UserWarning, stacklevel=2)',
+        "  [PROBLEEM] Negatief aantal in telbestand week 10",
+        "  [PROBLEEM] Negatief aantal in telbestand week 10",
+        "Klaar.",
+    ]
+    assert overridden_problems(lines) == [
+        "Historisch realisme: extreme afwijking",
+        "Negatief aantal in telbestand week 10",
+    ]
+
+
+def test_overridden_problems_empty_for_clean_run():
+    from gui.process import overridden_problems
+
+    assert overridden_problems(["Predicting first-years: 2026-10...", "Klaar."]) == []
+
+
 # ── Conflicterende run-parameters (#322) ────────────────────────────────────
 
 

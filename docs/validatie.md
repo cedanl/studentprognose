@@ -48,7 +48,10 @@ Hoe de pipeline stopt, zie je aan de exitcode:
 
 Die laatste regel voorkomt dat een script of de GUI een run die nooit een prognose
 maakte als geslaagd ziet. De [grafische interface](gui.md) draait daarom altijd met
-`--yes` en toont de gevonden problemen in het logboek.
+`--yes` en toont de gevonden problemen in het logboek. Zijn er problemen die
+vanaf de opdrachtregel tot een stop of een vraag zouden leiden, dan toont de GUI
+na afloop bovendien een waarschuwingsbanner met die problemen: de run heet dan
+wel *Geslaagd*, maar je ziet direct dat je de data moet controleren.
 
 ## Een validatiefout oplossen
 
@@ -176,7 +179,7 @@ De decimaalcheck en lege-dataset-check zijn nooit te omzeilen: corrupte of afwez
 uv run studentprognose --yes -y 2024 -w 10
 ```
 
-Met `--yes` verschijnt een waarschuwing in de console maar stopt de pipeline niet. Gebruik dit bewust: een extreme afwijking kan duiden op een Studielink-probleem dat je niet wilt meenemen in de modeltraining.
+Met `--yes` verschijnt een waarschuwing in de console maar stopt de pipeline niet. Die waarschuwing (herkenbaar aan `[--yes]`) blijft ook met `--no-warnings` altijd zichtbaar: anders zou een run met extreme data stil als geslaagd eindigen. Gebruik `--yes` bewust: een extreme afwijking kan duiden op een Studielink-probleem dat je niet wilt meenemen in de modeltraining.
 
 ### Numerus-fixus-sleutels
 

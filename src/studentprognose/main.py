@@ -93,11 +93,28 @@ def _resolve_tune_targets(tune) -> dict:
     )
 
 
+def _configure_warnings(no_warnings: bool) -> None:
+    """Stel de waarschuwingsfilters voor deze run in.
+
+    ``--no-warnings`` onderdrukt de UserWarnings van het pakket, maar nooit een
+    hard stop die met ``--yes`` is omgezet in een waarschuwing (``[--yes] ...``):
+    zonder die melding zou een run met extreme data stil als geslaagd eindigen
+    (#322).
+
+    Args:
+        no_warnings: True als ``--no-warnings`` is opgegeven.
+    """
+    if not no_warnings:
+        return
+    warnings.filterwarnings("ignore", category=UserWarning, module=r"studentprognose\.")
+    # Later toegevoegd = hogere prioriteit: deze uitzondering wint van "ignore".
+    warnings.filterwarnings("always", message=r"\[--yes\]", category=UserWarning)
+
+
 def main(argv):
     cfg = parse_args(argv)
 
-    if cfg.no_warnings:
-        warnings.filterwarnings("ignore", category=UserWarning, module=r"studentprognose\.")
+    _configure_warnings(cfg.no_warnings)
 
     if cfg.command == "init":
         from studentprognose.init import run_init

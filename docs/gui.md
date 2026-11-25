@@ -157,7 +157,10 @@ zodat je niet pas na een mislukte run ontdekt dat iets niet kan:
 Er is geen vinkje voor de validatieprompt: de GUI draait altijd met `--yes`,
 omdat ze geen vragen kan beantwoorden terwijl de pipeline loopt. Gevonden
 datakwaliteitsproblemen staan in het logboek van de run (zie
-[Validatie](validatie.md)). Een run die mislukt of die je met **Stop** afbreekt,
+[Validatie](validatie.md)). Problemen die vanaf de opdrachtregel de run zouden
+stoppen of om bevestiging zouden vragen, toont de GUI na afloop ook in een
+oranje waarschuwingsbanner, zodat een geslaagde run nooit stil over slechte data
+heen stapt. Het vinkje *Waarschuwingen onderdrukken* verbergt die banner niet. Een run die mislukt of die je met **Stop** afbreekt,
 laat de resultaten van je vorige geslaagde run intact. Een gestopte run heet
 daarom ook *Gestopt* en niet *Mislukt*.
 

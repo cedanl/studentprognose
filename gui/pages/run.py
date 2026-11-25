@@ -492,7 +492,8 @@ class _RunView:
                 )
                 self._no_warnings.tooltip(
                     "Onderdruk UserWarning-meldingen over historisch realisme en ontbrekende "
-                    "lag-fallback (--no-warnings). Gebruik dit als de warnings bekend zijn."
+                    "lag-fallback (--no-warnings). Gebruik dit als de warnings bekend zijn. "
+                    "Problemen die de run normaal zouden stoppen, blijven altijd zichtbaar."
                 )
                 for cb in (self._noetl, self._no_warnings):
                     cb.on_value_change(lambda _e: self._update_preview())
