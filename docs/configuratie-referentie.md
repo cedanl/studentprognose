@@ -25,6 +25,7 @@ Alle paden zijn relatief aan de werkmap waar je de pipeline uitvoert.
 | `path_student_count_higher-years` | `data/input/student_count_higher-years.xlsx` | Werkelijk aantal hogerejaars (alleen nodig bij `-sy h`) |
 | `path_student_volume` | `data/input/student_volume.xlsx` | Totaal studentvolume (afgeleid uit telbestand studenten) |
 | `path_ratios` | `data/input/ratiobestand.xlsx` | Ratiobestand (optioneel) |
+| `path_programme_names` | `""` | DUO-decodeertabel `Dec_opleidingscode.asc` voor het opzoeken van opleidingsnamen bij de opleidingscode. Leeg = de met de tool meegeleverde tabel. Zie [Opleidingsnamen](je-data-voorbereiden.md#opleidingsnamen). |
 
 ## `telbestand_filename_patterns` — bestandsnaampatronen voor telbestanden
 

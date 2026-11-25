@@ -2,6 +2,11 @@ import pandas as pd
 import os
 from studentprognose.utils.weeks import DataOption
 from studentprognose.utils.programme_key import normalize_programme_series
+from studentprognose.data.programme_names import (
+    fill_programme_names,
+    load_programme_names,
+    warn_missing_programme_names,
+)
 from studentprognose.data.preprocessing.add_zero_weeks import AddWeeksWherePreapplicantsAreZero
 from studentprognose.data.preprocessing.institution_filter import apply_institution_filter
 
@@ -291,6 +296,14 @@ def load_data(configuration, data_option):
         # CI-subset (die selected_set hieruit bouwt) en vóór de strategie-merges
         # met student_count.
         _normalize_programme_code(data_cumulative, _roles.get("croho_source"))
+
+        # Officiële opleidingsnaam (DUO) invullen waar de bron alleen de code
+        # levert (#326). Alleen een etiket: de code blijft de sleutel.
+        names = load_programme_names(paths.get("path_programme_names", ""))
+        missing = fill_programme_names(
+            data_cumulative, "Croho", "Naam Croho opleiding Nederlands", names
+        )
+        warn_missing_programme_names(missing)
 
     return (
         data_individual,
