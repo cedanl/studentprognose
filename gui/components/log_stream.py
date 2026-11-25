@@ -22,6 +22,7 @@ _STATUS = {
     "running": ("Bezig…", theme.INFO, "hourglass_top"),
     "success": ("Geslaagd", theme.POSITIVE, "task_alt"),
     "failed": ("Mislukt", theme.NEGATIVE, "error"),
+    "stopped": ("Gestopt", theme.WARNING, "stop_circle"),
 }
 
 
@@ -45,6 +46,7 @@ class ProcessPanel:
         self._show_log = show_log
         self._show_status = show_status
         self._process: asyncio.subprocess.Process | None = None
+        self._stopped = False
         self._error_slot: ui.element
         self._log: ui.log | None = None
         self._all_lines: list[str] = []
@@ -81,9 +83,15 @@ class ProcessPanel:
         self._label.style(f"color: {color}")
         self._stop_btn.set_visibility(state == "running")
 
+    @property
+    def stopped(self) -> bool:
+        """True als de laatste run door de gebruiker is gestopt."""
+        return self._stopped
+
     def stop(self) -> None:
         """Beëindig het lopende subprocess (zo mogelijk)."""
         if self._process is not None and self._process.returncode is None:
+            self._stopped = True
             self._process.terminate()
             if self._log is not None:
                 self._log.push("— gestopt door gebruiker —")
@@ -110,6 +118,7 @@ class ProcessPanel:
         if self._log is not None:
             self._log.clear()
         self._all_lines = []
+        self._stopped = False
         self._set_status("running")
 
         try:
@@ -150,12 +159,46 @@ class ProcessPanel:
 
         if returncode == 0:
             self._set_status("success")
+            self._render_overridden_problems()
             if on_success is not None:
                 on_success()
+        elif self._stopped:
+            # Bewust gestopt is geen fout: zeg dat ook zo, en dat er niets
+            # verloren is gegaan (#322).
+            from gui.components.states import info_banner
+
+            self._set_status("stopped")
+            with self._error_slot:
+                info_banner(
+                    "Run gestopt. Er is geen nieuwe prognose gemaakt; de "
+                    "resultaten van je vorige geslaagde run zijn ongewijzigd."
+                )
         else:
             self._set_status("failed")
             self._render_error("\n".join(tail))
         return returncode
+
+    def _render_overridden_problems(self) -> None:
+        """Toon validatieproblemen die door ``--yes`` niet tot een stop leidden.
+
+        Zonder deze banner eindigt een run met bijvoorbeeld een extreme
+        afwijking ten opzichte van vorig jaar als gewoon "Geslaagd" (#322).
+        """
+        from gui.components.states import warning_banner
+        from gui.process import overridden_problems
+
+        problems = overridden_problems(self._all_lines)
+        if not problems:
+            return
+        with self._error_slot:
+            warning_banner(
+                "De run is geslaagd, maar de validatie vond problemen die de "
+                "prognose onbetrouwbaar kunnen maken. Vanaf de opdrachtregel "
+                "zou de run hier stoppen of om bevestiging vragen. Controleer "
+                "je data voordat je deze resultaten gebruikt.",
+                problems[:10]
+                + ([f"… en nog {len(problems) - 10} meldingen (zie de log)"] if len(problems) > 10 else []),
+            )
 
     def _render_error(self, raw: str) -> None:
         """Toon een actiegerichte foutmelding onder de log."""

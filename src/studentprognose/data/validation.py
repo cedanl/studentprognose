@@ -678,9 +678,19 @@ def _handle_result(result, yes, no_warnings=False):
 
         try:
             answer = input("\nWil je doorgaan met de pipeline? [j/N] ").strip().lower()
-        except (EOFError, KeyboardInterrupt):
+        except KeyboardInterrupt:
             print("\nPipeline gestopt.")
             sys.exit(0)
+        except EOFError:
+            # Geen interactieve invoer (bijv. de GUI, CI of een cronjob): er komt
+            # geen prognose, dus dat is een mislukte run — niet stil exitcode 0
+            # teruggeven, anders lijkt de run voor de aanroeper geslaagd (#322).
+            print(
+                "\nPipeline gestopt: er is geen interactieve invoer om de vraag te "
+                "beantwoorden. Los de problemen op, of draai opnieuw met --yes om "
+                "toch door te gaan."
+            )
+            sys.exit(1)
 
         if answer != "j":
             print(

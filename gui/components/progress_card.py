@@ -65,6 +65,8 @@ class ProgressCard:
         self._start_time: float | None = None
         self._done: bool = False
         self._success: bool | None = None
+        self._stopped: bool = False
+        self._end_time: float | None = None
         self._timer: ui.timer | None = None
         self._build()
         # Timer created here (in build context) and kept inactive until start().
@@ -83,6 +85,8 @@ class ProgressCard:
         self._display = 0.0
         self._done = False
         self._success = None
+        self._stopped = False
+        self._end_time = None
         self._start_time = time.time()
 
         self._card.set_visibility(True)
@@ -108,15 +112,28 @@ class ProgressCard:
                 self._render_stepper()
                 break
 
-    def complete(self, *, success: bool) -> None:
-        """Markeer de run als afgerond."""
+    def complete(self, *, success: bool, stopped: bool = False) -> None:
+        """Markeer de run als afgerond.
+
+        Args:
+            success: True bij exitcode 0.
+            stopped: True als de gebruiker de run zelf heeft gestopt; dat
+                tonen we als "Gestopt" in plaats van als fout.
+        """
         self._done = True
         self._success = success
+        self._stopped = stopped
         self._step_lbl.set_text("")
+        # Eindtijd meteen tonen: anders staat er tijdens de afrondingsanimatie
+        # nog "~0:09 resterend" naast "Klaar" (#322).
+        self._set_final_time()
         if success:
             self._target = 1.0  # succesvolle run: vul de balk helemaal
             self._phase_lbl.set_text("Klaar")
             self._phase_lbl.style(f"color:{theme.POSITIVE}; font-weight:600")
+        elif stopped:
+            self._phase_lbl.set_text("Gestopt")
+            self._phase_lbl.style(f"color:{theme.WARNING}; font-weight:600")
         else:
             # Mislukt: stop op huidige positie — eerlijk beeld van hoever het kwám
             self._phase_lbl.set_text("Mislukt")
@@ -189,6 +206,20 @@ class ProgressCard:
             if self._timer:
                 self._timer.active = False
 
+    def _set_final_time(self) -> None:
+        """Toon de totale duur met een label dat bij de uitkomst past."""
+        if not self._start_time:
+            return
+        if self._success:
+            label = "Klaar in"
+        elif self._stopped:
+            label = "Gestopt na"
+        else:
+            label = "Mislukt na"
+        if self._end_time is None:
+            self._end_time = time.time()
+        self._timer_lbl.set_text(f"{label} {_fmt(self._end_time - self._start_time)}")
+
     def _tick_inner(self) -> None:
         ease = _EASE_DONE if self._done else _EASE_RUNNING
 
@@ -202,10 +233,7 @@ class ProgressCard:
             if self._timer:
                 self._timer.active = False
             self._apply_bar(1.0 if self._success else self._display)
-            if self._start_time:
-                elapsed = time.time() - self._start_time
-                label = "Klaar in" if self._success else "Gestopt na"
-                self._timer_lbl.set_text(f"{label} {_fmt(elapsed)}")
+            self._set_final_time()
             return
 
         # Langzaam kruipen binnen de huidige fase

@@ -309,7 +309,7 @@ def test_cumulative_page_written_without_dead_nav_link(tmp_path, output, student
     assert "../individual/dashboard.html" not in page, (
         "-d c bouwt geen individuele pagina"
     )
-    assert "../final/dashboard.html" in page
+    assert "../final/dashboard_cumulatief.html" in page
     final = (tmp_path / "data/output/visualisations/final/dashboard.html").read_text(
         "utf-8"
     )
@@ -532,8 +532,9 @@ def test_both_mode_builds_all_three_pages(tmp_path, output, studentcount):
         "individual",
     ]
     final = (vis / "final/dashboard.html").read_text("utf-8")
-    for page in ("individual", "cumulative", "final"):
+    for page in ("individual", "cumulative"):
         assert f"../{page}/dashboard.html" in final
+    assert "../final/dashboard_beide.html" in final
 
 
 # ── Herkomst (#297) ───────────────────────────────────────────────────
@@ -878,4 +879,19 @@ def test_cwf_page_is_written_with_nav(tmp_path, studentcount):
     page = (tmp_path / "data/output/visualisations/cwf/dashboard.html").read_text("utf-8")
     assert "Predictie-interval en betrouwbaarheid" in page
     assert "../cumulative/dashboard.html" not in page
-    assert "../final/dashboard.html" in page
+    assert "../final/dashboard_cwf.html" in page
+
+
+def test_final_overview_is_kept_per_mode(tmp_path, output, studentcount):
+    """Een CWF-run overschrijft het eindoverzicht van een cumulatieve run niet (#322)."""
+    _builder(tmp_path, output, studentcount).build_and_save()
+    _builder(
+        tmp_path, _cwf_output(), studentcount, option=DataOption.CWF
+    ).build_and_save()
+    final_dir = tmp_path / "data/output/visualisations/final"
+    assert (final_dir / "dashboard_cumulatief.html").is_file()
+    assert (final_dir / "dashboard_cwf.html").is_file()
+    # dashboard.html blijft het eindoverzicht van de laatste run.
+    assert (final_dir / "dashboard.html").read_text("utf-8") == (
+        final_dir / "dashboard_cwf.html"
+    ).read_text("utf-8")

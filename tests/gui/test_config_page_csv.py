@@ -1,7 +1,7 @@
 """Tests voor het defensief inlezen van telbestand-CSV's op de configuratiepagina.
 
 Telbestanden komen zowel puntkomma-gescheiden (legacy Studielink) als
-komma-gescheiden (UvA SQL-export, o.a. de demodataset) voor. De
+komma-gescheiden (SQL-export, o.a. de demodataset) voor. De
 opleiding-dropdowns moeten beide formaten kunnen lezen, anders blijven ze leeg.
 
 Slaat over als NiceGUI niet geïnstalleerd is (de `gui`-extra is optioneel).

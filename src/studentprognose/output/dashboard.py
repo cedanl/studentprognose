@@ -3,6 +3,11 @@
 Schrijft zelfstandige HTML-pagina's (geen server nodig) naar
 ``data/output/visualisations[_ci_test_N{n}]/{individual,cumulative,cwf,final}/dashboard.html``.
 
+Het eindoverzicht wordt per modus ook als ``final/dashboard_<modus>.html``
+bewaard (bijv. ``dashboard_cwf.html``), zodat een run met een ander model het
+eindoverzicht van de vorige niet overschrijft. ``final/dashboard.html`` blijft
+het eindoverzicht van de laatste run (#322).
+
 Alle pagina's delen één opzet rond modelperformance en betrouwbaarheid; zie
 :mod:`studentprognose.output.performance_page` voor de inhoud en
 :mod:`studentprognose.output.model_performance` voor de berekeningen.
@@ -146,8 +151,12 @@ class DashboardBuilder:
             pages.append(("cumulative", "Cumulatief", "../cumulative/dashboard.html"))
         if self._builds_cwf():
             pages.append(("cwf", "CWF", "../cwf/dashboard.html"))
-        pages.append(("final", "Eindoverzicht", "../final/dashboard.html"))
+        pages.append(("final", "Eindoverzicht", f"../final/{self._final_filename()}"))
         return pages
+
+    def _final_filename(self) -> str:
+        """Bestandsnaam van het eindoverzicht voor deze modus (bijv. ``dashboard_cwf.html``)."""
+        return f"dashboard_{self.data_option.filename_suffix}.html"
 
     # ── Schrijven ─────────────────────────────────────────────────────
 
@@ -167,10 +176,17 @@ class DashboardBuilder:
         nav = [(label, href, t == track) for t, label, href in self._pages()]
         out_dir = os.path.join(self.base_dir, track)
         os.makedirs(out_dir, exist_ok=True)
-        path = os.path.join(out_dir, "dashboard.html")
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(performance_page.render_html(payload, nav))
-        print(f"  Dashboard saved: {path}")
+        html = performance_page.render_html(payload, nav)
+        filenames = ["dashboard.html"]
+        if track == "final":
+            # Per modus bewaren, zodat een run met een ander model dit
+            # eindoverzicht niet overschrijft; dashboard.html = laatste run.
+            filenames.append(self._final_filename())
+        for filename in filenames:
+            path = os.path.join(out_dir, filename)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(html)
+            print(f"  Dashboard saved: {path}")
 
     def _save_individual(self) -> None:
         self._save("individual")

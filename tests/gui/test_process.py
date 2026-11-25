@@ -2,7 +2,7 @@
 
 import os
 
-from gui.process import locate_cli, preview_command
+from gui.process import higher_years_source, locate_cli, preview_command, run_conflicts
 
 
 def test_locate_cli_finds_console_script():
@@ -21,8 +21,9 @@ def test_preview_command_formats_readable():
 def test_build_run_args_defaults():
     from gui.process import build_run_args
 
-    # Alleen --yes staat standaard aan.
-    assert build_run_args() == ["--yes"]
+    # --dashboard en --yes staan in de GUI altijd aan (#322): zo hoort het
+    # dashboard op Resultaten altijd bij de laatste run.
+    assert build_run_args() == ["--dashboard", "--yes"]
 
 
 def test_build_run_args_full():
@@ -64,7 +65,7 @@ def test_build_run_args_full():
 def test_build_run_args_splits_ranges_into_tokens():
     from gui.process import build_run_args
 
-    args = build_run_args(weeks="10 : 20", yes=False)
+    args = build_run_args(weeks="10 : 20", yes=False, dashboard=False)
     assert args == ["-w", "10", ":", "20"]
 
 
@@ -94,3 +95,104 @@ def test_wizard_mode_choice_overrides_stored_run_dataset(monkeypatch):
     assert fake_app.storage.general["run_settings"] == {"dataset": "CWF", "weeks": "16"}
     run.remember_wizard_mode("onbekend")
     assert fake_app.storage.general["run_settings"]["dataset"] == "CWF"
+
+
+def test_stored_wizard_mode_follows_run_dataset(monkeypatch):
+    """Wizard en Uitvoeren delen één keuze: de opgeslagen dataset."""
+    from types import SimpleNamespace
+
+    from gui.pages import run
+
+    fake_app = SimpleNamespace(storage=SimpleNamespace(general={}))
+    monkeypatch.setattr(run, "app", fake_app)
+    assert run.stored_wizard_mode() is None
+
+    run.remember_wizard_mode("cwf")
+    assert run.stored_wizard_mode() == "cwf"
+
+    fake_app.storage.general["run_settings"] = {"dataset": "Beide"}
+    assert run.stored_wizard_mode() == "both"
+
+
+def test_overridden_problems_extracts_yes_and_soft_validation_lines():
+    from gui.process import overridden_problems
+
+    lines = [
+        "Predicting first-years: 2026-10...",
+        "/x/prediction_validator.py:210: UserWarning: [--yes] Historisch realisme: extreme afwijking",
+        # Python print de bronregel van de warning eronder; die is geen melding.
+        '  warnings.warn(f"[--yes] {msg}", UserWarning, stacklevel=2)',
+        "  [PROBLEEM] Negatief aantal in telbestand week 10",
+        "  [PROBLEEM] Negatief aantal in telbestand week 10",
+        "Klaar.",
+    ]
+    assert overridden_problems(lines) == [
+        "Historisch realisme: extreme afwijking",
+        "Negatief aantal in telbestand week 10",
+    ]
+
+
+def test_overridden_problems_empty_for_clean_run():
+    from gui.process import overridden_problems
+
+    assert overridden_problems(["Predicting first-years: 2026-10...", "Klaar."]) == []
+
+
+# ── Conflicterende run-parameters (#322) ────────────────────────────────────
+
+
+_CONFIG = {
+    "paths": {
+        "path_latest_cumulative": "data/input/totaal_cumulatief.xlsx",
+        "path_latest_cwf": "data/input/totaal_cwf.xlsx",
+    }
+}
+
+
+def _conflicts(tmp_path, **overrides):
+    params = {
+        "dataset": "Cumulatief",
+        "cohort": "Eerstejaars",
+        "skip_years": 0,
+        "project_dir": str(tmp_path),
+        "config": _CONFIG,
+    }
+    params.update(overrides)
+    return run_conflicts(**params)
+
+
+def test_run_conflicts_none_for_default_run(tmp_path):
+    assert _conflicts(tmp_path) == []
+
+
+def test_run_conflicts_cwf_with_skip_years(tmp_path):
+    errors = _conflicts(tmp_path, dataset="CWF", skip_years=2)
+    assert len(errors) == 1 and "backtest" in errors[0]
+
+
+def test_run_conflicts_skip_years_fine_for_cumulative(tmp_path):
+    assert _conflicts(tmp_path, skip_years=2) == []
+
+
+def test_run_conflicts_higher_years_without_source_file(tmp_path):
+    errors = _conflicts(tmp_path, cohort="Hogerejaars")
+    assert len(errors) == 1
+    assert "data/input/totaal_cumulatief.xlsx" in errors[0]
+
+
+def test_run_conflicts_higher_years_with_source_file(tmp_path):
+    src = tmp_path / "data" / "input" / "totaal_cwf.xlsx"
+    src.parent.mkdir(parents=True)
+    src.write_bytes(b"x")
+    assert _conflicts(tmp_path, dataset="CWF", cohort="Hogerejaars") == []
+
+
+def test_run_conflicts_higher_years_impossible_for_both(tmp_path):
+    errors = _conflicts(tmp_path, dataset="Beide", cohort="Hogerejaars")
+    assert len(errors) == 1 and "Beide" in errors[0]
+
+
+def test_higher_years_source_reads_config_paths():
+    assert higher_years_source("CWF", _CONFIG) == "data/input/totaal_cwf.xlsx"
+    assert higher_years_source("Beide", _CONFIG) is None
+    assert higher_years_source("Individueel", {}) is None

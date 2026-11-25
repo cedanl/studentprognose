@@ -213,3 +213,19 @@ class TestCWFMainGuards:
         with pytest.raises(SystemExit) as exc:
             main(["prog", "-d", "cwf", "-sk", "1"])
         assert exc.value.code == 1
+
+
+def test_no_warnings_never_hides_overridden_hard_stop():
+    """--no-warnings onderdrukt gewone warnings, maar nooit een [--yes]-hard stop (#322)."""
+    import warnings
+
+    from studentprognose.main import _configure_warnings
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.resetwarnings()
+        _configure_warnings(True)
+        module = "studentprognose.data.prediction_validator"
+        warnings.warn_explicit("gewone waarschuwing", UserWarning, "x.py", 1, module=module)
+        warnings.warn_explicit("[--yes] extreme afwijking", UserWarning, "x.py", 2, module=module)
+    messages = [str(w.message) for w in caught]
+    assert messages == ["[--yes] extreme afwijking"]

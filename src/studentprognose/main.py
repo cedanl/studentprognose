@@ -93,11 +93,28 @@ def _resolve_tune_targets(tune) -> dict:
     )
 
 
+def _configure_warnings(no_warnings: bool) -> None:
+    """Stel de waarschuwingsfilters voor deze run in.
+
+    ``--no-warnings`` onderdrukt de UserWarnings van het pakket, maar nooit een
+    hard stop die met ``--yes`` is omgezet in een waarschuwing (``[--yes] ...``):
+    zonder die melding zou een run met extreme data stil als geslaagd eindigen
+    (#322).
+
+    Args:
+        no_warnings: True als ``--no-warnings`` is opgegeven.
+    """
+    if not no_warnings:
+        return
+    warnings.filterwarnings("ignore", category=UserWarning, module=r"studentprognose\.")
+    # Later toegevoegd = hogere prioriteit: deze uitzondering wint van "ignore".
+    warnings.filterwarnings("always", message=r"\[--yes\]", category=UserWarning)
+
+
 def main(argv):
     cfg = parse_args(argv)
 
-    if cfg.no_warnings:
-        warnings.filterwarnings("ignore", category=UserWarning, module=r"studentprognose\.")
+    _configure_warnings(cfg.no_warnings)
 
     if cfg.command == "init":
         from studentprognose.init import run_init
@@ -785,8 +802,16 @@ def _preprocess(strategy, student_year_prediction):
     if student_year_prediction == StudentYearPrediction.HIGHER_YEARS:
         if strategy.postprocessor.data_latest is None:
             print("\nFout: geen 'totaal'-bestand gevonden voor hogerjaarsvoorspelling.")
-            print("  Dit bestand wordt aangemaakt na een eerste first-years run.")
-            print("  Draai eerst: studentprognose -d cumulative (of -d both / -d cwf)")
+            print(
+                "  Hogerejaars voorspellen leest eerdere prognoses met realisaties uit het "
+                "bestand in 'paths.path_latest_<modus>' (standaard "
+                "data/input/totaal_<modus>.xlsx)."
+            )
+            print(
+                "  Een gewone run maakt dat bestand niet aan; maak het met "
+                "scripts/append_studentcount_and_compute_errors.py. Met -d both kan "
+                "geen hogerejaarsvoorspelling worden gemaakt."
+            )
             sys.exit(1)
         strategy.postprocessor.data = strategy.postprocessor.data_latest[
             HIGHER_YEARS_COLUMNS

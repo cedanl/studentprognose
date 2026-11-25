@@ -64,7 +64,7 @@ _USE_CASES: list[tuple[str, str, str]] = [
     ),
     (
         "leaderboard",
-        "Benchmark",
+        "Peer-vergelijking",
         "Vergelijk jouw instellingstrend met vergelijkbare instellingen — zie waar je staat.",
     ),
 ]
@@ -192,7 +192,7 @@ class _HomeView:
                     )
 
                 # Headline + subtitel
-                ui.label("Weet in maart wat september brengt").classes(
+                ui.label("Weet in februari wat september brengt").classes(
                     "text-2xl font-bold"
                 ).style("letter-spacing:-0.3px;line-height:1.2;")
                 ui.label(
@@ -739,16 +739,17 @@ class _HomeView:
         ).classes("text-xs opacity-60 leading-relaxed mb-1")
 
         self._uc_section("HBO Informatica — instroom 2021–2025")
-        # Fictieve benchmark: 5 instellingen, eigen instelling = HvA
+        # Fictieve benchmark met geanonimiseerde peers: verzonnen cijfers horen
+        # niet bij de naam van een echte instelling.
         bench_data = [
-            ("Jouw instelling (HvA)", 245, 278, 312, 356, 400, True),
-            ("Hogeschool Rotterdam",  220, 241, 259, 271, 280, False),
-            ("Fontys Hogeschool",     310, 328, 345, 370, 395, False),
-            ("Saxion Hogeschool",     180, 188, 195, 204, 210, False),
-            ("Windesheim",            260, 272, 284, 301, 318, False),
+            ("Jouw instelling", 245, 278, 312, 356, 400, True),
+            ("Hogeschool A",    220, 241, 259, 271, 280, False),
+            ("Hogeschool B",    330, 352, 378, 404, 430, False),
+            ("Hogeschool C",    180, 188, 195, 204, 210, False),
+            ("Hogeschool D",    260, 272, 284, 301, 318, False),
         ]
         years = [2021, 2022, 2023, 2024, 2025]
-        peak = 400
+        peak = max(max(vals) for _, *vals, _ in bench_data)
         rows_html = ""
         for inst, *vals, is_own in bench_data:
             last = vals[-1]
@@ -808,7 +809,7 @@ class _HomeView:
                border-radius:8px;background:{A}08;border:1px solid {A}20;">
             <span style="font-size:14px;flex-shrink:0;">📈</span>
             <div style="font-size:11px;color:#444;line-height:1.55;">
-              <strong>Jij groeit het snelst (+63%)</strong> — maar Fontys heeft meer absolute volume.
+              <strong>Jij groeit het snelst (+63%)</strong> — maar Hogeschool B heeft meer absolute volume.
               Schaalvoordelen zijn daar mogelijk groter.
             </div>
           </div>
@@ -816,7 +817,7 @@ class _HomeView:
                border-radius:8px;background:#f7f7f7;border:1px solid #e8e8e8;">
             <span style="font-size:14px;flex-shrink:0;">💡</span>
             <div style="font-size:11px;color:#555;line-height:1.55;">
-              Windesheim groeit stabiel (+22%) zonder grote pieken — mogelijk een
+              Hogeschool D groeit stabiel (+22%) zonder grote pieken — mogelijk een
               stabieler aanmeldpatroon om van te leren voor prognose-nauwkeurigheid.
             </div>
           </div>
@@ -824,7 +825,7 @@ class _HomeView:
                border-radius:8px;background:#f7f7f7;border:1px solid #e8e8e8;">
             <span style="font-size:14px;flex-shrink:0;">⚠️</span>
             <div style="font-size:11px;color:#555;line-height:1.55;">
-              Saxion en Rotterdam groeien nauwelijks — vergelijkbare regio, andere uitkomst.
+              Hogeschool A en C groeien nauwelijks — vergelijkbare regio, andere uitkomst.
               Aanleiding voor strategisch gesprek.
             </div>
           </div>
@@ -1024,23 +1025,57 @@ class _HomeView:
             )
 
             self._step("Demodata downloaden…")
-            await self._download_demodata(project_dir)
+            try:
+                await self._download_demodata(project_dir)
+            except Exception as exc:  # noqa: BLE001
+                self._demo_failed(
+                    "De demodata kon niet worden gedownload.",
+                    "Controleer je internetverbinding en probeer het opnieuw. "
+                    "Je kunt ook direct een project opzetten met je eigen "
+                    f"bestanden. Details: {exc}",
+                )
+                return
 
             self._step("Voorspelling draaien (cumulatief spoor)…")
             self._pipeline_progress.start()
             rc = await panel.run(
-                ["-d", "c", "-w", _DEMO_WEEK, "-y", _DEMO_YEAR, "--yes"],
+                # --dashboard: de interactieve dashboards horen bij de eerste
+                # indruk en zijn via Resultaten direct te openen (#322).
+                ["-d", "c", "-w", _DEMO_WEEK, "-y", _DEMO_YEAR, "--yes", "--dashboard"],
                 cwd=project_dir,
                 on_line=self._pipeline_progress.on_line,
             )
-            self._pipeline_progress.complete(success=rc == 0)
+            self._pipeline_progress.complete(success=rc == 0, stopped=panel.stopped)
         except Exception as exc:  # noqa: BLE001
-            with self._error:
-                error_banner("De demo kon niet worden voltooid.", f"Details: {exc}")
+            self._demo_failed("De demo kon niet worden voltooid.", f"Details: {exc}")
             return
 
         if rc == 0:
             self._on_demo_done()
+        elif not panel.stopped:
+            self._demo_failed(
+                "De demo-voorspelling is niet gelukt.",
+                "Open hierboven het Uitvoerlog voor de details.",
+            )
+
+    def _demo_failed(self, message: str, hint: str) -> None:
+        """Toon een mislukte demo en geef de gebruiker de startpagina terug.
+
+        Het half aangemaakte demoproject wordt losgelaten, zodat de knoppen
+        "Project opzetten" en "Probeer direct met demodata" weer werken (#322).
+        """
+        STATE.project_dir = None
+        try:
+            with self._error:
+                error_banner(message, hint)
+                ui.button(
+                    "Terug naar start",
+                    icon="home",
+                    on_click=lambda: ui.navigate.to("/"),
+                ).props("unelevated").classes("mt-2")
+        except RuntimeError:
+            # De gebruiker heeft de pagina al verlaten; niets meer te tonen.
+            pass
 
     def _on_demo_done(self) -> None:
         self._step("Klaar!", done=True)
@@ -1050,7 +1085,8 @@ class _HomeView:
                 icon="insights",
                 on_click=lambda: ui.navigate.to("/output"),
             ).props("unelevated").classes("mt-1")
-        ui.timer(0.8, lambda: ui.navigate.to("/output"), once=True)
+            # In een levende container: de startknop van de demo bestaat niet meer.
+            ui.timer(0.8, lambda: ui.navigate.to("/output"), once=True)
 
     def _step(self, text: str, *, done: bool = False) -> None:
         self._step_n += 1
@@ -1070,16 +1106,38 @@ class _HomeView:
 
     async def _download_demodata(self, project_dir: str) -> None:
         dest = os.path.join(project_dir, "data", "input_raw")
-        self._progress.props("indeterminate")
+        # Echte voortgang i.p.v. een eindeloze balk: de gebruiker ziet of de
+        # download vordert of vastzit.
+        holder: dict = {"value": 0.0}
+        self._progress.props(remove="indeterminate")
+        self._progress.set_value(0.0)
         self._progress.set_visibility(True)
+
+        def _tick() -> None:
+            frac = max(holder["value"], 0.0)
+            self._progress.set_value(frac)
+            pct_label.set_text(f"{frac * 100:.0f}% gedownload")
+
+        # Label én timer in een bestaande container aanmaken: de knop waarmee de
+        # demo startte is na container.clear() al verwijderd, dus de huidige
+        # slot-context is niet meer bruikbaar.
+        with self._steps:
+            pct_label = ui.label("0% gedownload").classes("text-xs opacity-60 ml-9")
+            timer = ui.timer(0.2, _tick)
 
         def _work() -> None:
             with tempfile.TemporaryDirectory() as tmp:
                 zip_path = os.path.join(tmp, "demo-data.zip")
-                demodata.download_file(demodata.DEMO_URL, zip_path)
+                demodata.download_file(
+                    demodata.DEMO_URL,
+                    zip_path,
+                    progress_cb=lambda f: holder.__setitem__("value", f),
+                )
                 demodata.extract_zip(zip_path, dest)
 
         try:
             await asyncio.to_thread(_work)
         finally:
+            timer.cancel()
             self._progress.set_visibility(False)
+            pct_label.delete()

@@ -13,6 +13,25 @@ import os
 
 import pandas as pd
 
+#: Leesbare namen voor de voorspelkolommen in de output. Een nieuwe gebruiker
+#: herkent "Ratio-model" wel, maar "Prognose_ratio" niet (#322).
+MODEL_LABELS = {
+    "Weighted_ensemble_prediction": "Gewogen ensemble",
+    "Ensemble_prediction": "Ensemble",
+    "SARIMA_cumulative": "Cumulatief (SARIMA)",
+    "SARIMA_individual": "Individueel",
+    "Prognose_ratio": "Ratio-model",
+    "Prognose_cwf": "CWF",
+}
+
+
+def model_label(column: str | None) -> str:
+    """Geef de leesbare naam van een voorspelkolom (de kolomnaam als hij onbekend is)."""
+    if not column:
+        return ""
+    return MODEL_LABELS.get(column, column)
+
+
 #: Voorkeursvolgorde voor de primaire voorspelkolom (eerste die bestaat wint).
 _PREDICTION_COLUMNS = [
     "Weighted_ensemble_prediction",
@@ -34,6 +53,19 @@ _MAPE_PREFIX = "MAPE_"
 PROGRAMME_COL = "Croho groepeernaam"
 
 
+def is_usable_output(path: str) -> bool:
+    """True als ``path`` een niet-leeg bestand is.
+
+    Oudere versies maakten outputbestanden aan het begin van een run leeg; een
+    mislukte run liet dan een bestand van 0 bytes achter (#322). Zo'n bestand is
+    geen resultaat en mag de GUI niet laten denken dat er output is.
+    """
+    try:
+        return os.path.getsize(path) > 0
+    except OSError:
+        return False
+
+
 def find_output_files(output_dir: str) -> list[tuple[str, str]]:
     """Zoek de definitieve outputbestanden (geen prelim/totaal).
 
@@ -44,6 +76,8 @@ def find_output_files(output_dir: str) -> list[tuple[str, str]]:
     for path in glob.glob(os.path.join(output_dir, "output_*.xlsx")):
         name = os.path.basename(path)
         if name.startswith("output_prelim") or "_ci_test" in name:
+            continue
+        if not is_usable_output(path):
             continue
         results.append((name, path))
     results.sort(key=lambda t: os.path.getmtime(t[1]), reverse=True)
@@ -299,3 +333,55 @@ def _safe_float(value) -> float | None:
     if pd.isna(f):
         return None
     return f
+
+
+#: Outputsuffix → dashboardpagina's van de modelsporen (zie output/dashboard.py).
+_DASHBOARD_TRACKS = {
+    "cumulatief": [("cumulative", "Cumulatief")],
+    "individueel": [("individual", "Individueel")],
+    "beide": [("individual", "Individueel"), ("cumulative", "Cumulatief")],
+    "cwf": [("cwf", "CWF")],
+}
+
+
+def dashboard_links(output_dir: str, output_filename: str) -> list[tuple[str, str]]:
+    """Vind de interactieve dashboards die bij een outputbestand horen.
+
+    Args:
+        output_dir: De ``data/output``-map van het project.
+        output_filename: Naam van het outputbestand, bijv.
+            ``output_first-years_cwf.xlsx``.
+
+    Returns:
+        ``(label, pad relatief aan visualisations/)`` voor elk bestaand
+        dashboard; leeg als er (nog) geen dashboards zijn gegenereerd.
+    """
+    stem = os.path.splitext(output_filename)[0]
+    suffix = stem.rsplit("_", 1)[-1]
+    tracks = _DASHBOARD_TRACKS.get(suffix)
+    if tracks is None:
+        return []
+    vis = os.path.join(output_dir, "visualisations")
+    candidates = [(label, f"{track}/dashboard.html") for track, label in tracks]
+    candidates.append(("Eindoverzicht", f"final/dashboard_{suffix}.html"))
+    return [
+        (label, rel)
+        for label, rel in candidates
+        if os.path.isfile(os.path.join(vis, rel))
+    ]
+
+
+def resolve_dashboard(output_dir: str, rel_path: str) -> str | None:
+    """Zet een dashboardpad veilig om naar een absoluut bestandspad.
+
+    Alleen ``.html``-bestanden binnen ``<output_dir>/visualisations`` worden
+    toegestaan, zodat de route geen willekeurige bestanden kan serveren.
+
+    Returns:
+        Het absolute pad, of ``None`` als het pad ongeldig is of niet bestaat.
+    """
+    vis = os.path.realpath(os.path.join(output_dir, "visualisations"))
+    full = os.path.realpath(os.path.join(vis, rel_path))
+    if not full.startswith(vis + os.sep) or not full.endswith(".html"):
+        return None
+    return full if os.path.isfile(full) else None

@@ -55,7 +55,7 @@ def build_run_args(
     institutions: list[str] | None = None,
     skip_years: int = 0,
     noetl: bool = False,
-    dashboard: bool = False,
+    dashboard: bool = True,
     no_warnings: bool = False,
     yes: bool = True,
 ) -> list[str]:
@@ -72,7 +72,8 @@ def build_run_args(
         institutions: Brincodes/instellingsnamen (leeg = alle).
         skip_years: Aantal jaren overslaan (backtesting); 0 = geen.
         noetl: Sla ETL + validatie over.
-        dashboard: Genereer dashboards.
+        dashboard: Genereer dashboards (default True voor de GUI, zodat het
+            dashboard op Resultaten altijd bij de laatste run hoort).
         no_warnings: Onderdruk UserWarnings.
         yes: Sla de interactieve validatieprompt over (default True voor de GUI,
             omdat een subprocess geen interactieve invoer heeft).
@@ -117,3 +118,117 @@ def preview_command(args: list[str]) -> str:
     """
     parts = ["studentprognose", *args]
     return " ".join(parts)
+
+
+#: Config-sleutel per dataset met de eerdere-runsdata die ``-sy h`` nodig heeft.
+#: ``Beide`` heeft geen eigen bron en kan daarom geen hogerejaars voorspellen.
+_HIGHER_YEARS_SOURCE_KEYS = {
+    "Cumulatief": "path_latest_cumulative",
+    "Individueel": "path_latest_individual",
+    "CWF": "path_latest_cwf",
+}
+
+
+def higher_years_source(dataset: str | None, config: dict | None) -> str | None:
+    """Geef het (relatieve) pad dat een hogerejaarsrun voor ``dataset`` inleest.
+
+    Args:
+        dataset: GUI-label van de dataset.
+        config: Geladen projectconfiguratie (mag ``None`` zijn).
+
+    Returns:
+        Het pad uit ``paths.path_latest_*``, of ``None`` als de dataset geen
+        hogerejaarsbron heeft (``Beide``) of het pad niet is ingesteld.
+    """
+    key = _HIGHER_YEARS_SOURCE_KEYS.get(dataset or "")
+    if key is None:
+        return None
+    path = ((config or {}).get("paths") or {}).get(key) or None
+    return path
+
+
+def run_conflicts(
+    *,
+    dataset: str | None,
+    cohort: str | None,
+    skip_years: int,
+    project_dir: str | None,
+    config: dict | None,
+) -> list[str]:
+    """Vind parametercombinaties die de CLI gegarandeerd zou weigeren.
+
+    Zo krijgt de gebruiker de uitleg vóór de run, in plaats van een mislukte
+    run na minuten wachten (#322).
+
+    Args:
+        dataset: GUI-label van de dataset (Cumulatief/Individueel/Beide/CWF).
+        cohort: GUI-label van het cohort (Eerstejaars/Hogerejaars/Volume).
+        skip_years: Aantal jaren overslaan (backtesting).
+        project_dir: Projectmap (voor het controleren van invoerbestanden).
+        config: Geladen projectconfiguratie.
+
+    Returns:
+        Leesbare foutmeldingen; leeg als de combinatie uitvoerbaar is.
+    """
+    errors: list[str] = []
+    if dataset == "CWF" and skip_years > 0:
+        errors.append(
+            "Het CWF-model ondersteunt geen backtest: zet 'Jaren overslaan' op 0."
+        )
+    if cohort == "Hogerejaars":
+        source = higher_years_source(dataset, config)
+        if source is None:
+            errors.append(
+                f"Hogerejaars voorspellen kan niet met dataset '{dataset}'. "
+                "Kies Cumulatief, Individueel of CWF."
+            )
+        else:
+            full = (
+                source
+                if os.path.isabs(source)
+                else os.path.join(project_dir or "", source)
+            )
+            if not os.path.isfile(full):
+                errors.append(
+                    "Hogerejaars voorspellen kan in dit project nog niet: daarvoor "
+                    "zijn eerdere prognoses mét de gerealiseerde aantallen nodig in "
+                    f"'{source}', en dat bestand ontbreekt. Een gewone run maakt "
+                    "het niet aan. Zie in de documentatie 'Draaien & CLI' → "
+                    "Hogerejaars hoe je het maakt; tot die tijd voorspel je "
+                    "Eerstejaars of Volume."
+                )
+    return errors
+
+
+#: Markeringen in de CLI-uitvoer van problemen die zonder ``--yes`` de run
+#: hadden gestopt (hard stop) of een vraag hadden gesteld (soft-validatie).
+#: De hard stop komt als Python-warning binnen ("...: UserWarning: [--yes] ...");
+#: op die volledige vorm matchen voorkomt dat de bronregel die Python eronder
+#: print (``warnings.warn(f"[--yes] {msg}", ...)``) als melding meetelt.
+_OVERRIDE_MARKERS = ("UserWarning: [--yes] ", "[PROBLEEM] ")
+
+
+def overridden_problems(lines: list[str]) -> list[str]:
+    """Vind validatieproblemen die de GUI via ``--yes`` heeft overgeslagen.
+
+    De GUI draait altijd met ``--yes`` (er is geen interactieve invoer). Een
+    hard stop of validatievraag wordt dan een regel in de log. Deze functie
+    haalt die regels eruit, zodat de GUI ze na een geslaagde run zichtbaar kan
+    maken in plaats van stil "Geslaagd" te tonen (#322).
+
+    Args:
+        lines: Uitvoerregels van de CLI (stdout + stderr).
+
+    Returns:
+        De meldingen zonder markering, uniek en in volgorde van voorkomen.
+    """
+    found: list[str] = []
+    for line in lines:
+        for marker in _OVERRIDE_MARKERS:
+            idx = line.find(marker)
+            if idx != -1:
+                msg = line[idx + len(marker):].strip()
+                if msg and msg not in found:
+                    found.append(msg)
+                break
+    return found

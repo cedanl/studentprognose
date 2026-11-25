@@ -58,8 +58,8 @@ _TEL_PREVIEW: dict = {
     "note": "CSV · puntkomma- of kommagescheiden · één bestand per rapportageweek",
     "filenames": [
         ("telbestandY2024W10.csv",                 "instellingsformaat"),
-        ("telbestand_sl_20241007_v01_2024.csv",    "UvA SQL (datum eerst)"),
-        ("Telbestand_SL_2020_V96_20210802.csv",    "UvA SQL (jaar eerst)"),
+        ("telbestand_sl_20241007_v01_2024.csv",    "SQL-export (datum eerst)"),
+        ("Telbestand_SL_2020_V96_20210802.csv",    "SQL-export (jaar eerst)"),
     ],
     "columns": [
         ("Studiejaar",      "Collegejaar (integer)",             "2024"),
@@ -90,8 +90,8 @@ _OKT_SOURCE: dict = {
     "label": "Je eigen instelling",
     "icon": "account_balance",
     "detail": (
-        "Genereer dit uit je SIS/datawarehouse — bijvoorbeeld Osiris, Usis "
-        "of een vergelijkbaar bronsysteem."
+        "Genereer dit uit het studentinformatiesysteem of datawarehouse van je "
+        "instelling."
     ),
     "url": None,
     "url_label": None,
@@ -99,7 +99,7 @@ _OKT_SOURCE: dict = {
 
 _OKT_PREVIEW: dict = {
     "title": "Verwacht formaat — Oktober-bestand",
-    "description": "Werkelijke eerstejaars inschrijvingen per opleiding en herkomstgroep, peildatum 1 oktober. Aangeleverd door de instelling vanuit SIS/datawarehouse (Osiris, Usis of vergelijkbaar).",
+    "description": "Werkelijke eerstejaars inschrijvingen per opleiding en herkomstgroep, peildatum 1 oktober. Aangeleverd door de instelling vanuit het studentinformatiesysteem of datawarehouse.",
     "note": "Excel (.xlsx) · peildatum 1 oktober · één rij per opleiding × herkomstgroep",
     "filenames": [
         ("oktober_bestand.xlsx", "elke .xlsx-naam is toegestaan — wordt hernoemd bij upload"),
@@ -190,10 +190,10 @@ _STATUS_VISUAL: dict[FileStatus, tuple[str, str, str]] = {
 # Beschikbare pipeline-modi met bijbehorende metadata.
 # Tuple: (key, label, icon, cli_flag, beschrijving, aanbevolen)
 _MODE_OPTS: list[tuple[str, str, str, str, str, bool]] = [
-    ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden",       True),
+    ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden",       False),
     ("individual", "Individueel", "person",    "-d individual", "Alleen aanmelddata",         False),
     ("both",       "Beide",       "bolt",      "-d both",       "Telbestanden + aanmelddata", False),
-    ("cwf",        "CWF",         "verified",  "-d cwf",        "Telbestanden · met interval", False),
+    ("cwf",        "CWF",         "verified",  "-d cwf",        "Telbestanden · met interval", True),
 ]
 
 # Modi die de telbestanden resp. de individuele aanmelddata nodig hebben.
@@ -1236,8 +1236,11 @@ class _WizardView:
             self._project_dir = os.path.join(
                 os.path.expanduser("~"), "tmp", f"studentprognose{stamp}"
             )
-        # Een eerder in deze sessie gekozen modus blijft staan bij terugkeer.
-        self._mode: str = STATE.wizard_mode or "cumulative"
+        # Een eerder gekozen modus blijft staan bij terugkeer — ook na een
+        # herstart, via de opgeslagen run-dataset (die Uitvoeren toont).
+        from gui.pages.run import stored_wizard_mode
+
+        self._mode: str = STATE.wizard_mode or stored_wizard_mode() or "cumulative"
         self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
@@ -1313,36 +1316,9 @@ class _WizardView:
             self._confirm_path = ui.label().classes("text-sm font-mono opacity-60 mb-2")
             with ui.row().classes("items-center gap-4 flex-wrap"):
                 self._demo_checkbox = ui.checkbox(
-                    "Demo Studielink-data downloaden (≈6 MB, beide sporen)",
+                    "Demo Studielink-data downloaden (≈6 MB, geschikt voor alle modi)",
                     value=False,
                 )
-                # Vertikale scheidingslijn
-                ui.html(
-                    '<div style="width:1px;height:20px;background:#e0e0e0;'
-                    'align-self:center;flex-shrink:0"></div>'
-                )
-                # Studielink-knop: visueel greyed-out, tooltip + klikfeedback
-                with ui.row().classes("items-center gap-1.5").style(
-                    "opacity:0.5; cursor:not-allowed"
-                ):
-                    ui.tooltip(
-                        "Directe koppeling met het Studielink-portaal"
-                        " — binnenkort beschikbaar"
-                    )
-                    (
-                        ui.button(
-                            "Download vanuit Studielink",
-                            icon="cloud_download",
-                            on_click=self._on_studielink_click,
-                        )
-                        .props("flat color=grey dense")
-                        .style("pointer-events:auto; cursor:not-allowed")
-                    )
-                    ui.label("binnenkort").classes("text-xs rounded-full px-2").style(
-                        "background:#f0f0f0; color:#999;"
-                        " border:1px solid #ddd; font-style:italic;"
-                        " white-space:nowrap"
-                    )
             self._demo_progress = ui.linear_progress(value=0.0, show_value=False)
             self._demo_progress.set_visibility(False)
             # Geen log/statusbadge: de wizard toont zelf voortgang (demo-balk)
@@ -1471,8 +1447,9 @@ class _WizardView:
                     on_click=lambda: ui.navigate.to("/config"),
                 ).props("unelevated color=accent disabled")
 
-            # Initialiseer visuele staat nadat alle elementen bestaan.
-            self._apply_mode()
+            # Initialiseer visuele staat nadat alle elementen bestaan. Leg de
+            # getoonde modus ook vast, zodat Uitvoeren exact deze keuze draait.
+            self._select_mode(self._mode)
 
     # ── Telbestand-dekking ───────────────────────────────────────────────────
 
@@ -1766,15 +1743,6 @@ class _WizardView:
         self._refresh_summary()
         self._refresh_overlap()
 
-    def _on_studielink_click(self) -> None:
-        ui.notify(
-            "Studielink-koppeling is nog niet beschikbaar"
-            " — wordt toegevoegd in een volgende versie.",
-            type="info",
-            icon="cloud_off",
-            timeout=4000,
-        )
-
     async def _download_demodata(self) -> None:
         dest = os.path.join(self._project_dir, "data", "input_raw")
         self._demo_progress.set_visibility(True)
@@ -1803,7 +1771,10 @@ class _WizardView:
             with self._create_feedback:
                 error_banner(
                     "Demodata downloaden mislukt.",
-                    f"Controleer je internetverbinding. Details: {exc}",
+                    "Controleer je internetverbinding. Het project is wel "
+                    "aangemaakt: upload hieronder je eigen bestanden, of klik "
+                    "rechtsboven op Reset om het opnieuw te proberen met "
+                    f"demodata. Details: {exc}",
                 )
         finally:
             timer.cancel()

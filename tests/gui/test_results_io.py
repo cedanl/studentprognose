@@ -108,3 +108,56 @@ def test_programme_rows_include_cwf_interval_and_label():
     assert row["voorspelling"] == 90.0
     assert (row["ondergrens"], row["bovengrens"]) == (80.0, 104.0)
     assert row["betrouwbaarheid"] == "Groen"
+
+
+def test_find_output_files_skips_empty_files(tmp_path):
+    # Een leeg bestand is geen resultaat en mag de resultatenpagina niet breken (#322).
+    (tmp_path / "output_first-years_cumulatief.xlsx").write_bytes(b"")
+    _sample_output().to_excel(tmp_path / "output_first-years_cwf.xlsx", index=False)
+    names = [name for name, _ in results_io.find_output_files(str(tmp_path))]
+    assert names == ["output_first-years_cwf.xlsx"]
+
+
+def _make_dashboards(tmp_path, *rels):
+    for rel in rels:
+        f = tmp_path / "visualisations" / rel
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text("<html></html>")
+
+
+def test_dashboard_links_per_mode(tmp_path):
+    _make_dashboards(
+        tmp_path,
+        "cwf/dashboard.html",
+        "final/dashboard_cwf.html",
+        "cumulative/dashboard.html",
+    )
+    assert results_io.dashboard_links(str(tmp_path), "output_first-years_cwf.xlsx") == [
+        ("CWF", "cwf/dashboard.html"),
+        ("Eindoverzicht", "final/dashboard_cwf.html"),
+    ]
+    # Cumulatief heeft hier geen eigen eindoverzicht: alleen de modelpagina.
+    assert results_io.dashboard_links(
+        str(tmp_path), "output_first-years_cumulatief.xlsx"
+    ) == [("Cumulatief", "cumulative/dashboard.html")]
+
+
+def test_dashboard_links_empty_without_dashboards(tmp_path):
+    assert (
+        results_io.dashboard_links(str(tmp_path), "output_first-years_cwf.xlsx") == []
+    )
+
+
+def test_resolve_dashboard_blocks_path_traversal(tmp_path):
+    _make_dashboards(tmp_path, "cwf/dashboard.html")
+    (tmp_path / "secret.html").write_text("geheim")
+    assert results_io.resolve_dashboard(str(tmp_path), "cwf/dashboard.html")
+    assert results_io.resolve_dashboard(str(tmp_path), "../secret.html") is None
+    assert results_io.resolve_dashboard(str(tmp_path), "cwf/missing.html") is None
+
+
+def test_model_label_readable_names():
+    assert results_io.model_label("Prognose_ratio") == "Ratio-model"
+    assert results_io.model_label("SARIMA_cumulative") == "Cumulatief (SARIMA)"
+    assert results_io.model_label("Onbekend_model") == "Onbekend_model"
+    assert results_io.model_label(None) == ""

@@ -79,6 +79,26 @@ def error_banner(message: str, hint: str | None = None) -> None:
                     ui.label(hint).classes("text-sm opacity-80")
 
 
+def warning_banner(message: str, details: list[str] | None = None) -> None:
+    """Render een waarschuwingsbanner, optioneel met een lijst meldingen.
+
+    Args:
+        message: Kernboodschap in gewone taal.
+        details: Losse meldingen die onder de boodschap worden opgesomd.
+    """
+    with (
+        ui.card()
+        .classes("w-full border-l-4")
+        .style(f"border-color: {theme.WARNING}; background: #fff4e5"),
+        ui.row().classes("items-start gap-2 no-wrap"),
+    ):
+        ui.icon("warning").style(f"color: {theme.WARNING}").classes("text-xl mt-1")
+        with ui.column().classes("gap-1"):
+            ui.label(message).classes("font-medium")
+            for detail in details or []:
+                ui.label(f"• {detail}").classes("text-sm opacity-80")
+
+
 def info_banner(message: str) -> None:
     """Render een neutrale informatiebanner."""
     with (
@@ -89,25 +109,6 @@ def info_banner(message: str) -> None:
         with ui.row().classes("items-center gap-2 no-wrap"):
             ui.icon("info").style(f"color: {theme.INFO}").classes("text-xl")
             ui.label(message).classes("text-sm")
-
-
-def concept_banner() -> None:
-    """Prominente banner die aangeeft dat een pagina een niet-functionele mockup is."""
-    with (
-        ui.card()
-        .classes("w-full border-l-4")
-        .style("border-color: #E53935; background: #fff5f5;")
-    ):
-        with ui.row().classes("items-center gap-3 no-wrap"):
-            ui.icon("science").style("color: #E53935; font-size: 22px;").classes("flex-none")
-            with ui.column().classes("gap-0"):
-                ui.label("Concept — niet functioneel").classes("font-semibold text-sm").style(
-                    "color: #B71C1C;"
-                )
-                ui.label(
-                    "Dit is een interactieve mockup voor evaluatie en feedback. "
-                    "Alle data is illustratief."
-                ).classes("text-xs opacity-70")
 
 
 def section_title(text: str, subtitle: str | None = None) -> None:
