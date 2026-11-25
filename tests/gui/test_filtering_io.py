@@ -183,3 +183,15 @@ def test_count_programme_filter_matches_across_dtype():
         }
     )
     assert _count(df, programme=["30008"]) == (1, 2)
+
+
+def test_with_duo_names_fills_only_missing_names():
+    """#326: DUO-naam als laatste bron; eigen namen gaan voor."""
+    merged = filtering_io.with_duo_names(
+        [56604, "59320", 11112.0, "B Legacy"], {"56604": "Psychologie (eigen)"}
+    )
+    assert merged["56604"] == "Psychologie (eigen)"
+    assert merged["59320"] == "B Security Studies"
+    assert "B Legacy" not in merged
+    options = filtering_io.build_programme_options([56604, 59320], merged)
+    assert options["59320"] == "59320 — B Security Studies"

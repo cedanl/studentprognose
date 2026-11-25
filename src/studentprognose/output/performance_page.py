@@ -755,6 +755,29 @@ def _cwf_payload(
 # ── Samenstellen ──────────────────────────────────────────────────────
 
 
+def _programme_names_payload(
+    data: pd.DataFrame,
+    data_cumulative: pd.DataFrame | None,
+    programme_names: dict[int, str] | None,
+) -> dict[str, str]:
+    """``{code: naam}`` voor de opleidingen op deze pagina (alleen codes met naam).
+
+    De pagina gebruikt dit alleen als etiket; alle filters en koppelingen blijven
+    op de code.
+    """
+    if not programme_names:
+        return {}
+    frames = [data] + ([data_cumulative] if data_cumulative is not None else [])
+    codes = pd.concat(
+        [f[mp.PROGRAMME].astype(str) for f in frames if mp.PROGRAMME in f.columns]
+    ).unique()
+    out: dict[str, str] = {}
+    for code in codes:
+        if code.isdigit() and int(code) in programme_names:
+            out[code] = programme_names[int(code)]
+    return out
+
+
 def build_payload(
     data: pd.DataFrame,
     data_cumulative: pd.DataFrame | None,
@@ -766,6 +789,7 @@ def build_payload(
     numerus_fixus: dict | None = None,
     track: str = "cumulative",
     xgboost_curve: pd.DataFrame | None = None,
+    programme_names: dict[int, str] | None = None,
 ) -> dict:
     """Alle data die een performancepagina nodig heeft, JSON-serialiseerbaar.
 
@@ -773,6 +797,8 @@ def build_payload(
         track: ``"cumulative"``, ``"individual"``, ``"cwf"`` of ``"final"``.
         xgboost_curve: Geaggregeerde XGBoost-curve van het individuele spoor; nodig
             voor het verloop op de individuele pagina.
+        programme_names: Opzoektabel opleidingscode -> naam (#326). De pagina toont
+            dan "naam (code)"; zonder tabel alleen de code.
 
     Returns:
         ``performance`` bevat de weergave "alle herkomsten"; ``performanceByOrigin``
@@ -878,6 +904,7 @@ def build_payload(
         ),
         "trend": trend,
         "cwf": _cwf_payload(data, prediction_year, predict_week) if track == "cwf" else None,
+        "names": _programme_names_payload(data, data_cumulative, programme_names),
     }
 
 

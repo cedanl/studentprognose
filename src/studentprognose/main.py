@@ -22,6 +22,7 @@ from studentprognose.data.nf_validation import (
     enforce_numerus_fixus_keys,
 )
 from studentprognose.data.prediction_validator import run_pre_prediction_checks
+from studentprognose.data.programme_names import build_programme_names
 from studentprognose.data.range_check import (
     detect_data_range_mismatch,
     format_api_range_error,
@@ -623,6 +624,12 @@ def _run_pipeline_strategy(cfg, datasets, configuration, filtering, cwd, save_ou
     """
     # Step 2: Initialize strategy (Individual / Cumulative / Combined)
     strategy = create_strategy(cfg, datasets, configuration, cwd)
+    # Opleidingsnamen (#326) voor uitvoer en dashboard: DUO-tabel + eigen namen
+    # van de instelling uit de cumulatieve data. Alleen een etiket; de code blijft
+    # de sleutel.
+    strategy.postprocessor.programme_names = build_programme_names(
+        configuration, datasets[1]
+    )
 
     if save_output:
         PostProcessor.check_output_writable(
@@ -907,6 +914,7 @@ def _make_dashboard_builder(strategy, cfg, cwd: str) -> DashboardBuilder:
         data_studentcount=strategy.postprocessor.data_studentcount,
         data_xgboost_curve=dd["xgboost_curve"],
         final_academic_week=strategy.final_academic_week,
+        programme_names=getattr(strategy.postprocessor, "programme_names", None),
     )
 
 

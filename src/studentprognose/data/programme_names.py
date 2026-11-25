@@ -166,3 +166,86 @@ def warn_missing_programme_names(missing: list[int]) -> None:
         "met opleidingsnamen bij (paths.path_programme_names).",
         stacklevel=2,
     )
+
+
+def build_programme_names(
+    configuration: dict,
+    data_cumulative: pd.DataFrame | None = None,
+    code_column: str = "Croho",
+    name_column: str = "Naam Croho opleiding Nederlands",
+) -> dict[int, str]:
+    """Bouw de opzoektabel code -> naam voor de uitvoer, het dashboard en de GUI.
+
+    Begint met de DUO-tabel (uit ``paths.path_programme_names`` of de
+    meegeleverde) en legt daar de eigen namen van de instelling uit de
+    cumulatieve data overheen. Eigen namen gaan dus voor, net als bij
+    :func:`fill_programme_names`.
+
+    Args:
+        configuration: De configuratiedict.
+        data_cumulative: Cumulatieve data met code- en naamkolom (optioneel).
+        code_column: Kolom met de opleidingscode.
+        name_column: Kolom met de opleidingsnaam.
+
+    Returns:
+        Een dict van opleidingscode (``int``) naar naam.
+    """
+    path = configuration.get("paths", {}).get("path_programme_names", "")
+    names = dict(load_programme_names(path))
+    if (
+        data_cumulative is None
+        or code_column not in data_cumulative.columns
+        or name_column not in data_cumulative.columns
+    ):
+        return names
+
+    pairs = data_cumulative[[code_column, name_column]].drop_duplicates()
+    code = _to_code(pairs[code_column])
+    name_text = pairs[name_column].astype("string").str.strip()
+    # Eigen naam = niet leeg en niet gelijk aan de code (dan is het een placeholder).
+    own = code.notna() & name_text.notna() & (name_text != "")
+    own &= (_to_code(pairs[name_column]) != code).fillna(True)
+    for c, n in zip(code[own], name_text[own]):
+        names[int(c)] = str(n)
+    return names
+
+
+def programme_label(code, names: dict[int, str]) -> str:
+    """Leesbaar etiket voor een opleiding: ``"B Psychologie (56604)"``.
+
+    Valt terug op de code als er geen naam bekend is. Een sleutel die zelf al
+    een naam is (legacy-formaat, bijv. ``"B Psychologie"``) blijft ongewijzigd.
+
+    Args:
+        code: De programmesleutel (code als int/str/float, of een naam).
+        names: Opzoektabel uit :func:`build_programme_names`.
+
+    Returns:
+        Het etiket als tekst.
+    """
+    key = _to_code(pd.Series([code], dtype=object)).iloc[0]
+    if pd.isna(key):
+        return "" if code is None or (isinstance(code, float) and pd.isna(code)) else str(code)
+    name = names.get(int(key))
+    return f"{name} ({int(key)})" if name else str(int(key))
+
+
+def programme_name_column(codes: pd.Series, names: dict[int, str]) -> pd.Series:
+    """Naam per rij bij een kolom met programmesleutels (voor uitvoerbestanden).
+
+    Bij een code zonder bekende naam blijft de cel leeg. Een sleutel die zelf al
+    een naam is (legacy-formaat) wordt overgenomen.
+
+    Args:
+        codes: Kolom met programmesleutels.
+        names: Opzoektabel uit :func:`build_programme_names`.
+
+    Returns:
+        Een kolom met namen, met dezelfde index als ``codes``.
+    """
+    as_code = _to_code(codes)
+    mapped = as_code.map(names)
+    is_name = as_code.isna() & codes.notna()
+    out = mapped.astype(object)
+    out[is_name] = codes[is_name].astype(str)
+    return out.where(out.notna(), None)

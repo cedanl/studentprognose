@@ -93,7 +93,7 @@ telbestanden en het oktober-bestand; individuele aanmelddata is niet nodig. Op d
 (*CWF* = `-d cwf`). Dat veld kun je daar niet wijzigen: de modus kies je op één
 plek, in de wizard, zodat hij altijd past bij de bestanden die je hebt
 geüpload. Met **Wijzigen** ga je terug naar de modus-keuze. Kies je niets, dan
-staat de modus op *Cumulatief*. Bij een CWF-run toont de **Resultaten**-pagina per opleiding
+staat de modus op *Cumulatief*. De **Resultaten**-pagina toont elke opleiding als **naam (code)**, bijv. `B Psychologie (56604)` — zie [Opleidingsnamen](je-data-voorbereiden.md#opleidingsnamen) voor waar de naam vandaan komt. Bij een CWF-run toont de **Resultaten**-pagina per opleiding
 ook het predictie-interval en het betrouwbaarheidslabel (Groen/Oranje/Rood); de
 detailgrafiek van een opleiding tekent het interval als foutbalk. Zie
 [CWF-model](methodologie/cwf.md) voor wat de labels betekenen.
@@ -185,8 +185,10 @@ een **zoekbare keuzelijst op Isatcode**. Bij *Filteren → Opleidingen* en bij
 geüploade data voorkomen — al vóór de eerste run, gelezen uit het
 oktober-bestand en de telbestanden (aangevuld met de bewerkte bestanden zodra
 die er zijn). Typ een **Isatcode** of een **opleidingsnaam** om te zoeken. Waar
-de naam bekend is (uit het oktober-bestand of de telbestanden) staat die achter
-de code — bijv. `56604 — B Geneeskunde` — maar de opgeslagen waarde is altijd de
+de naam bekend is staat die achter de code — bijv. `56604 — B Psychologie`. De
+naam komt eerst uit je eigen bestanden (oktober-bestand, telbestanden); heeft een
+code daar geen naam, dan staat er de officiële DUO-naam
+([Opleidingsnamen](je-data-voorbereiden.md#opleidingsnamen)). De opgeslagen waarde is altijd de
 **Isatcode**,
 zodat de sleutel op het cumulatieve spoor aangrijpt. Staat een opleiding niet in
 de lijst, dan kun je de Isatcode ook handmatig typen en toevoegen. De

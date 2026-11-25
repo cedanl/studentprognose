@@ -172,3 +172,83 @@ def test_default_config_uses_bundled_table():
     from studentprognose.config import load_defaults
 
     assert load_defaults()["paths"]["path_programme_names"] == ""
+
+
+# --- Deel 2: etiketten voor uitvoer, dashboard en GUI --------------------------
+
+
+from studentprognose.data.programme_names import (  # noqa: E402
+    build_programme_names,
+    programme_label,
+    programme_name_column,
+)
+
+
+def test_programme_label_formats_name_and_code():
+    assert programme_label(56604, NAMES) == "B Psychologie (56604)"
+    assert programme_label("56604", NAMES) == "B Psychologie (56604)"
+    assert programme_label(56604.0, NAMES) == "B Psychologie (56604)"
+
+
+def test_programme_label_falls_back_to_code_or_legacy_name():
+    assert programme_label(11111, NAMES) == "11111"
+    assert programme_label("B Psychologie", NAMES) == "B Psychologie"
+    assert programme_label(None, NAMES) == ""
+
+
+def test_programme_name_column_maps_codes_and_keeps_legacy_names():
+    codes = pd.Series([56604, 11111, "B Eigen"], dtype=object)
+    assert programme_name_column(codes, NAMES).tolist() == ["B Psychologie", None, "B Eigen"]
+
+
+def test_build_programme_names_prefers_own_institution_names():
+    cumulative = pd.DataFrame(
+        {"Croho": [56604, 59320, 34808], NAME_COL: ["Psychologie (UvA)", 59320, "34808"]}
+    )
+    names = build_programme_names({"paths": {}}, cumulative)
+    assert names[56604] == "Psychologie (UvA)"  # eigen naam wint
+    assert names[59320] == "B Security Studies"  # placeholder -> DUO
+    assert len(names) > 4000
+
+
+def test_build_programme_names_without_data_is_duo_table():
+    assert build_programme_names({"paths": {"path_programme_names": ""}}) == load_programme_names()
+
+
+# --- Uitvoerbestanden ----------------------------------------------------------
+
+
+def _postprocessor():
+    from studentprognose.config import load_defaults
+    from studentprognose.output.postprocessor import PostProcessor
+    from studentprognose.utils.weeks import DataOption
+
+    return PostProcessor(load_defaults(), None, None, None, ".", DataOption.CUMULATIVE, None)
+
+
+def test_output_gets_name_column_next_to_code_without_changing_data():
+    pp = _postprocessor()
+    pp.programme_names = NAMES
+    data = pd.DataFrame(
+        {"Collegejaar": [2024, 2024], "Croho groepeernaam": [56604, 11111], "Prognose": [1, 2]}
+    )
+    out = pp._with_programme_names(data)
+    assert list(out.columns) == ["Collegejaar", "Croho groepeernaam", "Opleidingsnaam", "Prognose"]
+    assert out["Opleidingsnaam"].tolist() == ["B Psychologie", None]
+    assert "Opleidingsnaam" not in data.columns  # alleen bij het wegschrijven
+
+
+def test_output_name_column_is_rebuilt_for_older_rows():
+    pp = _postprocessor()
+    pp.programme_names = NAMES
+    data = pd.DataFrame(
+        {"Croho groepeernaam": [56604, 34808], "Opleidingsnaam": ["oud", None]}
+    )
+    out = pp._with_programme_names(data)
+    assert out["Opleidingsnaam"].tolist() == ["B Psychologie", "B Rechtsgeleerdheid"]
+
+
+def test_output_uses_duo_table_when_pipeline_set_no_names():
+    pp = _postprocessor()
+    out = pp._with_programme_names(pd.DataFrame({"Croho groepeernaam": [59320]}))
+    assert out["Opleidingsnaam"].tolist() == ["B Security Studies"]

@@ -321,7 +321,7 @@ class _ResultsView:
                 {
                     "name": "opleiding",
                     "label": "Opleiding",
-                    "field": "opleiding",
+                    "field": "naam",
                     "align": "left",
                     "sortable": True,
                 },
@@ -417,7 +417,7 @@ class _ResultsView:
     def _show_detail(self, row) -> None:
         with ui.dialog() as dialog, ui.card().classes("w-[32rem] max-w-full"):
             ui.label(
-                f"{row['opleiding']} · {row['herkomst']} · {row['examentype']}"
+                f"{row.get('naam') or row['opleiding']} · {row['herkomst']} · {row['examentype']}"
             ).classes("text-lg font-medium")
             labels, values, colors = [], [], []
             if row.get("voorspelling") is not None:

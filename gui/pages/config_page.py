@@ -749,7 +749,9 @@ class _ConfigView:
         2. de ruwe **telbestanden** (``Isatcode`` + ``Groepeernaam``);
         3. het bewerkte **1cijferho**-bestand (isatcode + naam);
         4. het bewerkte **student_count**-bestand (alleen isatcodes);
-        5. reeds geconfigureerde sleutels (filter + numerus fixus),
+        5. reeds geconfigureerde sleutels (filter + numerus fixus);
+        6. de officiële DUO-naam (``Dec_opleidingscode.asc``) voor codes zonder
+           naam uit de bronnen hierboven,
 
         zodat bestaande selecties zichtbaar blijven ook als de data ze (nog) niet
         bevat.
@@ -804,8 +806,20 @@ class _ConfigView:
         # 5. Reeds geconfigureerde sleutels.
         codes += list(self._filtering.get("programme", []))
         codes += [r.get("key") for r in self._nf_rows]
+        # 6. Officiële DUO-naam (#326) voor codes die nergens anders een naam
+        # hebben. Laagste prioriteit: eigen namen van de instelling gaan voor.
+        name_map = filtering_io.with_duo_names(
+            codes, name_map, self._programme_names_path(project)
+        )
 
         return filtering_io.build_programme_options(codes, name_map)
+
+    def _programme_names_path(self, project: str) -> str:
+        """Pad naar een eigen DUO-tabel uit ``paths.path_programme_names`` (of ``""``)."""
+        path = self._config.get("paths", {}).get("path_programme_names", "") or ""
+        if path and not os.path.isabs(path):
+            path = os.path.join(project, path)
+        return path
 
     def _filtering_section(self) -> None:
         active_count = (

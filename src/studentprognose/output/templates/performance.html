@@ -396,7 +396,7 @@ code.plain { background: none; padding: 0; }
       <div class="picker">
         <label class="control">Opleiding
           <input type="search" id="programme-search" list="programme-list" autocomplete="off"
-                 placeholder="Zoek op code, examentype of faculteit">
+                 placeholder="Zoek op naam, code, examentype of faculteit">
         </label>
         <datalist id="programme-list"></datalist>
       </div>
@@ -431,6 +431,15 @@ code.plain { background: none; padding: 0; }
   const fmtSignedNum = v => (v == null ? "–" : (v > 0 ? "+" : v < 0 ? "−" : "") + num.format(Math.abs(v)));
   const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const block = name => document.querySelector(`[data-block="${name}"]`);
+  // Opleidingsnamen (#326): alleen een etiket. Filters en koppelingen blijven op de code.
+  const NAMES = DATA.names || {};
+  const pname = code => (NAMES[code] ? `${NAMES[code]} (${code})` : String(code));
+  // Code uit een getypte zoekterm: "B Psychologie (56604) · ..." of gewoon "56604".
+  const codeFromText = text => {
+    const head = String(text).split(" · ")[0].trim();
+    const m = head.match(/\((\d+)\)$/);
+    return m ? m[1] : head;
+  };
 
   function tokens() {
     const cs = getComputedStyle(document.documentElement);
@@ -673,14 +682,15 @@ code.plain { background: none; padding: 0; }
     if (showNf) {
       const ens = tableModels.length ? tableModels[0].key : null;
       Plotly.react("chart-nf", [
-        { type: "bar", orientation: "h", name: `Prognose ${META.year}`, y: NF.map(r => r.p), x: NF.map(r => r.prognose),
+        { type: "bar", orientation: "h", name: `Prognose ${META.year}`, y: NF.map(r => pname(r.p)), x: NF.map(r => r.prognose),
           marker: { color: modelColor(ens, t), cornerradius: 4 }, hovertemplate: "Prognose: %{x:,.0f}<extra></extra>" },
-        { type: "scatter", mode: "markers", name: "Capaciteit", y: NF.map(r => r.p), x: NF.map(r => r.cap),
+        { type: "scatter", mode: "markers", name: "Capaciteit", y: NF.map(r => pname(r.p)), x: NF.map(r => r.cap),
           marker: { symbol: "line-ns", size: 22, line: { width: 3, color: t.statusBad } }, hovertemplate: "Capaciteit: %{x:,.0f}<extra></extra>" },
-      ], baseLayout(t, { height: Math.max(220, 60 + NF.length * 44), margin: { l: 90, r: 16, t: 8, b: 36 } }), CONFIG);
+      ], baseLayout(t, { height: Math.max(220, 60 + NF.length * 44),
+        margin: { l: Math.min(320, Math.max(90, 16 + 7 * Math.max(...NF.map(r => pname(r.p).length)))), r: 16, t: 8, b: 36 } }), CONFIG);
       document.getElementById("table-nf").innerHTML =
         `<thead><tr><th scope="col">Opleiding</th><th scope="col">Capaciteit</th><th scope="col">Prognose</th><th scope="col">Status</th></tr></thead><tbody>` +
-        NF.map(r => `<tr><th scope="row">${esc(r.p)}</th><td>${num.format(r.cap)}</td><td>${num.format(r.prognose)}</td>` +
+        NF.map(r => `<tr><th scope="row">${esc(pname(r.p))}</th><td>${num.format(r.cap)}</td><td>${num.format(r.prognose)}</td>` +
           `<td style="text-align:left">${r.prognose > r.cap ? '<span class="badge laag">Boven capaciteit</span>' : '<span class="badge hoog">Binnen capaciteit</span>'}</td></tr>`).join("") + "</tbody>";
     }
   }
@@ -766,7 +776,7 @@ code.plain { background: none; padding: 0; }
         type: "scatter", mode: "markers", name: e,
         x: us.map(u => u.a), y: us.map(u => (u.m[m] - u.a) / u.a),
         marker: { color, size: 8, symbol: symbols[i % symbols.length], opacity: 0.75, line: { color: t.surface, width: 1 } },
-        customdata: us.map(u => [u.p, u.y, num.format(u.m[m]), num.format(u.a), fmtSigned((u.m[m] - u.a) / u.a)]),
+        customdata: us.map(u => [pname(u.p), u.y, num.format(u.m[m]), num.format(u.a), fmtSigned((u.m[m] - u.a) / u.a)]),
         hovertemplate: "<b>%{customdata[0]}</b> · %{customdata[1]}<br>Voorspeld %{customdata[2]} · werkelijk %{customdata[3]}" +
           "<br>Fout %{customdata[4]}<extra>" + esc(e) + "</extra>",
       };
@@ -905,7 +915,11 @@ code.plain { background: none; padding: 0; }
       .map(k => c[k]);
   }
 
-  function sortValue(r, key) { return key === "t" ? TRUST_ORDER[r.t] : r[key]; }
+  function sortValue(r, key) {
+    if (key === "t") return TRUST_ORDER[r.t];
+    if (key === "p") return pname(r.p).toLowerCase();
+    return r[key];
+  }
 
   function filteredRows() {
     const q = table.query.trim().toLowerCase();
@@ -913,7 +927,7 @@ code.plain { background: none; padding: 0; }
     const counts = { alle: rows.length, hoog: 0, middel: 0, laag: 0, onbekend: 0, nf: 0 };
     rows.forEach(r => { counts[r.t] += 1; });
     if (table.trust !== "alle") rows = rows.filter(r => r.t === table.trust);
-    if (q) rows = rows.filter(r => `${r.p} ${r.e} ${r.faculty}`.toLowerCase().includes(q));
+    if (q) rows = rows.filter(r => `${pname(r.p)} ${r.e} ${r.faculty}`.toLowerCase().includes(q));
     rows.sort((x, y) => {
       const a = sortValue(x, table.sort), b = sortValue(y, table.sort);
       if (a == null && b == null) return 0;
@@ -955,13 +969,13 @@ code.plain { background: none; padding: 0; }
           const toggle = expandable
             ? (subs.length
               ? `<button type="button" class="expand" data-key="${esc(r.key)}" aria-expanded="${open}" ` +
-                `aria-label="${open ? "Verberg" : "Toon"} herkomst voor ${esc(r.p)} ${esc(r.e)}" title="Uitsplitsing per herkomst">` +
+                `aria-label="${open ? "Verberg" : "Toon"} herkomst voor ${esc(pname(r.p))} ${esc(r.e)}" title="Uitsplitsing per herkomst">` +
                 `<span aria-hidden="true">›</span></button>`
               : `<span class="expand-spacer" aria-hidden="true"></span>`)
             : "";
           const code = hasTrend && byCode[r.p]
-            ? `<button type="button" class="link" data-code="${esc(r.p)}">${esc(r.p)}</button>`
-            : `<strong>${esc(r.p)}</strong>`;
+            ? `<button type="button" class="link" data-code="${esc(r.p)}">${esc(pname(r.p))}</button>`
+            : `<strong>${esc(pname(r.p))}</strong>`;
           return `<th scope="row">${toggle}${code} <span class="sub">${esc([r.e, r.faculty].filter(Boolean).join(" · "))}</span></th>`;
         }
         case "n": return `<td>${r.n || "–"}</td>`;
@@ -1018,8 +1032,8 @@ code.plain { background: none; padding: 0; }
       return `"${String(v).replace(/"/g, '""')}"`;
     };
     const origin = isOrigin() ? state.origin : "Alle";
-    const line = (r, h) => cols.map(c => val(r, c.key)).concat([val(r, "e"), val(r, "faculty"), val(r, "marge"), `"${h}"`]).join(";");
-    const header = cols.map(c => `"${c.label}"`).concat(['"Examentype"', '"Faculteit"', '"Marge"', '"Herkomst"']).join(";");
+    const line = (r, h) => cols.map(c => val(r, c.key)).concat([val(r, "e"), val(r, "faculty"), val(r, "marge"), `"${h}"`, val({ n: NAMES[r.p] }, "n")]).join(";");
+    const header = cols.map(c => `"${c.label}"`).concat(['"Examentype"', '"Faculteit"', '"Marge"', '"Herkomst"', '"Opleidingsnaam"']).join(";");
     // Uitgeklapte opleidingen gaan met hun herkomstregels mee, net als op het scherm.
     const lines = [];
     rows.forEach(r => {
@@ -1114,7 +1128,7 @@ code.plain { background: none; padding: 0; }
   // ── Verloop per opleiding ─────────────────────────────────────────
   const progs = TREND.programmes;
   const byCode = Object.fromEntries(progs.map(p => [p.code, p]));
-  const labelOf = p => [p.code, p.exam, p.faculty].filter(Boolean).join(" · ");
+  const labelOf = p => [pname(p.code), p.exam, p.faculty].filter(Boolean).join(" · ");
   const byLabel = Object.fromEntries(progs.map(p => [labelOf(p), p]));
   const search = document.getElementById("programme-search");
   // Reeksen staan per herkomst in de pagina; voor "alle herkomsten" tellen we ze op.
@@ -1160,7 +1174,7 @@ code.plain { background: none; padding: 0; }
     document.getElementById("trend-title").textContent = PAGE.trend.title;
     document.getElementById("trend-lede").textContent = PAGE.trend.lede;
     search.addEventListener("change", () => {
-      const p = byLabel[search.value] || byCode[search.value.split(" · ")[0].trim()];
+      const p = byLabel[search.value] || byCode[codeFromText(search.value)];
       if (p) selectProgramme(p.code);
     });
   }
@@ -1282,7 +1296,7 @@ code.plain { background: none; padding: 0; }
     }
     document.getElementById("cwf-tiles").innerHTML = tiles.join("");
     const q = document.getElementById("cwf-search").value.trim().toLowerCase();
-    const rows = CWF.rows.filter(r => !q || [r.p, r.e, r.h, r.f].join(" ").toLowerCase().includes(q));
+    const rows = CWF.rows.filter(r => !q || [pname(r.p), r.e, r.h, r.f].join(" ").toLowerCase().includes(q));
     const order = { Rood: 0, Oranje: 1, Groen: 2 };
     rows.sort((a, b) => (order[a.label] - order[b.label]) || ((b.pred || 0) - (a.pred || 0)));
     const head = "<thead><tr><th>Opleiding</th><th>Examentype</th><th>Herkomst</th>" +
@@ -1291,7 +1305,7 @@ code.plain { background: none; padding: 0; }
       "</tr></thead>";
     const showActual = rows.some(r => r.a != null);
     const body = rows.map(r => "<tr>" +
-      `<td>${esc(r.p)}</td><td>${esc(r.e)}</td><td>${esc(r.h || "")}</td>` +
+      `<td>${esc(pname(r.p))}</td><td>${esc(r.e)}</td><td>${esc(r.h || "")}</td>` +
       `<td>${r.pred == null ? "–" : num.format(r.pred)}</td>` +
       `<td>${r.lo == null ? "–" : num.format(r.lo) + "–" + num.format(r.hi)}</td>` +
       `<td><span class="badge ${esc(r.label)}">${esc(r.label)}</span></td>` +

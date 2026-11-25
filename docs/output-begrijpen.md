@@ -46,6 +46,16 @@ Het bestand wordt **nooit** door de pipeline als input ingelezen — de data loa
 
 Elke rij in de output beschrijft een combinatie van **opleiding × herkomst × examentype × week × jaar**.
 
+### Opleiding: code en naam
+
+| Kolom | Betekenis |
+|---|---|
+| `Croho groepeernaam` | De **opleidingscode** (CROHO-/Isatcode). Dit is de sleutel: hierop koppel en filter je. |
+| `Opleidingsnaam` | De leesbare naam, direct naast de code. Eerst de eigen naam van je instelling (als je bron die levert), anders de officiële DUO-naam — ongewijzigd, dus inclusief `B `/`M `/`Ad `. Leeg als de code in geen van beide voorkomt. Zie [Opleidingsnamen](je-data-voorbereiden.md#opleidingsnamen). |
+
+!!! tip "Koppel altijd op de code, niet op de naam"
+    Namen zijn niet uniek: "B Psychologie" is zowel `34930` (hbo) als `56604` (wo). Gebruik `Opleidingsnaam` om te lezen en de code om te koppelen of te filteren. De naam wordt bij elke run opnieuw ingevuld, ook voor oudere rijen in de audittrail; aan de voorspellingen verandert niets.
+
 ### Voorspelkolommen
 
 | Kolom | Beschikbaar bij | Omschrijving |
@@ -166,7 +176,7 @@ Naast de Excel-bestanden kan de pipeline interactieve HTML-dashboards genereren 
 | **CWF** (`cwf/dashboard.html`) | `-d cwf` | Hoe goed voorspelt het CWF-model, en hoe zeker is elke prognose? |
 | **Eindoverzicht** (`final/dashboard_<modus>.html`) | Altijd | Wat is de prognose, en hoeveel vertrouwen verdient die? |
 
-Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. Alle pagina's hebben dezelfde opzet: een [herkomstfilter](#herkomstfilter-en-fout-naar-herkomst) bovenaan, kerncijfers, de fout naar opleidingsgrootte, examentype en herkomst, een tabel per opleiding met een **betrouwbaarheidslabel**, en (bij de modelpagina's) het verloop per opleiding. Elk model heeft op alle pagina's dezelfde kleur. De dashboards zijn zelfstandige HTML-bestanden (geen server of internet nodig) en openen in elke browser.
+Zonder `-d` draait de pipeline in modus `b` (beide) en krijg je dus alle drie. Alle pagina's hebben dezelfde opzet: een [herkomstfilter](#herkomstfilter-en-fout-naar-herkomst) bovenaan, kerncijfers, de fout naar opleidingsgrootte, examentype en herkomst, een tabel per opleiding met een **betrouwbaarheidslabel**, en (bij de modelpagina's) het verloop per opleiding. Elk model heeft op alle pagina's dezelfde kleur. Opleidingen staan overal als **naam (code)**, bijv. `B Psychologie (56604)`; je kunt op naam én op code zoeken, en de CSV-download van de tabel bevat een extra kolom `Opleidingsnaam`. De dashboards zijn zelfstandige HTML-bestanden (geen server of internet nodig) en openen in elke browser.
 
 !!! info "Dashboard is opt-in"
     Het dashboard wordt alleen gegenereerd als je expliciet `--dashboard` meegeeft. Een voorbeeld:
