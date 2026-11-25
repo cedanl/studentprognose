@@ -78,6 +78,35 @@ def programme_name_map(df: pd.DataFrame, *, code_col: str, name_col: str) -> dic
     return mapping
 
 
+def with_duo_names(codes, name_map: dict[str, str], path: str = "") -> dict[str, str]:
+    """Vul ``name_map`` aan met de officiële DUO-naam voor codes zonder naam.
+
+    Bestaande namen (eigen namen van de instelling) blijven staan.
+
+    Args:
+        codes: Iterable met ruwe isatcodes.
+        name_map: ``{isatcode_str: naam}`` uit de eigen bronnen.
+        path: Eigen DUO-tabel (``paths.path_programme_names``); leeg = meegeleverd.
+
+    Returns:
+        Een nieuwe ``{isatcode_str: naam}``-map.
+    """
+    import warnings
+
+    from studentprognose.data.programme_names import load_programme_names
+
+    with warnings.catch_warnings():
+        # Een ontbrekend eigen bestand meldt de pipeline al; hier stil terugvallen.
+        warnings.simplefilter("ignore")
+        duo = load_programme_names(path)
+    merged = dict(name_map)
+    for code in codes:
+        key = isatcode_str(code)
+        if key.isdigit() and key not in merged and int(key) in duo:
+            merged[key] = duo[int(key)]
+    return merged
+
+
 def build_programme_options(codes, name_map: dict[str, str] | None = None) -> dict[str, str]:
     """Bouw een ``{isatcode_str: label}``-dropdownmap, numeriek gesorteerd.
 

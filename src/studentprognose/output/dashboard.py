@@ -17,6 +17,7 @@ import os
 
 import pandas as pd
 
+from studentprognose.data.programme_names import load_programme_names
 from studentprognose.output import performance_page
 from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK
 from studentprognose.utils.weeks import (
@@ -55,6 +56,7 @@ class DashboardBuilder:
         data_studentcount: pd.DataFrame | None,
         data_xgboost_curve: pd.DataFrame | None = None,
         final_academic_week: int = FINAL_ACADEMIC_WEEK,
+        programme_names: dict[int, str] | None = None,
     ):
         self.data = data.copy()
         self.data["Weeknummer"] = self.data["Weeknummer"].astype(int)
@@ -73,6 +75,11 @@ class DashboardBuilder:
         # Academische jaargrens (UvA 36, legacy 38) bepaalt de week-x-as-volgorde.
         self.final_academic_week = final_academic_week
         self.academic_weeks = _academic_weeks(final_academic_week)
+        # Code -> naam (#326); het dashboard toont "naam (code)", de code blijft
+        # de sleutel. None = de meegeleverde DUO-tabel.
+        self.programme_names = (
+            programme_names if programme_names is not None else load_programme_names()
+        )
         if data_cumulative is not None:
             data_cumulative = data_cumulative.copy()
             data_cumulative["Weeknummer"] = data_cumulative["Weeknummer"].astype(int)
@@ -172,6 +179,7 @@ class DashboardBuilder:
             numerus_fixus=self.numerus_fixus_list,
             track=track,
             xgboost_curve=self.data_xgboost_curve,
+            programme_names=self.programme_names,
         )
         nav = [(label, href, t == track) for t, label, href in self._pages()]
         out_dir = os.path.join(self.base_dir, track)

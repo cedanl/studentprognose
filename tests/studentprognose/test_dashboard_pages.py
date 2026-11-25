@@ -895,3 +895,37 @@ def test_final_overview_is_kept_per_mode(tmp_path, output, studentcount):
     assert (final_dir / "dashboard.html").read_text("utf-8") == (
         final_dir / "dashboard_cwf.html"
     ).read_text("utf-8")
+
+
+def test_payload_carries_programme_names_for_codes_on_page(studentcount):
+    """#326: het dashboard krijgt code -> naam mee; de sleutel blijft de code."""
+    out = pd.DataFrame([_row(2024, "56604", "NL", 10, 60, 66.0, 60.0),
+                        _row(2024, "11111", "NL", 10, 10, 9.0, 10.0)])
+    names = {56604: "B Psychologie", 34808: "B Rechtsgeleerdheid"}
+    payload = performance_page.build_payload(
+        out, None, studentcount, 2024, 10, [str(w) for w in range(1, 53)], 38,
+        programme_names=names,
+    )
+    assert payload["names"] == {"56604": "B Psychologie"}  # alleen codes op de pagina
+    assert payload["trend"]["programmes"] == [] or all(
+        p["code"] in {"56604", "11111"} for p in payload["trend"]["programmes"]
+    )
+
+
+def test_payload_without_names_is_empty_mapping(output, studentcount):
+    payload = performance_page.build_payload(
+        output, _cumulative(), studentcount, 2024, 10, [str(w) for w in range(1, 53)], 38
+    )
+    assert payload["names"] == {}
+
+
+def test_template_shows_names_via_pname():
+    """Elke plek waar de opleiding getoond wordt, gaat via pname()."""
+    from importlib.resources import files
+
+    html = files("studentprognose.output").joinpath("templates/performance.html").read_text(
+        encoding="utf-8"
+    )
+    assert "const NAMES = DATA.names || {};" in html
+    assert "${esc(r.p)}</td>" not in html
+    assert '<strong>${esc(r.p)}</strong>' not in html

@@ -33,7 +33,7 @@ De ETL leest een **subset** van de officiële Studielink-velden. De belangrijkst
     | `Studiejaar` | int | §5.7 | Collegejaar (bijv. `2024`). ETL hernoemt naar `Collegejaar`. |
     | `Type_HO` | str | §5.5 | Type hoger onderwijs (`B` = Bachelor, `M` = Master, etc.). ETL hernoemt naar `Type hoger onderwijs`. |
     | `Isatcode` | str | §5.4 | CROHO-code van de opleiding. ETL hernoemt naar `Croho`. |
-    | `Groepeernaam` | str | — | Naam van de opleiding (afgeleid/verrijkt veld, niet in PvL). ETL kopieert naar `Groepeernaam Croho` én `Naam Croho opleiding Nederlands`. |
+    | `Groepeernaam` | str | — | Naam van de opleiding (afgeleid/verrijkt veld, niet in PvL). ETL kopieert naar `Groepeernaam Croho` én `Naam Croho opleiding Nederlands`. Ontbreekt de kolom, dan vult de tool bij het inlezen de officiële DUO-naam in — zie [Opleidingsnamen](#opleidingsnamen). |
     | `Faculteit` | str | — | Faculteit (afgeleid/verrijkt veld, niet in PvL). Wordt leeg gezet als de kolom ontbreekt. |
     | `Herkomst` | str | §5.10 | `N` (Nederland), `E` (EER), `R` (rest). ETL hertaalt naar `NL` / `EER` / `Niet-EER`. |
     | `Hogerejaars` | str | §5.14 | `J` of `N`. ETL hertaalt naar `Ja` / `Nee`. |
@@ -172,6 +172,32 @@ Dit zijn de bestanden die het model direct inleest. De ETL maakt ze aan; bij `--
 | `totaal_cumulatief.xlsx` / `totaal_individueel.xlsx` | Optioneel | `scripts/append_studentcount_and_compute_errors.py` |
 | `totaal_cwf.xlsx` | Optioneel (`-d cwf`) | Eerdere CWF-output; het label van vorige week geeft hysterese op het betrouwbaarheidslabel |
 
+## Opleidingsnamen
+
+De tool herkent een opleiding aan haar **opleidingscode** (CROHO-/Isatcode, bijv. `56604`). Die code is landelijk stabiel en uniek, en daarom de sleutel waarop alle bestanden aan elkaar gekoppeld worden. Voor mensen is een code alleen lastig te lezen. Daarom zoekt de tool bij het inlezen van `vooraanmeldingen_cumulatief.csv` de bijbehorende **naam** op en zet die in de kolom `Naam Croho opleiding Nederlands`.
+
+Per opleiding gebruikt de tool, in deze volgorde:
+
+1. **De eigen naam van je instelling**, als je bron die levert (de kolom `Groepeernaam` in het telbestand). Jouw naam gaat altijd voor.
+2. **De officiële DUO-naam** uit de decodeertabel `Dec_opleidingscode.asc` van de 1CijferHO-levering. Deze tabel wordt met de tool meegeleverd en bevat ook vervallen opleidingen, zodat historische jaren ook een naam krijgen.
+3. **De code zelf**, als de opleiding nergens gevonden wordt. De tool geeft dan één waarschuwing met de codes zonder naam — geen foutmelding; de run gaat gewoon door.
+
+Dit gebeurt na de ETL, op het moment dat de tool de bestanden inleest. Het werkt dus ook als je de ETL overslaat (`--noetl`) en zelf bestanden aanlevert. Je invoerbestanden zelf worden niet aangepast.
+
+!!! info "Waarom de naam alleen een etiket is"
+    - **Namen zijn niet uniek.** Zo heet zowel `34930` (hbo) als `56604` (wo) "B Psychologie". In de DUO-tabel komen 280 namen bij meer dan één code voor. De tool koppelt en filtert daarom altijd op de code, nooit op de naam. Je instellingen voor `numerus_fixus` en de filters in `filtering/base.json` hoef je dus niet aan te passen.
+    - **De voorspellingen veranderen niet.** De modellen gebruiken de naam niet; alleen wat je te zien krijgt wordt leesbaarder.
+    - **De DUO-naam wordt ongewijzigd overgenomen**, inclusief het voorvoegsel zoals `B ` (bachelor), `M ` (master) of `Ad ` (associate degree) en de schrijfwijze van DUO (DUO laat accenten weg). Zo blijft de naam herkenbaar als de officiële naam.
+
+!!! tip "Een nieuwere of eigen lijst gebruiken"
+    Mist er een naam (bijvoorbeeld bij een nieuwe opleiding), zet dan een recentere `Dec_opleidingscode.asc` uit je eigen 1CijferHO-levering in je projectmap en verwijs ernaar via [`paths.path_programme_names`](configuratie-referentie.md#paths-bestandspaden):
+
+    ```json
+    { "paths": { "path_programme_names": "data/input_raw/Dec_opleidingscode.asc" } }
+    ```
+
+    Het bestand heeft een vaste breedte: positie 1–5 de opleidingscode, positie 6–185 de naam. Staat het opgegeven bestand er niet, dan valt de tool met een waarschuwing terug op de meegeleverde lijst.
+
 ## Institutiespecifieke kolomnamen
 
 Gebruikt jouw instelling andere kolomnamen dan de kanonieke? Map ze in de `columns`-sectie van `configuration.json` — alleen de afwijkende namen:
@@ -202,7 +228,7 @@ De UvA levert de wekelijkse telbestanden als **SQL-export met 22 kolommen**: een
     | Kolom | Omschrijving |
     |-------|-------------|
     | `Brincode` | → `Korte naam instelling`. **Multi-instelling**: één levering bevat alle instellingen waar een student zich aanmeldde. |
-    | `Isatcode` | → `Croho`. Ook placeholder voor `Groepeernaam Croho`/`Naam Croho opleiding Nederlands`. |
+    | `Isatcode` | → `Croho`. Ook placeholder voor `Groepeernaam Croho`/`Naam Croho opleiding Nederlands`; bij het inlezen wordt `Naam Croho opleiding Nederlands` aangevuld met de officiële DUO-naam (zie [Opleidingsnamen](#opleidingsnamen)). |
     | `Type_HO` | `B`/`P` → Bachelor, `M` → Master, **`A` → Associate degree**, `O` → Onbekend. |
     | `Studiejaar` | → `Collegejaar`. |
     | `Herkomst` | `N`/`E`/`R`/`O` → `NL`/`EER`/`Niet-EER`/`Onbekend`. |

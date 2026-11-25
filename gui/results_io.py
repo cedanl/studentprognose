@@ -13,6 +13,8 @@ import os
 
 import pandas as pd
 
+from studentprognose.data.programme_names import load_programme_names, programme_label
+
 #: Leesbare namen voor de voorspelkolommen in de output. Een nieuwe gebruiker
 #: herkent "Ratio-model" wel, maar "Prognose_ratio" niet (#322).
 MODEL_LABELS = {
@@ -51,6 +53,8 @@ _MAE_PREFIX = "MAE_"
 _MAPE_PREFIX = "MAPE_"
 
 PROGRAMME_COL = "Croho groepeernaam"
+#: Leesbare naam naast de sleutel in de uitvoer (#326); ontbreekt in oudere uitvoer.
+PROGRAMME_NAME_COL = "Opleidingsnaam"
 
 
 def is_usable_output(path: str) -> bool:
@@ -208,6 +212,7 @@ def programme_rows(df: pd.DataFrame) -> list[dict]:
     rows = prediction_rows(df)
     pred_col = primary_prediction_column(rows)
     mape_col = _pick_mape_for(pred_col)
+    labels = programme_labels(rows)
     records: list[dict] = []
 
     for _, r in rows.iterrows():
@@ -233,6 +238,7 @@ def programme_rows(df: pd.DataFrame) -> list[dict]:
             {
                 **cwf,
                 "opleiding": str(r.get(PROGRAMME_COL, "")),
+                "naam": labels.get(str(r.get(PROGRAMME_COL, "")), str(r.get(PROGRAMME_COL, ""))),
                 "herkomst": str(r.get("Herkomst", "")),
                 "examentype": str(r.get("Examentype", "")),
                 "voorspelling": round(prediction, 1)
@@ -247,6 +253,26 @@ def programme_rows(df: pd.DataFrame) -> list[dict]:
 
     records.sort(key=lambda d: (d["afwijking"] is None, -(d["afwijking"] or 0)))
     return records
+
+
+def programme_labels(df: pd.DataFrame) -> dict[str, str]:
+    """``{sleutel: "naam (code)"}`` voor de opleidingen in een uitvoerframe.
+
+    Gebruikt de kolom ``Opleidingsnaam`` uit de uitvoer; ontbreekt die (oudere
+    uitvoer), dan de meegeleverde DUO-tabel. De sleutel blijft de code.
+    """
+    if PROGRAMME_COL not in df.columns:
+        return {}
+    keys = df[PROGRAMME_COL].dropna().astype(str).unique()
+    if PROGRAMME_NAME_COL in df.columns:
+        pairs = df[[PROGRAMME_COL, PROGRAMME_NAME_COL]].dropna().drop_duplicates(PROGRAMME_COL)
+        names = {}
+        for key, name in zip(pairs[PROGRAMME_COL].astype(str), pairs[PROGRAMME_NAME_COL]):
+            if key.isdigit() and str(name) != key:
+                names[int(key)] = str(name)
+    else:
+        names = load_programme_names()
+    return {k: programme_label(k, names) for k in keys}
 
 
 def _pick_mape_for(pred_col: str | None) -> str | None:
@@ -288,6 +314,13 @@ def audit_diff(totaal: pd.DataFrame, *, shift_threshold: float = 0.10) -> dict:
         return sub.set_index(key_cols)[pred_col]
 
     prev_s, curr_s = _anchor(prev), _anchor(curr)
+    labels = programme_labels(totaal)
+
+    def _key_str(idx) -> str:
+        parts = idx if isinstance(idx, tuple) else (idx,)
+        return " · ".join(
+            labels.get(str(x), str(x)) if i == 0 else str(x) for i, x in enumerate(parts)
+        )
 
     new_keys = set(map(_key_str, curr_s.index)) - set(map(_key_str, prev_s.index))
     shifts = []

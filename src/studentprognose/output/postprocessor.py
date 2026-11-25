@@ -12,6 +12,13 @@ from studentprognose.utils.constants import FINAL_ACADEMIC_WEEK, LOOKBACK_YEARS
 from studentprognose.utils.programme_key import merge_on_programme_key
 from studentprognose.models.ratio import predict_with_ratio as _predict_with_ratio
 from studentprognose.data.transforms import replace_latest_data
+from studentprognose.data.programme_names import (
+    load_programme_names,
+    programme_name_column,
+)
+
+# Leesbare opleidingsnaam naast de programmesleutel in de uitvoerbestanden (#326).
+PROGRAMME_NAME_COLUMN = "Opleidingsnaam"
 
 # Outputkolommen van het CWF-spoor (zie strategies/cwf.py). Hier gedupliceerd
 # i.p.v. geïmporteerd om een circulaire import (strategies → postprocessor) te
@@ -116,6 +123,13 @@ class PostProcessor:
             "default":           {"individual": 0.5, "cumulative": 0.5},
         })
         self._column_roles = configuration.get("column_roles", {})
+        # Opzoektabel code -> naam voor de uitvoer. De pipeline zet hem met de
+        # eigen namen van de instelling (zie main._run_pipeline_strategy); anders
+        # wordt bij het schrijven de DUO-tabel geladen.
+        self.programme_names: dict[int, str] | None = None
+        self._programme_names_path = configuration.get("paths", {}).get(
+            "path_programme_names", ""
+        )
         self.CWD = cwd
         self.data_option = data_option
         self.ci_test_n = ci_test_n
@@ -277,6 +291,25 @@ class PostProcessor:
                 how="left",
             )
 
+    def _with_programme_names(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Kopie van ``df`` met kolom ``Opleidingsnaam`` direct na de programmesleutel.
+
+        Alleen voor het wegschrijven: ``self.data`` zelf krijgt de kolom niet, zodat
+        merges en berekeningen ongewijzigd blijven. De sleutel blijft de code.
+        """
+        programme_col = self._column_roles.get("programme", "Croho groepeernaam")
+        if programme_col not in df.columns:
+            return df
+        if self.programme_names is None:
+            self.programme_names = load_programme_names(self._programme_names_path)
+        out = df.drop(columns=[PROGRAMME_NAME_COLUMN], errors="ignore")
+        out.insert(
+            out.columns.get_loc(programme_col) + 1,
+            PROGRAMME_NAME_COLUMN,
+            programme_name_column(out[programme_col], self.programme_names),
+        )
+        return out
+
     def save_output_prelim(self):
         """Schrijf het voorlopige tussenresultaat naar
         ``data/output/output_prelim_<modus>.xlsx``.
@@ -296,7 +329,7 @@ class PostProcessor:
             "output",
             f"output_prelim_{self.data_option.filename_suffix}{ci_suffix}.xlsx",
         )
-        write_excel_atomic(self.data, output_path)
+        write_excel_atomic(self._with_programme_names(self.data), output_path)
 
     def predict_with_ratio(self, data_cumulative, predict_year):
         self.data = _predict_with_ratio(
@@ -549,7 +582,7 @@ class PostProcessor:
             ignore_index=True,
         )
 
-        write_excel_atomic(self.data, output_path)
+        write_excel_atomic(self._with_programme_names(self.data), output_path)
 
     # Sleutel- en sorteer-volgorde van de audittrail, uitgedrukt in
     # column_roles. De concrete kolomnamen verschillen per instelling
@@ -620,4 +653,5 @@ class PostProcessor:
         norm_key = combined[key_cols].astype(str)
         combined = combined[~norm_key.duplicated(keep="last")].reset_index(drop=True)
         combined = combined.sort_values(by=sort_cols, ignore_index=True)
-        write_excel_atomic(combined, path)
+        # Naam opnieuw afleiden voor alle rijen, ook die uit eerdere runs.
+        write_excel_atomic(self._with_programme_names(combined), path)

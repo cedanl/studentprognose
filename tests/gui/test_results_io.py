@@ -161,3 +161,45 @@ def test_model_label_readable_names():
     assert results_io.model_label("SARIMA_cumulative") == "Cumulatief (SARIMA)"
     assert results_io.model_label("Onbekend_model") == "Onbekend_model"
     assert results_io.model_label(None) == ""
+
+
+def test_programme_rows_show_name_from_output_column():
+    df = pd.DataFrame(
+        {
+            "Croho groepeernaam": [56604, 11111],
+            "Opleidingsnaam": ["B Psychologie", None],
+            "Herkomst": ["NL", "NL"],
+            "Examentype": ["Bachelor", "Bachelor"],
+            "Collegejaar": [2024, 2024],
+            "Weeknummer": [10, 10],
+            "SARIMA_cumulative": [100.0, 50.0],
+        }
+    )
+    rows = {r["opleiding"]: r for r in results_io.programme_rows(df)}
+    assert rows["56604"]["naam"] == "B Psychologie (56604)"
+    assert rows["11111"]["naam"] == "11111"  # geen naam in de uitvoer -> code
+
+
+def test_programme_rows_fall_back_to_duo_for_older_output():
+    df = pd.DataFrame(
+        {
+            "Croho groepeernaam": [59320], "Herkomst": ["NL"], "Examentype": ["Bachelor"],
+            "Collegejaar": [2024], "Weeknummer": [10], "SARIMA_cumulative": [10.0],
+        }
+    )
+    assert results_io.programme_rows(df)[0]["naam"] == "B Security Studies (59320)"
+
+
+def test_programme_rows_keep_legacy_names():
+    rows = results_io.programme_rows(_sample_output())
+    assert {r["naam"] for r in rows} == {"B A", "B B"}
+
+
+def test_audit_diff_labels_programmes_with_names():
+    base = {"Herkomst": ["NL"], "Examentype": ["Bachelor"], "Weeknummer": [10]}
+    run1 = pd.DataFrame({**base, "Croho groepeernaam": [59320], "SARIMA_cumulative": [100.0],
+                         "Run_date": ["2024-01-01"]})
+    run2 = pd.DataFrame({**base, "Croho groepeernaam": [59320], "SARIMA_cumulative": [150.0],
+                         "Run_date": ["2024-01-08"]})
+    diff = results_io.audit_diff(pd.concat([run1, run2], ignore_index=True))
+    assert diff["shifts"][0]["opleiding"].startswith("B Security Studies (59320)")
