@@ -101,6 +101,7 @@ De landelijke Studielink-teldata bevat rijen van **álle** instellingen (elke Br
 - **Type:** lijst van instellingscodes (Brincodes, bijv. `"21PC"`) of leesbare instellingsnamen — precies zoals ze in de kolom `Korte naam instelling` staan.
 - **Standaard (`[]`):** geen filter — **alle instellingen** in de data worden meegenomen. Dit is het backwards-compatibele default-gedrag.
 - Meerdere instellingen: `["21PC", "00IC"]`.
+- In de [GUI](gui.md) kies je precies **één** instelling, op naam (bijv. *Rijksuniversiteit Groningen*); de GUI slaat de Brincode op. De namen komen uit de openbare DUO-lijst *Instellingen hbo en wo*, die met het package wordt meegeleverd. Meerdere instellingen stel je in via het JSON-tabblad of de CLI (`--institution`).
 
 Het filter grijpt aan op **load-tijd**, vóór preprocessing, zodat zowel de training als de voorspelling op de gekozen instelling(en) draaien.
 

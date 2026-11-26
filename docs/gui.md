@@ -80,20 +80,30 @@ De interface leidt je langs vier stappen, in volgorde:
 
 !!! warning "Kies je instelling"
     Telbestanden van Studielink bevatten vaak meerdere instellingen. Kies op het
-    tabblad **Basis** onder *Jouw instelling* je eigen Brincode (meerdere mag).
+    tabblad **Basis** onder *Jouw instelling* je eigen universiteit of hogeschool.
+    Je kiest er precies één, op naam (bijv. *Universiteit van Amsterdam*); je kunt
+    in de lijst typen om te zoeken. In de configuratie wordt de bijbehorende
+    Brincode opgeslagen (`institution_filter: ["21PK"]`). De namen komen uit de
+    openbare DUO-lijst *Instellingen hbo en wo*; staat een code daar niet in, dan
+    zie je de code zelf. Heb je nog geen telbestanden geüpload, dan kies je uit
+    alle instellingen in die DUO-lijst. Wil je meerdere instellingen samen
+    voorspellen, gebruik dan de CLI (`--institution`) of het JSON-tabblad.
     Laat je dit leeg, dan telt de prognose **alle** instellingen in je
     telbestanden bij elkaar op. De **Uitvoeren**-pagina toont bovenaan altijd
-    voor welke instelling(en) je voorspelt, met een waarschuwing als er geen is
+    voor welke instelling je voorspelt, met een waarschuwing als er geen is
     gekozen.
 
-In stap 1 kies je ook de **modus**: *Cumulatief*, *Individueel*, *Beide* of
-*CWF*. *CWF* is gemarkeerd als aanbevolen. De modus bepaalt welke bestanden je moet uploaden. Voor *CWF* zijn dat de
+In stap 1 kies je ook de **modus**. *CWF* staat bovenaan als aanbevolen
+hoofdkeuze en is de standaard. *Cumulatief*, *Individueel* en *Beide* staan
+daaronder gedempt als **legacy-modi**: je kunt ze nog kiezen (bijvoorbeeld om met
+eerdere prognoses te vergelijken), maar voor een nieuwe prognose is CWF het
+uitgangspunt. De modus bepaalt welke bestanden je moet uploaden. Voor *CWF* zijn dat de
 telbestanden en het oktober-bestand; individuele aanmelddata is niet nodig. Op de
 **Uitvoeren**-pagina zie je deze keuze terug in het veld *Dataset*
 (*CWF* = `-d cwf`). Dat veld kun je daar niet wijzigen: de modus kies je op één
 plek, in de wizard, zodat hij altijd past bij de bestanden die je hebt
 geüpload. Met **Wijzigen** ga je terug naar de modus-keuze. Kies je niets, dan
-staat de modus op *Cumulatief*. De **Resultaten**-pagina toont elke opleiding als **naam (code)**, bijv. `B Psychologie (56604)` — zie [Opleidingsnamen](je-data-voorbereiden.md#opleidingsnamen) voor waar de naam vandaan komt. Bij een CWF-run toont de **Resultaten**-pagina per opleiding
+staat de modus op *CWF*. De **Resultaten**-pagina toont elke opleiding als **naam (code)**, bijv. `B Psychologie (56604)` — zie [Opleidingsnamen](je-data-voorbereiden.md#opleidingsnamen) voor waar de naam vandaan komt. Bij een CWF-run toont de **Resultaten**-pagina per opleiding
 ook het predictie-interval en het betrouwbaarheidslabel (Groen/Oranje/Rood); de
 detailgrafiek van een opleiding tekent het interval als foutbalk. Zie
 [CWF-model](methodologie/cwf.md) voor wat de labels betekenen.
@@ -149,10 +159,8 @@ zodat je niet pas na een mislukte run ontdekt dat iets niet kan:
 
 - Bij dataset **CWF** staat *Jaren overslaan* vast op 0: het CWF-model kent
   geen backtest.
-- Cohort **Hogerejaars** werkt alleen als het project eerdere prognoses met
-  realisaties bevat (het bestand uit `paths.path_latest_<modus>`, standaard
-  `data/input/totaal_<modus>.xlsx`), en niet met dataset *Beide*. Ontbreekt dat,
-  dan legt de pagina uit wat er nodig is en start de run niet.
+- Het **cohort** staat vast op *Eerstejaars*; er is geen keuzelijst. Voor
+  hogerejaars of volume gebruik je de CLI (`-sy h` / `-sy v`).
 
 Er is geen vinkje voor de validatieprompt: de GUI draait altijd met `--yes`,
 omdat ze geen vragen kan beantwoorden terwijl de pipeline loopt. Gevonden

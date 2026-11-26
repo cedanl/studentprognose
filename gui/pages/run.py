@@ -18,6 +18,7 @@ from gui.components.progress_card import ProgressCard
 from gui.components.states import empty_state, section_title
 from gui.data_upload import DataYearBounds, scan_data_year_bounds
 from gui.state import STATE
+from studentprognose.data.institution_names import institution_label
 
 #: Sleutel waaronder de laatst gebruikte parameters bewaard worden.
 _STORAGE_KEY = "run_settings"
@@ -35,9 +36,13 @@ def _default_week() -> str:
     return str(datetime.date.today().isocalendar()[1])
 
 
+#: De GUI voorspelt altijd eerstejaars; een cohortkeuze is er bewust niet (#328).
+#: Een oude cohortkeuze in de opgeslagen run-instellingen wordt genegeerd.
+COHORT: str = "Eerstejaars"
+
+
 _DEFAULTS: dict = {
-    "dataset": "Cumulatief",
-    "cohort": "Eerstejaars",
+    "dataset": "CWF",
     "years": [_CURRENT_YEAR],
     "weeks": "38",
     "skip_years": 0,
@@ -328,6 +333,7 @@ class _RunView:
         expliciet zichtbaar vóór de run (#322).
         """
         codes = [str(c) for c in (self._config.get("institution_filter") or [])]
+        names = [institution_label(c) for c in codes]
         color = theme.ACCENT if codes else theme.WARNING
         with ui.row().classes("w-full items-center gap-3 no-wrap mb-4 px-4 py-3").style(
             "background: white; border-radius: 10px; "
@@ -339,15 +345,16 @@ class _RunView:
             ).style(f"color: {color}")
             with ui.column().classes("gap-0 grow"):
                 if codes:
-                    ui.label(f"Instelling: {', '.join(codes)}").classes("font-medium")
+                    ui.label(f"Instelling: {', '.join(names)}").classes("font-medium")
+                    which = "deze instelling" if len(codes) == 1 else "deze instellingen"
                     ui.label(
-                        "De prognose gebruikt alleen de teldata van deze instelling(en)."
+                        f"De prognose gebruikt alleen de teldata van {which}."
                     ).classes("text-sm opacity-60")
                 else:
                     ui.label("Geen instelling gekozen").classes("font-medium")
                     ui.label(
                         "De prognose telt alle instellingen in je telbestanden bij "
-                        "elkaar op. Kies je eigen Brincode in Configuratie › Basis."
+                        "elkaar op. Kies je instelling in Configuratie › Basis."
                     ).classes("text-sm opacity-70")
             if not codes and nav.is_available("/config"):
                 ui.button(
@@ -394,13 +401,12 @@ class _RunView:
                     )
                 )
 
-                # ── Cohort ──────────────────────────────────────────────────
-                self._cohort = ui.select(
-                    ["Eerstejaars", "Hogerejaars", "Volume"],
-                    value=self._settings["cohort"],
-                    label="Cohort",
-                ).classes("w-full")
-                self._cohort.on_value_change(lambda _e: self._update_preview())
+                # ── Cohort: vast eerstejaars, geen keuze (#328) ─────────────
+                with ui.row().classes("w-full items-center gap-2 no-wrap"):
+                    ui.icon("school").style(f"color: {theme.ACCENT}; font-size: 20px;")
+                    with ui.column().classes("gap-0"):
+                        ui.label("Cohort").classes("text-xs opacity-60")
+                        ui.label(COHORT).classes("font-medium")
 
                 # ── Prognosejaren (dropdown + bereik-helper) ─────────────────
                 with ui.column().classes("w-full gap-0"):
@@ -599,7 +605,7 @@ class _RunView:
     def _current_args(self) -> list[str]:
         return process.build_run_args(
             dataset=self._dataset.value,
-            cohort=self._cohort.value,
+            cohort=COHORT,
             years=self._years_as_str(),
             weeks=self._weeks.value or "",
             skip_years=int(self._skip_years.value or 0),
@@ -623,7 +629,7 @@ class _RunView:
     def _conflicts(self) -> list[str]:
         return process.run_conflicts(
             dataset=self._dataset.value,
-            cohort=self._cohort.value,
+            cohort=COHORT,
             skip_years=int(self._skip_years.value or 0),
             project_dir=STATE.project_dir,
             config=self._config,
@@ -692,7 +698,6 @@ class _RunView:
     def _persist(self) -> None:
         app.storage.general[_STORAGE_KEY] = {
             "dataset": self._dataset.value,
-            "cohort": self._cohort.value,
             "years": list(self._years.value or []),
             "weeks": self._weeks.value or "",
             "skip_years": int(self._skip_years.value or 0),

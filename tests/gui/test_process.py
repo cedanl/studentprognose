@@ -196,3 +196,28 @@ def test_higher_years_source_reads_config_paths():
     assert higher_years_source("CWF", _CONFIG) == "data/input/totaal_cwf.xlsx"
     assert higher_years_source("Beide", _CONFIG) is None
     assert higher_years_source("Individueel", {}) is None
+
+
+def test_run_page_defaults_to_cwf_and_fixed_first_years():
+    """Uitvoeren kent geen cohortkeuze meer: altijd eerstejaars (#328)."""
+    from gui.pages import run
+
+    assert run.COHORT == "Eerstejaars"
+    assert "cohort" not in run._DEFAULTS
+    assert run._DEFAULTS["dataset"] == "CWF"
+    from gui.process import build_run_args
+
+    args = build_run_args(dataset="CWF", cohort=run.COHORT)
+    assert args[args.index("-sy") + 1] == "f"
+
+
+def test_wizard_defaults_to_cwf_and_marks_others_legacy():
+    """CWF is de eerste en enige aanbevolen modus; de rest is legacy (#328)."""
+    from gui.pages import wizard
+
+    assert wizard.DEFAULT_MODE == "cwf"
+    assert wizard._MODE_OPTS[0][0] == "cwf"
+    assert [o[0] for o in wizard._MODE_OPTS if o[5]] == ["cwf"]
+    legacy = wizard._mode_card_style(recommended=False, selected=False)
+    assert "opacity" in legacy
+    assert "opacity" not in wizard._mode_card_style(recommended=False, selected=True)
