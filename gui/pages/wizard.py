@@ -187,14 +187,55 @@ _STATUS_VISUAL: dict[FileStatus, tuple[str, str, str]] = {
     FileStatus.ERRORS:   ("error",         theme.NEGATIVE, "Fouten gevonden"),
 }
 
-# Beschikbare pipeline-modi met bijbehorende metadata.
+# Beschikbare pipeline-modi met bijbehorende metadata. De eerste is de
+# aanbevolen hoofdkeuze (CWF); de rest is legacy en wordt gedempt getoond (#328).
 # Tuple: (key, label, icon, cli_flag, beschrijving, aanbevolen)
 _MODE_OPTS: list[tuple[str, str, str, str, str, bool]] = [
+    ("cwf",        "CWF",         "verified",  "-d cwf",
+     "Alleen telbestanden. Prognose met predictie-interval en betrouwbaarheidslabel "
+     "per opleiding.", True),
     ("cumulative", "Cumulatief",  "bar_chart", "-d cumulative", "Alleen telbestanden",       False),
     ("individual", "Individueel", "person",    "-d individual", "Alleen aanmelddata",         False),
     ("both",       "Beide",       "bolt",      "-d both",       "Telbestanden + aanmelddata", False),
-    ("cwf",        "CWF",         "verified",  "-d cwf",        "Telbestanden · met interval", True),
 ]
+
+#: Modus waarmee de wizard opent als er nog niets gekozen is.
+DEFAULT_MODE: str = "cwf"
+
+#: Kleur van gedempte (legacy) modus-kaarten.
+_LEGACY_GREY = "#9e9e9e"
+
+
+def _mode_card_style(recommended: bool, selected: bool) -> str:
+    """CSS voor een modus-kaart: aanbevolen valt op, legacy is gedempt.
+
+    Een gekozen legacy-kaart wordt niet gedempt, zodat altijd zichtbaar is
+    welke modus actief is.
+
+    Args:
+        recommended: Of dit de aanbevolen (CWF-)kaart is.
+        selected: Of deze modus nu gekozen is.
+
+    Returns:
+        Inline-stijl voor de kaart.
+    """
+    accent = theme.ACCENT
+    if recommended:
+        border = accent if selected else f"{accent}66"
+        bg = f"{accent}14" if selected else f"{accent}08"
+        return (
+            f"border-radius: 10px; border: 2px solid {border}; background: {bg}; "
+            "transition: all 0.15s;"
+        )
+    if selected:
+        return (
+            f"border-radius: 8px; border: 2px solid {accent}; background: {accent}0d; "
+            "transition: all 0.15s;"
+        )
+    return (
+        "border-radius: 8px; border: 1px dashed #d0d0d0; background: #fafafa; "
+        "opacity: 0.6; transition: all 0.15s;"
+    )
 
 # Modi die de telbestanden resp. de individuele aanmelddata nodig hebben.
 _TEL_MODES = ("cumulative", "both", "cwf")
@@ -1240,7 +1281,7 @@ class _WizardView:
         # herstart, via de opgeslagen run-dataset (die Uitvoeren toont).
         from gui.pages.run import stored_wizard_mode
 
-        self._mode: str = STATE.wizard_mode or stored_wizard_mode() or "cumulative"
+        self._mode: str = STATE.wizard_mode or stored_wizard_mode() or DEFAULT_MODE
         self._picker = DirectoryPicker(on_select=self._on_dir_selected)
         self._build()
 
@@ -1345,25 +1386,60 @@ class _WizardView:
             ).classes("text-sm opacity-60 mb-3")
 
             self._mode_cards: dict[str, ui.card] = {}
+            self._mode_icons: dict[str, ui.icon] = {}
+            main_opts = [o for o in _MODE_OPTS if o[5]]
+            legacy_opts = [o for o in _MODE_OPTS if not o[5]]
+
+            # Hoofdkeuze: één brede, opvallende CWF-kaart.
+            for key, label, icon, cli_flag, desc, _rec in main_opts:
+                with (
+                    ui.card()
+                    .classes("w-full cursor-pointer px-5 py-4 mb-3")
+                    .style(_mode_card_style(True, False))
+                ) as card:
+                    card.on("click", lambda k=key: self._select_mode(k))
+                    with ui.row().classes("items-center gap-4 no-wrap w-full"):
+                        with ui.element("div").classes(
+                            "w-12 h-12 rounded-xl flex items-center justify-center flex-none"
+                        ).style(f"background: {theme.ACCENT}1f"):
+                            self._mode_icons[key] = ui.icon(icon).style(
+                                f"color: {theme.ACCENT}; font-size: 26px;"
+                            )
+                        with ui.column().classes("gap-0.5 grow"):
+                            with ui.row().classes("items-center gap-2 flex-wrap"):
+                                ui.label(label).classes("text-base font-semibold")
+                                ui.badge("★ Aanbevolen").props("color=accent").classes(
+                                    "text-xs px-2"
+                                )
+                                ui.label(cli_flag).classes("text-xs font-mono opacity-40")
+                            ui.label(desc).classes("text-sm opacity-70")
+                self._mode_cards[key] = card
+
+            # Legacy-modi: klein en gedempt, maar nog wel te kiezen.
+            with ui.row().classes("items-center gap-1.5 mb-1"):
+                ui.icon("history").style(f"color: {_LEGACY_GREY}; font-size: 14px;")
+                ui.label(
+                    "Legacy-modi — alleen nodig om met eerdere prognoses te vergelijken"
+                ).classes("text-xs").style(f"color: {_LEGACY_GREY}")
             with ui.row().classes("w-full gap-3 mb-5"):
-                for key, label, icon, cli_flag, desc, recommended in _MODE_OPTS:
+                for key, label, icon, cli_flag, desc, _rec in legacy_opts:
                     with (
                         ui.card()
-                        .classes("flex-1 cursor-pointer")
-                        .style("border-radius: 8px; border: 2px solid #e8e8e8;")
+                        .classes("flex-1 cursor-pointer py-2")
+                        .style(_mode_card_style(False, False))
                     ) as card:
                         card.on("click", lambda k=key: self._select_mode(k))
-                        with ui.column().classes("items-center text-center gap-1"):
-                            ui.icon(icon).classes("text-3xl").style(
-                                f"color: {theme.ACCENT}"
+                        with ui.column().classes("items-center text-center gap-0.5"):
+                            self._mode_icons[key] = ui.icon(icon).classes("text-xl").style(
+                                f"color: {_LEGACY_GREY}"
                             )
-                            ui.label(label).classes("font-medium text-sm")
+                            with ui.row().classes("items-center gap-1.5"):
+                                ui.label(label).classes("font-medium text-sm")
+                                ui.badge("Legacy").props("color=grey-6 outline").classes(
+                                    "text-xs"
+                                )
                             ui.label(cli_flag).classes("text-xs font-mono opacity-40")
                             ui.label(desc).classes("text-xs opacity-60")
-                            if recommended:
-                                ui.badge("★ Aanbevolen").props(
-                                    "color=accent outline"
-                                ).classes("text-xs mt-1")
                     self._mode_cards[key] = card
 
             # ── Upload-zones ───────────────────────────────────────────────
@@ -1577,14 +1653,13 @@ class _WizardView:
         """Pas kaartrand, zichtbaarheid van zones en badge-teksten aan."""
         STATE.wizard_mode = self._mode
 
+        recommended = {key: rec for key, *_rest, rec in _MODE_OPTS}
         for key, card in self._mode_cards.items():
-            if key == self._mode:
-                card.style(
-                    f"border-radius: 8px; border: 2px solid {theme.ACCENT};"
-                    f"background: {theme.ACCENT}0d;"
-                )
-            else:
-                card.style("border-radius: 8px; border: 2px solid #e8e8e8;")
+            selected = key == self._mode
+            card.style(replace=_mode_card_style(recommended[key], selected))
+            if not recommended[key]:
+                color = theme.ACCENT if selected else _LEGACY_GREY
+                self._mode_icons[key].style(f"color: {color}")
 
         needs_tel = self._mode in _TEL_MODES
         needs_ind = self._mode in _IND_MODES

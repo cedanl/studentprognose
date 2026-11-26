@@ -19,6 +19,11 @@ from gui.components.layout import page_shell
 from gui.components.states import empty_state, error_banner, section_title
 from gui.data_upload import scan_data_year_bounds, selectable_exclusion_years
 from gui.state import STATE
+from studentprognose.data.institution_names import (
+    institution_label,
+    institution_options,
+    load_institution_names,
+)
 
 #: Vertraging (s) waarmee een wijziging naar de auto-save wordt gedebounced, zodat
 #: snel typen niet bij elke toetsaanslag valideert en naar schijf schrijft.
@@ -32,27 +37,20 @@ def _separator_name(sep: str) -> str:
     )
 
 
-def _institution_values(value) -> list[str]:
-    """Normaliseer de waarde van de instellingskiezer naar een lijst codes.
+def _institution_choice(value) -> list[str]:
+    """Zet de keuze van de instellingskiezer om naar ``institution_filter``.
 
-    De kiezer is een multiselect (lijst) of, zonder gedetecteerde codes, een
-    tekstveld waarin meerdere codes komma- of spatiegescheiden mogen staan.
+    De GUI laat precies één instelling kiezen; de config houdt het lijstformaat
+    aan dat de CLI en pipeline verwachten.
 
     Args:
-        value: Lijst, string of ``None``.
+        value: De gekozen Brincode, of ``None``/leeg als niets gekozen is.
 
     Returns:
-        Unieke, niet-lege codes in invoervolgorde.
+        ``[code]`` bij een keuze, anders een lege lijst.
     """
-    if value is None:
-        return []
-    items = value if isinstance(value, list) else str(value).replace(",", " ").split()
-    seen: list[str] = []
-    for item in items:
-        code = str(item).strip()
-        if code and code not in seen:
-            seen.append(code)
-    return seen
+    code = str(value).strip() if value is not None else ""
+    return [code] if code else []
 
 
 def _load_brincodes(project_dir: str) -> list[str]:
@@ -136,9 +134,8 @@ HELP = {
         "maximum afgetopt."
     ),
     "institution_filter": (
-        "Beperk de teldata tot je eigen instelling(en) via Brincode. "
-        "Leeg = alle instellingen. De meeste gebruikers zetten hier hun "
-        "eigen Brincode."
+        "Beperk de teldata tot je eigen instelling. Je kiest op naam; in de "
+        "configuratie wordt de Brincode opgeslagen. Leeg = alle instellingen."
     ),
     "excluded_data_points": (
         "Sluit bekende probleemjaren (bijv. een uitzonderlijk coronajaar) uit de "
@@ -319,6 +316,11 @@ class _ConfigView:
             data_codes = _load_brincodes(project_dir)
         except Exception:
             data_codes = []
+        # Zonder telbestanden: kies uit alle instellingen in de DUO-lijst.
+        choice_codes = data_codes or list(load_institution_names())
+        # Een code uit de config die niet in de lijst staat, blijft kiesbaar.
+        options = institution_options([*current, *choice_codes])
+        selected = current[0] if len(current) == 1 else None
 
         with ui.card().classes("w-full mb-4"):
             with ui.row().classes("items-start gap-4 no-wrap"):
@@ -331,50 +333,47 @@ class _ConfigView:
                         ui.label("Jouw instelling").classes("text-base font-medium")
                         ui.badge("Essentieel").props("color=orange-8").classes("text-xs px-2")
                     ui.label(
-                        "Selecteer je Brincode (meerdere mag). De prognose gebruikt dan "
-                        "alleen de teldata van die instelling(en)."
+                        "Kies je universiteit of hogeschool. De prognose gebruikt dan "
+                        "alleen de teldata van die instelling."
                     ).classes("text-sm opacity-60 mt-1")
 
-                    if data_codes:
-                        extra = [c for c in current if c not in data_codes]
-                        options = [*extra, *data_codes]
-
-                        self._inst_select = (
-                            ui.select(
-                                options=options,
-                                value=current,
-                                label="Selecteer Brincode",
-                                multiple=True,
-                            )
-                            .props("outlined use-input use-chips input-debounce=0 clearable")
-                            .classes("w-full mt-2")
+                    self._inst_select = (
+                        ui.select(
+                            options=options,
+                            value=selected,
+                            label="Selecteer je instelling",
+                            with_input=True,
+                            clearable=True,
                         )
-                        self._inst_select.on_value_change(self._on_institution_change)
+                        .props("outlined input-debounce=0")
+                        .classes("w-full mt-2")
+                    )
+                    self._inst_select.on_value_change(self._on_institution_change)
 
-                        with ui.row().classes("items-center gap-1.5 mt-2"):
+                    with ui.row().classes("items-center gap-1.5 mt-2"):
+                        if data_codes:
                             ui.icon("folder_open").style(
                                 f"color: {theme.INFO}; font-size: 14px;"
                             )
                             ui.label(
                                 f"{len(data_codes)} instelling(en) gevonden in de telbestanden."
                             ).classes("text-xs").style(f"color: {theme.INFO}")
-                    else:
-                        self._inst_select = (
-                            ui.input(
-                                value=", ".join(current),
-                                label="Brincode (bijv. 25DW)",
-                                placeholder="Voer de Brincode in (meerdere: komma-gescheiden)",
-                            )
-                            .props("outlined clearable")
-                            .classes("w-full mt-2")
-                        )
-                        self._inst_select.on_value_change(self._on_institution_change)
-
-                        with ui.row().classes("items-center gap-1.5 mt-2"):
+                        else:
                             ui.icon("info").style("color: #aaa; font-size: 14px;")
                             ui.label(
-                                "Upload telbestanden om de beschikbare Brincodes te detecteren."
+                                "Nog geen telbestanden: je kiest uit alle hogescholen en "
+                                "universiteiten in de DUO-lijst."
                             ).classes("text-xs").style("color: #aaa;")
+
+                    if len(current) > 1:
+                        names = ", ".join(institution_label(c) for c in current)
+                        ui.label(
+                            f"Je configuratie bevat nog meerdere instellingen ({names}). "
+                            "Kies er hierboven één; tot dan blijven deze "
+                            "instellingen ongewijzigd staan."
+                        ).classes("text-xs font-medium mt-1").style(
+                            f"color: {theme.WARNING}"
+                        )
 
                     self._inst_empty_hint = ui.label(
                         "Nog geen instelling gekozen: de prognose telt nu alle "
@@ -1904,7 +1903,7 @@ class _ConfigView:
         return True
 
     def _on_institution_change(self, e) -> None:
-        self._config["institution_filter"] = _institution_values(e.value)
+        self._config["institution_filter"] = _institution_choice(e.value)
         self._inst_empty_hint.set_visibility(not self._config["institution_filter"])
         self._mark_dirty()
 

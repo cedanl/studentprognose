@@ -3,7 +3,7 @@
 import urllib.parse
 
 from gui.components.layout import FEEDBACK_ADDRESS, feedback_mailto
-from gui.pages.config_page import _institution_values
+from gui.pages.config_page import _institution_choice
 
 
 def test_feedback_mailto_contains_address_and_text():
@@ -14,18 +14,14 @@ def test_feedback_mailto_contains_address_and_text():
     assert query["subject"] == ["Feedback Studentprognose-GUI"]
 
 
-def test_institution_values_from_multiselect():
-    assert _institution_values(["21PC", "22OJ", "21PC"]) == ["21PC", "22OJ"]
+def test_institution_choice_single_code():
+    assert _institution_choice("21PK") == ["21PK"]
+    assert _institution_choice(" 28DN ") == ["28DN"]
 
 
-def test_institution_values_from_text_input():
-    assert _institution_values(" 21PC, 22OJ  25DW ") == ["21PC", "22OJ", "25DW"]
-
-
-def test_institution_values_empty():
-    assert _institution_values(None) == []
-    assert _institution_values("") == []
-    assert _institution_values([]) == []
+def test_institution_choice_empty():
+    assert _institution_choice(None) == []
+    assert _institution_choice("") == []
 
 
 def test_separator_name_is_readable():
