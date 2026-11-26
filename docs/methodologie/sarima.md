@@ -10,7 +10,7 @@ SARIMA staat voor **Seasonal AutoRegressive Integrated Moving Average**. Het is 
 
 !!! tip "Uitgebreide versie — Jupyter notebook"
     Wil je het model zien fitten en forecasten op de demodata, inclusief aannames op de testbank?
-    Zie [`notebooks/02_sarima.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/02_sarima.ipynb).
+    Zie [`notebooks/04_sarima.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/04_sarima.ipynb).
 
 ## Wat doet het?
 

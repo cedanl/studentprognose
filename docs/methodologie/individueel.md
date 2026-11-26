@@ -13,7 +13,7 @@ Dit is fundamenteel anders dan het cumulatieve spoor: in plaats van geaggregeerd
 !!! tip "Uitgebreide versie — Jupyter notebook"
     Een uitvoerbare versie van het classifier-deel met feature-engineering stap voor stap
     (lagged features, acceleration, exclusivity ratio) en feature importance op de demodata staat in
-    [`notebooks/03_xgboost.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/03_xgboost.ipynb).
+    [`notebooks/05_xgboost.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/05_xgboost.ipynb).
 
 ## Activeren
 

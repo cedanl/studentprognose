@@ -42,7 +42,7 @@ Zie [Output lezen](output-begrijpen.md) voor uitleg van elk cijfer en wanneer je
 Voor **data-analisten en onderzoekers** bij Nederlandse onderwijsinstellingen. Je hebt géén machine learning-expertise nodig. De focus ligt niet alleen op *hoe* je de tool gebruikt, maar ook op *waarom* het model werkt zoals het werkt — inclusief aannames, beperkingen en wanneer je de output kritisch moet interpreteren.
 
 !!! tip "Liever experimenteren dan lezen?"
-    In [`notebooks/`](https://github.com/cedanl/studentprognose/tree/main/notebooks) staan zeven **uitvoerbare** Jupyter-notebooks die de methodologie stap-voor-stap doorlopen op de demodata — van `00_overzicht.ipynb` tot `06_output_interpreteren.ipynb`. Zie de [notebooks-README](https://github.com/cedanl/studentprognose/blob/main/notebooks/README.md).
+    In [`notebooks/`](https://github.com/cedanl/studentprognose/tree/main/notebooks) staan acht **uitvoerbare** Jupyter-notebooks die de methodologie stap-voor-stap doorlopen op de demodata: `00`–`03` over het aanbevolen CWF-model (van overzicht tot output lezen), `04`–`07` als verdieping op de andere sporen. Zie de [notebooks-README](https://github.com/cedanl/studentprognose/blob/main/notebooks/README.md).
 
 ## In de praktijk
 

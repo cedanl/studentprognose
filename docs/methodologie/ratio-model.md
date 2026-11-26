@@ -10,7 +10,7 @@ Het ratio-model is het eenvoudigste model in de pipeline en dient als **referent
 
 !!! tip "Uitgebreide versie — Jupyter notebook"
     Een uitvoerbare versie waarin we de ratio handmatig stap-voor-stap herberekenen en per week
-    visualiseren staat in [`notebooks/04_ratio_model.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/04_ratio_model.ipynb).
+    visualiseren staat in [`notebooks/06_ratio_model.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/06_ratio_model.ipynb).
 
 ## Wat doet het?
 

@@ -8,7 +8,7 @@ De tool schrijft je resultaten naar `data/output/`. Het belangrijkste bestand is
     - **Wat betekent een getal?** Zie [Kolomdefinities](#kolomdefinities). Onbekende term? Zie [Begrippen](begrippen.md).
 
 !!! tip "Uitgebreide versie — Jupyter notebook"
-    Een uitvoerbare versie die de outputkolommen stap voor stap interpreteert (met MAE/MAPE-voorbeelden en modelvergelijking): [`notebooks/06_output_interpreteren.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/06_output_interpreteren.ipynb).
+    Een uitvoerbare versie die de output van het CWF-model stap voor stap leest (kolommen, interval, betrouwbaarheidslabel en Excel-export): [`notebooks/03_output_interpreteren.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/03_output_interpreteren.ipynb).
 
 ## Outputbestanden
 

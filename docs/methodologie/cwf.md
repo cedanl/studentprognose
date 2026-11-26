@@ -6,6 +6,9 @@
     - **Wees voorzichtig als:** het label Rood is, het nog vroeg in de cyclus is, de opleiding nieuw is of numerus fixus heeft.
     - **Ten opzichte van de andere sporen:** een zelfstandig derde model (`-d cwf`), niet onderdeel van het ensemble. Het heeft alleen telbestanden en studentaantallen nodig.
 
+!!! tip "Uitgebreide versie — Jupyter notebook"
+    Een uitvoerbare versie die het model stap voor stap narekent (pijplijn, vulgraad, ratiofactor, prior, interval, label en een backtest over meerdere jaren) staat in [`notebooks/02_cwf_model.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/02_cwf_model.ipynb).
+
 Het CWF-model is gebaseerd op het model van Radboud Institutional Research (MIT-licentie; zie `NOTICE`). Studentprognose neemt de methode over en maakt hem configureerbaar voor elke instelling.
 
 ## Wat doet het?

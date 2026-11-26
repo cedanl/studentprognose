@@ -36,33 +36,20 @@ def project_root() -> Path:
 # ----------------------------------------------------------------------
 
 def preprocess_cumulative(df: pd.DataFrame) -> pd.DataFrame:
-    """Renames en typecasts zoals ``CumulativeStrategy.preprocess()`` doet.
+    """Bereid de cumulatieve data voor zoals de pipeline dat doet.
 
-    Effect:
-    - ``Type hoger onderwijs`` → ``Examentype``
-    - ``Groepeernaam Croho`` → ``Croho groepeernaam``
-    - Hogerejaars uitsluiten (de pipeline voorspelt alleen eerstejaars)
-    - Cast numerieke kolommen, voeg ``ts`` toe
+    Gebruikt dezelfde functie als het cumulatieve spoor
+    (``prepare_cumulative_data``): kolommen hernoemen, alleen eerstejaars, de
+    programmasleutel als Isatcode (getal) en optellen over instellingen tot één
+    rij per opleiding × herkomst × examentype × jaar × week. Daarna komt de
+    kolom ``ts`` erbij (gewogen vooraanmelders + inschrijvingen), de reeks die
+    SARIMA voorspelt.
     """
-    df = df.copy()
-    for col in (
-        "Gewogen vooraanmelders",
-        "Ongewogen vooraanmelders",
-        "Aantal aanmelders met 1 aanmelding",
-        "Inschrijvingen",
-    ):
-        if pd.api.types.is_string_dtype(df[col].dtype):
-            df[col] = df[col].str.replace(".", "").str.replace(",", ".")
-        df[col] = pd.to_numeric(df[col], errors="coerce").astype("float64")
+    from studentprognose.strategies.cumulative import prepare_cumulative_data
 
-    df = df.rename(columns={
-        "Type hoger onderwijs": "Examentype",
-        "Groepeernaam Croho": "Croho groepeernaam",
-    })
-    df = df[df["Hogerejaars"] == "Nee"].copy()
+    df = prepare_cumulative_data(df.copy())
     df["ts"] = df["Gewogen vooraanmelders"].fillna(0) + df["Inschrijvingen"].fillna(0)
-    df = df.astype({"Weeknummer": "int32", "Collegejaar": "int32"})
-    return df
+    return df.astype({"Weeknummer": "int32", "Collegejaar": "int32"})
 
 
 def load_cumulative(preprocessed: bool = True):
@@ -83,23 +70,63 @@ def load_cumulative(preprocessed: bool = True):
     return data_cum, sc, raw
 
 
+INDIVIDUEEL_PADEN = (
+    Path("data/input/vooraanmeldingen_individueel.csv"),
+    Path("data/input_raw/individuele_aanmelddata.csv"),
+)
+
+
 def load_individueel(n_sample: int | None = 5000, seed: int = 42):
-    """Laad een sample van de individuele aanmelddata, hernoem kolommen kanoniek.
+    """Laad (een sample van) de individuele aanmelddata.
+
+    Zoekt eerst de ETL-output (``data/input/vooraanmeldingen_individueel.csv``)
+    en anders de ruwe demodata die ``studentprognose init`` downloadt
+    (``data/input_raw/individuele_aanmelddata.csv``).
 
     Args:
         n_sample: aantal rijen om te samplen (None = volledig bestand).
         seed: random_state voor reproduceerbaarheid.
 
     Returns:
-        DataFrame met kanonieke kolomnamen, of ``None`` als het bestand ontbreekt.
+        DataFrame met de individuele aanmeldingen, of ``None`` als geen van
+        beide bestanden bestaat.
     """
-    path = Path("data/input/vooraanmeldingen_individueel.csv")
-    if not path.exists():
+    path = next((p for p in INDIVIDUEEL_PADEN if p.exists()), None)
+    if path is None:
         return None
-    df = pd.read_csv(path, sep=";", skiprows=[1], low_memory=False)
+    df = pd.read_csv(path, sep=";", low_memory=False)
     if n_sample is not None and len(df) > n_sample:
         df = df.sample(n=n_sample, random_state=seed).reset_index(drop=True)
     return df
+
+
+def opleidingsnamen() -> dict[int, str]:
+    """Opzoektabel Isatcode → officiële opleidingsnaam (meegeleverde DUO-tabel)."""
+    from studentprognose.data.programme_names import load_programme_names
+
+    return load_programme_names()
+
+
+def label(code, namen: dict | None = None, max_len: int = 40) -> str:
+    """Leesbaar label voor een opleiding: ``"56604 B Psychologie"``."""
+    namen = opleidingsnamen() if namen is None else namen
+    naam = namen.get(code, "") if not isinstance(code, str) else ""
+    return f"{code} {naam}".strip()[:max_len]
+
+
+def grootste_opleidingen(
+    data_studentcount: pd.DataFrame, n: int = 15, examentype: str | None = None
+) -> list:
+    """De ``n`` opleidingen met de grootste instroom in het laatste jaar met realisatie.
+
+    Handig om zware runs (het cumulatieve spoor) in een notebook te beperken.
+    """
+    sc = data_studentcount
+    if examentype is not None:
+        sc = sc[sc["Examentype"] == examentype]
+    laatste = sc[sc["Collegejaar"] == sc["Collegejaar"].max()]
+    totaal = laatste.groupby("Croho groepeernaam")["Aantal_studenten"].sum()
+    return [int(c) for c in totaal.nlargest(n).index]
 
 
 # ----------------------------------------------------------------------
