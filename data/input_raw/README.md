@@ -28,3 +28,15 @@ individuele_aanmelddata.csv ──► copy ────────────�
 ```
 
 De ETL draait standaard bij het starten van de pipeline. Overslaan met `--noetl`.
+
+## Alle herkomsten per opleiding
+
+In de demodata heeft elke opleiding in elke week en elk jaar rijen voor alle drie de herkomsten (NL, EER, Niet-EER), zowel in de telbestanden als in het oktober-bestand. Zo toont het dashboard voor elke opleiding een uitsplitsing per herkomst.
+
+Die aanvulling komt uit [`scripts/fill_missing_origins.py`](../../scripts/fill_missing_origins.py). Ontbreekt een herkomst in een week, dan kopieert het script de rijen van een herkomst die er wel is. De aantallen schaalt het met de verhouding tussen beide herkomsten die in dezelfde opleiding al voorkomt. Bestaande rijen blijven ongewijzigd, en een tweede run voegt niets toe:
+
+```bash
+uv run python scripts/fill_missing_origins.py
+```
+
+In echte data komt een herkomst zonder aanmelders of inschrijvingen gewoon niet voor. Daar kan een opleiding dus terecht maar één of twee herkomsten hebben.

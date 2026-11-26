@@ -150,11 +150,13 @@ rm -f data/output/output_prelim_cumulatief.xlsx
 FILTER_LOG="$(uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution 21PC)"
 [ -f data/output/output_prelim_cumulatief.xlsx ] || { echo "FOUT: output ontbreekt na --institution run"; exit 1; }
 # De run moet de gebruiker informeren waarvoor er gerekend wordt.
-echo "$FILTER_LOG" | grep -q "Instellingsfilter actief: 21PC" \
+# Here-string i.p.v. `echo | grep -q`: met pipefail geeft een vroeg stoppende
+# grep -q een SIGPIPE aan echo zodra de log groter is dan de pipe-buffer.
+grep -q "Instellingsfilter actief: 21PC" <<< "$FILTER_LOG" \
     || { echo "FOUT: scope-melding voor actief filter niet gevonden"; echo "$FILTER_LOG" | tail -n 20; exit 1; }
 # Zonder filter moet de tool expliciet melden dat álle instellingen meedraaien.
 NOFILTER_LOG="$(uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes)"
-echo "$NOFILTER_LOG" | grep -q "Instellingsfilter: geen — alle" \
+grep -q "Instellingsfilter: geen — alle" <<< "$NOFILTER_LOG" \
     || { echo "FOUT: scope-melding voor 'geen filter' niet gevonden"; echo "$NOFILTER_LOG" | tail -n 20; exit 1; }
 # Een onbekende instelling mag NIET stil een lege pipeline draaien: harde fout.
 if uv run studentprognose -w 6 -y 2024 -d cumulative --noetl --yes --institution ZZZZ 2>/dev/null; then
