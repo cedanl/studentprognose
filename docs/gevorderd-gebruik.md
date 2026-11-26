@@ -10,7 +10,7 @@ Deze pagina bundelt de gevorderde onderwerpen die je **niet** nodig hebt voor ee
 Naast de CLI kun je `studentprognose` ook direct vanuit Python-scripts importeren. Dit is handig voor geautomatiseerde pipelines, notebooks, of cloudworkflows waarbij de data al in-memory beschikbaar is.
 
 !!! tip "Uitvoerbaar voorbeeld — implementatienotebook"
-    Voor een direct inpasbaar startpunt voor MS Fabric, Databricks of Azure: zie [`notebooks/implementatie.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/implementatie.ipynb). Vereist alleen `pip install studentprognose` — geen repo-clone nodig.
+    Voor een direct inpasbaar startpunt voor MS Fabric, Databricks of Azure: zie [`notebooks/implementatie.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/implementatie.ipynb). Het draait standaard het [CWF-model](methodologie/cwf.md); het cumulatieve spoor staat er als alternatief bij. Vereist alleen `pip install studentprognose` — geen repo-clone nodig.
 
 ### Beschikbare bouwstenen
 

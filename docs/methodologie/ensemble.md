@@ -9,8 +9,8 @@
 Het ensemble combineert de voorspellingen van SARIMA, XGBoost en het ratio-model tot één eindvoorspelling. Dit is alleen beschikbaar in de `-d b` (both) modus.
 
 !!! tip "Uitgebreide versie — Jupyter notebook"
-    Een uitvoerbare versie die laat zien hoe de gewichten per peilweek doorwerken in een
-    voorspelling staat in [`notebooks/05_ensemble.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/05_ensemble.ipynb).
+    Een uitvoerbare versie die laat zien hoe een gewicht tussen twee modellen doorwerkt in de
+    fout staat in [`notebooks/07_ensemble.ipynb`](https://github.com/cedanl/studentprognose/blob/main/notebooks/07_ensemble.ipynb).
 
 ## Waarom een ensemble?
 
