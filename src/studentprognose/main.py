@@ -29,6 +29,7 @@ from studentprognose.data.range_check import (
     format_cli_range_warning,
 )
 from studentprognose.utils.ci_subset import apply_ci_test_subset
+from studentprognose.utils.programme_key import normalize_programme_keys
 from studentprognose.output.postprocessor import PostProcessor
 from studentprognose.output.dashboard import DashboardBuilder
 from studentprognose.output.validator import run_post_prediction_checks
@@ -540,6 +541,16 @@ def _prepare_in_memory_run(
         configuration = copy.deepcopy(configuration)
         model_config = configuration.setdefault("model_config", {})
         model_config["tune_targets"] = tune_targets
+
+    # Zelfde sleutel-normalisatie als load_configuration() (CLI-pad), zodat een
+    # numerus_fixus-key als tekst ("56604", zoals JSON hem altijd oplevert) de
+    # Int64-programmakolom matcht in plaats van NumerusFixusConfigError (#323).
+    # Ondiepe kopie: de configuration-dict van de aanroeper blijft ongemoeid.
+    if isinstance(configuration.get("numerus_fixus"), dict):
+        configuration = {
+            **configuration,
+            "numerus_fixus": normalize_programme_keys(configuration["numerus_fixus"]),
+        }
 
     final_week = get_final_academic_week(configuration)
     if week == final_week:

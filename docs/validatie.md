@@ -191,6 +191,8 @@ Als een numerus-fixus-sleutel niet exact overeenkomt met een opleiding in je dat
 | Sleutel matcht wel het ene, maar niet het andere geladen spoor | Waarschuwing — bekende naam-versus-Isatcode-verschil tussen de twee sporen |
 | Elke sleutel matcht alle geladen sporen | Check slaagt stilzwijgend |
 
+Of je een code als getal (`56604`) of als tekst (`"56604"`) opgeeft, maakt niet uit — ook niet via de Python-API in een notebook. Een harde stop betekent dus dat de code echt niet in je data voorkomt.
+
 ??? note "Technische achtergrond"
     De check draait direct na het preprocessen op de genormaliseerde, gepreprocesste data, zodat het exacte dtype van de programmakolom (`Croho groepeernaam`) wordt gezien. Een niet-matchende sleutel leverde bij `.isin`/`==` simpelweg `False` op zonder foutmelding (issue #258); het gedeeltelijke-match-geval is de bekende namen-vs-Isatcodes-mismatch uit issue #238.
 
