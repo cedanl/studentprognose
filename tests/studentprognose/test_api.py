@@ -2,6 +2,7 @@
 
 import importlib
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -216,6 +217,58 @@ def test_run_pipeline_from_dataframes_normalizes_programme_key(monkeypatch):
     # De DataFrames van de aanroeper mogen niet in place gemuteerd zijn.
     assert str(df_cum["Groepeernaam Croho"].dtype) != "Int64"
     assert str(label["Croho groepeernaam"].dtype) != "Int64"
+
+
+@pytest.mark.parametrize("nf_key", ["56604", " 56604 ", 56604, 56604.0, np.float64(56604)])
+def test_run_pipeline_from_dataframes_normalizes_numerus_fixus_keys(monkeypatch, nf_key):
+    """Regressie #323: een numerus_fixus-key als tekst ("56604", zoals JSON hem
+    oplevert) moet in de in-memory route net zo werken als in de CLI. Zonder
+    normalisatie bleef de key str terwijl de data Int64 werd, en stopte de
+    NF-guard met NumerusFixusConfigError."""
+    import studentprognose.main as main_mod
+    from studentprognose import run_pipeline_from_dataframes, DataOption
+    from studentprognose.config import load_defaults
+
+    captured = {}
+
+    def _fake_core(cfg, datasets, configuration, filtering, cwd, save_output=True):
+        captured["configuration"] = configuration
+        captured["datasets"] = datasets
+        return None
+
+    monkeypatch.setattr(main_mod, "_run_pipeline_core", _fake_core)
+
+    df_cum = pd.DataFrame({
+        "Collegejaar": [2024], "Weeknummer": [10],
+        "Groepeernaam Croho": [56604],
+    })
+    label = pd.DataFrame({
+        "Collegejaar": [2024], "Herkomst": ["NL"], "Examentype": ["Bachelor"],
+        "Croho groepeernaam": [56604], "Aantal_studenten": [120],
+    })
+    config = load_defaults()
+    config["numerus_fixus"] = {nf_key: 340}
+
+    run_pipeline_from_dataframes(
+        year=2024, week=10,
+        data_cumulative=df_cum, data_student_numbers=label,
+        dataset=DataOption.CUMULATIVE, configuration=config,
+        save_output=False,
+    )
+
+    assert captured["configuration"]["numerus_fixus"] == {56604: 340}
+    # De config-dict van de aanroeper mag niet gemuteerd zijn.
+    assert config["numerus_fixus"] == {nf_key: 340}
+
+    # End-to-end met de echte guard: de genormaliseerde key matcht de
+    # genormaliseerde programmakolom, dus geen NumerusFixusConfigError.
+    from studentprognose.data.nf_validation import enforce_numerus_fixus_keys
+
+    _, cum, _, _, _ = captured["datasets"]
+    enforce_numerus_fixus_keys(
+        captured["configuration"]["numerus_fixus"],
+        {"cumulatief": cum["Groepeernaam Croho"]},
+    )
 
 
 def test_all_exports_present():

@@ -14,6 +14,7 @@ Dezelfde regel wordt toegepast op de config-zijde van elke vergelijking
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
 
 
@@ -47,6 +48,10 @@ def normalize_programme_value(value):
     """
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return value
+    # Een float zonder decimalen (56604.0, bijv. uit een kolom met lege cellen)
+    # is een Isatcode; str() zou er "56604.0" van maken en int() laten falen.
+    if isinstance(value, (float, np.floating)) and float(value).is_integer():
+        return int(value)
     text = str(value).strip()
     try:
         return int(text)

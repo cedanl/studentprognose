@@ -77,7 +77,7 @@ Als de gesommeerde voorspelling het maximum overschrijdt, wordt het overschot af
     - **Cumulatief spoor** — de programmakolom bevat sinds de Isatcode-migratie de numerieke **Isatcode** (CROHO-code, bijv. `56604`). Gebruik dan de Isatcode als sleutel.
     - **Individueel spoor / legacy** — de programmakolom bevat de **leesbare opleidingsnaam** (bijv. `"B Geneeskunde"`). Gebruik dan de naam als sleutel.
 
-    Het dtype maakt niet uit: een numerieke sleutel wordt automatisch als getal geïnterpreteerd (`"56604"` en `56604` zijn equivalent). JSON kent geen inline-commentaar, dus noteer de leesbare naam bij voorkeur in je eigen documentatie of changelog naast de Isatcode.
+    Het dtype maakt niet uit: een numerieke sleutel wordt automatisch als getal geïnterpreteerd (`"56604"` en `56604` zijn equivalent). Dat geldt zowel voor de CLI als voor de Python-API (`run_pipeline_from_dataframes`, bijvoorbeeld in een notebook). JSON kent geen inline-commentaar, dus noteer de leesbare naam bij voorkeur in je eigen documentatie of changelog naast de Isatcode.
 
 !!! tip "In de grafische interface kies je de sleutel uit een keuzelijst"
     Werk je via de [grafische interface](gui.md), dan biedt de tab **Geavanceerd** zowel bij *Numerus fixus → Programmasleutel* als bij *Filteren → Opleidingen* een zoekbare keuzelijst met de Isatcodes uit je data (met de opleidingsnaam erachter waar bekend). Je kunt op Isatcode of naam zoeken; de opgeslagen waarde is altijd de Isatcode. Een code die nog niet in je data zit kun je ook handmatig typen en toevoegen.
