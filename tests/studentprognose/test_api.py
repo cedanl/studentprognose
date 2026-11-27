@@ -2,6 +2,7 @@
 
 import importlib
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -218,7 +219,7 @@ def test_run_pipeline_from_dataframes_normalizes_programme_key(monkeypatch):
     assert str(label["Croho groepeernaam"].dtype) != "Int64"
 
 
-@pytest.mark.parametrize("nf_key", ["56604", " 56604 ", 56604])
+@pytest.mark.parametrize("nf_key", ["56604", " 56604 ", 56604, 56604.0, np.float64(56604)])
 def test_run_pipeline_from_dataframes_normalizes_numerus_fixus_keys(monkeypatch, nf_key):
     """Regressie #323: een numerus_fixus-key als tekst ("56604", zoals JSON hem
     oplevert) moet in de in-memory route net zo werken als in de CLI. Zonder
